@@ -175,19 +175,43 @@ defmodule EspresoWeb.MenuLiveTest do
     assert html =~ "₱120"
   end
 
+  test "/menu keeps sticky category anchors", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+
+    assert has_element?(view, "a.menu-nav-link[href='#category-HOT']", "HOT")
+    assert has_element?(view, "#category-HOT")
+  end
+
+  test "/menu renders product description only when present", %{conn: conn, hot: hot} do
+    insert_product!(hot, "Spanish Latte", true, [{"8oz", "160"}], "Rich and creamy")
+
+    {:ok, view, html} = live(conn, ~p"/menu")
+
+    assert has_element?(view, ".menu-product-description", "Rich and creamy")
+    refute html =~ ~r/Espresso<\/h4>\s*<p class="menu-product-description"/
+  end
+
+  test "/menu prepares CoffeeSpot image slots", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+
+    assert has_element?(view, ~s([data-image-slot="menu-hero"]))
+    assert has_element?(view, ~s([data-image-slot="menu-drink-01"]))
+  end
+
   defp insert_category!(name) do
     %Category{}
     |> Category.changeset(%{name: name})
     |> Repo.insert!()
   end
 
-  defp insert_product!(category, name, available, prices) do
+  defp insert_product!(category, name, available, prices, description \\ nil) do
     product =
       %Product{}
       |> Product.changeset(%{
         name: name,
         category_id: category.id,
-        available: available
+        available: available,
+        description: description
       })
       |> Repo.insert!()
 

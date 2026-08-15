@@ -20,9 +20,16 @@ defmodule EspresoWeb.MenuLive do
       <div class="menu-atmosphere" aria-hidden="true"></div>
 
       <header class="menu-header">
-        <p class="menu-brand">CoffeeSpot</p>
-        <p class="menu-location">Lilac Marikina</p>
-        <p class="menu-tagline">Hot · Cold · Frappe · Soda · Food</p>
+        <div class="menu-header-copy">
+          <p class="menu-brand">CoffeeSpot</p>
+          <p class="menu-location">Lilac Marikina</p>
+          <p class="menu-tagline">Hot · Cold · Frappe · Soda · Food</p>
+        </div>
+
+        <figure class="menu-media menu-media-hero" data-image-slot="menu-hero">
+          <div class="menu-media-frame" role="img" aria-label="CoffeeSpot menu photo coming soon"></div>
+          <figcaption class="menu-media-caption">Photo coming soon</figcaption>
+        </figure>
       </header>
 
       <nav class="menu-nav" aria-label="Menu categories">
@@ -36,31 +43,55 @@ defmodule EspresoWeb.MenuLive do
       </nav>
 
       <main class="menu-main">
-        <section :for={category <- @categories} class="menu-category" id={"category-#{category.name}"}>
-          <h2 class="menu-category-title">{category.name}</h2>
+        <div :for={category <- @categories}>
+          <section class="menu-category" id={"category-#{category.name}"}>
+            <h2 class="menu-category-title">{category.name}</h2>
 
-          <div class="menu-groups">
-            <div :for={group <- category.groups} class="menu-subgroup">
-              <h3 :if={group.name} class="menu-subgroup-title">{group.name}</h3>
+            <div class="menu-groups">
+              <div :for={group <- category.groups} class="menu-subgroup">
+                <h3 :if={group.name} class="menu-subgroup-title">{group.name}</h3>
 
-              <ul class="menu-product-list">
-                <li :for={product <- group.products} class="menu-product">
-                  <h4 class="menu-product-name">{product.name}</h4>
+                <ul class="menu-product-list">
+                  <li :for={product <- group.products} class="menu-product">
+                    <h4 class="menu-product-name">{product.name}</h4>
 
-                  <ul class="menu-price-list">
-                    <li :for={price <- product.product_prices} class="menu-price">
-                      <span :if={price.size} class="menu-size">{price.size}</span>
-                      <span :if={price.size} class="menu-price-rule" aria-hidden="true"></span>
-                      <span class={["menu-amount", !price.size && "menu-amount-only"]}>
-                        {Menu.format_price(price.price)}
-                      </span>
-                    </li>
-                  </ul>
-                </li>
-              </ul>
+                    <p :if={description?(product.description)} class="menu-product-description">
+                      {product.description}
+                    </p>
+
+                    <ul class="menu-price-list">
+                      <li :for={price <- product.product_prices} class="menu-price">
+                        <span :if={price.size} class="menu-size">{price.size}</span>
+                        <span :if={price.size} class="menu-price-rule" aria-hidden="true"></span>
+                        <span class={["menu-amount", !price.size && "menu-amount-only"]}>
+                          {Menu.format_price(price.price)}
+                        </span>
+                      </li>
+                    </ul>
+                  </li>
+                </ul>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+
+          <figure
+            :if={category.name == "COLD"}
+            class="menu-media menu-media-moment"
+            data-image-slot="menu-drink-01"
+          >
+            <div class="menu-media-frame" role="img" aria-label="CoffeeSpot drink photo coming soon"></div>
+            <figcaption class="menu-media-caption">Photo coming soon</figcaption>
+          </figure>
+
+          <figure
+            :if={category.name == "FOOD"}
+            class="menu-media menu-media-moment"
+            data-image-slot="menu-food-01"
+          >
+            <div class="menu-media-frame" role="img" aria-label="CoffeeSpot food photo coming soon"></div>
+            <figcaption class="menu-media-caption">Photo coming soon</figcaption>
+          </figure>
+        </div>
       </main>
 
       <footer class="menu-footer">
@@ -69,4 +100,10 @@ defmodule EspresoWeb.MenuLive do
     </div>
     """
   end
+
+  defp description?(description) when is_binary(description) do
+    String.trim(description) != ""
+  end
+
+  defp description?(_description), do: false
 end
