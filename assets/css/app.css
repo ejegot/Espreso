@@ -2,4 +2,322 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
-/* This file is for your main application CSS */
+/* CoffeeSpot – Lilac Marikina customer menu */
+html {
+  --menu-sticky-offset: 5rem;
+  scroll-padding-top: var(--menu-sticky-offset);
+}
+
+.menu-page {
+  --menu-espresso: #2b1810;
+  --menu-ink: #3f2a1f;
+  --menu-muted: #7a5c48;
+  --menu-paper: #f3ebe3;
+  --menu-latte: #e8d8c8;
+  --menu-mocha: #6b422e;
+  --menu-roast: #8b5a3c;
+  --menu-foam: #fff8f1;
+  --menu-line: rgba(43, 24, 16, 0.14);
+
+  position: relative;
+  min-height: 100vh;
+  color: var(--menu-ink);
+  background:
+    radial-gradient(ellipse 100% 60% at 50% -5%, rgba(139, 90, 60, 0.18), transparent 50%),
+    linear-gradient(180deg, var(--menu-foam) 0%, var(--menu-paper) 42%, var(--menu-latte) 100%);
+  font-family: "Figtree", sans-serif;
+  /* clip avoids horizontal bleed without breaking position:sticky (unlike hidden) */
+  overflow-x: clip;
+}
+
+.menu-atmosphere {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 10% 12%, rgba(107, 66, 46, 0.1), transparent 30%),
+    radial-gradient(circle at 90% 6%, rgba(139, 90, 60, 0.12), transparent 26%),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 3px,
+      rgba(43, 24, 16, 0.015) 3px,
+      rgba(43, 24, 16, 0.015) 4px
+    );
+  animation: menu-glow 12s ease-in-out infinite alternate;
+}
+
+.menu-header {
+  position: relative;
+  z-index: 1;
+  padding: 2rem 1.15rem 1.1rem;
+  text-align: center;
+}
+
+.menu-brand {
+  margin: 0;
+  color: var(--menu-espresso);
+  font-family: "Fraunces", serif;
+  font-size: clamp(2.6rem, 11vw, 3.75rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 0.95;
+  animation: menu-rise 0.65s ease-out both;
+}
+
+.menu-location {
+  margin: 0.55rem 0 0;
+  color: var(--menu-mocha);
+  font-family: "Fraunces", serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  animation: menu-rise 0.65s ease-out 0.08s both;
+}
+
+.menu-tagline {
+  margin: 0.45rem 0 0;
+  color: var(--menu-muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  animation: menu-rise 0.65s ease-out 0.14s both;
+}
+
+.menu-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 0.65rem 1.15rem;
+  background: rgba(255, 248, 241, 0.92);
+  backdrop-filter: blur(10px);
+  border-block: 1px solid var(--menu-line);
+  /* opacity-only: transform animations break position:sticky */
+  animation: menu-fade 0.65s ease-out 0.18s both;
+}
+
+.menu-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.menu-nav-link {
+  flex: 0 0 auto;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid rgba(107, 66, 46, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--menu-mocha);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.menu-nav-link:hover,
+.menu-nav-link:focus-visible {
+  background: var(--menu-mocha);
+  border-color: var(--menu-mocha);
+  color: var(--menu-foam);
+  outline: none;
+}
+
+.menu-main {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 28rem);
+  margin: 0 auto;
+  padding: 0.35rem 1.15rem 2.5rem;
+}
+
+.menu-category {
+  margin-top: 1.35rem;
+  padding: 1rem 0.95rem 0.85rem;
+  border: 1px solid var(--menu-line);
+  border-radius: 1rem;
+  background: rgba(255, 252, 248, 0.72);
+  box-shadow: 0 10px 28px rgba(43, 24, 16, 0.05);
+  scroll-margin-top: var(--menu-sticky-offset);
+  animation: menu-rise 0.6s ease-out both;
+}
+
+.menu-category:nth-child(1) { animation-delay: 0.16s; }
+.menu-category:nth-child(2) { animation-delay: 0.2s; }
+.menu-category:nth-child(3) { animation-delay: 0.24s; }
+.menu-category:nth-child(4) { animation-delay: 0.28s; }
+.menu-category:nth-child(5) { animation-delay: 0.32s; }
+
+.menu-category-title {
+  margin: 0 0 0.65rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 2px solid rgba(107, 66, 46, 0.2);
+  color: var(--menu-mocha);
+  font-family: "Fraunces", serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-align: center;
+}
+
+.menu-groups {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.menu-subgroup-title {
+  margin: 0 0 0.2rem;
+  color: var(--menu-roast);
+  font-family: "Fraunces", serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-align: left;
+}
+
+.menu-empty {
+  color: var(--menu-muted);
+  font-size: 0.92rem;
+  font-style: italic;
+  text-align: center;
+  padding: 0.45rem 0 0.2rem;
+}
+
+.menu-product-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.menu-product {
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--menu-line);
+}
+
+.menu-product:last-child {
+  border-bottom: 0;
+  padding-bottom: 0.15rem;
+}
+
+.menu-product-name {
+  margin: 0;
+  color: var(--menu-espresso);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.menu-price-list {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.22rem;
+}
+
+.menu-price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  min-height: 1.25rem;
+  color: var(--menu-muted);
+  font-size: 0.9rem;
+}
+
+.menu-size {
+  flex: 0 0 auto;
+  min-width: 2.5rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.menu-price-rule {
+  flex: 1 1 auto;
+  border-bottom: 1px dotted rgba(122, 92, 72, 0.5);
+  transform: translateY(-0.18rem);
+}
+
+.menu-amount {
+  flex: 0 0 auto;
+  color: var(--menu-roast);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.menu-amount-only {
+  margin-left: auto;
+}
+
+.menu-footer {
+  position: relative;
+  z-index: 1;
+  padding: 0 1.15rem 2.25rem;
+  text-align: center;
+  color: var(--menu-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}
+
+.menu-footer p {
+  margin: 0;
+}
+
+@keyframes menu-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.55rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes menu-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes menu-glow {
+  from {
+    opacity: 0.75;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (min-width: 640px) {
+  .menu-header {
+    padding: 2.75rem 1.5rem 1.35rem;
+  }
+
+  .menu-nav {
+    justify-content: center;
+    padding-inline: 1.5rem;
+  }
+
+  .menu-main {
+    width: min(100%, 32rem);
+    padding: 0.5rem 1.5rem 3rem;
+  }
+
+  .menu-category {
+    margin-top: 1.5rem;
+    padding: 1.15rem 1.15rem 1rem;
+  }
+
+  .menu-product-name {
+    font-size: 1.05rem;
+  }
+}
