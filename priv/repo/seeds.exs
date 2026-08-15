@@ -9,3 +9,166 @@
 #
 # We recommend using the bang functions (`insert!`, `update!`
 # and so on) as they will fail if something goes wrong.
+
+import Ecto.Query
+
+alias Espreso.Repo
+alias Espreso.Menu.{Category, Product, ProductPrice}
+
+find_or_create_category = fn name ->
+  case Repo.get_by(Category, name: name) do
+    nil ->
+      %Category{}
+      |> Category.changeset(%{name: name})
+      |> Repo.insert!()
+
+    category ->
+      category
+  end
+end
+
+seed_products = fn category, products ->
+  Enum.each(products, fn {product_name, prices} ->
+    product =
+      case Repo.get_by(Product, name: product_name, category_id: category.id) do
+        nil ->
+          %Product{}
+          |> Product.changeset(%{
+            name: product_name,
+            category_id: category.id,
+            available: true
+          })
+          |> Repo.insert!()
+
+        existing_product ->
+          existing_product
+      end
+
+    Enum.each(prices, fn {size, price} ->
+      existing_price =
+        ProductPrice
+        |> where([pp], pp.product_id == ^product.id)
+        |> then(fn query ->
+          if is_nil(size) do
+            where(query, [pp], is_nil(pp.size))
+          else
+            where(query, [pp], pp.size == ^size)
+          end
+        end)
+        |> Repo.one()
+
+      if is_nil(existing_price) do
+        %ProductPrice{}
+        |> ProductPrice.changeset(%{
+          product_id: product.id,
+          size: size,
+          price: Decimal.new(price)
+        })
+        |> Repo.insert!()
+      end
+    end)
+  end)
+end
+
+hot_category = find_or_create_category.("HOT")
+
+hot_products = [
+  {"Espresso", [{nil, "75"}]},
+  {"Double Espresso", [{nil, "85"}]},
+  {"Americano", [{"8oz", "110"}, {"12oz", "120"}]},
+  {"Café Latte", [{"8oz", "150"}, {"12oz", "160"}]},
+  {"Cappuccino", [{"8oz", "160"}, {"12oz", "170"}]},
+  {"Spanish Latte", [{"8oz", "160"}, {"12oz", "170"}]},
+  {"Mocha Latte", [{"8oz", "160"}, {"12oz", "170"}]},
+  {"Caramel Macchiato", [{"8oz", "160"}, {"12oz", "170"}]},
+  {"Butter Scotch", [{"8oz", "160"}, {"12oz", "170"}]},
+  {"Matcha Latte", [{"8oz", "160"}, {"12oz", "170"}]},
+  {"Hot Belagio Chocolate", [{"8oz", "160"}, {"12oz", "170"}]}
+]
+
+seed_products.(hot_category, hot_products)
+
+cold_category = find_or_create_category.("COLD")
+
+cold_products = [
+  {"Americano", [{"16oz", "140"}]},
+  {"Café Latte", [{"16oz", "180"}]},
+  {"Mocha Latte", [{"16oz", "180"}]},
+  {"Hazelnut", [{"16oz", "180"}]},
+  {"Macadamia", [{"16oz", "180"}]},
+  {"Roasted Almond", [{"16oz", "180"}]},
+  {"English Toffee", [{"16oz", "180"}]},
+  {"Caramel Macchiato", [{"16oz", "180"}]},
+  {"Spanish Latte", [{"16oz", "180"}]},
+  {"Butter Scotch", [{"16oz", "180"}]},
+  {"Matcha Caramel", [{"16oz", "180"}]},
+  {"Strawberry Matcha", [{"16oz", "180"}]},
+  {"Choco Berry", [{"16oz", "180"}]}
+]
+
+seed_products.(cold_category, cold_products)
+
+frappe_category = find_or_create_category.("FRAPPE")
+
+frappe_products = [
+  {"Salted Caramel", [{"16oz", "180"}]},
+  {"Mocha", [{"16oz", "180"}]},
+  {"Butter Scotch", [{"16oz", "180"}]},
+  {"Mocha Crumble", [{"16oz", "180"}]},
+  {"Biscoff", [{"16oz", "180"}]},
+  {"Cookies & Cream", [{"16oz", "180"}]},
+  {"Matcha", [{"16oz", "180"}]},
+  {"Double Chocolate", [{"16oz", "180"}]},
+  {"Vanilla Bean Hazelnut", [{"16oz", "180"}]},
+  {"Strawberry", [{"16oz", "180"}]}
+]
+
+seed_products.(frappe_category, frappe_products)
+
+soda_category = find_or_create_category.("SODA")
+
+soda_products = [
+  {"Tropical Passion Fruit", [{"16oz", "120"}]},
+  {"Green Apple Campaign", [{"16oz", "120"}]},
+  {"Minty Peach", [{"16oz", "120"}]},
+  {"Scarlet Berry", [{"16oz", "120"}]},
+  {"Majestic Mango", [{"16oz", "120"}]},
+  {"Peach Berry", [{"16oz", "120"}]},
+  {"Hummingbird", [{"16oz", "120"}]}
+]
+
+seed_products.(soda_category, soda_products)
+
+food_category = find_or_create_category.("FOOD")
+
+food_products = [
+  # Rice Meal
+  {"Chicken Flakes", [{nil, "179"}]},
+  {"Beef Tapa", [{nil, "179"}]},
+  {"Corned Beef", [{nil, "179"}]},
+  {"Spam", [{nil, "179"}]},
+  {"Pork Liempo", [{nil, "249"}]},
+  {"Spam Musubi", [{nil, "75"}]},
+  {"Nugget", [{nil, "179"}]},
+  # Appetizers
+  {"Solo Fries", [{nil, "99"}]},
+  {"Fries w/ Nuggets", [{nil, "199"}]},
+  {"Beef Nachos", [{nil, "249"}]},
+  {"Quesadillas", [{nil, "249"}]},
+  {"Chicken & Chips", [{nil, "150"}]},
+  {"Spam & Chips", [{nil, "150"}]},
+  # Muffins
+  {"BNN Cream Cheese", [{nil, "75"}]},
+  {"BNN Choco Overload", [{nil, "75"}]},
+  {"BNN Biscoff", [{nil, "75"}]},
+  {"Choco Chips", [{nil, "75"}]},
+  {"Red Velvet", [{nil, "75"}]},
+  # Cakes / Breads
+  {"Dark Choco Dream Cake", [{nil, "229"}]},
+  {"Choco Chip Cookies", [{nil, "65"}]},
+  {"BNN Moist Slice", [{nil, "75"}]},
+  {"Choco Moist Slice", [{nil, "75"}]},
+  {"Carrot Moist Slice", [{nil, "75"}]}
+]
+
+seed_products.(food_category, food_products)
