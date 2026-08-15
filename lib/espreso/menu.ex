@@ -10,15 +10,56 @@ defmodule Espreso.Menu do
 
   @category_order ~w(HOT COLD FRAPPE SODA FOOD)
 
+  @food_subcategories [
+    {"Rice Meal",
+     [
+       "Chicken Flakes",
+       "Beef Tapa",
+       "Corned Beef",
+       "Spam",
+       "Pork Liempo",
+       "Spam Musubi",
+       "Nugget"
+     ]},
+    {"Appetizers",
+     [
+       "Solo Fries",
+       "Fries w/ Nuggets",
+       "Beef Nachos",
+       "Quesadillas",
+       "Chicken & Chips",
+       "Spam & Chips"
+     ]},
+    {"Muffins",
+     [
+       "BNN Cream Cheese",
+       "BNN Choco Overload",
+       "BNN Biscoff",
+       "Choco Chips",
+       "Red Velvet"
+     ]},
+    {"Cakes / Breads",
+     [
+       "Dark Choco Dream Cake",
+       "Choco Chip Cookies",
+       "BNN Moist Slice",
+       "Choco Moist Slice",
+       "Carrot Moist Slice"
+     ]}
+  ]
+
   @doc """
-  Returns categories in menu order, each with available products and their prices.
+  Returns categories in menu order, each with available products, prices,
+  and display groups (FOOD is split into subcategories).
   """
   def list_menu do
     Category
     |> preload(products: :product_prices)
     |> Repo.all()
     |> Enum.map(&filter_available_products/1)
+    |> Enum.reject(&(&1.products == []))
     |> Enum.sort_by(&category_position/1)
+    |> Enum.map(&decorate_category/1)
   end
 
   defp filter_available_products(category) do
@@ -35,6 +76,35 @@ defmodule Espreso.Menu do
       end)
 
     %{category | products: products}
+  end
+
+  defp decorate_category(category) do
+    groups =
+      case category.name do
+        "FOOD" -> food_groups(category.products)
+        _other -> [%{name: nil, products: category.products}]
+      end
+
+    %{
+      name: category.name,
+      products: category.products,
+      groups: groups
+    }
+  end
+
+  defp food_groups(products) do
+    products_by_name = Map.new(products, &{&1.name, &1})
+
+    @food_subcategories
+    |> Enum.map(fn {group_name, product_names} ->
+      grouped_products =
+        product_names
+        |> Enum.map(&Map.get(products_by_name, &1))
+        |> Enum.reject(&is_nil/1)
+
+      %{name: group_name, products: grouped_products}
+    end)
+    |> Enum.reject(fn group -> group.products == [] end)
   end
 
   defp category_position(%{name: name}) do

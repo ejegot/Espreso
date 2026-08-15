@@ -11,7 +11,7 @@ defmodule EspresoWeb.MenuLiveTest do
     cold = insert_category!("COLD")
     frappe = insert_category!("FRAPPE")
     soda = insert_category!("SODA")
-    _food = insert_category!("FOOD")
+    food = insert_category!("FOOD")
 
     americano =
       insert_product!(hot, "Americano", true, [
@@ -29,6 +29,7 @@ defmodule EspresoWeb.MenuLiveTest do
     %{
       hot: hot,
       cold: cold,
+      food: food,
       americano: americano,
       espresso: espresso
     }
@@ -50,18 +51,16 @@ defmodule EspresoWeb.MenuLiveTest do
     assert html =~ "COLD"
     assert html =~ "FRAPPE"
     assert html =~ "SODA"
-    assert html =~ "FOOD"
+    refute has_element?(view, "#category-FOOD")
 
     hot_index = :binary.match(html, "HOT") |> elem(0)
     cold_index = :binary.match(html, "COLD") |> elem(0)
     frappe_index = :binary.match(html, "FRAPPE") |> elem(0)
     soda_index = :binary.match(html, "SODA") |> elem(0)
-    food_index = :binary.match(html, "FOOD") |> elem(0)
 
     assert hot_index < cold_index
     assert cold_index < frappe_index
     assert frappe_index < soda_index
-    assert soda_index < food_index
   end
 
   test "/menu displays HOT products", %{conn: conn} do
@@ -89,11 +88,42 @@ defmodule EspresoWeb.MenuLiveTest do
     assert html =~ "Hummingbird"
   end
 
-  test "/menu displays FOOD category even without products", %{conn: conn} do
-    {:ok, view, _html} = live(conn, ~p"/menu")
+  test "/menu does not display empty categories", %{conn: conn} do
+    {:ok, view, html} = live(conn, ~p"/menu")
+
+    refute has_element?(view, "#category-FOOD")
+    refute html =~ "Coming soon"
+  end
+
+  test "/menu groups FOOD products by subcategory", %{conn: conn, food: food} do
+    insert_product!(food, "Chicken Flakes", true, [{nil, "179"}])
+    insert_product!(food, "Solo Fries", true, [{nil, "99"}])
+    insert_product!(food, "Red Velvet", true, [{nil, "75"}])
+    insert_product!(food, "Choco Chip Cookies", true, [{nil, "65"}])
+
+    {:ok, view, html} = live(conn, ~p"/menu")
 
     assert has_element?(view, "#category-FOOD")
-    assert render(view) =~ "Coming soon"
+    assert html =~ "Rice Meal"
+    assert html =~ "Appetizers"
+    assert html =~ "Muffins"
+    assert html =~ "Cakes / Breads"
+    assert html =~ "Chicken Flakes"
+    assert html =~ "Solo Fries"
+    assert html =~ "Red Velvet"
+    assert html =~ "Choco Chip Cookies"
+    assert html =~ "₱179"
+    assert html =~ "₱99"
+    assert html =~ "₱65"
+
+    rice_index = :binary.match(html, "Rice Meal") |> elem(0)
+    appetizers_index = :binary.match(html, "Appetizers") |> elem(0)
+    muffins_index = :binary.match(html, "Muffins") |> elem(0)
+    cakes_index = :binary.match(html, "Cakes / Breads") |> elem(0)
+
+    assert rice_index < appetizers_index
+    assert appetizers_index < muffins_index
+    assert muffins_index < cakes_index
   end
 
   test "/menu does not display unavailable products", %{conn: conn} do
@@ -101,6 +131,35 @@ defmodule EspresoWeb.MenuLiveTest do
 
     refute html =~ "Secret Blend"
     refute html =~ "₱999"
+  end
+
+  test "/menu hides FOOD subgroups when all products are unavailable", %{conn: conn, food: food} do
+    insert_product!(food, "Chicken Flakes", true, [{nil, "179"}])
+    insert_product!(food, "Solo Fries", false, [{nil, "99"}])
+    insert_product!(food, "Beef Nachos", false, [{nil, "249"}])
+
+    {:ok, _view, html} = live(conn, ~p"/menu")
+
+    assert html =~ "Rice Meal"
+    assert html =~ "Chicken Flakes"
+    refute html =~ "Appetizers"
+    refute html =~ "Solo Fries"
+    refute html =~ "Beef Nachos"
+  end
+
+  test "/menu hides categories when all products are unavailable", %{conn: conn, cold: cold} do
+    cold
+    |> then(fn category ->
+      Repo.get_by!(Product, name: "Hazelnut", category_id: category.id)
+    end)
+    |> Product.changeset(%{available: false})
+    |> Repo.update!()
+
+    {:ok, view, html} = live(conn, ~p"/menu")
+
+    refute has_element?(view, "#category-COLD")
+    refute html =~ "Hazelnut"
+    assert has_element?(view, "#category-HOT")
   end
 
   test "/menu displays product sizes and prices correctly", %{conn: conn} do

@@ -39,25 +39,27 @@ defmodule EspresoWeb.MenuLive do
         <section :for={category <- @categories} class="menu-category" id={"category-#{category.name}"}>
           <h2 class="menu-category-title">{category.name}</h2>
 
-          <div :if={category.products == []} class="menu-empty">
-            Coming soon
-          </div>
+          <div class="menu-groups">
+            <div :for={group <- category.groups} class="menu-subgroup">
+              <h3 :if={group.name} class="menu-subgroup-title">{group.name}</h3>
 
-          <ul :if={category.products != []} class="menu-product-list">
-            <li :for={product <- category.products} class="menu-product">
-              <h3 class="menu-product-name">{product.name}</h3>
+              <ul class="menu-product-list">
+                <li :for={product <- group.products} class="menu-product">
+                  <h4 class="menu-product-name">{product.name}</h4>
 
-              <ul class="menu-price-list">
-                <li :for={price <- product.product_prices} class="menu-price">
-                  <span :if={price.size} class="menu-size">{price.size}</span>
-                  <span :if={price.size} class="menu-price-rule" aria-hidden="true"></span>
-                  <span class={["menu-amount", !price.size && "menu-amount-only"]}>
-                    {Menu.format_price(price.price)}
-                  </span>
+                  <ul class="menu-price-list">
+                    <li :for={price <- product.product_prices} class="menu-price">
+                      <span :if={price.size} class="menu-size">{price.size}</span>
+                      <span :if={price.size} class="menu-price-rule" aria-hidden="true"></span>
+                      <span class={["menu-amount", !price.size && "menu-amount-only"]}>
+                        {Menu.format_price(price.price)}
+                      </span>
+                    </li>
+                  </ul>
                 </li>
               </ul>
-            </li>
-          </ul>
+            </div>
+          </div>
         </section>
       </main>
 
