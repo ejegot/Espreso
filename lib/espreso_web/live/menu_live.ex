@@ -17,8 +17,6 @@ defmodule EspresoWeb.MenuLive do
   def render(assigns) do
     ~H"""
     <div class="menu-page">
-      <div class="menu-atmosphere" aria-hidden="true"></div>
-
       <header class="menu-header">
         <div class="menu-header-copy">
           <p class="menu-brand">CoffeeSpot</p>
@@ -27,8 +25,14 @@ defmodule EspresoWeb.MenuLive do
         </div>
 
         <figure class="menu-media menu-media-hero" data-image-slot="menu-hero">
-          <div class="menu-media-frame" role="img" aria-label="CoffeeSpot menu photo coming soon"></div>
-          <figcaption class="menu-media-caption">Photo coming soon</figcaption>
+          <div class="menu-media-frame">
+            <img
+              src={~p"/images/coffeespot/menu-hero.jpg"}
+              alt="CoffeeSpot café atmosphere in Lilac Marikina"
+              class="menu-media-image"
+              loading="eager"
+            />
+          </div>
         </figure>
       </header>
 
@@ -53,19 +57,25 @@ defmodule EspresoWeb.MenuLive do
 
                 <ul class="menu-product-list">
                   <li :for={product <- group.products} class="menu-product">
-                    <h4 class="menu-product-name">{product.name}</h4>
+                    <div :if={inline_price?(product)} class="menu-product-inline">
+                      <h4 class="menu-product-name">{product.name}</h4>
+                      <span class="menu-price-rule" aria-hidden="true"></span>
+                      <span class="menu-amount">
+                        {Menu.format_price(hd(product.product_prices).price)}
+                      </span>
+                    </div>
+
+                    <h4 :if={!inline_price?(product)} class="menu-product-name">{product.name}</h4>
 
                     <p :if={description?(product.description)} class="menu-product-description">
                       {product.description}
                     </p>
 
-                    <ul class="menu-price-list">
+                    <ul :if={!inline_price?(product)} class="menu-price-list">
                       <li :for={price <- product.product_prices} class="menu-price">
                         <span :if={price.size} class="menu-size">{price.size}</span>
-                        <span :if={price.size} class="menu-price-rule" aria-hidden="true"></span>
-                        <span class={["menu-amount", !price.size && "menu-amount-only"]}>
-                          {Menu.format_price(price.price)}
-                        </span>
+                        <span class="menu-price-rule" aria-hidden="true"></span>
+                        <span class="menu-amount">{Menu.format_price(price.price)}</span>
                       </li>
                     </ul>
                   </li>
@@ -79,8 +89,14 @@ defmodule EspresoWeb.MenuLive do
             class="menu-media menu-media-moment"
             data-image-slot="menu-drink-01"
           >
-            <div class="menu-media-frame" role="img" aria-label="CoffeeSpot drink photo coming soon"></div>
-            <figcaption class="menu-media-caption">Photo coming soon</figcaption>
+            <div class="menu-media-frame">
+              <img
+                src={~p"/images/coffeespot/menu-drink-01.jpg"}
+                alt="CoffeeSpot specialty drinks from the Lilac Marikina menu"
+                class="menu-media-image"
+                loading="lazy"
+              />
+            </div>
           </figure>
 
           <figure
@@ -88,10 +104,30 @@ defmodule EspresoWeb.MenuLive do
             class="menu-media menu-media-moment"
             data-image-slot="menu-food-01"
           >
-            <div class="menu-media-frame" role="img" aria-label="CoffeeSpot food photo coming soon"></div>
-            <figcaption class="menu-media-caption">Photo coming soon</figcaption>
+            <div class="menu-media-frame">
+              <img
+                src={~p"/images/coffeespot/menu-food-01.jpg"}
+                alt="CoffeeSpot food from the Lilac Marikina kitchen"
+                class="menu-media-image"
+                loading="lazy"
+              />
+            </div>
           </figure>
         </div>
+
+        <figure
+          class="menu-media menu-media-moment"
+          data-image-slot="cafe-atmosphere-01"
+        >
+          <div class="menu-media-frame">
+            <img
+              src={~p"/images/coffeespot/cafe-atmosphere-01.jpg"}
+              alt="Quiet corner inside CoffeeSpot Lilac Marikina"
+              class="menu-media-image"
+              loading="lazy"
+            />
+          </div>
+        </figure>
       </main>
 
       <footer class="menu-footer">
@@ -106,4 +142,8 @@ defmodule EspresoWeb.MenuLive do
   end
 
   defp description?(_description), do: false
+
+  # Single price without a size → classic editorial "Name …… ₱" row.
+  defp inline_price?(%{product_prices: [%{size: size}]}) when size in [nil, ""], do: true
+  defp inline_price?(_product), do: false
 end

@@ -17,7 +17,7 @@ defmodule EspresoWeb.Router do
   scope "/", EspresoWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    live "/", HomeLive
     live "/menu", MenuLive
   end
 

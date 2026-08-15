@@ -1,8 +1,9 @@
 defmodule EspresoWeb.PageControllerTest do
   use EspresoWeb.ConnCase
 
-  test "GET /", %{conn: conn} do
+  test "GET / serves the CoffeeSpot homepage", %{conn: conn} do
     conn = get(conn, ~p"/")
-    assert html_response(conn, 200) =~ "Peace of mind from prototype to production"
+    assert html_response(conn, 200) =~ "CoffeeSpot"
+    assert html_response(conn, 200) =~ "Lilac"
   end
 end
