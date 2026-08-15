@@ -175,19 +175,30 @@ defmodule EspresoWeb.MenuLiveTest do
     assert html =~ "₱120"
   end
 
+  test "/menu renders product description only when present", %{conn: conn, hot: hot} do
+    insert_product!(hot, "Spanish Latte", true, [{"8oz", "160"}], "Rich and creamy")
+
+    {:ok, view, html} = live(conn, ~p"/menu")
+
+    assert html =~ "Spanish Latte"
+    assert has_element?(view, ".menu-product-description", "Rich and creamy")
+    refute html =~ ~r/Espresso<\/h4>\s*<p class="menu-product-description"/
+  end
+
   defp insert_category!(name) do
     %Category{}
     |> Category.changeset(%{name: name})
     |> Repo.insert!()
   end
 
-  defp insert_product!(category, name, available, prices) do
+  defp insert_product!(category, name, available, prices, description \\ nil) do
     product =
       %Product{}
       |> Product.changeset(%{
         name: name,
         category_id: category.id,
-        available: available
+        available: available,
+        description: description
       })
       |> Repo.insert!()
 

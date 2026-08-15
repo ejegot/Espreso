@@ -47,6 +47,10 @@ defmodule EspresoWeb.MenuLive do
                 <li :for={product <- group.products} class="menu-product">
                   <h4 class="menu-product-name">{product.name}</h4>
 
+                  <p :if={description?(product.description)} class="menu-product-description">
+                    {product.description}
+                  </p>
+
                   <ul class="menu-price-list">
                     <li :for={price <- product.product_prices} class="menu-price">
                       <span :if={price.size} class="menu-size">{price.size}</span>
@@ -69,4 +73,10 @@ defmodule EspresoWeb.MenuLive do
     </div>
     """
   end
+
+  defp description?(description) when is_binary(description) do
+    String.trim(description) != ""
+  end
+
+  defp description?(_description), do: false
 end

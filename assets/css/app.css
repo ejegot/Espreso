@@ -2,9 +2,9 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
-/* CoffeeSpot – Lilac Marikina customer menu */
+/* CoffeeSpot – Lilac Marikina customer menu (editorial café layout) */
 html {
-  --menu-sticky-offset: 5rem;
+  --menu-sticky-offset: 5.5rem;
   scroll-padding-top: var(--menu-sticky-offset);
 }
 
@@ -17,14 +17,14 @@ html {
   --menu-mocha: #6b422e;
   --menu-roast: #8b5a3c;
   --menu-foam: #fff8f1;
-  --menu-line: rgba(43, 24, 16, 0.14);
+  --menu-line: rgba(43, 24, 16, 0.12);
 
   position: relative;
   min-height: 100vh;
   color: var(--menu-ink);
   background:
-    radial-gradient(ellipse 100% 60% at 50% -5%, rgba(139, 90, 60, 0.18), transparent 50%),
-    linear-gradient(180deg, var(--menu-foam) 0%, var(--menu-paper) 42%, var(--menu-latte) 100%);
+    radial-gradient(ellipse 100% 60% at 50% -5%, rgba(139, 90, 60, 0.16), transparent 52%),
+    linear-gradient(180deg, var(--menu-foam) 0%, var(--menu-paper) 45%, var(--menu-latte) 100%);
   font-family: "Figtree", sans-serif;
   /* clip avoids horizontal bleed without breaking position:sticky (unlike hidden) */
   overflow-x: clip;
@@ -35,22 +35,15 @@ html {
   position: absolute;
   inset: 0;
   background-image:
-    radial-gradient(circle at 10% 12%, rgba(107, 66, 46, 0.1), transparent 30%),
-    radial-gradient(circle at 90% 6%, rgba(139, 90, 60, 0.12), transparent 26%),
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 3px,
-      rgba(43, 24, 16, 0.015) 3px,
-      rgba(43, 24, 16, 0.015) 4px
-    );
-  animation: menu-glow 12s ease-in-out infinite alternate;
+    radial-gradient(circle at 10% 12%, rgba(107, 66, 46, 0.09), transparent 30%),
+    radial-gradient(circle at 90% 6%, rgba(139, 90, 60, 0.1), transparent 26%);
+  animation: menu-glow 14s ease-in-out infinite alternate;
 }
 
 .menu-header {
   position: relative;
   z-index: 1;
-  padding: 2rem 1.15rem 1.1rem;
+  padding: 3rem 1.35rem 1.75rem;
   text-align: center;
 }
 
@@ -58,31 +51,31 @@ html {
   margin: 0;
   color: var(--menu-espresso);
   font-family: "Fraunces", serif;
-  font-size: clamp(2.6rem, 11vw, 3.75rem);
+  font-size: clamp(3rem, 13vw, 4.35rem);
   font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 0.95;
-  animation: menu-rise 0.65s ease-out both;
+  letter-spacing: -0.035em;
+  line-height: 0.92;
+  animation: menu-rise 0.7s ease-out both;
 }
 
 .menu-location {
-  margin: 0.55rem 0 0;
+  margin: 0.85rem 0 0;
   color: var(--menu-mocha);
   font-family: "Fraunces", serif;
   font-size: 1.05rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  animation: menu-rise 0.65s ease-out 0.08s both;
+  animation: menu-rise 0.7s ease-out 0.08s both;
 }
 
 .menu-tagline {
-  margin: 0.45rem 0 0;
+  margin: 0.7rem 0 0;
   color: var(--menu-muted);
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   font-weight: 500;
-  letter-spacing: 0.06em;
-  animation: menu-rise 0.65s ease-out 0.14s both;
+  letter-spacing: 0.08em;
+  animation: menu-rise 0.7s ease-out 0.14s both;
 }
 
 .menu-nav {
@@ -90,16 +83,16 @@ html {
   top: 0;
   z-index: 20;
   display: flex;
-  gap: 0.45rem;
+  gap: 0.55rem;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  padding: 0.65rem 1.15rem;
-  background: rgba(255, 248, 241, 0.92);
-  backdrop-filter: blur(10px);
+  padding: 0.85rem 1.35rem;
+  background: rgba(255, 248, 241, 0.94);
+  backdrop-filter: blur(12px);
   border-block: 1px solid var(--menu-line);
   /* opacity-only: transform animations break position:sticky */
-  animation: menu-fade 0.65s ease-out 0.18s both;
+  animation: menu-fade 0.7s ease-out 0.18s both;
 }
 
 .menu-nav::-webkit-scrollbar {
@@ -108,14 +101,14 @@ html {
 
 .menu-nav-link {
   flex: 0 0 auto;
-  padding: 0.4rem 0.75rem;
-  border: 1px solid rgba(107, 66, 46, 0.22);
+  padding: 0.45rem 0.9rem;
+  border: 1px solid rgba(107, 66, 46, 0.18);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.55);
+  background: transparent;
   color: var(--menu-mocha);
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-decoration: none;
   white-space: nowrap;
   transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
@@ -132,20 +125,24 @@ html {
 .menu-main {
   position: relative;
   z-index: 1;
-  width: min(100%, 28rem);
+  width: min(100%, 34rem);
   margin: 0 auto;
-  padding: 0.35rem 1.15rem 2.5rem;
+  padding: 1.75rem 1.35rem 3.5rem;
 }
 
 .menu-category {
-  margin-top: 1.35rem;
-  padding: 1rem 0.95rem 0.85rem;
-  border: 1px solid var(--menu-line);
-  border-radius: 1rem;
-  background: rgba(255, 252, 248, 0.72);
-  box-shadow: 0 10px 28px rgba(43, 24, 16, 0.05);
+  margin-top: 2.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   scroll-margin-top: var(--menu-sticky-offset);
-  animation: menu-rise 0.6s ease-out both;
+  animation: menu-rise 0.65s ease-out both;
+}
+
+.menu-category:first-child {
+  margin-top: 0.35rem;
 }
 
 .menu-category:nth-child(1) { animation-delay: 0.16s; }
@@ -155,38 +152,30 @@ html {
 .menu-category:nth-child(5) { animation-delay: 0.32s; }
 
 .menu-category-title {
-  margin: 0 0 0.65rem;
-  padding-bottom: 0.4rem;
-  border-bottom: 2px solid rgba(107, 66, 46, 0.2);
-  color: var(--menu-mocha);
+  margin: 0 0 1.35rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--menu-line);
+  color: var(--menu-espresso);
   font-family: "Fraunces", serif;
-  font-size: 1.05rem;
+  font-size: clamp(1.35rem, 5vw, 1.65rem);
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.2em;
   text-align: center;
 }
 
 .menu-groups {
   display: grid;
-  gap: 0.85rem;
+  gap: 2rem;
 }
 
 .menu-subgroup-title {
-  margin: 0 0 0.2rem;
-  color: var(--menu-roast);
+  margin: 0 0 0.85rem;
+  color: var(--menu-mocha);
   font-family: "Fraunces", serif;
-  font-size: 0.82rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-align: left;
-}
-
-.menu-empty {
-  color: var(--menu-muted);
   font-size: 0.92rem;
-  font-style: italic;
-  text-align: center;
-  padding: 0.45rem 0 0.2rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-align: left;
 }
 
 .menu-product-list {
@@ -196,35 +185,50 @@ html {
 }
 
 .menu-product {
-  padding: 0.7rem 0;
+  padding: 1.15rem 0;
   border-bottom: 1px solid var(--menu-line);
+}
+
+.menu-product:first-child {
+  padding-top: 0.15rem;
 }
 
 .menu-product:last-child {
   border-bottom: 0;
-  padding-bottom: 0.15rem;
+  padding-bottom: 0.2rem;
 }
 
 .menu-product-name {
   margin: 0;
   color: var(--menu-espresso);
-  font-size: 1rem;
+  font-family: "Fraunces", serif;
+  font-size: 1.2rem;
   font-weight: 600;
+  letter-spacing: -0.01em;
   line-height: 1.25;
+}
+
+.menu-product-description {
+  margin: 0.4rem 0 0;
+  max-width: 28rem;
+  color: var(--menu-muted);
+  font-size: 0.92rem;
+  font-weight: 400;
+  line-height: 1.45;
 }
 
 .menu-price-list {
   list-style: none;
-  margin: 0.35rem 0 0;
+  margin: 0.65rem 0 0;
   padding: 0;
   display: grid;
-  gap: 0.22rem;
+  gap: 0.28rem;
 }
 
 .menu-price {
   display: flex;
   align-items: baseline;
-  gap: 0.45rem;
+  gap: 0.55rem;
   min-height: 1.25rem;
   color: var(--menu-muted);
   font-size: 0.9rem;
@@ -232,22 +236,23 @@ html {
 
 .menu-size {
   flex: 0 0 auto;
-  min-width: 2.5rem;
+  min-width: 2.6rem;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
 .menu-price-rule {
   flex: 1 1 auto;
-  border-bottom: 1px dotted rgba(122, 92, 72, 0.5);
+  border-bottom: 1px dotted rgba(122, 92, 72, 0.42);
   transform: translateY(-0.18rem);
 }
 
 .menu-amount {
   flex: 0 0 auto;
   color: var(--menu-roast);
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
 }
 
 .menu-amount-only {
@@ -257,11 +262,11 @@ html {
 .menu-footer {
   position: relative;
   z-index: 1;
-  padding: 0 1.15rem 2.25rem;
+  padding: 0.5rem 1.35rem 3rem;
   text-align: center;
   color: var(--menu-muted);
-  font-size: 0.78rem;
-  letter-spacing: 0.04em;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
 }
 
 .menu-footer p {
@@ -271,7 +276,7 @@ html {
 @keyframes menu-rise {
   from {
     opacity: 0;
-    transform: translateY(0.55rem);
+    transform: translateY(0.45rem);
   }
   to {
     opacity: 1;
@@ -299,25 +304,43 @@ html {
 
 @media (min-width: 640px) {
   .menu-header {
-    padding: 2.75rem 1.5rem 1.35rem;
+    padding: 4rem 1.75rem 2.15rem;
   }
 
   .menu-nav {
     justify-content: center;
-    padding-inline: 1.5rem;
+    gap: 0.65rem;
+    padding: 0.95rem 1.75rem;
   }
 
   .menu-main {
-    width: min(100%, 32rem);
-    padding: 0.5rem 1.5rem 3rem;
+    width: min(100%, 40rem);
+    padding: 2.5rem 1.75rem 4.5rem;
   }
 
   .menu-category {
-    margin-top: 1.5rem;
-    padding: 1.15rem 1.15rem 1rem;
+    margin-top: 3.25rem;
+  }
+
+  .menu-groups {
+    gap: 2.35rem;
+  }
+
+  .menu-product {
+    padding: 1.35rem 0;
   }
 
   .menu-product-name {
-    font-size: 1.05rem;
+    font-size: 1.3rem;
+  }
+
+  .menu-product-description {
+    font-size: 0.95rem;
+  }
+}
+
+@media (min-width: 900px) {
+  .menu-main {
+    width: min(100%, 44rem);
   }
 }
