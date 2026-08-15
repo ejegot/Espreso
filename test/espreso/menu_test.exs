@@ -83,6 +83,47 @@ defmodule Espreso.MenuTest do
     end
   end
 
+  describe "update_product_availability/2" do
+    setup do
+      category = insert_category!("HOT")
+      %{category: category}
+    end
+
+    test "sets an available product to false", %{category: category} do
+      product = insert_product!(category, "Espresso", true, [{nil, "75"}])
+
+      assert {:ok, updated} = Menu.update_product_availability(product, false)
+      assert updated.available == false
+      assert Repo.get!(Product, product.id).available == false
+    end
+
+    test "sets an unavailable product to true", %{category: category} do
+      product = insert_product!(category, "Espresso", false, [{nil, "75"}])
+
+      assert {:ok, updated} = Menu.update_product_availability(product, true)
+      assert updated.available == true
+      assert Repo.get!(Product, product.id).available == true
+    end
+
+    test "returns the persisted product", %{category: category} do
+      product = insert_product!(category, "Espresso", true, [{nil, "75"}])
+
+      assert {:ok, updated} = Menu.update_product_availability(product, false)
+      assert %Product{} = updated
+      assert updated.id == product.id
+      assert updated.available == false
+    end
+
+    test "returns an error changeset for invalid availability", %{category: category} do
+      product = insert_product!(category, "Espresso", true, [{nil, "75"}])
+
+      assert {:error, changeset} = Menu.update_product_availability(product, "maybe")
+      refute changeset.valid?
+      assert "is invalid" in errors_on(changeset).available
+      assert Repo.get!(Product, product.id).available == true
+    end
+  end
+
   defp insert_category!(name) do
     %Category{}
     |> Category.changeset(%{name: name})

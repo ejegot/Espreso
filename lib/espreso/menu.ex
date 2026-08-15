@@ -6,7 +6,7 @@ defmodule Espreso.Menu do
   import Ecto.Query
 
   alias Espreso.Repo
-  alias Espreso.Menu.Category
+  alias Espreso.Menu.{Category, Product}
 
   @category_order ~w(HOT COLD FRAPPE SODA FOOD)
 
@@ -60,6 +60,17 @@ defmodule Espreso.Menu do
     |> Enum.reject(&(&1.products == []))
     |> Enum.sort_by(&category_position/1)
     |> Enum.map(&decorate_category/1)
+  end
+
+  @doc """
+  Updates whether a product is available on the customer menu.
+
+  Returns `{:ok, product}` or `{:error, changeset}`.
+  """
+  def update_product_availability(%Product{} = product, available) do
+    product
+    |> Product.changeset(%{available: available})
+    |> Repo.update()
   end
 
   defp filter_available_products(category) do
