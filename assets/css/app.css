@@ -496,7 +496,8 @@ html {
   }
 }
 
-/* —— CoffeeSpot homepage (editorial) —— */
+
+/* —— CoffeeSpot homepage v2 (editorial refinement) —— */
 .home-page {
   --home-espresso: #2a1810;
   --home-ink: #3a261c;
@@ -513,30 +514,31 @@ html {
   overflow-x: clip;
 }
 
+/* Masthead */
 .home-top {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 1.15rem 1.4rem 0.35rem;
-  max-width: 72rem;
+  gap: 1.25rem;
+  width: min(100%, 70rem);
   margin: 0 auto;
+  padding: 1.35rem 1.5rem 0.25rem;
 }
 
 .home-top-brand {
   margin: 0;
   color: var(--home-espresso);
   font-family: "Fraunces", serif;
-  font-size: 1.05rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
 }
 
 .home-top-link {
   color: var(--home-muted);
-  font-size: 0.74rem;
+  font-size: 0.7rem;
   font-weight: 600;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.2em;
   text-decoration: none;
   text-transform: uppercase;
 }
@@ -547,72 +549,72 @@ html {
   outline: none;
 }
 
+/* Hero ★★★★★ */
 .home-hero {
   display: grid;
-  gap: 1.75rem;
-  padding: 1.5rem 0 0;
+  gap: 2rem;
+  padding: 1.85rem 0 0;
 }
 
 .home-hero-copy {
+  width: min(100%, 32rem);
+  margin: 0 auto;
   padding: 0 1.5rem;
   text-align: center;
-  max-width: 34rem;
-  margin: 0 auto;
 }
 
 .home-hero-brand {
   margin: 0;
   color: var(--home-espresso);
   font-family: "Fraunces", serif;
-  font-size: clamp(3rem, 14vw, 4.4rem);
+  font-size: clamp(2.85rem, 13.5vw, 4.15rem);
   font-weight: 700;
   letter-spacing: -0.045em;
   line-height: 0.9;
 }
 
 .home-hero-location {
-  margin: 0.85rem 0 0;
+  margin: 0.9rem 0 0;
   color: var(--home-mocha);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.3em;
   text-transform: uppercase;
 }
 
 .home-hero-statement {
-  margin: 1.1rem auto 0;
-  max-width: 22rem;
+  margin: 1.15rem auto 0;
+  max-width: 20.5rem;
   color: var(--home-muted);
-  font-size: 1.02rem;
+  font-size: 0.98rem;
   line-height: 1.55;
+  font-weight: 400;
 }
 
 .home-cta {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-top: 1.5rem;
-  min-height: 2.75rem;
-  padding: 0.55rem 1.35rem;
-  border: 1px solid var(--home-espresso);
+  margin-top: 1.65rem;
+  min-height: 2.7rem;
+  padding: 0.5rem 1.4rem;
+  border: 1px solid rgba(42, 24, 16, 0.55);
   background: transparent;
   color: var(--home-espresso);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   text-decoration: none;
   text-transform: uppercase;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .home-cta:hover,
 .home-cta:focus-visible {
+  border-color: var(--home-espresso);
   background: var(--home-espresso);
   color: var(--home-cream);
   outline: none;
-}
-
-.home-cta-secondary {
-  margin-top: 1.35rem;
 }
 
 .home-media {
@@ -631,170 +633,231 @@ html {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center;
 }
 
 .home-media-hero .home-media-image,
-.home-media-wide .home-media-image,
-.home-media-story .home-media-image,
+.home-media-feature .home-media-image,
 .home-media-intimate .home-media-image,
-.home-media-portrait .home-media-image {
+.home-media-shift .home-media-image,
+.home-media-story .home-media-image {
   position: absolute;
   inset: 0;
 }
 
 .home-media-hero .home-media-frame {
-  aspect-ratio: 4 / 5;
-  max-height: 28rem;
-  min-height: 16rem;
+  aspect-ratio: 5 / 6;
+  min-height: 17rem;
+  max-height: 30rem;
 }
 
 .home-media-hero .home-media-image {
-  object-position: 55% 45%;
+  object-position: 58% 42%;
 }
 
+/* Intro — editorial pause */
 .home-intro {
-  width: min(100%, 30rem);
+  width: min(100%, 26rem);
   margin: 0 auto;
-  padding: 3.75rem 1.5rem 2.5rem;
+  padding: 4.5rem 1.5rem 3.75rem;
   text-align: center;
 }
 
 .home-intro-eyebrow {
+  margin: 0 0 1rem;
+  color: var(--home-lilac);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.home-intro-title,
+.home-story-title,
+.home-invite-title,
+.home-cold-title {
+  margin: 0;
+  color: var(--home-espresso);
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.home-intro-title {
+  font-size: clamp(1.45rem, 5.8vw, 1.85rem);
+}
+
+.home-intro-body,
+.home-moment-caption,
+.home-story-body,
+.home-cold-body {
+  margin: 1.1rem 0 0;
+  color: var(--home-muted);
+  font-size: 0.98rem;
+  line-height: 1.65;
+  font-weight: 400;
+}
+
+/* Coffee lifestyle ★★★★★ — largest lifestyle beat */
+.home-moment-coffee {
+  padding: 0.5rem 0 0;
+}
+
+.home-media-feature .home-media-frame {
+  aspect-ratio: 5 / 4;
+  max-height: 28rem;
+}
+
+.home-media-feature .home-media-image {
+  object-position: 38% 55%;
+}
+
+.home-moment-caption {
+  text-align: center;
+  padding: 1.15rem 1.5rem 3.5rem;
+  font-size: 0.92rem;
+}
+
+.home-moment-caption-feature {
+  max-width: 26rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding-top: 1.45rem;
+  padding-bottom: 4.25rem;
+}
+
+/* Espresso ★★★ — intimate magazine detail */
+.home-moment-espresso {
+  padding: 0.75rem 0 1rem;
+}
+
+.home-media-intimate {
+  width: min(100% - 3rem, 16.5rem);
+  margin: 0 auto;
+}
+
+.home-media-intimate .home-media-frame {
+  aspect-ratio: 1 / 1;
+}
+
+.home-media-intimate .home-media-image {
+  object-position: center 38%;
+}
+
+.home-moment-espresso .home-moment-caption {
+  padding: 1.25rem 1.5rem 4.5rem;
+  font-size: 0.88rem;
+  letter-spacing: 0.01em;
+}
+
+/* Cold ★★★★ — rhythm shift */
+.home-moment-cold {
+  display: grid;
+  gap: 1.75rem;
+  padding: 0 0 2rem;
+}
+
+.home-media-shift {
+  width: min(100%, 22rem);
+  margin: 0 auto;
+}
+
+.home-media-shift .home-media-frame {
+  aspect-ratio: 3 / 4;
+  max-height: 30rem;
+}
+
+.home-media-shift .home-media-image {
+  object-position: center 42%;
+}
+
+.home-cold-note {
+  width: min(100%, 20rem);
+  margin: 0 auto;
+  padding: 0 1.5rem 3.5rem;
+  text-align: left;
+}
+
+.home-cold-title {
+  font-size: clamp(1.3rem, 5vw, 1.55rem);
+}
+
+.home-cold-body {
+  margin-top: 0.65rem;
+  font-size: 0.95rem;
+}
+
+/* Story ★★★★ — copy first, then place */
+.home-story {
+  padding: 1rem 0 0;
+}
+
+.home-story-copy {
+  width: min(100%, 24rem);
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 2rem;
+  text-align: center;
+}
+
+.home-story-title {
+  font-size: clamp(1.4rem, 5.5vw, 1.75rem);
+}
+
+.home-media-story .home-media-frame {
+  aspect-ratio: 16 / 10;
+  max-height: 18rem;
+}
+
+.home-media-story .home-media-image {
+  object-position: 35% 48%;
+}
+
+/* Quiet CTA conclusion */
+.home-menu-invite {
+  width: min(100%, 22rem);
+  margin: 0 auto;
+  padding: 4rem 1.5rem 3.75rem;
+  text-align: center;
+}
+
+.home-invite-lead {
   margin: 0 0 0.85rem;
   color: var(--home-lilac);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.22em;
   text-transform: uppercase;
 }
 
-.home-intro-title,
-.home-moment-title,
 .home-invite-title {
-  margin: 0;
+  font-size: clamp(1.4rem, 5.5vw, 1.75rem);
+}
+
+.home-invite-link {
+  display: inline-block;
+  margin-top: 1.5rem;
   color: var(--home-espresso);
-  font-family: "Fraunces", serif;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-decoration: none;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(42, 24, 16, 0.35);
+  padding-bottom: 0.2rem;
+  transition: border-color 0.15s ease;
 }
 
-.home-intro-title {
-  font-size: clamp(1.55rem, 6vw, 2rem);
-}
-
-.home-intro-body,
-.home-moment-body,
-.home-invite-body,
-.home-moment-caption {
-  margin: 1rem 0 0;
-  color: var(--home-muted);
-  font-size: 1rem;
-  line-height: 1.6;
-}
-
-.home-moment {
-  padding: 1.5rem 0 0.5rem;
-}
-
-.home-moment-copy {
-  width: min(100%, 28rem);
-  margin: 0 auto;
-  padding: 1.75rem 1.5rem 2.5rem;
-  text-align: center;
-}
-
-.home-moment-copy-lead {
-  padding-bottom: 1.5rem;
-}
-
-.home-moment-title {
-  font-size: clamp(1.4rem, 5.5vw, 1.85rem);
-}
-
-.home-moment-caption {
-  text-align: center;
-  padding: 1rem 1.5rem 2.75rem;
-  font-size: 0.92rem;
-  letter-spacing: 0.02em;
-}
-
-.home-media-wide .home-media-frame {
-  aspect-ratio: 16 / 10;
-  max-height: 22rem;
-}
-
-.home-media-wide .home-media-image {
-  object-position: 40% 55%;
-}
-
-.home-media-intimate {
-  width: min(100%, 20rem);
-  margin: 0.5rem auto 0;
-}
-
-.home-media-intimate .home-media-frame {
-  aspect-ratio: 1 / 1;
-  max-height: 20rem;
-}
-
-.home-media-intimate .home-media-image {
-  object-position: center 40%;
-}
-
-.home-media-portrait {
-  width: min(100%, 21rem);
-  margin: 0 auto 2rem;
-}
-
-.home-media-portrait .home-media-frame {
-  aspect-ratio: 3 / 4;
-  max-height: 28rem;
-}
-
-.home-media-portrait .home-media-image {
-  object-position: center 45%;
-}
-
-.home-story {
-  padding: 2rem 0 1rem;
-}
-
-.home-media-story .home-media-frame {
-  aspect-ratio: 16 / 10;
-  max-height: 20rem;
-}
-
-.home-media-story .home-media-image {
-  object-position: 40% 50%;
-}
-
-.home-story-copy {
-  width: min(100%, 28rem);
-  margin: 0 auto;
-  padding: 2rem 1.5rem 3rem;
-  text-align: center;
-}
-
-.home-menu-invite {
-  width: min(100%, 28rem);
-  margin: 0 auto;
-  padding: 1rem 1.5rem 3.5rem;
-  text-align: center;
-  border-top: 1px solid var(--home-line);
-}
-
-.home-invite-title {
-  font-size: clamp(1.45rem, 5.5vw, 1.9rem);
-  padding-top: 2.75rem;
+.home-invite-link:hover,
+.home-invite-link:focus-visible {
+  border-bottom-color: var(--home-espresso);
+  outline: none;
 }
 
 .home-footer {
-  padding: 2.25rem 1.5rem 3rem;
+  padding: 2rem 1.5rem 3rem;
   text-align: center;
   color: var(--home-muted);
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   font-weight: 500;
   letter-spacing: 0.14em;
   border-top: 1px solid var(--home-line);
@@ -804,107 +867,122 @@ html {
   margin: 0;
 }
 
-.home-footer-links {
-  margin-top: 0.85rem !important;
-  letter-spacing: 0.18em;
-}
-
-.home-footer-link {
-  color: var(--home-mocha);
-  text-decoration: none;
-  text-transform: uppercase;
-  font-size: 0.7rem;
-  font-weight: 600;
-}
-
-.home-footer-link:hover,
-.home-footer-link:focus-visible {
-  color: var(--home-espresso);
-  outline: none;
-}
-
 @media (min-width: 640px) {
   .home-top {
-    padding: 1.4rem 2rem 0.5rem;
+    padding: 1.65rem 2.25rem 0.4rem;
   }
 
   .home-hero {
-    gap: 2.25rem;
-    padding-top: 1.85rem;
-  }
-
-  .home-hero-copy {
-    padding: 0 2rem;
+    gap: 2.5rem;
+    padding-top: 2.25rem;
   }
 
   .home-media-hero .home-media-frame {
     aspect-ratio: 16 / 9;
-    max-height: 32rem;
-    min-height: 18rem;
+    max-height: 34rem;
+    min-height: 20rem;
   }
 
   .home-media-hero .home-media-image {
-    object-position: 50% 42%;
+    object-position: 52% 40%;
   }
 
   .home-intro {
-    padding: 4.5rem 2rem 3rem;
+    padding: 5.5rem 2rem 4.5rem;
   }
 
-  .home-media-wide .home-media-frame {
+  .home-media-feature .home-media-frame {
     aspect-ratio: 16 / 9;
-    max-height: 28rem;
+    max-height: 32rem;
   }
 
   .home-media-intimate {
-    width: min(100%, 22rem);
+    width: min(100%, 17.5rem);
   }
 
-  .home-media-portrait {
+  .home-media-shift {
     width: min(100%, 24rem);
+    margin-left: max(1.5rem, calc((100% - 36rem) / 2));
+    margin-right: auto;
+  }
+
+  .home-cold-note {
+    margin-left: max(1.5rem, calc((100% - 36rem) / 2 + 1.5rem));
+    padding-bottom: 4.5rem;
   }
 
   .home-media-story .home-media-frame {
     aspect-ratio: 21 / 9;
-    max-height: 26rem;
+    max-height: 24rem;
   }
 
-  .home-story-copy,
-  .home-moment-copy,
+  .home-story-copy {
+    padding: 3.5rem 2rem 2.35rem;
+  }
+
   .home-menu-invite {
-    padding-left: 2rem;
-    padding-right: 2rem;
+    padding: 5rem 2rem 4.5rem;
   }
 }
 
 @media (min-width: 900px) {
   .home-hero {
-    width: min(100%, 64rem);
+    width: min(100%, 72rem);
     margin: 0 auto;
-    gap: 2.75rem;
+    gap: 2.85rem;
   }
 
   .home-media-hero .home-media-frame {
-    aspect-ratio: 21 / 9;
-    max-height: 30rem;
+    aspect-ratio: 2.2 / 1;
+    max-height: 36rem;
   }
 
-  .home-moment-coffee,
-  .home-story {
-    width: min(100%, 64rem);
-    margin-left: auto;
-    margin-right: auto;
+  .home-moment-coffee {
+    width: min(100%, 72rem);
+    margin: 0 auto;
   }
 
-  .home-media-wide .home-media-frame,
-  .home-media-story .home-media-frame {
-    max-height: 30rem;
+  .home-media-feature .home-media-frame {
+    max-height: 36rem;
   }
 
-  .home-moment-espresso,
+  .home-moment-espresso {
+    width: min(100%, 42rem);
+    margin: 0 auto;
+    padding-top: 1.5rem;
+  }
+
+  .home-media-intimate {
+    width: 15.5rem;
+  }
+
   .home-moment-cold {
-    width: min(100%, 40rem);
-    margin-left: auto;
-    margin-right: auto;
+    width: min(100%, 48rem);
+    margin: 0 auto;
+    grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
+    align-items: end;
+    gap: 2.5rem;
+    padding: 1rem 2rem 3rem;
+  }
+
+  .home-media-shift {
+    width: 100%;
+    margin: 0;
+  }
+
+  .home-cold-note {
+    width: auto;
+    margin: 0;
+    padding: 0 0 2.5rem;
+    text-align: left;
+  }
+
+  .home-story {
+    width: min(100%, 68rem);
+    margin: 0 auto;
+  }
+
+  .home-media-story .home-media-frame {
+    max-height: 28rem;
   }
 }

@@ -22,7 +22,7 @@ defmodule EspresoWeb.HomeLive do
           <h1 class="home-hero-brand">CoffeeSpot</h1>
           <p class="home-hero-location">Lilac, Marikina</p>
           <p class="home-hero-statement">
-            A quiet specialty café — for coffee, company, and a little time.
+            A quiet specialty café for coffee, company, and a little time.
           </p>
           <.link navigate={~p"/menu"} class="home-cta">View Menu</.link>
         </div>
@@ -40,16 +40,15 @@ defmodule EspresoWeb.HomeLive do
       </section>
 
       <section class="home-intro">
-        <p class="home-intro-eyebrow">Welcome</p>
-        <h2 class="home-intro-title">A neighborhood café in Lilac</h2>
+        <p class="home-intro-eyebrow">Lilac</p>
+        <h2 class="home-intro-title">A neighborhood café, without the rush.</h2>
         <p class="home-intro-body">
-          CoffeeSpot is a calm place to sit with a drink, something simple to eat,
-          and the soft pace of an afternoon in Marikina.
+          Come for a cup. Stay for the light, the quiet, and whatever the afternoon needs.
         </p>
       </section>
 
       <section class="home-moment home-moment-coffee">
-        <figure class="home-media home-media-wide" data-home-image="coffee-table-01">
+        <figure class="home-media home-media-feature" data-home-image="coffee-table-01">
           <div class="home-media-frame">
             <img
               src={~p"/images/coffeespot/coffee-table-01.jpg"}
@@ -59,12 +58,9 @@ defmodule EspresoWeb.HomeLive do
             />
           </div>
         </figure>
-        <div class="home-moment-copy">
-          <h2 class="home-moment-title">Coffee, made quietly</h2>
-          <p class="home-moment-body">
-            Espresso and everyday cups — prepared with care, served without hurry.
-          </p>
-        </div>
+        <p class="home-moment-caption home-moment-caption-feature">
+          Coffee, made quietly — prepared with care, served without hurry.
+        </p>
       </section>
 
       <section class="home-moment home-moment-espresso">
@@ -82,13 +78,7 @@ defmodule EspresoWeb.HomeLive do
       </section>
 
       <section class="home-moment home-moment-cold">
-        <div class="home-moment-copy home-moment-copy-lead">
-          <h2 class="home-moment-title">More than coffee</h2>
-          <p class="home-moment-body">
-            Cold drinks for warm afternoons — simple, refreshing, and thoughtfully made.
-          </p>
-        </div>
-        <figure class="home-media home-media-portrait" data-home-image="cold-signature-01">
+        <figure class="home-media home-media-shift" data-home-image="cold-signature-01">
           <div class="home-media-frame">
             <img
               src={~p"/images/coffeespot/cold-signature-01.jpg"}
@@ -98,9 +88,20 @@ defmodule EspresoWeb.HomeLive do
             />
           </div>
         </figure>
+        <div class="home-cold-note">
+          <h2 class="home-cold-title">More than coffee</h2>
+          <p class="home-cold-body">Cold drinks for warm Marikina afternoons.</p>
+        </div>
       </section>
 
       <section class="home-story">
+        <div class="home-story-copy">
+          <p class="home-intro-eyebrow">The space</p>
+          <h2 class="home-story-title">Come sit for a while</h2>
+          <p class="home-story-body">
+            Soft light and quiet corners — a neighborhood place to linger.
+          </p>
+        </div>
         <figure class="home-media home-media-story" data-home-image="atmosphere-interior-01">
           <div class="home-media-frame">
             <img
@@ -111,29 +112,16 @@ defmodule EspresoWeb.HomeLive do
             />
           </div>
         </figure>
-        <div class="home-story-copy">
-          <p class="home-intro-eyebrow">The space</p>
-          <h2 class="home-moment-title">Come sit for a while</h2>
-          <p class="home-moment-body">
-            Soft light, quiet corners, and a neighborhood pace —
-            CoffeeSpot is built for lingering.
-          </p>
-        </div>
       </section>
 
       <section class="home-menu-invite">
+        <p class="home-invite-lead">When you’re ready</p>
         <h2 class="home-invite-title">Explore the menu</h2>
-        <p class="home-invite-body">
-          Hot, cold, frappe, soda, and food — everything we serve at CoffeeSpot.
-        </p>
-        <.link navigate={~p"/menu"} class="home-cta home-cta-secondary">View Menu</.link>
+        <.link navigate={~p"/menu"} class="home-invite-link">View Menu</.link>
       </section>
 
       <footer class="home-footer">
         <p>CoffeeSpot · Lilac Marikina</p>
-        <p class="home-footer-links">
-          <.link navigate={~p"/menu"} class="home-footer-link">Menu</.link>
-        </p>
       </footer>
     </div>
     """
