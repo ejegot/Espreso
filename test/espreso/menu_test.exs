@@ -89,6 +89,13 @@ defmodule Espreso.MenuTest do
     |> Repo.insert!()
   end
 
+  describe "public_url/0" do
+    test "returns the configured public menu URL for QR deployment" do
+      assert Menu.public_url() == "http://localhost:4000/menu"
+      assert String.ends_with?(Menu.public_url(), "/menu")
+    end
+  end
+
   defp insert_product!(category, name, available, prices) do
     product =
       %Product{}

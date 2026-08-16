@@ -47,10 +47,32 @@ defmodule EspresoWeb.MenuLive do
       </nav>
 
       <main class="menu-main">
-        <div :for={category <- @categories}>
-          <section class="menu-category" id={"category-#{category.name}"}>
-            <h2 class="menu-category-title">{category.name}</h2>
+        <h1 class="menu-intro">Menu</h1>
 
+        <section
+          :for={category <- @categories}
+          class={"menu-category menu-category--#{section_tone(category.name)}"}
+          id={"category-#{category.name}"}
+          data-category={category.name}
+        >
+          <figure
+            :if={photo = category_photo(category.name)}
+            class={"menu-media menu-media-category menu-media-category--#{photo.tone}"}
+            data-image-slot={photo.slot}
+          >
+            <div class="menu-media-frame">
+              <img
+                src={~p"/images/coffeespot/#{photo.file}"}
+                alt={photo.alt}
+                class="menu-media-image"
+                loading="lazy"
+              />
+            </div>
+          </figure>
+
+          <h2 class="menu-category-title">{category.name}</h2>
+
+          <div class="menu-category-body">
             <div class="menu-groups">
               <div :for={group <- category.groups} class="menu-subgroup">
                 <h3 :if={group.name} class="menu-subgroup-title">{group.name}</h3>
@@ -82,41 +104,11 @@ defmodule EspresoWeb.MenuLive do
                 </ul>
               </div>
             </div>
-          </section>
-
-          <figure
-            :if={category.name == "COLD"}
-            class="menu-media menu-media-moment"
-            data-image-slot="menu-drink-01"
-          >
-            <div class="menu-media-frame">
-              <img
-                src={~p"/images/coffeespot/menu-drink-01.jpg"}
-                alt="CoffeeSpot specialty drinks from the Lilac Marikina menu"
-                class="menu-media-image"
-                loading="lazy"
-              />
-            </div>
-          </figure>
-
-          <figure
-            :if={category.name == "FOOD"}
-            class="menu-media menu-media-moment"
-            data-image-slot="menu-food-01"
-          >
-            <div class="menu-media-frame">
-              <img
-                src={~p"/images/coffeespot/menu-food-01.jpg"}
-                alt="CoffeeSpot food from the Lilac Marikina kitchen"
-                class="menu-media-image"
-                loading="lazy"
-              />
-            </div>
-          </figure>
-        </div>
+          </div>
+        </section>
 
         <figure
-          class="menu-media menu-media-moment"
+          class="menu-media menu-media-moment menu-media-atmosphere"
           data-image-slot="cafe-atmosphere-01"
         >
           <div class="menu-media-frame">
@@ -137,13 +129,57 @@ defmodule EspresoWeb.MenuLive do
     """
   end
 
+  defp section_tone("HOT"), do: "hot"
+  defp section_tone("COLD"), do: "cold"
+  defp section_tone("FRAPPE"), do: "frappe"
+  defp section_tone("SODA"), do: "soda"
+  defp section_tone("FOOD"), do: "food"
+  defp section_tone(_name), do: "default"
+
+  defp category_photo("HOT") do
+    %{
+      file: "coffee-espresso-01.jpg",
+      slot: "category-hot",
+      tone: "hot",
+      alt: "Espresso served at CoffeeSpot Lilac Marikina"
+    }
+  end
+
+  defp category_photo("COLD") do
+    %{
+      file: "cold-signature-01.jpg",
+      slot: "category-cold",
+      tone: "cold",
+      alt: "Iced coffee from the CoffeeSpot Lilac Marikina menu"
+    }
+  end
+
+  defp category_photo("FRAPPE") do
+    %{
+      file: "IMG_3481.JPG",
+      slot: "category-frappe",
+      tone: "frappe",
+      alt: "Blended frappe from CoffeeSpot Lilac Marikina"
+    }
+  end
+
+  defp category_photo("FOOD") do
+    %{
+      file: "food-table-01.jpg",
+      slot: "category-food",
+      tone: "food",
+      alt: "Food from the CoffeeSpot Lilac Marikina kitchen"
+    }
+  end
+
+  defp category_photo(_name), do: nil
+
   defp description?(description) when is_binary(description) do
     String.trim(description) != ""
   end
 
   defp description?(_description), do: false
 
-  # Single price without a size → classic editorial "Name …… ₱" row.
   defp inline_price?(%{product_prices: [%{size: size}]}) when size in [nil, ""], do: true
   defp inline_price?(_product), do: false
 end

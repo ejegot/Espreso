@@ -20,6 +20,16 @@ if System.get_env("PHX_SERVER") do
   config :espreso, EspresoWeb.Endpoint, server: true
 end
 
+# CoffeeSpot QR menu destination. Prefer PUBLIC_MENU_URL when set.
+# Dev/test keep the localhost fallback from config.exs unless overridden.
+case System.get_env("PUBLIC_MENU_URL") do
+  url when is_binary(url) and byte_size(url) > 0 ->
+    config :espreso, public_menu_url: url
+
+  _ ->
+    :ok
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||
@@ -52,6 +62,11 @@ if config_env() == :prod do
   port = String.to_integer(System.get_env("PORT") || "4000")
 
   config :espreso, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+
+  # QR destination defaults to https://PHX_HOST/menu when PUBLIC_MENU_URL is unset.
+  if System.get_env("PUBLIC_MENU_URL") in [nil, ""] do
+    config :espreso, public_menu_url: "https://#{host}/menu"
+  end
 
   config :espreso, EspresoWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
