@@ -19,6 +19,8 @@ defmodule EspresoWeb.Router do
 
     live "/", HomeLive
     live "/menu", MenuLive
+    live "/about", AboutLive
+    live "/contact", ContactLive
   end
 
   # Other scopes may use custom stacks.

@@ -571,6 +571,104 @@ defmodule EspresoWeb.CoreComponents do
   end
 
   @doc """
+  Renders CoffeeSpot visit/contact links with brand icons.
+  """
+  attr :variant, :string, default: "home", values: ~w(home menu contact)
+  attr :links, :list, required: true
+
+  def contact_links(assigns) do
+    ~H"""
+    <ul class={"#{@variant}-visit-links"}>
+      <li :for={link <- @links}>
+        <a
+          href={link.href}
+          class={"#{@variant}-visit-link"}
+          target={if(link.external?, do: "_blank", else: nil)}
+          rel={if(link.external?, do: "noopener noreferrer", else: nil)}
+        >
+          <span class={"#{@variant}-visit-icon #{@variant}-visit-icon--#{link.id}"} aria-hidden="true">
+            <.contact_icon name={link.id} />
+          </span>
+          <span class={"#{@variant}-visit-link-text"}>
+            <span class={"#{@variant}-visit-link-label"}>{link.label}</span>
+            <span class={"#{@variant}-visit-link-detail"}>{link.detail}</span>
+          </span>
+        </a>
+      </li>
+    </ul>
+    """
+  end
+
+  attr :name, :atom, required: true
+
+  def contact_icon(%{name: :instagram} = assigns) do
+    ~H"""
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <defs>
+        <linearGradient id="ig-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#f58529" />
+          <stop offset="45%" stop-color="#dd2a7b" />
+          <stop offset="100%" stop-color="#8134af" />
+        </linearGradient>
+      </defs>
+      <rect x="3.5" y="3.5" width="17" height="17" rx="4.5" fill="none" stroke="url(#ig-grad)" stroke-width="1.8" />
+      <circle cx="12" cy="12" r="4" fill="none" stroke="url(#ig-grad)" stroke-width="1.8" />
+      <circle cx="17.2" cy="6.8" r="1.15" fill="url(#ig-grad)" />
+    </svg>
+    """
+  end
+
+  def contact_icon(%{name: :facebook} = assigns) do
+    ~H"""
+    <svg viewBox="0 0 24 24" fill="#1877F2" aria-hidden="true">
+      <path d="M14.5 8.5V6.8c0-.7.5-1.3 1.2-1.3H17V3h-2.1C12.4 3 11 4.5 11 6.6v1.9H9v2.7h2V21h3.5v-9.8h2.3l.5-2.7h-2.8z" />
+    </svg>
+    """
+  end
+
+  def contact_icon(%{name: :tiktok} = assigns) do
+    ~H"""
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="#25F4EE"
+        d="M16.6 4.2c.7 1.5 2 2.6 3.6 3v2.5c-1.5-.1-2.9-.6-4.1-1.5v6.2c0 3.1-2.5 5.6-5.6 5.6S5 17.5 5 14.4s2.5-5.6 5.6-5.6c.3 0 .6 0 .9.1v2.7c-.3-.1-.6-.2-.9-.2-1.6 0-2.9 1.3-2.9 2.9s1.3 2.9 2.9 2.9 2.9-1.3 2.9-2.9V4.2h3.1z"
+        transform="translate(-0.55 0.45)"
+      />
+      <path
+        fill="#FE2C55"
+        d="M16.6 4.2c.7 1.5 2 2.6 3.6 3v2.5c-1.5-.1-2.9-.6-4.1-1.5v6.2c0 3.1-2.5 5.6-5.6 5.6S5 17.5 5 14.4s2.5-5.6 5.6-5.6c.3 0 .6 0 .9.1v2.7c-.3-.1-.6-.2-.9-.2-1.6 0-2.9 1.3-2.9 2.9s1.3 2.9 2.9 2.9 2.9-1.3 2.9-2.9V4.2h3.1z"
+        transform="translate(0.55 -0.45)"
+      />
+      <path
+        fill="#111111"
+        d="M16.6 4.2c.7 1.5 2 2.6 3.6 3v2.5c-1.5-.1-2.9-.6-4.1-1.5v6.2c0 3.1-2.5 5.6-5.6 5.6S5 17.5 5 14.4s2.5-5.6 5.6-5.6c.3 0 .6 0 .9.1v2.7c-.3-.1-.6-.2-.9-.2-1.6 0-2.9 1.3-2.9 2.9s1.3 2.9 2.9 2.9 2.9-1.3 2.9-2.9V4.2h3.1z"
+      />
+    </svg>
+    """
+  end
+
+  def contact_icon(%{name: :email} = assigns) do
+    ~H"""
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2" stroke="#C45C26" stroke-width="1.8" />
+      <path d="m4.5 7.5 7.5 5.5 7.5-5.5" stroke="#C45C26" stroke-width="1.8" />
+    </svg>
+    """
+  end
+
+  def contact_icon(%{name: :phone} = assigns) do
+    ~H"""
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M7.2 4.8h2.6l1.1 3.2-1.7 1.2a11.5 11.5 0 0 0 5.6 5.6l1.2-1.7 3.2 1.1v2.6c0 .7-.5 1.3-1.2 1.4-7.2.9-13.2-5.1-12.3-12.3.1-.7.7-1.2 1.5-1.2z"
+        stroke="#2F9E44"
+        stroke-width="1.8"
+      />
+    </svg>
+    """
+  end
+
+  @doc """
   Renders a [Heroicon](https://heroicons.com).
 
   Heroicons come in three styles – outline, solid, and mini.

@@ -1,29 +1,44 @@
 defmodule EspresoWeb.MenuLive do
   use EspresoWeb, :live_view
 
+  alias Espreso.CoffeeSpot
   alias Espreso.Menu
 
   @impl true
   def mount(_params, _session, socket) do
     categories = Menu.list_menu()
+    selected = categories |> List.first() |> then(&(&1 && &1.name))
 
     {:ok,
      socket
      |> assign(:page_title, "Menu")
-     |> assign(:categories, categories), layout: false}
+     |> assign(:categories, categories)
+     |> assign(:selected_category, selected), layout: false}
+  end
+
+  @impl true
+  def handle_event("select_category", %{"name" => name}, socket) do
+    if Enum.any?(socket.assigns.categories, &(&1.name == name)) do
+      {:noreply, assign(socket, :selected_category, name)}
+    else
+      {:noreply, socket}
+    end
   end
 
   @impl true
   def render(assigns) do
     ~H"""
     <div class="menu-page">
-      <header class="menu-header">
-        <div class="menu-header-copy">
-          <p class="menu-brand">CoffeeSpot</p>
-          <p class="menu-location">Lilac Marikina</p>
-          <p class="menu-tagline">Hot · Cold · Frappe · Soda · Food</p>
-        </div>
+      <header class="menu-top">
+        <.link navigate={~p"/"} class="menu-top-brand">CoffeeSpot</.link>
+        <nav class="menu-top-nav" aria-label="Primary">
+          <.link navigate={~p"/"} class="menu-top-link">Home</.link>
+          <.link navigate={~p"/about"} class="menu-top-link">About us</.link>
+          <.link navigate={~p"/contact"} class="menu-top-link">Get in touch</.link>
+        </nav>
+      </header>
 
+      <section class="menu-hero" aria-label="CoffeeSpot menu">
         <figure class="menu-media menu-media-hero" data-image-slot="menu-hero">
           <div class="menu-media-frame">
             <img
@@ -32,25 +47,66 @@ defmodule EspresoWeb.MenuLive do
               class="menu-media-image"
               loading="eager"
             />
+            <div class="menu-hero-overlay">
+              <div class="menu-hero-copy">
+                <p class="menu-brand">CoffeeSpot</p>
+                <h1 class="menu-hero-title">
+                  The menu.<br />
+                  <em>Lilac mornings.</em>
+                </h1>
+                <p class="menu-hero-statement">
+                  Hot, cold, frappe, soda, and food — everything we serve at CoffeeSpot Lilac Marikina.
+                </p>
+              </div>
+            </div>
           </div>
         </figure>
-      </header>
+      </section>
+
+      <div class="menu-marquee" aria-hidden="true">
+        <div class="menu-marquee-track">
+          <span>Hot</span><span>·</span>
+          <span>Cold</span><span>·</span>
+          <span>Frappe</span><span>·</span>
+          <span>Soda</span><span>·</span>
+          <span>Food</span><span>·</span>
+          <span>Hot</span><span>·</span>
+          <span>Cold</span><span>·</span>
+          <span>Frappe</span><span>·</span>
+          <span>Soda</span><span>·</span>
+          <span>Food</span><span>·</span>
+          <span>Hot</span><span>·</span>
+          <span>Cold</span><span>·</span>
+          <span>Frappe</span><span>·</span>
+          <span>Soda</span><span>·</span>
+          <span>Food</span><span>·</span>
+          <span>Hot</span><span>·</span>
+          <span>Cold</span><span>·</span>
+          <span>Frappe</span><span>·</span>
+          <span>Soda</span><span>·</span>
+          <span>Food</span><span>·</span>
+        </div>
+      </div>
 
       <nav class="menu-nav" aria-label="Menu categories">
-        <a
+        <button
           :for={category <- @categories}
-          href={"#category-#{category.name}"}
-          class="menu-nav-link"
+          type="button"
+          phx-click="select_category"
+          phx-value-name={category.name}
+          class={[
+            "menu-nav-link",
+            @selected_category == category.name && "menu-nav-link-active"
+          ]}
+          aria-pressed={to_string(@selected_category == category.name)}
         >
           {category.name}
-        </a>
+        </button>
       </nav>
 
       <main class="menu-main">
-        <h1 class="menu-intro">Menu</h1>
-
         <section
-          :for={category <- @categories}
+          :for={category <- visible_categories(@categories, @selected_category)}
           class={"menu-category menu-category--#{section_tone(category.name)}"}
           id={"category-#{category.name}"}
           data-category={category.name}
@@ -70,7 +126,15 @@ defmodule EspresoWeb.MenuLive do
             </div>
           </figure>
 
-          <h2 class="menu-category-title">{category.name}</h2>
+          <div class="menu-category-heading">
+            <p class="menu-eyebrow">{category_eyebrow(category.name)}</p>
+            <h2 class="menu-category-title">
+              {category_heading(category.name)}
+            </h2>
+            <p :if={lede = category_lede(category.name)} class="menu-category-lede">
+              {lede}
+            </p>
+          </div>
 
           <div class="menu-category-body">
             <div class="menu-groups">
@@ -120,13 +184,55 @@ defmodule EspresoWeb.MenuLive do
             />
           </div>
         </figure>
+
+        <section class="menu-closing" id="visit" aria-labelledby="menu-visit-title">
+          <figure
+            class="menu-media menu-media-visit"
+            data-image-slot="visit-interior-01"
+          >
+            <div class="menu-media-frame">
+              <img
+                src={~p"/images/coffeespot/visit-interior-01.jpg"}
+                alt="Warm booth seating and pendant lights inside CoffeeSpot Lilac Marikina"
+                class="menu-media-image"
+                width="817"
+                height="1024"
+                loading="lazy"
+              />
+            </div>
+          </figure>
+          <div class="menu-closing-copy">
+            <p class="menu-eyebrow">Visit</p>
+            <h2 id="menu-visit-title" class="menu-closing-title">
+              Come sit in <em>Lilac.</em>
+            </h2>
+            <p class="menu-closing-body">
+              Soft light, quiet corners, and a neighborhood pace —
+              CoffeeSpot is built for lingering.
+            </p>
+            <p class="menu-closing-place">{CoffeeSpot.place_line()}</p>
+            <.link navigate={~p"/contact"} class="menu-cta menu-visit-cta">Get in touch</.link>
+          </div>
+        </section>
       </main>
 
       <footer class="menu-footer">
-        <p>CoffeeSpot · Lilac Marikina</p>
+        <p class="menu-footer-brand">CoffeeSpot</p>
+        <p>Lilac Marikina</p>
+        <p class="menu-footer-links">
+          <.link navigate={~p"/"} class="menu-footer-link">Home</.link>
+          <span class="menu-footer-sep" aria-hidden="true">·</span>
+          <.link navigate={~p"/about"} class="menu-footer-link">About us</.link>
+          <span class="menu-footer-sep" aria-hidden="true">·</span>
+          <.link navigate={~p"/contact"} class="menu-footer-link">Get in touch</.link>
+        </p>
       </footer>
     </div>
     """
+  end
+
+  defp visible_categories(categories, selected_category) do
+    Enum.filter(categories, &(&1.name == selected_category))
   end
 
   defp section_tone("HOT"), do: "hot"
@@ -135,6 +241,27 @@ defmodule EspresoWeb.MenuLive do
   defp section_tone("SODA"), do: "soda"
   defp section_tone("FOOD"), do: "food"
   defp section_tone(_name), do: "default"
+
+  defp category_eyebrow("HOT"), do: "01 / Hot"
+  defp category_eyebrow("COLD"), do: "02 / Cold"
+  defp category_eyebrow("FRAPPE"), do: "03 / Frappe"
+  defp category_eyebrow("SODA"), do: "04 / Soda"
+  defp category_eyebrow("FOOD"), do: "05 / Food"
+  defp category_eyebrow(_name), do: "Menu"
+
+  defp category_heading("HOT"), do: "HOT"
+  defp category_heading("COLD"), do: "COLD"
+  defp category_heading("FRAPPE"), do: "FRAPPE"
+  defp category_heading("SODA"), do: "SODA"
+  defp category_heading("FOOD"), do: "FOOD"
+  defp category_heading(name), do: name
+
+  defp category_lede("HOT"), do: "Espresso and everyday cups — prepared with care."
+  defp category_lede("COLD"), do: "Iced drinks for warm Lilac afternoons."
+  defp category_lede("FRAPPE"), do: "Blended cups, topped and ready to share."
+  defp category_lede("SODA"), do: "Light, bright, and easy to sip."
+  defp category_lede("FOOD"), do: "Rice meals, chips, muffins, and cakes from the kitchen."
+  defp category_lede(_name), do: nil
 
   defp category_photo("HOT") do
     %{
@@ -163,12 +290,21 @@ defmodule EspresoWeb.MenuLive do
     }
   end
 
+  defp category_photo("SODA") do
+    %{
+      file: "soda-signature-01.jpg",
+      slot: "category-soda",
+      tone: "soda",
+      alt: "Tropical fruit soda served at CoffeeSpot Lilac Marikina"
+    }
+  end
+
   defp category_photo("FOOD") do
     %{
-      file: "food-table-01.jpg",
+      file: "food-savory-01.jpg",
       slot: "category-food",
       tone: "food",
-      alt: "Food from the CoffeeSpot Lilac Marikina kitchen"
+      alt: "Chicken and chips from the CoffeeSpot Lilac Marikina kitchen"
     }
   end
 
