@@ -63,29 +63,50 @@ defmodule EspresoWeb.MenuLiveTest do
     assert frappe_index < soda_index
   end
 
-  test "/menu displays HOT products", %{conn: conn} do
-    {:ok, _view, html} = live(conn, ~p"/menu")
+  test "/menu displays HOT products by default", %{conn: conn} do
+    {:ok, view, html} = live(conn, ~p"/menu")
 
     assert html =~ "Americano"
     assert html =~ "Espresso"
+    assert has_element?(view, "#category-HOT")
+    refute has_element?(view, "#category-COLD")
+    refute html =~ "Hazelnut"
   end
 
-  test "/menu displays COLD products", %{conn: conn} do
-    {:ok, _view, html} = live(conn, ~p"/menu")
+  test "/menu displays only the selected category", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
 
+    view |> element("button.menu-nav-link", "COLD") |> render_click()
+    html = render(view)
+    assert has_element?(view, "#category-COLD")
     assert html =~ "Hazelnut"
-  end
+    refute has_element?(view, "#category-HOT")
+    refute html =~ "Americano"
 
-  test "/menu displays FRAPPE products", %{conn: conn} do
-    {:ok, _view, html} = live(conn, ~p"/menu")
-
+    view |> element("button.menu-nav-link", "FRAPPE") |> render_click()
+    html = render(view)
+    assert has_element?(view, "#category-FRAPPE")
     assert html =~ "Biscoff"
+    refute has_element?(view, "#category-COLD")
+
+    view |> element("button.menu-nav-link", "SODA") |> render_click()
+    html = render(view)
+    assert has_element?(view, "#category-SODA")
+    assert html =~ "Hummingbird"
+    refute has_element?(view, "#category-FRAPPE")
   end
 
-  test "/menu displays SODA products", %{conn: conn} do
-    {:ok, _view, html} = live(conn, ~p"/menu")
+  test "/menu keeps Visit section while filtering categories", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
 
-    assert html =~ "Hummingbird"
+    assert has_element?(view, "#visit")
+    assert has_element?(view, ~s([data-image-slot="visit-interior-01"]))
+
+    view |> element("button.menu-nav-link", "SODA") |> render_click()
+
+    assert has_element?(view, "#visit")
+    assert has_element?(view, ~s([data-image-slot="cafe-atmosphere-01"]))
+    assert has_element?(view, "a[href='/contact']", "Get in touch")
   end
 
   test "/menu does not display empty categories", %{conn: conn} do
@@ -101,7 +122,9 @@ defmodule EspresoWeb.MenuLiveTest do
     insert_product!(food, "Red Velvet", true, [{nil, "75"}])
     insert_product!(food, "Choco Chip Cookies", true, [{nil, "65"}])
 
-    {:ok, view, html} = live(conn, ~p"/menu")
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view |> element("button.menu-nav-link", "FOOD") |> render_click()
+    html = render(view)
 
     assert has_element?(view, "#category-FOOD")
     assert html =~ "Rice Meal"
@@ -138,7 +161,9 @@ defmodule EspresoWeb.MenuLiveTest do
     insert_product!(food, "Solo Fries", false, [{nil, "99"}])
     insert_product!(food, "Beef Nachos", false, [{nil, "249"}])
 
-    {:ok, _view, html} = live(conn, ~p"/menu")
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view |> element("button.menu-nav-link", "FOOD") |> render_click()
+    html = render(view)
 
     assert html =~ "Rice Meal"
     assert html =~ "Chicken Flakes"
@@ -163,23 +188,35 @@ defmodule EspresoWeb.MenuLiveTest do
   end
 
   test "/menu displays product sizes and prices correctly", %{conn: conn} do
-    {:ok, _view, html} = live(conn, ~p"/menu")
+    {:ok, view, html} = live(conn, ~p"/menu")
 
     assert html =~ "8oz"
     assert html =~ "₱110"
     assert html =~ "12oz"
     assert html =~ "₱120"
     assert html =~ "₱75"
+
+    view |> element("button.menu-nav-link", "COLD") |> render_click()
+    html = render(view)
     assert html =~ "16oz"
     assert html =~ "₱180"
+
+    view |> element("button.menu-nav-link", "SODA") |> render_click()
+    html = render(view)
     assert html =~ "₱120"
   end
 
-  test "/menu keeps sticky category anchors", %{conn: conn} do
+  test "/menu filters categories from sticky nav", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
 
-    assert has_element?(view, "a.menu-nav-link[href='#category-HOT']", "HOT")
+    assert has_element?(view, "button.menu-nav-link-active", "HOT")
     assert has_element?(view, "#category-HOT")
+
+    view |> element("button.menu-nav-link", "COLD") |> render_click()
+
+    assert has_element?(view, "button.menu-nav-link-active", "COLD")
+    assert has_element?(view, "#category-COLD")
+    refute has_element?(view, "#category-HOT")
   end
 
   test "/menu renders product description only when present", %{conn: conn, hot: hot} do
@@ -191,13 +228,28 @@ defmodule EspresoWeb.MenuLiveTest do
     refute html =~ ~r/Espresso<\/h4>\s*<p class="menu-product-description"/
   end
 
-  test "/menu prepares CoffeeSpot image slots", %{conn: conn} do
+  test "/menu prepares CoffeeSpot image slots", %{conn: conn, food: food} do
+    insert_product!(food, "Chicken & Chips", true, [{nil, "149"}])
+
     {:ok, view, _html} = live(conn, ~p"/menu")
 
     assert has_element?(view, ~s([data-image-slot="menu-hero"] img[src="/images/coffeespot/menu-hero.jpg"]))
     assert has_element?(view, ~s([data-image-slot="category-hot"] img[src="/images/coffeespot/coffee-espresso-01.jpg"]))
-    assert has_element?(view, ~s([data-image-slot="category-cold"] img[src="/images/coffeespot/cold-signature-01.jpg"]))
     assert has_element?(view, ~s([data-image-slot="cafe-atmosphere-01"] img[src="/images/coffeespot/cafe-atmosphere-01.jpg"]))
+    assert has_element?(view, ~s([data-image-slot="visit-interior-01"] img[src="/images/coffeespot/visit-interior-01.jpg"]))
+
+    view |> element("button.menu-nav-link", "COLD") |> render_click()
+    assert has_element?(view, ~s([data-image-slot="category-cold"] img[src="/images/coffeespot/cold-signature-01.jpg"]))
+
+    view |> element("button.menu-nav-link", "FRAPPE") |> render_click()
+    assert has_element?(view, ~s([data-image-slot="category-frappe"] img[src="/images/coffeespot/IMG_3481.JPG"]))
+
+    view |> element("button.menu-nav-link", "SODA") |> render_click()
+    assert has_element?(view, ~s([data-image-slot="category-soda"] img[src="/images/coffeespot/soda-signature-01.jpg"]))
+
+    view |> element("button.menu-nav-link", "FOOD") |> render_click()
+    assert has_element?(view, ~s([data-image-slot="category-food"] img[src="/images/coffeespot/food-savory-01.jpg"]))
+    assert has_element?(view, "a[href='/contact']", "Get in touch")
   end
 
   defp insert_category!(name) do
