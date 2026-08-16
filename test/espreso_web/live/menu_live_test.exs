@@ -195,7 +195,9 @@ defmodule EspresoWeb.MenuLiveTest do
     {:ok, view, _html} = live(conn, ~p"/menu")
 
     assert has_element?(view, ~s([data-image-slot="menu-hero"] img[src="/images/coffeespot/menu-hero.jpg"]))
-    assert has_element?(view, ~s([data-image-slot="menu-drink-01"] img[src="/images/coffeespot/menu-drink-01.jpg"]))
+    assert has_element?(view, ~s([data-image-slot="category-hot"] img[src="/images/coffeespot/coffee-espresso-01.jpg"]))
+    assert has_element?(view, ~s([data-image-slot="category-cold"] img[src="/images/coffeespot/cold-signature-01.jpg"]))
+    assert has_element?(view, ~s([data-image-slot="cafe-atmosphere-01"] img[src="/images/coffeespot/cafe-atmosphere-01.jpg"]))
   end
 
   defp insert_category!(name) do

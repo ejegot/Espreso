@@ -62,6 +62,16 @@ defmodule Espreso.Menu do
     |> Enum.map(&decorate_category/1)
   end
 
+  @doc """
+  Absolute public URL for the CoffeeSpot QR menu (`/menu`).
+
+  Configured as `:public_menu_url` (env `PUBLIC_MENU_URL`).
+  Development falls back to `http://localhost:4000/menu`.
+  """
+  def public_url do
+    Application.fetch_env!(:espreso, :public_menu_url)
+  end
+
   defp filter_available_products(category) do
     products =
       category.products
