@@ -3,6 +3,8 @@ defmodule Espreso.CoffeeSpot do
   Public CoffeeSpot – Lilac Marikina contact, place, and about details.
   """
 
+  alias Espreso.Menu
+
   def location, do: "Lilac, Marikina"
 
   def address, do: "84 Lilac St., Concepcion Dos, Marikina City, Philippines, 1811"
@@ -65,6 +67,52 @@ defmodule Espreso.CoffeeSpot do
   def phone_display, do: "+639566728906"
 
   def phone_tel, do: "+639566728906"
+
+  @doc """
+  Digits-only phone for WhatsApp (`wa.me`), e.g. `639566728906`.
+  """
+  def whatsapp_digits, do: phone_tel() |> String.replace(~r/\D/, "")
+
+  @doc """
+  Prefills a WhatsApp chat to CoffeeSpot with the customer's basket.
+
+  Each line is a map with `:name`, `:size` (optional), `:quantity`, and `:price` (Decimal).
+  """
+  def order_whatsapp_url(lines) when is_list(lines) and lines != [] do
+    "https://wa.me/#{whatsapp_digits()}?text=#{URI.encode_www_form(order_message(lines))}"
+  end
+
+  @doc """
+  Human-readable order message for WhatsApp handoff.
+  """
+  def order_message(lines) when is_list(lines) and lines != [] do
+    items =
+      lines
+      |> Enum.map_join("\n", &format_order_line/1)
+
+    total =
+      lines
+      |> Enum.reduce(Decimal.new(0), fn line, acc ->
+        Decimal.add(acc, Decimal.mult(line.price, line.quantity))
+      end)
+      |> Menu.format_price()
+
+    """
+    Hi CoffeeSpot! I'd like to order:
+
+    #{items}
+
+    Total: #{total}
+    """
+    |> String.trim()
+  end
+
+  defp format_order_line(%{name: name, quantity: qty, price: price} = line) do
+    size = Map.get(line, :size)
+    size_part = if is_binary(size) and size != "", do: " (#{size})", else: ""
+    line_total = Decimal.mult(price, qty)
+    "• #{qty}x #{name}#{size_part} — #{Menu.format_price(line_total)}"
+  end
 
   def email, do: "elilaicorp.ph@gmail.com"
 
