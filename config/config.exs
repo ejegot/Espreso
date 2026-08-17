@@ -10,9 +10,9 @@ import Config
 config :espreso,
   ecto_repos: [Espreso.Repo],
   generators: [timestamp_type: :utc_datetime],
-  # Absolute URL encoded in CoffeeSpot QR codes (destination: /menu).
-  # Override at runtime with PUBLIC_MENU_URL (e.g. https://your-domain.com/menu).
-  public_menu_url: "http://localhost:4000/menu"
+  # Absolute URL encoded in CoffeeSpot QR codes (destination: homepage `/`).
+  # Override at runtime with PUBLIC_MENU_URL (e.g. https://your-domain.com/).
+  public_menu_url: "http://localhost:4000/"
 
 # Configures the endpoint
 config :espreso, EspresoWeb.Endpoint,
