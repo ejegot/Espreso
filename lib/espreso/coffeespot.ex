@@ -130,6 +130,17 @@ defmodule Espreso.CoffeeSpot do
 
   def tiktok_url, do: "https://www.tiktok.com/@coffeespotlilac_"
 
+  @doc """
+  Public social profiles for header icon links.
+  """
+  def social_links do
+    [
+      %{id: :instagram, href: instagram_url(), label: "Instagram"},
+      %{id: :facebook, href: facebook_url(), label: "Facebook"},
+      %{id: :tiktok, href: tiktok_url(), label: "TikTok"}
+    ]
+  end
+
   def contact_links do
     [
       %{

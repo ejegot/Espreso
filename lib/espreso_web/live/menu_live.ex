@@ -4,6 +4,15 @@ defmodule EspresoWeb.MenuLive do
   alias Espreso.CoffeeSpot
   alias Espreso.Menu
 
+  @instagram_images [
+    "/images/coffeespot/IMG_3478.JPG",
+    "/images/coffeespot/IMG_3482.JPG",
+    "/images/coffeespot/IMG_3468.JPG",
+    "/images/coffeespot/IMG_3475.JPG",
+    "/images/coffeespot/IMG_3488.JPG",
+    "/images/coffeespot/IMG_3457.JPG"
+  ]
+
   @impl true
   def mount(_params, _session, socket) do
     categories = Menu.list_menu()
@@ -13,6 +22,7 @@ defmodule EspresoWeb.MenuLive do
      socket
      |> assign(:page_title, "Menu")
      |> assign(:categories, categories)
+     |> assign(:instagram_images, @instagram_images)
      |> assign(:selected_category, selected)
      |> assign(:cart, [])
      |> assign(:basket_open?, false)
@@ -52,7 +62,8 @@ defmodule EspresoWeb.MenuLive do
        socket
        |> assign(:selected_category, name)
        |> assign(:detail, nil)
-       |> assign(:detail_closing?, false)}
+       |> assign(:detail_closing?, false)
+       |> push_event("scroll_to_items", %{})}
     else
       {:noreply, socket}
     end
@@ -122,7 +133,14 @@ defmodule EspresoWeb.MenuLive do
     if detail && !socket.assigns.detail_closing? do
       with %{product: product, selected_price_id: price_id, quantity: qty} <- detail,
            %{} = price <- Enum.find(product.product_prices, &(&1.id == price_id)) do
-        cart = add_line(socket.assigns.cart, product, price, qty)
+        cart =
+          add_line(
+            socket.assigns.cart,
+            product,
+            price,
+            qty,
+            Menu.product_image(socket.assigns.selected_category, product.name)
+          )
         Process.send_after(self(), :clear_toast, 2400)
 
         {:noreply,
@@ -187,29 +205,20 @@ defmodule EspresoWeb.MenuLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class={[
-      "menu-page",
-      (@detail || @basket_open?) && "menu-page-locked"
-    ]}>
-      <header class="menu-top">
-        <.link navigate={~p"/"} class="menu-top-brand">CoffeeSpot</.link>
-        <nav class="menu-top-nav" aria-label="Primary">
-          <.link navigate={~p"/"} class="menu-top-link">Home</.link>
-          <.link navigate={~p"/about"} class="menu-top-link">About us</.link>
-          <.link navigate={~p"/contact"} class="menu-top-link">Get in touch</.link>
-          <button
-            type="button"
-            class={["menu-basket-btn", @basket_pulse? && "menu-basket-btn-pulse"]}
-            phx-click="open_basket"
-            aria-label={"Basket, #{cart_count(@cart)} items"}
-          >
-            Basket
-            <span class={["menu-basket-count", @basket_pulse? && "is-pulse"]}>
-              {cart_count(@cart)}
-            </span>
-          </button>
-        </nav>
-      </header>
+    <div
+      id="menu-page"
+      phx-hook="MenuBrowse"
+      class={[
+        "menu-page site-page",
+        (@detail || @basket_open?) && "menu-page-locked"
+      ]}
+    >
+      <.site_header
+        current="menu"
+        show_basket?={true}
+        basket_count={cart_count(@cart)}
+        basket_pulse?={@basket_pulse?}
+      />
 
       <section class="menu-hero" aria-label="CoffeeSpot menu">
         <figure class="menu-media menu-media-hero" data-image-slot="menu-hero">
@@ -224,11 +233,11 @@ defmodule EspresoWeb.MenuLive do
               <div class="menu-hero-copy">
                 <p class="menu-brand">CoffeeSpot</p>
                 <h1 class="menu-hero-title">
-                  The menu.<br />
-                  <em>Lilac mornings.</em>
+                  Order something good.<br />
+                  <em>Brewed to linger.</em>
                 </h1>
                 <p class="menu-hero-statement">
-                  Hot, cold, frappe, soda, and food — everything we serve at CoffeeSpot Lilac Marikina.
+                  Hot, cold, frappe, soda, and food — build your order, then send on WhatsApp.
                 </p>
               </div>
             </div>
@@ -236,27 +245,7 @@ defmodule EspresoWeb.MenuLive do
         </figure>
       </section>
 
-      <div class="menu-marquee" aria-hidden="true">
-        <div class="menu-marquee-track">
-          <span>Keep scrolling</span><span>·</span>
-          <span>Lilac Marikina</span><span>·</span>
-          <span>Keep scrolling</span><span>·</span>
-          <span>CoffeeSpot</span><span>·</span>
-          <span>Keep scrolling</span><span>·</span>
-          <span>Lilac Marikina</span><span>·</span>
-          <span>Keep scrolling</span><span>·</span>
-          <span>CoffeeSpot</span><span>·</span>
-          <span>Keep scrolling</span><span>·</span>
-          <span>Lilac Marikina</span><span>·</span>
-          <span>Keep scrolling</span><span>·</span>
-          <span>CoffeeSpot</span><span>·</span>
-          <span>Keep scrolling</span><span>·</span>
-          <span>Lilac Marikina</span><span>·</span>
-          <span>Keep scrolling</span><span>·</span>
-          <span>CoffeeSpot</span><span>·</span>
-        </div>
-      </div>
-
+      <main class="contact-main menu-main">
       <div class="menu-browse">
         <div class="menu-categories-block">
           <p class="menu-categories-label">Categories</p>
@@ -277,7 +266,7 @@ defmodule EspresoWeb.MenuLive do
           </nav>
         </div>
 
-        <main class="menu-main">
+        <div class="menu-main">
           <section
             :for={category <- visible_categories(@categories, @selected_category)}
             class={"menu-category menu-category--#{section_tone(category.name)}"}
@@ -291,11 +280,11 @@ defmodule EspresoWeb.MenuLive do
               </p>
             </div>
 
-            <div class="menu-shop">
+            <div class="menu-shop" id="menu-items">
               <div :for={group <- category.groups} class="menu-shop-group">
                 <h2 :if={group.name} class="menu-subgroup-title">{group.name}</h2>
 
-                <ul class="menu-card-rail">
+                <ul class="menu-card-rail" id={"menu-cards-#{category.name}-#{group.name || "all"}"}>
                   <li :for={product <- group.products} class="menu-card">
                     <button
                       type="button"
@@ -305,9 +294,12 @@ defmodule EspresoWeb.MenuLive do
                       aria-label={"View #{product.name}"}
                     >
                       <div class={"menu-card-visual menu-card-visual--#{section_tone(category.name)}"}>
-                        <span class="menu-card-initial" aria-hidden="true">
-                          {product_initial(product.name)}
-                        </span>
+                        <img
+                          src={Menu.product_image(category.name, product.name)}
+                          alt={product.name}
+                          class="menu-card-photo"
+                          loading="lazy"
+                        />
                       </div>
                       <div class="menu-card-body">
                         <h3 class="menu-card-name">{product.name}</h3>
@@ -329,36 +321,7 @@ defmodule EspresoWeb.MenuLive do
             </div>
           </section>
 
-        <figure
-          class="menu-media menu-media-moment menu-media-atmosphere"
-          data-image-slot="cafe-atmosphere-01"
-        >
-          <div class="menu-media-frame">
-            <img
-              src={~p"/images/coffeespot/cafe-atmosphere-01.jpg"}
-              alt="Quiet corner inside CoffeeSpot Lilac Marikina"
-              class="menu-media-image"
-              loading="lazy"
-            />
-          </div>
-        </figure>
-
         <section class="menu-closing" id="visit" aria-labelledby="menu-visit-title">
-          <figure
-            class="menu-media menu-media-visit"
-            data-image-slot="visit-interior-01"
-          >
-            <div class="menu-media-frame">
-              <img
-                src={~p"/images/coffeespot/visit-interior-01.jpg"}
-                alt="Warm booth seating and pendant lights inside CoffeeSpot Lilac Marikina"
-                class="menu-media-image"
-                width="817"
-                height="1024"
-                loading="lazy"
-              />
-            </div>
-          </figure>
           <div class="menu-closing-copy">
             <p class="menu-eyebrow">Visit</p>
             <h2 id="menu-visit-title" class="menu-closing-title">
@@ -372,18 +335,47 @@ defmodule EspresoWeb.MenuLive do
             <.link navigate={~p"/contact"} class="menu-cta menu-visit-cta">Get in touch</.link>
           </div>
         </section>
-      </main>
+        </div>
       </div>
+      </main>
 
-      <footer class="menu-footer">
-        <p class="menu-footer-brand">CoffeeSpot</p>
-        <p>Lilac Marikina</p>
-        <p class="menu-footer-links">
-          <.link navigate={~p"/"} class="menu-footer-link">Home</.link>
-          <span class="menu-footer-sep" aria-hidden="true">·</span>
-          <.link navigate={~p"/about"} class="menu-footer-link">About us</.link>
-          <span class="menu-footer-sep" aria-hidden="true">·</span>
-          <.link navigate={~p"/contact"} class="menu-footer-link">Get in touch</.link>
+      <section class="site-instagram site-instagram-menu" aria-labelledby="menu-instagram-title">
+        <header class="site-instagram-head">
+          <h2 id="menu-instagram-title" class="site-instagram-title">
+            <a
+              href={CoffeeSpot.instagram_url()}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Follow us on Instagram
+            </a>
+          </h2>
+        </header>
+
+        <ul class="site-instagram-grid">
+          <li :for={src <- @instagram_images} class="site-instagram-cell">
+            <a
+              href={CoffeeSpot.instagram_url()}
+              target="_blank"
+              rel="noopener noreferrer"
+              tabindex="-1"
+              aria-hidden="true"
+            >
+              <img src={src} alt="" loading="lazy" />
+            </a>
+          </li>
+        </ul>
+      </section>
+
+      <footer class="site-footer menu-footer">
+        <p class="site-footer-brand menu-footer-brand">CoffeeSpot</p>
+        <p>{CoffeeSpot.place_line()}</p>
+        <p class="site-footer-links menu-footer-links">
+          <.link navigate={~p"/"} class="site-footer-link menu-footer-link">Home</.link>
+          <span class="site-footer-sep menu-footer-sep" aria-hidden="true">·</span>
+          <.link navigate={~p"/about"} class="site-footer-link menu-footer-link">About us</.link>
+          <span class="site-footer-sep menu-footer-sep" aria-hidden="true">·</span>
+          <.link navigate={~p"/contact"} class="site-footer-link menu-footer-link">Get in touch</.link>
         </p>
       </footer>
 
@@ -411,16 +403,12 @@ defmodule EspresoWeb.MenuLive do
             <span class="menu-buy-handle-label">Swipe down to close</span>
           </div>
 
-          <header class="menu-buy-top">
-            <button type="button" class="menu-buy-back" phx-click="close_detail" aria-label="Back to menu">
-              ←
-            </button>
-          </header>
-
           <div class={"menu-buy-visual menu-detail-visual--#{section_tone(@selected_category)}"}>
-            <span class="menu-buy-initial" aria-hidden="true">
-              {product_initial(@detail.product.name)}
-            </span>
+            <img
+              src={Menu.product_image(@selected_category, @detail.product.name)}
+              alt={@detail.product.name}
+              class="menu-buy-photo"
+            />
           </div>
 
           <div class="menu-buy-body">
@@ -493,7 +481,7 @@ defmodule EspresoWeb.MenuLive do
               <span class="menu-buy-basket-count">{cart_count(@cart)}</span>
             </button>
             <button type="button" class="menu-buy-now" phx-click="buy_now">
-              Buy now
+              Add to basket
             </button>
           </footer>
         </div>
@@ -535,7 +523,8 @@ defmodule EspresoWeb.MenuLive do
 
           <header class="menu-basket-header">
             <div class="menu-basket-heading">
-              <h2 id="menu-basket-title">Basket</h2>
+              <p class="menu-basket-eyebrow">CoffeeSpot</p>
+              <h2 id="menu-basket-title">Your order</h2>
               <p class="menu-basket-count-label">
                 {cart_count(@cart)} {if cart_count(@cart) == 1, do: "item", else: "items"}
               </p>
@@ -546,18 +535,21 @@ defmodule EspresoWeb.MenuLive do
           </header>
 
           <div :if={@cart == []} class="menu-basket-empty">
-            <p class="menu-basket-empty-mark" aria-hidden="true">◇</p>
             <p class="menu-basket-empty-title">Nothing here yet</p>
-            <p>Pick a drink from the menu, then tap Buy now.</p>
+            <p>Choose something from the menu, then add it to your basket.</p>
             <button type="button" class="menu-basket-empty-cta" phx-click="close_basket">
-              Keep browsing
+              Back to menu
             </button>
           </div>
 
           <ul :if={@cart != []} class="menu-basket-list">
             <li :for={line <- @cart} class="menu-basket-line">
-              <div class="menu-basket-line-visual" aria-hidden="true">
-                {product_initial(line.name)}
+              <div class="menu-basket-line-visual">
+                <img
+                  src={line.image}
+                  alt=""
+                  class="menu-basket-line-photo"
+                />
               </div>
               <div class="menu-basket-line-main">
                 <div class="menu-basket-line-top">
@@ -618,7 +610,7 @@ defmodule EspresoWeb.MenuLive do
             >
               Send order on WhatsApp
             </a>
-            <p class="menu-basket-note">Opens WhatsApp with your order ready to send.</p>
+            <p class="menu-basket-note">We’ll open WhatsApp with your order ready to send.</p>
           </footer>
         </aside>
       </div>
@@ -640,7 +632,7 @@ defmodule EspresoWeb.MenuLive do
     |> Enum.find(&(&1.id == id))
   end
 
-  defp add_line(cart, product, price, quantity) do
+  defp add_line(cart, product, price, quantity, image) do
     key = line_key(product.id, price)
     size = size_label(price)
 
@@ -654,7 +646,8 @@ defmodule EspresoWeb.MenuLive do
               name: product.name,
               size: size,
               price: price.price,
-              quantity: quantity
+              quantity: quantity,
+              image: image
             }
           ]
 
@@ -699,16 +692,6 @@ defmodule EspresoWeb.MenuLive do
 
   defp size_label(%{size: size}) when is_binary(size) and size != "", do: size
   defp size_label(_price), do: nil
-
-  defp product_initial(name) when is_binary(name) do
-    name
-    |> String.trim()
-    |> String.first()
-    |> case do
-      nil -> "?"
-      char -> String.upcase(char)
-    end
-  end
 
   defp section_tone("HOT"), do: "hot"
   defp section_tone("COLD"), do: "cold"

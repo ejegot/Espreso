@@ -24,6 +24,135 @@ import topbar from "../vendor/topbar"
 
 const Hooks = {}
 
+Hooks.SmoothScroll = {
+  mounted() {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    const coarse = window.matchMedia("(pointer: coarse)").matches
+
+    if (reduce) return
+
+    this.current = window.scrollY
+    this.target = window.scrollY
+    this.running = false
+    this.lastTime = performance.now()
+    this.ease = coarse ? 0.075 : 0.036
+    this.wheelScale = coarse ? 1 : 0.72
+    this.stopAt = 0.12
+
+    if (coarse) {
+      document.documentElement.style.scrollBehavior = "smooth"
+      return
+    }
+
+    this.isLocked = () =>
+      document.querySelector(".menu-page-locked, .menu-buy-layer, #menu-basket")
+
+    this.inScrollable = (target) => {
+      let node = target
+      while (node && node !== document.body) {
+        const style = window.getComputedStyle(node)
+        const scrollableX =
+          (style.overflowX === "auto" || style.overflowX === "scroll") &&
+          node.scrollWidth > node.clientWidth + 1
+        const scrollableY =
+          (style.overflowY === "auto" || style.overflowY === "scroll") &&
+          node.scrollHeight > node.clientHeight + 1
+
+        if (scrollableX || scrollableY) return true
+        node = node.parentElement
+      }
+
+      return false
+    }
+
+    this.onWheel = (event) => {
+      if (this.isLocked() || this.inScrollable(event.target)) return
+      if (event.ctrlKey) return
+      event.preventDefault()
+      const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
+      this.target = Math.max(
+        0,
+        Math.min(max, this.target + event.deltaY * this.wheelScale)
+      )
+      if (!this.running) {
+        this.lastTime = performance.now()
+        this.raf = requestAnimationFrame(this.loop)
+      }
+    }
+
+    this.loop = (time) => {
+      const dt = Math.min(48, time - this.lastTime)
+      this.lastTime = time
+      const factor = 1 - Math.pow(1 - this.ease, dt / 16.67)
+
+      this.running = true
+      this.current += (this.target - this.current) * factor
+
+      if (Math.abs(this.target - this.current) < this.stopAt) {
+        this.current = this.target
+        window.scrollTo(0, this.current)
+        this.running = false
+        this.raf = null
+        return
+      }
+
+      window.scrollTo(0, this.current)
+      this.raf = requestAnimationFrame(this.loop)
+    }
+
+    this.sync = () => {
+      if (this.running) return
+      this.current = window.scrollY
+      this.target = window.scrollY
+    }
+
+    this.onNavigate = () => {
+      if (this.lastPath === window.location.pathname) return
+      this.lastPath = window.location.pathname
+      this.current = 0
+      this.target = 0
+      this.running = false
+      if (this.raf) cancelAnimationFrame(this.raf)
+      window.scrollTo(0, 0)
+    }
+
+    this.lastPath = window.location.pathname
+
+    window.addEventListener("wheel", this.onWheel, {passive: false})
+    window.addEventListener("scroll", this.sync, {passive: true})
+    window.addEventListener("phx:page-loading-stop", this.onNavigate)
+  },
+
+  destroyed() {
+    document.documentElement.style.scrollBehavior = ""
+    if (this.onWheel) window.removeEventListener("wheel", this.onWheel)
+    if (this.sync) window.removeEventListener("scroll", this.sync)
+    if (this.onNavigate) window.removeEventListener("phx:page-loading-stop", this.onNavigate)
+    if (this.raf) cancelAnimationFrame(this.raf)
+  }
+}
+
+Hooks.MenuBrowse = {
+  mounted() {
+    this.handleEvent("scroll_to_items", () => this.scrollToItems())
+  },
+
+  scrollToItems() {
+    const items = this.el.querySelector("#menu-items")
+    if (!items) return
+
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    const header = this.el.querySelector(".site-top")
+    const cats = this.el.querySelector(".menu-categories-block")
+    const offset = (header?.offsetHeight || 0) + (cats?.offsetHeight || 0) + 10
+    const top = Math.max(0, items.getBoundingClientRect().top + window.scrollY - offset)
+
+    requestAnimationFrame(() => {
+      window.scrollTo({top, behavior: reduce ? "auto" : "smooth"})
+    })
+  }
+}
+
 Hooks.MenuSheet = {
   mounted() {
     const sheet = this.el

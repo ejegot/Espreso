@@ -11,23 +11,14 @@ defmodule EspresoWeb.AboutLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="about-page contact-page">
-      <header class="contact-top">
-        <.link navigate={~p"/"} class="contact-top-brand">CoffeeSpot</.link>
-        <nav class="contact-top-nav" aria-label="Primary">
-          <.link navigate={~p"/menu"} class="contact-top-link">Menu</.link>
-          <.link navigate={~p"/about"} class="contact-top-link contact-top-link-current">
-            About us
-          </.link>
-          <.link navigate={~p"/contact"} class="contact-top-link">Get in touch</.link>
-        </nav>
-      </header>
+    <div class="about-page contact-page site-page">
+      <.site_header current="about" />
 
       <main class="contact-main">
         <header class="contact-hero">
           <p class="contact-eyebrow">About us</p>
           <h1 class="contact-title">CoffeeSpot</h1>
-          <p class="contact-lede">Lilac, Marikina</p>
+          <p class="contact-lede">An oasis in Lilac, Marikina</p>
         </header>
 
         <section class="contact-section" aria-labelledby="about-intro-title">
@@ -72,17 +63,21 @@ defmodule EspresoWeb.AboutLive do
             </article>
           </div>
         </section>
+
+        <div class="contact-order-cta">
+          <.link navigate={~p"/menu"} class="site-cta">Order from the menu</.link>
+        </div>
       </main>
 
-      <footer class="contact-footer">
-        <p class="contact-footer-brand">CoffeeSpot</p>
-        <p>Lilac Marikina</p>
-        <p class="contact-footer-links">
-          <.link navigate={~p"/"} class="contact-footer-link">Home</.link>
-          <span class="contact-footer-sep" aria-hidden="true">·</span>
-          <.link navigate={~p"/menu"} class="contact-footer-link">Menu</.link>
-          <span class="contact-footer-sep" aria-hidden="true">·</span>
-          <.link navigate={~p"/contact"} class="contact-footer-link">Get in touch</.link>
+      <footer class="site-footer">
+        <p class="site-footer-brand">CoffeeSpot</p>
+        <p>{CoffeeSpot.place_line()}</p>
+        <p class="site-footer-links">
+          <.link navigate={~p"/"} class="site-footer-link">Home</.link>
+          <span class="site-footer-sep" aria-hidden="true">·</span>
+          <.link navigate={~p"/menu"} class="site-footer-link">Menu</.link>
+          <span class="site-footer-sep" aria-hidden="true">·</span>
+          <.link navigate={~p"/contact"} class="site-footer-link">Get in touch</.link>
         </p>
       </footer>
     </div>

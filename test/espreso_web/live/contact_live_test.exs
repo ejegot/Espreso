@@ -11,7 +11,6 @@ defmodule EspresoWeb.ContactLiveTest do
     assert html =~ "Get in touch"
     assert html =~ "84 Lilac St"
     assert html =~ "Concepcion Dos"
-    assert has_element?(view, ".contact-visit-icon")
   end
 
   test "contact page keeps find us and contact channels", %{conn: conn} do
@@ -29,8 +28,9 @@ defmodule EspresoWeb.ContactLiveTest do
   test "contact page top nav includes About us and Menu", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/contact")
 
-    assert has_element?(view, ".contact-top a[href='/']", "CoffeeSpot")
-    assert has_element?(view, ".contact-top a[href='/menu']", "Menu")
-    assert has_element?(view, ".contact-top a[href='/about']", "About us")
+    assert has_element?(view, ".site-top a[href='/']", "Home")
+    assert has_element?(view, ".site-top a[href='/menu']", "Menu")
+    assert has_element?(view, ".site-top a[href='/about']", "About us")
+    assert has_element?(view, ".site-top a.is-current[href='/contact']", "Get in touch")
   end
 end

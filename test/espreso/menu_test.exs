@@ -96,6 +96,27 @@ defmodule Espreso.MenuTest do
     end
   end
 
+  describe "product_image/2" do
+    test "returns a named CoffeeSpot photo for known items" do
+      assert Menu.product_image("HOT", "Espresso") ==
+               "/images/coffeespot/coffee-espresso-01.jpg"
+
+      assert Menu.product_image("FOOD", "Beef Tapa") ==
+               "/images/coffeespot/IMG_3464.JPG"
+
+      assert Menu.product_image("COLD", "Strawberry Matcha") ==
+               "/images/coffeespot/IMG_3467.JPG"
+    end
+
+    test "returns a category fallback for unknown item names" do
+      src = Menu.product_image("SODA", "Mystery Fizz")
+      assert src in [
+               "/images/coffeespot/menu-drink-01.jpg",
+               "/images/coffeespot/IMG_3481.JPG"
+             ]
+    end
+  end
+
   defp insert_product!(category, name, available, prices) do
     product =
       %Product{}
