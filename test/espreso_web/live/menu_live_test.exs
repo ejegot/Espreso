@@ -41,7 +41,9 @@ defmodule EspresoWeb.MenuLiveTest do
     assert html =~ "CoffeeSpot"
     assert has_element?(view, ".menu-page")
     assert has_element?(view, ".menu-hero")
-    assert has_element?(view, ".menu-marquee")
+    assert has_element?(view, ".site-instagram-menu")
+    refute has_element?(view, ".menu-marquee")
+    refute has_element?(view, ".contact-hero")
   end
 
   test "/menu displays categories in order", %{conn: conn} do
@@ -72,6 +74,15 @@ defmodule EspresoWeb.MenuLiveTest do
     assert html =~ "Espresso"
     assert has_element?(view, "#category-HOT")
     assert has_element?(view, ".menu-card")
+    assert has_element?(
+             view,
+             ~s(.menu-card-photo[src="/images/coffeespot/coffee-espresso-01.jpg"][alt="Americano"])
+           )
+    assert has_element?(
+             view,
+             ~s(.menu-card-photo[src="/images/coffeespot/coffee-espresso-01.jpg"][alt="Espresso"])
+           )
+    refute has_element?(view, ".menu-card-initial")
     refute has_element?(view, "#category-COLD")
     refute html =~ "Hazelnut"
   end
@@ -103,12 +114,11 @@ defmodule EspresoWeb.MenuLiveTest do
     {:ok, view, _html} = live(conn, ~p"/menu")
 
     assert has_element?(view, "#visit")
-    assert has_element?(view, ~s([data-image-slot="visit-interior-01"]))
 
     view |> element("button.menu-nav-link", "SODA") |> render_click()
 
     assert has_element?(view, "#visit")
-    assert has_element?(view, ~s([data-image-slot="cafe-atmosphere-01"]))
+    refute has_element?(view, ~s([data-image-slot="cafe-atmosphere-01"]))
     assert has_element?(view, "a[href='/contact']", "Get in touch")
   end
 
@@ -247,9 +257,13 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, ".menu-buy-modal")
     assert has_element?(view, ".menu-buy-handle")
     assert has_element?(view, "#menu-detail-title", "Espresso")
-    assert has_element?(view, "button.menu-buy-now", "Buy now")
+    assert has_element?(
+             view,
+             ~s(.menu-buy-photo[src="/images/coffeespot/coffee-espresso-01.jpg"][alt="Espresso"])
+           )
+    assert has_element?(view, "button.menu-buy-now", "Add to basket")
 
-    view |> element("button.menu-buy-now", "Buy now") |> render_click()
+    view |> element("button.menu-buy-now", "Add to basket") |> render_click()
     refute has_element?(view, "#menu-detail")
     refute has_element?(view, "#menu-basket")
     assert has_element?(view, ".menu-toast", "Added to basket")
@@ -259,7 +273,10 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#menu-basket")
     assert has_element?(view, ".menu-basket-count-label", "1 item")
     assert has_element?(view, ".menu-basket-line-name", "Espresso")
-    assert has_element?(view, ".menu-basket-line-visual", "E")
+    assert has_element?(
+             view,
+             ~s(.menu-basket-line-photo[src="/images/coffeespot/coffee-espresso-01.jpg"])
+           )
 
     view |> element("button.menu-basket-close") |> render_click()
     Process.sleep(300)
@@ -271,7 +288,7 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#menu-detail-title", "Americano")
 
     view |> element("button.menu-size-pill", "12oz") |> render_click()
-    view |> element("button.menu-buy-now", "Buy now") |> render_click()
+    view |> element("button.menu-buy-now", "Add to basket") |> render_click()
 
     assert has_element?(view, ".menu-basket-count", "2")
     assert has_element?(view, ".menu-toast", "Added to basket")
@@ -295,13 +312,17 @@ defmodule EspresoWeb.MenuLiveTest do
   end
 
 
-  test "/menu keeps hero Visit imagery", %{conn: conn} do
+  test "/menu keeps page intro and visit copy", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
 
-    assert has_element?(view, ~s([data-image-slot="menu-hero"] img[src="/images/coffeespot/menu-hero.jpg"]))
-    assert has_element?(view, ~s([data-image-slot="cafe-atmosphere-01"] img[src="/images/coffeespot/cafe-atmosphere-01.jpg"]))
-    assert has_element?(view, ~s([data-image-slot="visit-interior-01"] img[src="/images/coffeespot/visit-interior-01.jpg"]))
+    assert has_element?(view, ".menu-hero .menu-brand", "CoffeeSpot")
+    assert has_element?(view, ".site-top a[href='/']", "Home")
+    assert has_element?(view, ".site-top a.is-current[href='/menu']", "Menu")
+    assert has_element?(view, "#visit")
     assert has_element?(view, "a[href='/contact']", "Get in touch")
+    assert has_element?(view, ~s([data-image-slot="menu-hero"] img[src="/images/coffeespot/menu-hero.jpg"]))
+    refute has_element?(view, ~s([data-image-slot="cafe-atmosphere-01"]))
+    refute has_element?(view, ~s([data-image-slot="visit-interior-01"]))
   end
 
   defp insert_category!(name) do

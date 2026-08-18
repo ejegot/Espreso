@@ -599,6 +599,105 @@ defmodule EspresoWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Monochrome social icons for the site header (Instagram, Facebook, TikTok).
+  """
+  def site_socials(assigns) do
+    ~H"""
+    <nav class="site-top-socials" aria-label="Social">
+      <a
+        :for={link <- Espreso.CoffeeSpot.social_links()}
+        href={link.href}
+        class="site-top-social"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={"CoffeeSpot on #{link.label}"}
+      >
+        <.social_icon name={link.id} />
+      </a>
+    </nav>
+    """
+  end
+
+  @doc """
+  Shared CoffeeSpot site header for Home, Menu, About, and Contact.
+  """
+  attr :current, :string, required: true, values: ~w(home menu about contact)
+  attr :variant, :string, default: "default", values: ~w(default overlay)
+  attr :show_basket?, :boolean, default: false
+  attr :basket_count, :integer, default: 0
+  attr :basket_pulse?, :boolean, default: false
+
+  def site_header(assigns) do
+    ~H"""
+    <header class={[
+      "site-top",
+      @variant == "overlay" && "site-top-over",
+      @show_basket? && "site-top-menu"
+    ]}>
+      <.link navigate="/" class="site-top-brand">CoffeeSpot</.link>
+      <nav class="site-top-nav" aria-label="Primary">
+        <.link navigate="/" class={["site-top-link", @current == "home" && "is-current"]}>
+          Home
+        </.link>
+        <.link navigate="/menu" class={["site-top-link", @current == "menu" && "is-current"]}>
+          Menu
+        </.link>
+        <.link navigate="/about" class={["site-top-link", @current == "about" && "is-current"]}>
+          About us
+        </.link>
+        <.link navigate="/contact" class={["site-top-link", @current == "contact" && "is-current"]}>
+          Get in touch
+        </.link>
+      </nav>
+      <%= if @show_basket? do %>
+        <div class="site-top-trailing">
+          <.site_socials />
+          <button
+            type="button"
+            class={["menu-basket-btn", @basket_pulse? && "menu-basket-btn-pulse"]}
+            phx-click="open_basket"
+            aria-label={"Basket, #{@basket_count} items"}
+          >
+            Basket
+            <span class={["menu-basket-count", @basket_pulse? && "is-pulse"]}>{@basket_count}</span>
+          </button>
+        </div>
+      <% else %>
+        <.site_socials />
+      <% end %>
+    </header>
+    """
+  end
+
+  attr :name, :atom, required: true
+
+  def social_icon(%{name: :instagram} = assigns) do
+    ~H"""
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="3.6" y="3.6" width="16.8" height="16.8" rx="5" stroke="currentColor" stroke-width="1.7" />
+      <circle cx="12" cy="12" r="3.85" stroke="currentColor" stroke-width="1.7" />
+      <circle cx="17.15" cy="6.85" r="1.05" fill="currentColor" />
+    </svg>
+    """
+  end
+
+  def social_icon(%{name: :facebook} = assigns) do
+    ~H"""
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M14.4 8.4V6.85c0-.62.4-1.15 1.05-1.15H17V3.2h-1.95C12.7 3.2 11.2 4.7 11.2 6.7v1.7H9.2v2.5h2v9.4h3.2v-9.4h2.05l.45-2.5h-2.5z" />
+    </svg>
+    """
+  end
+
+  def social_icon(%{name: :tiktok} = assigns) do
+    ~H"""
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M16.55 4.15c.65 1.4 1.9 2.45 3.4 2.85v2.35c-1.4-.08-2.7-.55-3.8-1.35v5.85c0 2.95-2.4 5.35-5.35 5.35S5.45 16.8 5.45 13.85s2.4-5.35 5.35-5.35c.28 0 .55.02.85.08v2.55c-.27-.08-.56-.14-.85-.14-1.5 0-2.7 1.22-2.7 2.72s1.2 2.72 2.7 2.72 2.7-1.22 2.7-2.72V4.15h3.05z" />
+    </svg>
+    """
+  end
+
   attr :name, :atom, required: true
 
   def contact_icon(%{name: :instagram} = assigns) do

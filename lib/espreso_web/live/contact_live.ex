@@ -11,17 +11,8 @@ defmodule EspresoWeb.ContactLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="contact-page">
-      <header class="contact-top">
-        <.link navigate={~p"/"} class="contact-top-brand">CoffeeSpot</.link>
-        <nav class="contact-top-nav" aria-label="Primary">
-          <.link navigate={~p"/menu"} class="contact-top-link">Menu</.link>
-          <.link navigate={~p"/about"} class="contact-top-link">About us</.link>
-          <.link navigate={~p"/contact"} class="contact-top-link contact-top-link-current">
-            Get in touch
-          </.link>
-        </nav>
-      </header>
+    <div class="contact-page site-page">
+      <.site_header current="contact" />
 
       <main class="contact-main">
         <header class="contact-hero">
@@ -81,17 +72,21 @@ defmodule EspresoWeb.ContactLive do
           </h2>
           <.contact_links variant="contact" links={CoffeeSpot.contact_links()} />
         </section>
+
+        <div class="contact-order-cta">
+          <.link navigate={~p"/menu"} class="site-cta">Order from the menu</.link>
+        </div>
       </main>
 
-      <footer class="contact-footer">
-        <p class="contact-footer-brand">CoffeeSpot</p>
-        <p>Lilac Marikina</p>
-        <p class="contact-footer-links">
-          <.link navigate={~p"/"} class="contact-footer-link">Home</.link>
-          <span class="contact-footer-sep" aria-hidden="true">·</span>
-          <.link navigate={~p"/menu"} class="contact-footer-link">Menu</.link>
-          <span class="contact-footer-sep" aria-hidden="true">·</span>
-          <.link navigate={~p"/about"} class="contact-footer-link">About us</.link>
+      <footer class="site-footer">
+        <p class="site-footer-brand">CoffeeSpot</p>
+        <p>{CoffeeSpot.place_line()}</p>
+        <p class="site-footer-links">
+          <.link navigate={~p"/"} class="site-footer-link">Home</.link>
+          <span class="site-footer-sep" aria-hidden="true">·</span>
+          <.link navigate={~p"/menu"} class="site-footer-link">Menu</.link>
+          <span class="site-footer-sep" aria-hidden="true">·</span>
+          <.link navigate={~p"/about"} class="site-footer-link">About us</.link>
         </p>
       </footer>
     </div>

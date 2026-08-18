@@ -29,8 +29,9 @@ defmodule EspresoWeb.AboutLiveTest do
   test "about page top nav includes Menu and Get in touch", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/about")
 
-    assert has_element?(view, ".contact-top a[href='/']", "CoffeeSpot")
-    assert has_element?(view, ".contact-top a[href='/menu']", "Menu")
-    assert has_element?(view, ".contact-top a[href='/contact']", "Get in touch")
+    assert has_element?(view, ".site-top a[href='/']", "Home")
+    assert has_element?(view, ".site-top a[href='/menu']", "Menu")
+    assert has_element?(view, ".site-top a.is-current[href='/about']", "About us")
+    assert has_element?(view, ".site-top a[href='/contact']", "Get in touch")
   end
 end

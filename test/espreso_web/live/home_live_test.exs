@@ -3,32 +3,32 @@ defmodule EspresoWeb.HomeLiveTest do
 
   import Phoenix.LiveViewTest
 
-  test "GET / loads CoffeeSpot landing homepage", %{conn: conn} do
+  test "GET / loads CoffeeSpot Shade homepage", %{conn: conn} do
     {:ok, view, html} = live(conn, ~p"/")
 
     assert html =~ "CoffeeSpot"
     assert html =~ "Lilac"
-    assert has_element?(view, ".home-page-landing")
-    refute has_element?(view, ".home-moments")
+    assert has_element?(view, ".home-page-shade")
+    assert has_element?(view, ".site-instagram")
+    refute has_element?(view, ".home-page-landing")
     refute has_element?(view, ".home-marquee")
-    refute has_element?(view, ".home-story")
-    refute has_element?(view, ".home-visit")
-    refute has_element?(view, ".home-footer")
   end
 
   test "homepage links to the menu from nav and hero", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/")
 
-    assert has_element?(view, ".home-top a[href='/menu']", "Menu")
-    assert has_element?(view, ".home-hero a[href='/menu']", "Explore Menu")
-    assert has_element?(view, ".home-hero a[href='/about']", "Our Story")
+    assert has_element?(view, ".site-top-over a[href='/menu']", "Menu")
+    assert has_element?(view, ".home-hero a[href='/menu']", "Order now")
+    assert has_element?(view, ".home-hero a[href='/about']", "Our story")
   end
 
-  test "homepage top nav includes About us and Get in touch", %{conn: conn} do
+  test "homepage top nav includes Home, About us, and Get in touch", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/")
 
-    assert has_element?(view, ".home-top a[href='/about']", "About us")
-    assert has_element?(view, ".home-top a[href='/contact']", "Get in touch")
+    assert has_element?(view, ".site-top-over a[href='/']", "Home")
+    assert has_element?(view, ".site-top-over a.is-current[href='/']", "Home")
+    assert has_element?(view, ".site-top-over a[href='/about']", "About us")
+    assert has_element?(view, ".site-top-over a[href='/contact']", "Get in touch")
   end
 
   test "homepage Get in touch navigates to /contact", %{conn: conn} do
@@ -36,7 +36,7 @@ defmodule EspresoWeb.HomeLiveTest do
 
     {:ok, contact_view, html} =
       view
-      |> element(".home-top a[href='/contact']", "Get in touch")
+      |> element(".site-top-over a[href='/contact']", "Get in touch")
       |> render_click()
       |> follow_redirect(conn, ~p"/contact")
 
@@ -50,24 +50,32 @@ defmodule EspresoWeb.HomeLiveTest do
 
     {:ok, menu_view, _html} =
       view
-      |> element(".home-top a[href='/menu']", "Menu")
+      |> element(".site-top-over a[href='/menu']", "Menu")
       |> render_click()
       |> follow_redirect(conn, ~p"/menu")
 
     assert has_element?(menu_view, ".menu-page")
   end
 
-  test "homepage hero fills the first screen for QR visitors", %{conn: conn} do
+  test "homepage hero uses Shade brew photography and headline", %{conn: conn} do
     {:ok, view, html} = live(conn, ~p"/")
 
-    assert has_element?(view, ".home-top-over")
-    assert has_element?(view, ".home-hero-overlay .home-hero-brand", "CoffeeSpot")
-    assert has_element?(view, ".home-hero-kicker", "Freshly brewed daily")
-    assert html =~ "Where every cup tells a"
-    assert html =~ "story"
+    assert has_element?(view, ".site-top-over .site-top-brand", "CoffeeSpot")
+    assert html =~ "An oasis to slow down"
+    assert html =~ "really good coffee"
     assert has_element?(
              view,
-             ~s([data-home-image="home-hero"] img[src="/images/coffeespot/home-hero.jpg"])
+             ~s([data-home-image="home-hero"] img[src="/images/coffeespot/home-hero-brew.jpg"])
            )
+  end
+
+  test "homepage includes Instagram grid and social icons", %{conn: conn} do
+    {:ok, view, html} = live(conn, ~p"/")
+
+    assert html =~ "Follow us on Instagram"
+    assert has_element?(view, ".site-instagram-grid .site-instagram-cell img")
+    assert has_element?(view, ".site-top-social[aria-label*='Instagram']")
+    assert has_element?(view, ".site-top-social[aria-label*='Facebook']")
+    assert has_element?(view, ".site-top-social[aria-label*='TikTok']")
   end
 end
