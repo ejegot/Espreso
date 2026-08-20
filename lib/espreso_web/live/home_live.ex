@@ -65,6 +65,9 @@ defmodule EspresoWeb.HomeLive do
         </div>
       </section>
 
+      <%!-- Promos --%>
+      <.brune_promos />
+
       <%!-- Find us / Hours --%>
       <section class="brune-visit" aria-label="Visit CoffeeSpot">
         <div class="brune-visit-grid">

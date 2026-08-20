@@ -17,6 +17,7 @@ defmodule EspresoWeb.CoreComponents do
   use Phoenix.Component
   use Gettext, backend: EspresoWeb.Gettext
 
+  alias Espreso.CoffeeSpot
   alias Phoenix.LiveView.JS
 
   @doc """
@@ -651,6 +652,46 @@ defmodule EspresoWeb.CoreComponents do
         <% end %>
       </div>
     </header>
+    """
+  end
+
+  @doc """
+  Home page promo cards — midnight hours and student discount.
+  """
+  def brune_promos(assigns) do
+    ~H"""
+    <section class="brune-promos" aria-labelledby="brune-promos-title">
+      <header class="brune-promos-head">
+        <p class="brune-promos-eyebrow">What's brewing</p>
+        <h2 id="brune-promos-title" class="brune-promos-title">Coming this September</h2>
+      </header>
+
+      <ul class="brune-promos-grid">
+        <li :for={promo <- CoffeeSpot.promo_cards()} class="brune-promo-card">
+          <article class="brune-promo-card-inner">
+            <figure class="brune-promo-visual">
+              <img src={promo.image} alt={promo.image_alt} loading="lazy" />
+              <span class="brune-promo-badge">{promo.badge}</span>
+            </figure>
+            <div class="brune-promo-copy">
+              <h3 class="brune-promo-name">{promo.title}</h3>
+              <p class="brune-promo-body">{promo.body}</p>
+            </div>
+          </article>
+        </li>
+      </ul>
+    </section>
+    """
+  end
+
+  @doc """
+  Slim student promo strip for the Menu page.
+  """
+  def brune_student_promo(assigns) do
+    ~H"""
+    <aside class="brune-student-promo" aria-label="Student promotion">
+      <p class="brune-student-promo-text">{CoffeeSpot.student_promo_note()}</p>
+    </aside>
     """
   end
 
