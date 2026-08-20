@@ -29,20 +29,21 @@ Hooks.SmoothScroll = {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
     const coarse = window.matchMedia("(pointer: coarse)").matches
 
+    this.reduce = reduce
+
     if (reduce) return
+
+    document.documentElement.style.scrollBehavior = "smooth"
 
     this.current = window.scrollY
     this.target = window.scrollY
     this.running = false
     this.lastTime = performance.now()
-    this.ease = coarse ? 0.075 : 0.036
-    this.wheelScale = coarse ? 1 : 0.72
-    this.stopAt = 0.12
+    this.ease = coarse ? 0.08 : 0.024
+    this.wheelScale = coarse ? 1 : 0.85
+    this.stopAt = 0.08
 
-    if (coarse) {
-      document.documentElement.style.scrollBehavior = "smooth"
-      return
-    }
+    if (coarse) return
 
     this.isLocked = () =>
       document.querySelector(".menu-page-locked, .menu-buy-layer, #menu-basket")
@@ -106,21 +107,50 @@ Hooks.SmoothScroll = {
       this.target = window.scrollY
     }
 
+    this.scrollToTop = () => {
+      this.target = 0
+      this.current = window.scrollY
+      if (this.current < 1) {
+        this.current = 0
+        window.scrollTo(0, 0)
+        return
+      }
+      if (!this.running) {
+        this.lastTime = performance.now()
+        this.raf = requestAnimationFrame(this.loop)
+      }
+    }
+
     this.onNavigate = () => {
       if (this.lastPath === window.location.pathname) return
       this.lastPath = window.location.pathname
-      this.current = 0
-      this.target = 0
-      this.running = false
-      if (this.raf) cancelAnimationFrame(this.raf)
-      window.scrollTo(0, 0)
+      this.scrollToTop()
     }
 
     this.lastPath = window.location.pathname
 
+    this.onProgrammaticScroll = (event) => {
+      event.preventDefault()
+      const top = event.detail?.top ?? 0
+      this.current = window.scrollY
+      this.target = top
+      if (event.detail?.reduce) {
+        this.current = top
+        this.running = false
+        if (this.raf) cancelAnimationFrame(this.raf)
+        window.scrollTo(0, top)
+        return
+      }
+      if (!this.running) {
+        this.lastTime = performance.now()
+        this.raf = requestAnimationFrame(this.loop)
+      }
+    }
+
     window.addEventListener("wheel", this.onWheel, {passive: false})
     window.addEventListener("scroll", this.sync, {passive: true})
     window.addEventListener("phx:page-loading-stop", this.onNavigate)
+    window.addEventListener("site:scroll-to", this.onProgrammaticScroll)
   },
 
   destroyed() {
@@ -128,6 +158,7 @@ Hooks.SmoothScroll = {
     if (this.onWheel) window.removeEventListener("wheel", this.onWheel)
     if (this.sync) window.removeEventListener("scroll", this.sync)
     if (this.onNavigate) window.removeEventListener("phx:page-loading-stop", this.onNavigate)
+    if (this.onProgrammaticScroll) window.removeEventListener("site:scroll-to", this.onProgrammaticScroll)
     if (this.raf) cancelAnimationFrame(this.raf)
   }
 }
@@ -139,33 +170,39 @@ Hooks.MenuBrowse = {
   },
 
   scrollOffset() {
-    const header = this.el.querySelector(".site-top")
-    const nav = this.el.querySelector(".brune-menu-nav")
+    const header = this.el.querySelector(".brune-top") || this.el.querySelector(".site-top")
+    const nav = this.el.querySelector(".brune-menu-tabs-line") || this.el.querySelector(".brune-menu-nav")
     return (header?.offsetHeight || 0) + (nav?.offsetHeight || 0) + 12
+  },
+
+  scrollTo(top) {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    const event = new CustomEvent("site:scroll-to", {detail: {top, reduce}, cancelable: true})
+    window.dispatchEvent(event)
+    if (!event.defaultPrevented) {
+      window.scrollTo({top, behavior: reduce ? "auto" : "smooth"})
+    }
   },
 
   scrollToItems() {
     const items = this.el.querySelector("#menu-items")
     if (!items) return
-
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
     const top = Math.max(0, items.getBoundingClientRect().top + window.scrollY - this.scrollOffset())
-
-    requestAnimationFrame(() => {
-      window.scrollTo({top, behavior: reduce ? "auto" : "smooth"})
-    })
+    requestAnimationFrame(() => this.scrollTo(top))
   },
 
   scrollToCategory(name) {
-    const section = this.el.querySelector(`#category-${name}`)
-    if (!section) return this.scrollToItems()
+    const go = () => {
+      const section = this.el.querySelector(`#category-${name}`)
+      const title = section?.querySelector(".brune-menu-category-title")
+      const target = title || section
+      if (!target) return this.scrollToItems()
 
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    const top = Math.max(0, section.getBoundingClientRect().top + window.scrollY - this.scrollOffset())
+      const top = Math.max(0, target.getBoundingClientRect().top + window.scrollY - this.scrollOffset())
+      this.scrollTo(top)
+    }
 
-    requestAnimationFrame(() => {
-      window.scrollTo({top, behavior: reduce ? "auto" : "smooth"})
-    })
+    requestAnimationFrame(() => requestAnimationFrame(go))
   }
 }
 
@@ -254,9 +291,25 @@ let liveSocket = new LiveSocket("/live", Socket, {
 })
 
 // Show progress bar on live navigation and form submits
-topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
-window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
-window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
+topbar.config({barColors: {0: "#3a8a3e"}, shadowColor: "rgba(58, 138, 62, 0.15)"})
+window.addEventListener("phx:page-loading-start", info => {
+  topbar.show(200)
+  const kind = info.detail?.kind
+  if (kind !== "initial" && kind !== "ignore") {
+    document.documentElement.classList.add("page-is-loading")
+  }
+})
+window.addEventListener("phx:page-loading-stop", _info => {
+  topbar.hide()
+  document.documentElement.classList.remove("page-is-loading")
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  if (reduce) return
+  const page = document.querySelector(".site-page")
+  if (!page) return
+  page.classList.remove("is-entering")
+  void page.offsetWidth
+  page.classList.add("is-entering")
+})
 
 // connect if there are any LiveViews on the page
 liveSocket.connect()

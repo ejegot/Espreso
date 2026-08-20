@@ -49,12 +49,13 @@ defmodule EspresoWeb.MenuLive do
   @impl true
   def handle_event("select_category", %{"name" => name}, socket) do
     if Enum.any?(socket.assigns.categories, &(&1.name == name)) do
-      {:noreply,
-       socket
-       |> assign(:selected_category, name)
-       |> assign(:search, "")
-       |> assign(:detail, nil)
-       |> assign(:detail_closing?, false)}
+        {:noreply,
+         socket
+         |> assign(:selected_category, name)
+         |> assign(:search, "")
+         |> assign(:detail, nil)
+         |> assign(:detail_closing?, false)
+         |> push_event("scroll_to_category", %{name: name})}
     else
       {:noreply, socket}
     end
@@ -138,7 +139,7 @@ defmodule EspresoWeb.MenuLive do
             qty,
             Menu.product_image(category_name, product.name)
           )
-        Process.send_after(self(), :clear_toast, 2400)
+        Process.send_after(self(), :clear_toast, 2000)
 
         {:noreply,
          socket
@@ -205,11 +206,9 @@ defmodule EspresoWeb.MenuLive do
     <div
       id="menu-page"
       phx-hook="MenuBrowse"
-      class={[
-        "menu-page menu-page-brune site-page",
-        (@detail || @basket_open?) && "menu-page-locked"
-      ]}
+      class={["menu-live-root", (@detail || @basket_open?) && "menu-page-locked"]}
     >
+      <div class="menu-page menu-page-brune site-page">
       <.brune_header
         current="menu"
         show_basket?={true}
@@ -268,6 +267,8 @@ defmodule EspresoWeb.MenuLive do
             {category_nav_label(category.name)}
           </button>
         </nav>
+
+        <.brune_student_promo />
 
         <div class="brune-menu-body" id="menu-items">
           <section
@@ -364,6 +365,7 @@ defmodule EspresoWeb.MenuLive do
         </div>
 
       </footer>
+      </div>
 
       <div
         :if={@detail}
@@ -405,7 +407,7 @@ defmodule EspresoWeb.MenuLive do
               </p>
             </div>
 
-            <div :if={length(@detail.product.product_prices) > 1} class="menu-detail-sizes">
+            <div class="menu-detail-sizes">
               <p class="menu-detail-label">Size</p>
               <div class="menu-size-pills" role="group" aria-label="Size">
                 <button

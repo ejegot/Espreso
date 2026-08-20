@@ -29,9 +29,44 @@ defmodule Espreso.CoffeeSpot do
   """
   def hours_lines do
     [
-      "Daily · Lilac, Marikina",
+      "Mon–Thu · 8:00 AM – 12:00 AM",
+      "Fri–Sun · 8:00 AM – 10:00 PM",
+      "Student Hour · Mon–Thu, 2:00 PM – 5:00 PM",
       "Holiday hours on Instagram"
     ]
+  end
+
+  @doc """
+  Featured promo cards for the Home page "What's brewing" section.
+  """
+  def promo_cards do
+    [
+      %{
+        id: :midnight_haven,
+        badge: "Coming September",
+        title: "Your New Midnight Haven",
+        body:
+          "We're extending our hours for students and night owls. Fast Wi-Fi, premium coffee, and cozy industrial vibes — open late for study sessions and deadlines.",
+        image: "/images/coffeespot/promo-midnight-haven.jpg",
+        image_alt: "CoffeeSpot interior at night with laptop and coffee"
+      },
+      %{
+        id: :student_discount,
+        badge: "Starting Sept 4",
+        title: "Student Discount Hour",
+        body:
+          "Marikina students, this one's for you. Drop by Mon–Thu from 2:00 PM to 5:00 PM, flash your valid School ID, and get a free size upgrade on iced drinks.",
+        image: "/images/coffeespot/promo-student-discount.jpg",
+        image_alt: "Large iced Spanish Latte at CoffeeSpot"
+      }
+    ]
+  end
+
+  @doc """
+  Slim promo note shown on the Menu page above item listings.
+  """
+  def student_promo_note do
+    "Students: Free size upgrade on iced drinks — Mon–Thu, 2:00 PM – 5:00 PM. Show valid School ID at counter."
   end
 
   def service_area, do: "Marikina City, Philippines"
@@ -57,12 +92,13 @@ defmodule Espreso.CoffeeSpot do
 
   def specialties do
     [
-      "Online booking",
+      "Extended hours",
+      "Fast Wi-Fi",
+      "Study-friendly space",
       "In-store pickup",
       "Dine-in",
       "Takeout",
-      "Outdoor seating",
-      "Reservations"
+      "Outdoor seating"
     ]
   end
 
