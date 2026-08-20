@@ -3,91 +3,123 @@ defmodule EspresoWeb.ContactLive do
 
   alias Espreso.CoffeeSpot
 
+  @instagram_images [
+    "/images/coffeespot/IMG_3478.JPG",
+    "/images/coffeespot/IMG_3482.JPG",
+    "/images/coffeespot/IMG_3468.JPG",
+    "/images/coffeespot/IMG_3475.JPG",
+    "/images/coffeespot/IMG_3488.JPG"
+  ]
+
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, :page_title, "Get in touch"), layout: false}
+    {:ok,
+     socket
+     |> assign(:page_title, "Contact")
+     |> assign(:instagram_images, @instagram_images), layout: false}
   end
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="contact-page site-page">
-      <.site_header current="contact" />
+    <div class="menu-page-brune site-page">
+      <.brune_header current="contact" />
 
-      <main class="contact-main">
-        <header class="contact-hero">
-          <p class="contact-eyebrow">Get in touch</p>
-          <h1 class="contact-title">CoffeeSpot</h1>
-          <p class="contact-lede">Lilac, Marikina</p>
-        </header>
+      <%!-- Two-column layout: left info, right form --%>
+      <section class="brune-contact-main">
+        <div class="brune-contact-left">
+          <div class="brune-contact-brand">
+            <p class="brune-contact-brand-name">CoffeeSpot</p>
+            <h1 class="brune-contact-brand-title">Contact</h1>
+          </div>
 
-        <section class="contact-section contact-section-find" aria-labelledby="contact-find-title">
-          <p class="contact-section-eyebrow">Find us</p>
-          <h2 id="contact-find-title" class="contact-section-title">
-            Come sit in <em>Lilac.</em>
-          </h2>
+          <div class="brune-contact-block">
+            <p class="brune-contact-label">Reach us</p>
+            <a href={"tel:#{CoffeeSpot.phone_tel()}"} class="brune-contact-value">{CoffeeSpot.phone_display()}</a>
+            <a href={CoffeeSpot.email_url()} class="brune-contact-value">{CoffeeSpot.email()}</a>
+          </div>
 
-          <div class="contact-map">
-            <iframe
-              class="contact-map-frame"
-              src={CoffeeSpot.map_embed_url()}
-              title="Map of CoffeeSpot on Lilac Street, Marikina"
+          <div class="brune-contact-block">
+            <p class="brune-contact-label">Find us</p>
+            <p class="brune-contact-value">{CoffeeSpot.address_short()}</p>
+            <p class="brune-contact-value">{CoffeeSpot.hours_label()}</p>
+          </div>
+
+          <figure class="brune-contact-image">
+            <img
+              src="/images/coffeespot/visit-interior-01.jpg"
+              alt="Inside CoffeeSpot"
               loading="lazy"
-              referrerpolicy="no-referrer-when-downgrade"
-              allowfullscreen
-            >
-            </iframe>
-          </div>
-
-          <div class="contact-details">
-            <div class="contact-detail">
-              <p class="contact-detail-value">{CoffeeSpot.address_display()}</p>
-              <p class="contact-detail-label">Address</p>
-              <a
-                href={CoffeeSpot.map_link_url()}
-                class="contact-map-link"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Open in Google Maps
-              </a>
-            </div>
-
-            <div class="contact-detail">
-              <p class="contact-detail-value">{CoffeeSpot.hours_label()}</p>
-              <p class="contact-detail-label">{CoffeeSpot.hours_note()}</p>
-            </div>
-
-            <div class="contact-detail">
-              <p class="contact-detail-value">{CoffeeSpot.service_area()}</p>
-              <p class="contact-detail-label">Service area</p>
-            </div>
-          </div>
-        </section>
-
-        <section class="contact-section contact-section-channels" aria-labelledby="contact-channels-title">
-          <p class="contact-section-eyebrow">Contact</p>
-          <h2 id="contact-channels-title" class="contact-section-title">
-            Say <em>hello</em>
-          </h2>
-          <.contact_links variant="contact" links={CoffeeSpot.contact_links()} />
-        </section>
-
-        <div class="contact-order-cta">
-          <.link navigate={~p"/menu"} class="site-cta">Order from the menu</.link>
+            />
+          </figure>
         </div>
-      </main>
 
-      <footer class="site-footer">
-        <p class="site-footer-brand">CoffeeSpot</p>
-        <p>{CoffeeSpot.place_line()}</p>
-        <p class="site-footer-links">
-          <.link navigate={~p"/"} class="site-footer-link">Home</.link>
-          <span class="site-footer-sep" aria-hidden="true">·</span>
-          <.link navigate={~p"/menu"} class="site-footer-link">Menu</.link>
-          <span class="site-footer-sep" aria-hidden="true">·</span>
-          <.link navigate={~p"/about"} class="site-footer-link">About us</.link>
-        </p>
+        <div class="brune-contact-right">
+          <h2 class="brune-contact-form-title">How can we help you?</h2>
+
+          <form class="brune-contact-form" phx-submit="send_message">
+            <div class="brune-contact-field">
+              <label for="contact-name" class="brune-contact-field-label">Full name</label>
+              <input type="text" id="contact-name" name="name" class="brune-contact-input" required />
+            </div>
+
+            <div class="brune-contact-field">
+              <label for="contact-phone" class="brune-contact-field-label">Phone number</label>
+              <input type="tel" id="contact-phone" name="phone" class="brune-contact-input" />
+            </div>
+
+            <div class="brune-contact-field">
+              <label for="contact-message" class="brune-contact-field-label">Message</label>
+              <textarea id="contact-message" name="message" rows="4" class="brune-contact-textarea" required></textarea>
+            </div>
+
+            <button type="submit" class="brune-contact-submit">Send Message</button>
+          </form>
+        </div>
+      </section>
+
+      <%!-- Instagram --%>
+      <section class="site-instagram site-instagram-menu" aria-labelledby="contact-instagram-title">
+        <header class="site-instagram-head">
+          <h2 id="contact-instagram-title" class="site-instagram-title">
+            <a href={CoffeeSpot.instagram_url()} target="_blank" rel="noopener noreferrer">
+              Check us out on Instagram
+            </a>
+          </h2>
+        </header>
+        <ul class="site-instagram-grid">
+          <li :for={src <- @instagram_images} class="site-instagram-cell">
+            <a href={CoffeeSpot.instagram_url()} target="_blank" rel="noopener noreferrer" tabindex="-1" aria-hidden="true">
+              <img src={src} alt="" loading="lazy" />
+            </a>
+          </li>
+        </ul>
+      </section>
+
+      <%!-- Mega footer --%>
+      <footer class="brune-mega-footer" aria-label="CoffeeSpot footer">
+        <p class="brune-mega-brand">Elilai</p>
+
+        <div class="brune-mega-grid">
+          <div class="brune-mega-block">
+            <p class="brune-mega-label">Hours</p>
+            <p :for={line <- CoffeeSpot.hours_lines()} class="brune-mega-text">{line}</p>
+          </div>
+
+          <div class="brune-mega-block">
+            <p class="brune-mega-label">Contact</p>
+            <a href={CoffeeSpot.email_url()} class="brune-mega-link">{CoffeeSpot.email()}</a>
+            <a href={"tel:#{CoffeeSpot.phone_tel()}"} class="brune-mega-link">{CoffeeSpot.phone_display()}</a>
+          </div>
+
+          <div class="brune-mega-block">
+            <p class="brune-mega-label">Location</p>
+            <a href={CoffeeSpot.map_link_url()} target="_blank" rel="noopener noreferrer" class="brune-mega-link">
+              {CoffeeSpot.address_short()}
+            </a>
+          </div>
+        </div>
+
       </footer>
     </div>
     """

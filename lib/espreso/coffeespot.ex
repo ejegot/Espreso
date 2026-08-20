@@ -14,6 +14,26 @@ defmodule Espreso.CoffeeSpot do
 
   def place_line, do: "CoffeeSpot · Lilac, Marikina"
 
+  def tagline, do: "The place where bold coffee meets good vibes."
+
+  def vibes_eyebrow, do: "The vibes"
+
+  def vibes_quote,
+    do:
+      "Unmatched vibes, great coffee, and a vibrant space that's all about community and creativity."
+
+  def address_short, do: "84 Lilac St., Concepcion Dos, Marikina City, Philippines"
+
+  @doc """
+  Short lines for the Brune-style visit strip and footer hours column.
+  """
+  def hours_lines do
+    [
+      "Daily · Lilac, Marikina",
+      "Holiday hours on Instagram"
+    ]
+  end
+
   def service_area, do: "Marikina City, Philippines"
 
   def hours_label, do: "Open now"

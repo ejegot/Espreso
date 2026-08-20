@@ -620,6 +620,74 @@ defmodule EspresoWeb.CoreComponents do
   end
 
   @doc """
+  Minimal Brune-style top bar — logo left, menu link right.
+  """
+  attr :current, :string, default: "home", values: ~w(home menu about contact)
+  attr :show_basket?, :boolean, default: false
+  attr :basket_count, :integer, default: 0
+  attr :basket_pulse?, :boolean, default: false
+
+  def brune_header(assigns) do
+    ~H"""
+    <header class="brune-top">
+      <.link navigate="/" class="brune-top-brand">CoffeeSpot</.link>
+      <div class="brune-top-trailing">
+        <nav class="brune-top-nav" aria-label="Main">
+          <.link navigate="/" class={["brune-top-link", @current == "home" && "is-current"]}>Home</.link>
+          <.link navigate="/menu" class={["brune-top-link", @current == "menu" && "is-current"]}>Menu</.link>
+          <.link navigate="/about" class={["brune-top-link", @current == "about" && "is-current"]}>About</.link>
+          <.link navigate="/contact" class={["brune-top-link", @current == "contact" && "is-current"]}>Contact</.link>
+        </nav>
+        <%= if @show_basket? do %>
+          <button
+            type="button"
+            class={["brune-basket-btn", @basket_pulse? && "brune-basket-btn-pulse"]}
+            phx-click="open_basket"
+            aria-label={"Checkout, #{@basket_count} items"}
+          >
+            Checkout
+            <span class={["brune-basket-count", @basket_pulse? && "is-pulse"]}>{@basket_count}</span>
+          </button>
+        <% end %>
+      </div>
+    </header>
+    """
+  end
+
+  def brune_cups(assigns) do
+    ~H"""
+    <svg class="brune-cups" viewBox="0 0 180 220" fill="none" aria-hidden="true">
+      <path
+        d="M42 118c0-18 10-34 28-38 8-2 16-1 22 2 10-14 28-18 42-8 14 10 16 30 6 44 4 2 8 6 10 12 6 14-2 30-16 34H52c-14-4-22-20-16-34 2-6 4-8 6-12z"
+        stroke="currentColor"
+        stroke-width="3.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <path
+        d="M78 44c0-12 8-22 20-22s20 10 20 22"
+        stroke="currentColor"
+        stroke-width="3.5"
+        stroke-linecap="round"
+      />
+      <circle cx="68" cy="92" r="3" fill="currentColor" />
+      <circle cx="88" cy="92" r="3" fill="currentColor" />
+      <path d="M72 104c6 6 16 6 22 0" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+      <path
+        d="M98 132c0-16 10-30 24-34 8-2 16 0 22 4 8-12 24-16 36-6 10 8 12 24 4 34 3 2 6 6 8 12 4 12-4 26-16 28H104c-12-2-20-16-16-28 2-6 5-10 10-12z"
+        stroke="currentColor"
+        stroke-width="3.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <circle cx="118" cy="108" r="3" fill="currentColor" />
+      <circle cx="138" cy="108" r="3" fill="currentColor" />
+      <path d="M122 120c6 5 14 5 20 0" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+    </svg>
+    """
+  end
+
+  @doc """
   Shared CoffeeSpot site header for Home, Menu, About, and Contact.
   """
   attr :current, :string, required: true, values: ~w(home menu about contact)
@@ -657,9 +725,9 @@ defmodule EspresoWeb.CoreComponents do
             type="button"
             class={["menu-basket-btn", @basket_pulse? && "menu-basket-btn-pulse"]}
             phx-click="open_basket"
-            aria-label={"Basket, #{@basket_count} items"}
+            aria-label={"Checkout, #{@basket_count} items"}
           >
-            Basket
+            Checkout
             <span class={["menu-basket-count", @basket_pulse? && "is-pulse"]}>{@basket_count}</span>
           </button>
         </div>

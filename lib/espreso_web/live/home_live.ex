@@ -3,36 +3,21 @@ defmodule EspresoWeb.HomeLive do
 
   alias Espreso.CoffeeSpot
 
-  @happenings [
+  @hero_images [
     %{
-      title: "The art of coffee",
-      image: "/images/coffeespot/coffee-espresso-01.jpg",
-      alt: "Espresso and craft at CoffeeSpot"
+      src: "/images/coffeespot/cafe-atmosphere-01.jpg",
+      alt: "Outdoor seating at CoffeeSpot Lilac",
+      tilt: "left"
     },
     %{
-      title: "Soft mornings in Lilac",
-      image: "/images/coffeespot/cafe-atmosphere-01.jpg",
-      alt: "Quiet corner inside CoffeeSpot"
+      src: "/images/coffeespot/visit-interior-01.jpg",
+      alt: "Coffee bar inside CoffeeSpot",
+      tilt: "center"
     },
     %{
-      title: "Come sit with us",
-      image: "/images/coffeespot/visit-interior-01.jpg",
-      alt: "Warm booth seating at CoffeeSpot"
-    },
-    %{
-      title: "Let it brew slow",
-      image: "/images/coffeespot/atmosphere-table-01.jpg",
-      alt: "Window light and a quiet table at CoffeeSpot"
-    },
-    %{
-      title: "Something cold",
-      image: "/images/coffeespot/cold-signature-01.jpg",
-      alt: "Cold drink at CoffeeSpot"
-    },
-    %{
-      title: "Bites between sips",
-      image: "/images/coffeespot/food-signature-01.jpg",
-      alt: "Food at CoffeeSpot"
+      src: "/images/coffeespot/cold-signature-01.jpg",
+      alt: "Cold drink at CoffeeSpot",
+      tilt: "right"
     }
   ]
 
@@ -41,8 +26,7 @@ defmodule EspresoWeb.HomeLive do
     "/images/coffeespot/IMG_3482.JPG",
     "/images/coffeespot/IMG_3468.JPG",
     "/images/coffeespot/IMG_3475.JPG",
-    "/images/coffeespot/IMG_3488.JPG",
-    "/images/coffeespot/IMG_3457.JPG"
+    "/images/coffeespot/IMG_3488.JPG"
   ]
 
   @impl true
@@ -50,111 +34,124 @@ defmodule EspresoWeb.HomeLive do
     {:ok,
      socket
      |> assign(:page_title, "CoffeeSpot")
-     |> assign(:happenings, @happenings)
+     |> assign(:hero_images, @hero_images)
      |> assign(:instagram_images, @instagram_images), layout: false}
   end
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="home-page home-page-shade">
-      <section class="home-hero" aria-label="CoffeeSpot Lilac Marikina">
-        <figure class="home-media home-media-hero" data-home-image="home-hero">
-          <div class="home-media-frame">
-            <img
-              src={~p"/images/coffeespot/home-hero-brew.jpg"}
-              alt="Coffee beans, portafilter, and latte on a wooden board"
-              class="home-media-image"
-              loading="eager"
-            />
-            <div class="home-hero-overlay">
-              <.site_header current="home" variant="overlay" />
+    <div class="menu-page-brune site-page">
+      <.brune_header current="home" />
 
-              <div class="home-hero-copy">
-                <h1 class="home-hero-title">
-                  An oasis to slow down and enjoy really good coffee.
-                </h1>
-                <p class="home-hero-place">{CoffeeSpot.address_display()}</p>
-                <div class="home-hero-actions">
-                  <.link navigate={~p"/menu"} class="home-cta home-cta-hero">Order now</.link>
-                  <.link navigate={~p"/about"} class="home-cta-ghost home-cta-hero-ghost">
-                    Our story
-                  </.link>
-                </div>
-              </div>
-            </div>
-          </div>
-        </figure>
-      </section>
+      <%!-- Hero --%>
+      <section class="brune-hero" aria-label="CoffeeSpot">
+        <div class="brune-hero-copy">
+          <h1 class="brune-hero-title">CoffeeSpot</h1>
+          <p class="brune-hero-lede">{CoffeeSpot.tagline()}</p>
+        </div>
 
-      <section class="home-happenings" aria-labelledby="home-happenings-title">
-        <header class="home-happenings-head">
-          <h2 id="home-happenings-title" class="home-happenings-title">What's happening</h2>
-          <p class="home-happenings-lede">
-            Moments from the shop — brew, food, and the quiet pace of Lilac.
-          </p>
-        </header>
-
-        <ul class="home-happenings-grid">
-          <li :for={item <- @happenings} class="home-happening">
-            <figure class="home-happening-media">
-              <img src={item.image} alt={item.alt} loading="lazy" />
-            </figure>
-            <p class="home-happening-title">{item.title}</p>
+        <ul class="brune-hero-gallery" aria-hidden="true">
+          <li
+            :for={image <- @hero_images}
+            class={["brune-hero-shot", "brune-hero-shot--#{image.tilt}"]}
+          >
+            <img src={image.src} alt={image.alt} loading="eager" />
           </li>
         </ul>
 
-        <div class="home-happenings-cta">
-          <.link navigate={~p"/menu"} class="home-cta">Browse the menu</.link>
+        <div class="brune-hero-actions">
+          <.link navigate={~p"/menu"} class="brune-primary-btn">View our menu</.link>
         </div>
       </section>
 
-      <figure class="home-break" data-home-image="home-break">
-        <img
-          src={~p"/images/coffeespot/coffee-table-01.jpg"}
-          alt="A cup of coffee on the table at CoffeeSpot Lilac Marikina"
-          loading="lazy"
-        />
-      </figure>
+      <%!-- Find us / Hours --%>
+      <section class="brune-visit" aria-label="Visit CoffeeSpot">
+        <div class="brune-visit-grid">
+          <div class="brune-visit-block">
+            <p class="brune-visit-label">Find us</p>
+            <p class="brune-visit-text">{CoffeeSpot.address_short()}</p>
+            <a href={"tel:#{CoffeeSpot.phone_tel()}"} class="brune-visit-link">
+              {CoffeeSpot.phone_display()}
+            </a>
+            <a href={CoffeeSpot.email_url()} class="brune-visit-link">{CoffeeSpot.email()}</a>
+          </div>
 
-      <section class="site-instagram" aria-labelledby="home-instagram-title">
+          <div class="brune-visit-art" aria-hidden="true">
+            <.brune_cups />
+          </div>
+
+          <div class="brune-visit-block brune-visit-block-end">
+            <p class="brune-visit-label">Our hours</p>
+            <p :for={line <- CoffeeSpot.hours_lines()} class="brune-visit-text">{line}</p>
+          </div>
+        </div>
+      </section>
+
+      <%!-- The vibes --%>
+      <section class="brune-vibes" aria-labelledby="brune-vibes-title">
+        <p class="brune-vibes-eyebrow">{CoffeeSpot.vibes_eyebrow()}</p>
+        <h2 id="brune-vibes-title" class="brune-vibes-quote">{CoffeeSpot.vibes_quote()}</h2>
+      </section>
+
+      <%!-- Instagram --%>
+      <section class="site-instagram site-instagram-menu" aria-labelledby="home-instagram-title">
         <header class="site-instagram-head">
           <h2 id="home-instagram-title" class="site-instagram-title">
-            <a
-              href={CoffeeSpot.instagram_url()}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Follow us on Instagram
+            <a href={CoffeeSpot.instagram_url()} target="_blank" rel="noopener noreferrer">
+              Check us out on Instagram
             </a>
           </h2>
         </header>
 
         <ul class="site-instagram-grid">
           <li :for={src <- @instagram_images} class="site-instagram-cell">
-            <a
-              href={CoffeeSpot.instagram_url()}
-              target="_blank"
-              rel="noopener noreferrer"
-              tabindex="-1"
-              aria-hidden="true"
-            >
+            <a href={CoffeeSpot.instagram_url()} target="_blank" rel="noopener noreferrer" tabindex="-1" aria-hidden="true">
               <img src={src} alt="" loading="lazy" />
             </a>
           </li>
         </ul>
       </section>
 
-      <footer class="site-footer">
-        <p class="site-footer-brand">CoffeeSpot</p>
-        <p>{CoffeeSpot.place_line()}</p>
-        <p class="site-footer-links">
-          <.link navigate={~p"/menu"} class="site-footer-link">Menu</.link>
-          <span class="site-footer-sep" aria-hidden="true">·</span>
-          <.link navigate={~p"/about"} class="site-footer-link">About us</.link>
-          <span class="site-footer-sep" aria-hidden="true">·</span>
-          <.link navigate={~p"/contact"} class="site-footer-link">Get in touch</.link>
-        </p>
+      <%!-- Socials --%>
+      <section class="brune-socials" aria-label="Follow CoffeeSpot">
+        <div class="brune-socials-grid">
+          <a href={CoffeeSpot.facebook_url()} target="_blank" rel="noopener noreferrer" class="brune-social-card" aria-label="Facebook">
+            <.social_icon name={:facebook} />
+          </a>
+          <a href={CoffeeSpot.tiktok_url()} target="_blank" rel="noopener noreferrer" class="brune-social-card" aria-label="TikTok">
+            <.social_icon name={:tiktok} />
+          </a>
+          <a href={CoffeeSpot.instagram_url()} target="_blank" rel="noopener noreferrer" class="brune-social-card" aria-label="Instagram">
+            <.social_icon name={:instagram} />
+          </a>
+        </div>
+      </section>
+
+      <%!-- Mega footer --%>
+      <footer class="brune-mega-footer" aria-label="CoffeeSpot footer">
+        <p class="brune-mega-brand">Elilai</p>
+
+        <div class="brune-mega-grid">
+          <div class="brune-mega-block">
+            <p class="brune-mega-label">Hours</p>
+            <p :for={line <- CoffeeSpot.hours_lines()} class="brune-mega-text">{line}</p>
+          </div>
+
+          <div class="brune-mega-block">
+            <p class="brune-mega-label">Contact</p>
+            <a href={CoffeeSpot.email_url()} class="brune-mega-link">{CoffeeSpot.email()}</a>
+            <a href={"tel:#{CoffeeSpot.phone_tel()}"} class="brune-mega-link">{CoffeeSpot.phone_display()}</a>
+          </div>
+
+          <div class="brune-mega-block">
+            <p class="brune-mega-label">Location</p>
+            <a href={CoffeeSpot.map_link_url()} target="_blank" rel="noopener noreferrer" class="brune-mega-link">
+              {CoffeeSpot.address_short()}
+            </a>
+          </div>
+        </div>
+
       </footer>
     </div>
     """
