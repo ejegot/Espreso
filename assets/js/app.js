@@ -135,6 +135,13 @@ Hooks.SmoothScroll = {
 Hooks.MenuBrowse = {
   mounted() {
     this.handleEvent("scroll_to_items", () => this.scrollToItems())
+    this.handleEvent("scroll_to_category", ({name}) => this.scrollToCategory(name))
+  },
+
+  scrollOffset() {
+    const header = this.el.querySelector(".site-top")
+    const nav = this.el.querySelector(".brune-menu-nav")
+    return (header?.offsetHeight || 0) + (nav?.offsetHeight || 0) + 12
   },
 
   scrollToItems() {
@@ -142,10 +149,19 @@ Hooks.MenuBrowse = {
     if (!items) return
 
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    const header = this.el.querySelector(".site-top")
-    const cats = this.el.querySelector(".menu-categories-block")
-    const offset = (header?.offsetHeight || 0) + (cats?.offsetHeight || 0) + 10
-    const top = Math.max(0, items.getBoundingClientRect().top + window.scrollY - offset)
+    const top = Math.max(0, items.getBoundingClientRect().top + window.scrollY - this.scrollOffset())
+
+    requestAnimationFrame(() => {
+      window.scrollTo({top, behavior: reduce ? "auto" : "smooth"})
+    })
+  },
+
+  scrollToCategory(name) {
+    const section = this.el.querySelector(`#category-${name}`)
+    if (!section) return this.scrollToItems()
+
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    const top = Math.max(0, section.getBoundingClientRect().top + window.scrollY - this.scrollOffset())
 
     requestAnimationFrame(() => {
       window.scrollTo({top, behavior: reduce ? "auto" : "smooth"})

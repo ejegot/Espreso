@@ -4,15 +4,6 @@ defmodule EspresoWeb.MenuLive do
   alias Espreso.CoffeeSpot
   alias Espreso.Menu
 
-  @instagram_images [
-    "/images/coffeespot/IMG_3478.JPG",
-    "/images/coffeespot/IMG_3482.JPG",
-    "/images/coffeespot/IMG_3468.JPG",
-    "/images/coffeespot/IMG_3475.JPG",
-    "/images/coffeespot/IMG_3488.JPG",
-    "/images/coffeespot/IMG_3457.JPG"
-  ]
-
   @impl true
   def mount(_params, _session, socket) do
     categories = Menu.list_menu()
@@ -22,8 +13,8 @@ defmodule EspresoWeb.MenuLive do
      socket
      |> assign(:page_title, "Menu")
      |> assign(:categories, categories)
-     |> assign(:instagram_images, @instagram_images)
      |> assign(:selected_category, selected)
+     |> assign(:search, "")
      |> assign(:cart, [])
      |> assign(:basket_open?, false)
      |> assign(:basket_closing?, false)
@@ -61,30 +52,36 @@ defmodule EspresoWeb.MenuLive do
       {:noreply,
        socket
        |> assign(:selected_category, name)
+       |> assign(:search, "")
        |> assign(:detail, nil)
-       |> assign(:detail_closing?, false)
-       |> push_event("scroll_to_items", %{})}
+       |> assign(:detail_closing?, false)}
     else
       {:noreply, socket}
     end
   end
 
+  def handle_event("search", %{"search" => query}, socket) do
+    {:noreply, assign(socket, :search, query)}
+  end
+
   def handle_event("open_detail", %{"id" => id}, socket) do
-    case find_product(socket.assigns.categories, id) do
+    case find_product_with_category(socket.assigns.categories, id) do
       nil ->
         {:noreply, socket}
 
-      product ->
+      {category, product} ->
         price = List.first(product.product_prices)
 
         detail = %{
           product: product,
+          category_name: category.name,
           selected_price_id: price && price.id,
           quantity: 1
         }
 
         {:noreply,
          socket
+         |> assign(:selected_category, category.name)
          |> assign(:detail, detail)
          |> assign(:detail_closing?, false)
          |> assign(:basket_open?, false)
@@ -131,7 +128,7 @@ defmodule EspresoWeb.MenuLive do
     detail = socket.assigns.detail
 
     if detail && !socket.assigns.detail_closing? do
-      with %{product: product, selected_price_id: price_id, quantity: qty} <- detail,
+      with %{product: product, category_name: category_name, selected_price_id: price_id, quantity: qty} <- detail,
            %{} = price <- Enum.find(product.product_prices, &(&1.id == price_id)) do
         cart =
           add_line(
@@ -139,7 +136,7 @@ defmodule EspresoWeb.MenuLive do
             product,
             price,
             qty,
-            Menu.product_image(socket.assigns.selected_category, product.name)
+            Menu.product_image(category_name, product.name)
           )
         Process.send_after(self(), :clear_toast, 2400)
 
@@ -209,174 +206,163 @@ defmodule EspresoWeb.MenuLive do
       id="menu-page"
       phx-hook="MenuBrowse"
       class={[
-        "menu-page site-page",
+        "menu-page menu-page-brune site-page",
         (@detail || @basket_open?) && "menu-page-locked"
       ]}
     >
-      <.site_header
+      <.brune_header
         current="menu"
         show_basket?={true}
         basket_count={cart_count(@cart)}
         basket_pulse?={@basket_pulse?}
       />
 
-      <section class="menu-hero" aria-label="CoffeeSpot menu">
-        <figure class="menu-media menu-media-hero" data-image-slot="menu-hero">
-          <div class="menu-media-frame">
-            <img
-              src={~p"/images/coffeespot/menu-hero.jpg"}
-              alt="Latte and café interior at CoffeeSpot Lilac Marikina"
-              class="menu-media-image"
-              loading="eager"
-            />
-            <div class="menu-hero-overlay">
-              <div class="menu-hero-copy">
-                <p class="menu-brand">CoffeeSpot</p>
-                <h1 class="menu-hero-title">
-                  Order something good.<br />
-                  <em>Brewed to linger.</em>
-                </h1>
-                <p class="menu-hero-statement">
-                  Hot, cold, frappe, soda, and food — build your order, then send on WhatsApp.
-                </p>
-              </div>
-            </div>
-          </div>
-        </figure>
+      <%!-- Menu header with cups illustration --%>
+      <section class="brune-menu-hero" aria-labelledby="brune-menu-title">
+        <div class="brune-menu-hero-copy">
+          <h1 id="brune-menu-title" class="brune-menu-hero-title">Our Menu</h1>
+          <p class="brune-menu-hero-lede">
+            We have drink for every taste and a place for every occasion.
+          </p>
+        </div>
+        <div class="brune-menu-hero-art" aria-hidden="true">
+          <.brune_cups />
+        </div>
       </section>
 
-      <main class="contact-main menu-main">
-      <div class="menu-browse">
-        <div class="menu-categories-block">
-          <p class="menu-categories-label">Categories</p>
-          <nav class="menu-nav" aria-label="Menu categories">
-            <button
-              :for={category <- @categories}
-              type="button"
-              phx-click="select_category"
-              phx-value-name={category.name}
-              class={[
-                "menu-nav-link",
-                @selected_category == category.name && "menu-nav-link-active"
-              ]}
-              aria-pressed={to_string(@selected_category == category.name)}
-            >
-              {category.name}
-            </button>
-          </nav>
+      <section class="brune-menu-shell" id="menu">
+        <%!-- Search --%>
+        <div class="brune-menu-search">
+          <form phx-change="search" phx-submit="search">
+            <div class="brune-search-wrap">
+              <span class="brune-search-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                name="search"
+                value={@search}
+                placeholder="Search menu..."
+                class="brune-search-input"
+                autocomplete="off"
+                phx-debounce="200"
+              />
+            </div>
+          </form>
         </div>
 
-        <div class="menu-main">
+        <nav class="brune-menu-tabs-line" aria-label="Menu categories">
+          <button
+            :for={category <- @categories}
+            type="button"
+            phx-click="select_category"
+            phx-value-name={category.name}
+            class={[
+              "brune-menu-tab-link",
+              @selected_category == category.name && "brune-menu-tab-link-active"
+            ]}
+            aria-pressed={to_string(@selected_category == category.name)}
+          >
+            {category_nav_label(category.name)}
+          </button>
+        </nav>
+
+        <div class="brune-menu-body" id="menu-items">
           <section
-            :for={category <- visible_categories(@categories, @selected_category)}
-            class={"menu-category menu-category--#{section_tone(category.name)}"}
+            :for={category <- visible_categories(@categories, @selected_category, @search)}
+            class={"brune-menu-section brune-menu-section--#{section_tone(category.name)}"}
             id={"category-#{category.name}"}
             data-category={category.name}
           >
-            <div class="menu-category-heading">
-              <h1 class="menu-category-title">{category_heading(category.name)}</h1>
-              <p :if={lede = category_lede(category.name)} class="menu-category-lede">
-                {lede}
-              </p>
-            </div>
+            <h2 class="brune-menu-category-title">{category_nav_label(category.name)}</h2>
+            <div :for={group <- category.groups} class="brune-menu-group">
+              <p :if={group.name} class="brune-menu-subgroup">{group.name}</p>
 
-            <div class="menu-shop" id="menu-items">
-              <div :for={group <- category.groups} class="menu-shop-group">
-                <h2 :if={group.name} class="menu-subgroup-title">{group.name}</h2>
-
-                <ul class="menu-card-rail" id={"menu-cards-#{category.name}-#{group.name || "all"}"}>
-                  <li :for={product <- group.products} class="menu-card">
-                    <button
-                      type="button"
-                      class="menu-card-hit"
-                      phx-click="open_detail"
-                      phx-value-id={product.id}
-                      aria-label={"View #{product.name}"}
-                    >
-                      <div class={"menu-card-visual menu-card-visual--#{section_tone(category.name)}"}>
-                        <img
-                          src={Menu.product_image(category.name, product.name)}
-                          alt={product.name}
-                          class="menu-card-photo"
-                          loading="lazy"
-                        />
+              <ul class="brune-menu-items">
+                <li :for={product <- group.products} class="brune-menu-item">
+                  <article class="brune-menu-item-card">
+                    <div class="brune-menu-item-thumb">
+                      <img
+                        src={Menu.product_image(category.name, product.name)}
+                        alt={product.name}
+                        class="brune-menu-item-photo"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div class="brune-menu-item-body">
+                      <div class="brune-menu-item-top">
+                        <h3 class="brune-menu-item-name">{product.name}</h3>
+                        <p class="brune-menu-item-price">{card_price_label(product)}</p>
                       </div>
-                      <div class="menu-card-body">
-                        <h3 class="menu-card-name">{product.name}</h3>
-                        <p class="menu-card-price">{card_price_label(product)}</p>
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      class="menu-card-add"
-                      phx-click="open_detail"
-                      phx-value-id={product.id}
-                      aria-label={"Buy #{product.name}"}
-                    >
-                      <span aria-hidden="true">+</span>
-                    </button>
-                  </li>
-                </ul>
-              </div>
+                      <p class="brune-menu-item-blurb">{product_blurb(product, category.name)}</p>
+                      <button
+                        type="button"
+                        class="brune-order-link"
+                        phx-click="open_detail"
+                        phx-value-id={product.id}
+                        aria-label={"Order #{product.name}"}
+                      >
+                        Order <span aria-hidden="true">›</span>
+                      </button>
+                    </div>
+                  </article>
+                </li>
+              </ul>
             </div>
           </section>
-
-        <section class="menu-closing" id="visit" aria-labelledby="menu-visit-title">
-          <div class="menu-closing-copy">
-            <p class="menu-eyebrow">Visit</p>
-            <h2 id="menu-visit-title" class="menu-closing-title">
-              Come sit in <em>Lilac.</em>
-            </h2>
-            <p class="menu-closing-body">
-              Soft light, quiet corners, and a neighborhood pace —
-              CoffeeSpot is built for lingering.
-            </p>
-            <p class="menu-closing-place">{CoffeeSpot.place_line()}</p>
-            <.link navigate={~p"/contact"} class="menu-cta menu-visit-cta">Get in touch</.link>
-          </div>
-        </section>
         </div>
-      </div>
-      </main>
+      </section>
 
+      <%!-- Instagram --%>
       <section class="site-instagram site-instagram-menu" aria-labelledby="menu-instagram-title">
         <header class="site-instagram-head">
           <h2 id="menu-instagram-title" class="site-instagram-title">
-            <a
-              href={CoffeeSpot.instagram_url()}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Follow us on Instagram
+            <a href={CoffeeSpot.instagram_url()} target="_blank" rel="noopener noreferrer">
+              Check us out on Instagram
             </a>
           </h2>
         </header>
-
         <ul class="site-instagram-grid">
-          <li :for={src <- @instagram_images} class="site-instagram-cell">
-            <a
-              href={CoffeeSpot.instagram_url()}
-              target="_blank"
-              rel="noopener noreferrer"
-              tabindex="-1"
-              aria-hidden="true"
-            >
+          <li :for={src <- instagram_images()} class="site-instagram-cell">
+            <a href={CoffeeSpot.instagram_url()} target="_blank" rel="noopener noreferrer" tabindex="-1" aria-hidden="true">
               <img src={src} alt="" loading="lazy" />
             </a>
           </li>
         </ul>
       </section>
 
-      <footer class="site-footer menu-footer">
-        <p class="site-footer-brand menu-footer-brand">CoffeeSpot</p>
-        <p>{CoffeeSpot.place_line()}</p>
-        <p class="site-footer-links menu-footer-links">
-          <.link navigate={~p"/"} class="site-footer-link menu-footer-link">Home</.link>
-          <span class="site-footer-sep menu-footer-sep" aria-hidden="true">·</span>
-          <.link navigate={~p"/about"} class="site-footer-link menu-footer-link">About us</.link>
-          <span class="site-footer-sep menu-footer-sep" aria-hidden="true">·</span>
-          <.link navigate={~p"/contact"} class="site-footer-link menu-footer-link">Get in touch</.link>
-        </p>
+      <footer class="brune-mega-footer" aria-label="CoffeeSpot footer">
+        <p class="brune-mega-brand">Elilai</p>
+
+        <div class="brune-mega-grid">
+          <div class="brune-mega-block">
+            <p class="brune-mega-label">Hours</p>
+            <p :for={line <- CoffeeSpot.hours_lines()} class="brune-mega-text">{line}</p>
+          </div>
+
+          <div class="brune-mega-block">
+            <p class="brune-mega-label">Contact</p>
+            <a href={CoffeeSpot.email_url()} class="brune-mega-link">{CoffeeSpot.email()}</a>
+            <a href={"tel:#{CoffeeSpot.phone_tel()}"} class="brune-mega-link">
+              {CoffeeSpot.phone_display()}
+            </a>
+          </div>
+
+          <div class="brune-mega-block">
+            <p class="brune-mega-label">Location</p>
+            <a
+              href={CoffeeSpot.map_link_url()}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="brune-mega-link"
+            >
+              {CoffeeSpot.address_short()}
+            </a>
+          </div>
+        </div>
+
       </footer>
 
       <div
@@ -403,9 +389,9 @@ defmodule EspresoWeb.MenuLive do
             <span class="menu-buy-handle-label">Swipe down to close</span>
           </div>
 
-          <div class={"menu-buy-visual menu-detail-visual--#{section_tone(@selected_category)}"}>
+          <div class={"menu-buy-visual menu-detail-visual--#{section_tone(@detail.category_name)}"}>
             <img
-              src={Menu.product_image(@selected_category, @detail.product.name)}
+              src={Menu.product_image(@detail.category_name, @detail.product.name)}
               alt={@detail.product.name}
               class="menu-buy-photo"
             />
@@ -475,7 +461,7 @@ defmodule EspresoWeb.MenuLive do
               type="button"
               class="menu-buy-basket"
               phx-click="open_basket"
-              aria-label={"Basket, #{cart_count(@cart)} items"}
+              aria-label={"Checkout, #{cart_count(@cart)} items"}
             >
               <span aria-hidden="true">▣</span>
               <span class="menu-buy-basket-count">{cart_count(@cart)}</span>
@@ -618,18 +604,41 @@ defmodule EspresoWeb.MenuLive do
     """
   end
 
-  defp visible_categories(categories, selected_category) do
-    Enum.filter(categories, &(&1.name == selected_category))
+  defp visible_categories(categories, selected_category, search) do
+    query = String.trim(search) |> String.downcase()
+
+    if query == "" do
+      Enum.filter(categories, &(&1.name == selected_category))
+    else
+      categories
+      |> Enum.map(fn category ->
+        filtered_groups =
+          Enum.map(category.groups, fn group ->
+            filtered = Enum.filter(group.products, fn product ->
+              String.downcase(product.name) |> String.contains?(query)
+            end)
+            %{group | products: filtered}
+          end)
+          |> Enum.reject(fn group -> group.products == [] end)
+
+        %{category | groups: filtered_groups}
+      end)
+      |> Enum.reject(fn category -> category.groups == [] end)
+    end
   end
 
-  defp find_product(categories, id) when is_binary(id) do
-    find_product(categories, String.to_integer(id))
+  defp find_product_with_category(categories, id) when is_binary(id) do
+    find_product_with_category(categories, String.to_integer(id))
   end
 
-  defp find_product(categories, id) when is_integer(id) do
+  defp find_product_with_category(categories, id) when is_integer(id) do
     categories
-    |> Enum.flat_map(& &1.products)
-    |> Enum.find(&(&1.id == id))
+    |> Enum.find_value(fn category ->
+      case Enum.find(category.products, &(&1.id == id)) do
+        nil -> nil
+        product -> {category, product}
+      end
+    end)
   end
 
   defp add_line(cart, product, price, quantity, image) do
@@ -700,23 +709,41 @@ defmodule EspresoWeb.MenuLive do
   defp section_tone("FOOD"), do: "food"
   defp section_tone(_name), do: "default"
 
-  defp category_heading("HOT"), do: "HOT"
-  defp category_heading("COLD"), do: "COLD"
-  defp category_heading("FRAPPE"), do: "FRAPPE"
-  defp category_heading("SODA"), do: "SODA"
-  defp category_heading("FOOD"), do: "FOOD"
-  defp category_heading(name), do: name
+  defp category_nav_label("HOT"), do: "Hot"
+  defp category_nav_label("COLD"), do: "Cold"
+  defp category_nav_label("FRAPPE"), do: "Frappe"
+  defp category_nav_label("SODA"), do: "Soda"
+  defp category_nav_label("FOOD"), do: "Food"
+  defp category_nav_label(name), do: name
 
-  defp category_lede("HOT"), do: "Espresso and everyday cups — prepared with care."
-  defp category_lede("COLD"), do: "Iced drinks for warm Lilac afternoons."
-  defp category_lede("FRAPPE"), do: "Blended cups, topped and ready to share."
-  defp category_lede("SODA"), do: "Light, bright, and easy to sip."
-  defp category_lede("FOOD"), do: "Rice meals, chips, muffins, and cakes from the kitchen."
-  defp category_lede(_name), do: nil
+  defp category_blurb("HOT"), do: "Freshly pulled and served warm."
+  defp category_blurb("COLD"), do: "Iced and ready for a slow Lilac afternoon."
+  defp category_blurb("FRAPPE"), do: "Blended, topped, and built to share."
+  defp category_blurb("SODA"), do: "Bright, fizzy, and easy to sip."
+  defp category_blurb("FOOD"), do: "From the kitchen at CoffeeSpot Lilac."
+  defp category_blurb(_name), do: "Prepared fresh at CoffeeSpot Lilac Marikina."
 
   defp description?(description) when is_binary(description) do
     String.trim(description) != ""
   end
 
   defp description?(_description), do: false
+
+  defp product_blurb(product, category_name) do
+    if description?(product.description) do
+      product.description
+    else
+      category_blurb(category_name)
+    end
+  end
+
+  defp instagram_images do
+    [
+      "/images/coffeespot/IMG_3478.JPG",
+      "/images/coffeespot/IMG_3482.JPG",
+      "/images/coffeespot/IMG_3468.JPG",
+      "/images/coffeespot/IMG_3475.JPG",
+      "/images/coffeespot/IMG_3488.JPG"
+    ]
+  end
 end
