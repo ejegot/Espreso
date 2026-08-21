@@ -4502,6 +4502,118 @@ html:not(.page-is-loading) .brune-top {
   margin-left: auto;
 }
 
+.brune-top-mobile {
+  display: none;
+}
+
+.brune-icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--brune-ink);
+  cursor: pointer;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.brune-icon-btn svg {
+  width: 1.45rem;
+  height: 1.45rem;
+}
+
+.brune-icon-btn:focus-visible {
+  outline: 2px solid var(--brune-sage);
+  outline-offset: 2px;
+  border-radius: 0.35rem;
+}
+
+.brune-top-mobile-leading,
+.brune-top-mobile-trailing {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.brune-bag-count {
+  position: absolute;
+  top: 0.15rem;
+  right: 0.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1rem;
+  height: 1rem;
+  padding: 0 0.2rem;
+  border-radius: 999px;
+  background: var(--brune-sage);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.brune-drawer {
+  position: relative;
+}
+
+.brune-drawer > summary {
+  list-style: none;
+}
+
+.brune-drawer > summary::-webkit-details-marker {
+  display: none;
+}
+
+.brune-drawer-panel {
+  position: fixed;
+  top: 3.25rem;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 1.25rem 1.35rem 2rem;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(17, 17, 18, 0.06);
+}
+
+.brune-drawer-nav {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.brune-drawer-link {
+  display: block;
+  padding: 0.85rem 0.25rem;
+  color: var(--brune-ink);
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 2rem;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(17, 17, 18, 0.06);
+}
+
+.brune-drawer-link.is-current {
+  color: var(--brune-sage);
+}
+
+.brune-drawer-link:hover,
+.brune-drawer-link:focus-visible {
+  color: var(--brune-sage);
+  outline: none;
+}
+
 .brune-top-link {
   position: relative;
   color: var(--brune-ink);
@@ -5597,41 +5709,22 @@ html:not(.page-is-loading) .brune-top {
 
 @media (max-width: 639px) {
   .brune-top {
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.55rem 0.75rem;
-    padding: 0.75rem 1rem 0.65rem;
+    display: block;
+    padding: 0.35rem 0.55rem;
   }
 
-  .brune-top-brand {
-    font-size: 1.4rem;
-  }
-
-  .brune-top-trailing {
-    margin-left: auto;
-    gap: 0.65rem;
-  }
-
-  /* Full nav on its own row so About + Contact stay visible with Checkout */
-  .brune-top-nav {
+  .brune-top-mobile {
     display: flex;
-    flex: 1 1 100%;
-    order: 3;
-    margin-left: 0;
+    align-items: center;
     justify-content: space-between;
-    gap: 0.35rem;
-    padding: 0.15rem 0 0.2rem;
+    width: 100%;
+    min-height: 2.75rem;
   }
 
-  .brune-top-link {
-    font-size: 0.8rem;
-    white-space: nowrap;
-  }
-
-  .brune-basket-btn {
-    min-height: 2rem;
-    padding: 0.3rem 0.7rem;
-    font-size: 0.78rem;
+  .brune-top-brand,
+  .brune-top-nav,
+  .brune-top-trailing {
+    display: none;
   }
 }
 

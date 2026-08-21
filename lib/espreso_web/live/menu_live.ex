@@ -358,7 +358,7 @@ defmodule EspresoWeb.MenuLive do
 
       <section class="brune-menu-shell" id="menu">
         <%!-- Search --%>
-        <div class="brune-menu-search">
+        <div id="menu-search" class="brune-menu-search">
           <form phx-change="search" phx-submit="search">
             <div class="brune-search-wrap">
               <span class="brune-search-icon" aria-hidden="true">
@@ -367,6 +367,7 @@ defmodule EspresoWeb.MenuLive do
                 </svg>
               </span>
               <input
+                id="menu-search-input"
                 type="text"
                 name="search"
                 value={@search}
