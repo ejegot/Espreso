@@ -632,14 +632,14 @@ defmodule EspresoWeb.CoreComponents do
     ~H"""
     <header class="brune-top">
       <.link navigate="/" class="brune-top-brand">CoffeeSpot</.link>
-      <div class="brune-top-trailing">
-        <nav class="brune-top-nav" aria-label="Main">
-          <.link navigate="/" class={["brune-top-link", @current == "home" && "is-current"]}>Home</.link>
-          <.link navigate="/menu" class={["brune-top-link", @current == "menu" && "is-current"]}>Menu</.link>
-          <.link navigate="/about" class={["brune-top-link", @current == "about" && "is-current"]}>About</.link>
-          <.link navigate="/contact" class={["brune-top-link", @current == "contact" && "is-current"]}>Contact</.link>
-        </nav>
-        <%= if @show_basket? do %>
+      <nav class="brune-top-nav" aria-label="Main">
+        <.link navigate="/" class={["brune-top-link", @current == "home" && "is-current"]}>Home</.link>
+        <.link navigate="/menu" class={["brune-top-link", @current == "menu" && "is-current"]}>Menu</.link>
+        <.link navigate="/about" class={["brune-top-link", @current == "about" && "is-current"]}>About</.link>
+        <.link navigate="/contact" class={["brune-top-link", @current == "contact" && "is-current"]}>Contact</.link>
+      </nav>
+      <%= if @show_basket? do %>
+        <div class="brune-top-trailing">
           <button
             type="button"
             class={["brune-basket-btn", @basket_pulse? && "brune-basket-btn-pulse"]}
@@ -649,8 +649,8 @@ defmodule EspresoWeb.CoreComponents do
             Checkout
             <span class={["brune-basket-count", @basket_pulse? && "is-pulse"]}>{@basket_count}</span>
           </button>
-        <% end %>
-      </div>
+        </div>
+      <% end %>
     </header>
     """
   end
