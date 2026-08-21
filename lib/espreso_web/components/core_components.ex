@@ -631,16 +631,26 @@ defmodule EspresoWeb.CoreComponents do
   def brune_header(assigns) do
     ~H"""
     <header class="brune-top">
-      <div class="brune-top-mobile" aria-label="Mobile navigation">
-        <div class="brune-top-mobile-leading">
-          <details class="brune-drawer">
-            <summary class="brune-icon-btn" aria-label="Open menu">
+      <div class="brune-top-bar">
+        <div class="brune-top-leading">
+          <div class="brune-drawer">
+            <input type="checkbox" id="brune-nav-drawer" class="brune-drawer-toggle" />
+            <label for="brune-nav-drawer" class="brune-icon-btn brune-drawer-open" aria-label="Open menu">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
               </svg>
-            </summary>
-            <div class="brune-drawer-panel">
-              <nav class="brune-drawer-nav" aria-label="Main">
+            </label>
+            <div class="brune-drawer-layer">
+              <label for="brune-nav-drawer" class="brune-drawer-scrim" aria-label="Close menu"></label>
+              <nav class="brune-drawer-panel" aria-label="Main">
+                <div class="brune-drawer-panel-head">
+                  <p class="brune-drawer-brand">CoffeeSpot</p>
+                  <label for="brune-nav-drawer" class="brune-icon-btn brune-drawer-close" aria-label="Close menu">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                    </svg>
+                  </label>
+                </div>
                 <.link navigate="/" class={["brune-drawer-link", @current == "home" && "is-current"]}>
                   Home
                 </.link>
@@ -655,12 +665,12 @@ defmodule EspresoWeb.CoreComponents do
                 </.link>
               </nav>
             </div>
-          </details>
+          </div>
 
           <%= if @current == "menu" do %>
             <button
               type="button"
-              class="brune-icon-btn"
+              class="brune-search-btn"
               aria-label="Search menu"
               phx-click={JS.focus(to: "#menu-search-input")}
             >
@@ -668,18 +678,22 @@ defmodule EspresoWeb.CoreComponents do
                 <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.6" />
                 <path d="M16.2 16.2 20 20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
               </svg>
+              <span class="brune-search-label">Search</span>
             </button>
           <% else %>
-            <.link navigate="/menu#menu-search" class="brune-icon-btn" aria-label="Search menu">
+            <.link navigate="/menu#menu-search" class="brune-search-btn" aria-label="Search menu">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.6" />
                 <path d="M16.2 16.2 20 20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
               </svg>
+              <span class="brune-search-label">Search</span>
             </.link>
           <% end %>
         </div>
 
-        <div class="brune-top-mobile-trailing">
+        <.link navigate="/" class="brune-top-brand">CoffeeSpot</.link>
+
+        <div class="brune-top-trailing">
           <.link navigate="/contact" class="brune-icon-btn" aria-label="Contact">
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6" />
@@ -714,10 +728,7 @@ defmodule EspresoWeb.CoreComponents do
                   stroke-linejoin="round"
                 />
               </svg>
-              <span
-                :if={@basket_count > 0}
-                class={["brune-bag-count", @basket_pulse? && "is-pulse"]}
-              >
+              <span :if={@basket_count > 0} class={["brune-bag-count", @basket_pulse? && "is-pulse"]}>
                 {@basket_count}
               </span>
             </button>
@@ -742,26 +753,12 @@ defmodule EspresoWeb.CoreComponents do
         </div>
       </div>
 
-      <.link navigate="/" class="brune-top-brand">CoffeeSpot</.link>
       <nav class="brune-top-nav" aria-label="Main">
         <.link navigate="/" class={["brune-top-link", @current == "home" && "is-current"]}>Home</.link>
         <.link navigate="/menu" class={["brune-top-link", @current == "menu" && "is-current"]}>Menu</.link>
         <.link navigate="/about" class={["brune-top-link", @current == "about" && "is-current"]}>About</.link>
         <.link navigate="/contact" class={["brune-top-link", @current == "contact" && "is-current"]}>Contact</.link>
       </nav>
-      <%= if @show_basket? do %>
-        <div class="brune-top-trailing">
-          <button
-            type="button"
-            class={["brune-basket-btn", @basket_pulse? && "brune-basket-btn-pulse"]}
-            phx-click="open_basket"
-            aria-label={"Checkout, #{@basket_count} items"}
-          >
-            Checkout
-            <span class={["brune-basket-count", @basket_pulse? && "is-pulse"]}>{@basket_count}</span>
-          </button>
-        </div>
-      <% end %>
     </header>
     """
   end

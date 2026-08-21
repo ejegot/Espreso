@@ -231,8 +231,8 @@ defmodule EspresoWeb.MenuLiveTest do
     {:ok, view, _html} = live(conn, ~p"/menu")
 
     assert has_element?(view, ".brune-menu-tabs-line")
-    assert has_element?(view, ".brune-basket-btn", "Checkout")
-    assert has_element?(view, ".brune-basket-count", "0")
+    assert has_element?(view, "button.brune-icon-bag[aria-label='Checkout, 0 items']")
+    refute has_element?(view, ".brune-bag-count")
 
     view |> element("button[aria-label='Order Espresso']") |> render_click()
     assert has_element?(view, "#menu-detail")
@@ -249,7 +249,7 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, "#menu-detail")
     refute has_element?(view, "#menu-basket")
     assert has_element?(view, ".menu-toast", "Added to basket")
-    assert has_element?(view, ".brune-basket-count", "1")
+    assert has_element?(view, ".brune-bag-count", "1")
 
     view |> element("button.menu-toast-action", "View") |> render_click()
     assert has_element?(view, "#menu-basket")
@@ -272,10 +272,10 @@ defmodule EspresoWeb.MenuLiveTest do
     view |> element("button.menu-size-pill", "12oz") |> render_click()
     view |> element("button.menu-buy-now", "Add to basket") |> render_click()
 
-    assert has_element?(view, ".brune-basket-count", "2")
+    assert has_element?(view, ".brune-bag-count", "2")
     assert has_element?(view, ".menu-toast", "Added to basket")
 
-    view |> element("button.brune-basket-btn") |> render_click()
+    view |> element("button.brune-icon-bag") |> render_click()
     assert has_element?(view, ".menu-basket-line-name", "Americano")
     assert has_element?(view, ".menu-basket-line-size", "12oz")
 
