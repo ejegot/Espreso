@@ -3,6 +3,7 @@ defmodule EspresoWeb.MenuLive do
 
   alias Espreso.CoffeeSpot
   alias Espreso.Menu
+  alias Espreso.Orders
 
   @impl true
   def mount(_params, _session, socket) do
@@ -26,7 +27,9 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:table_number, "")
      |> assign(:customer_name, "")
      |> assign(:notes, "")
-     |> assign(:checkout_errors, %{}), layout: false}
+     |> assign(:checkout_errors, %{})
+     |> assign(:payment_method, :counter)
+     |> assign(:placing_order?, false), layout: false}
   end
 
   @impl true
@@ -213,6 +216,80 @@ defmodule EspresoWeb.MenuLive do
 
   def handle_event("validate_checkout", _params, socket) do
     {:noreply, assign(socket, :checkout_errors, checkout_errors(socket.assigns))}
+  end
+
+  def handle_event("set_payment_method", %{"method" => method}, socket) do
+    payment_method =
+      case method do
+        "online" -> :online
+        _ -> :counter
+      end
+
+    {:noreply, assign(socket, :payment_method, payment_method)}
+  end
+
+  def handle_event("place_order", _params, socket) do
+    errors = checkout_errors(socket.assigns)
+
+    cond do
+      socket.assigns.cart == [] ->
+        {:noreply, socket}
+
+      socket.assigns.placing_order? ->
+        {:noreply, socket}
+
+      errors != %{} ->
+        {:noreply, assign(socket, :checkout_errors, errors)}
+
+      socket.assigns.payment_method == :online ->
+        {:noreply,
+         socket
+         |> assign(:checkout_errors, %{})
+         |> assign(:toast, "Online payment coming soon — use Pay at counter")
+         |> then(fn s ->
+           Process.send_after(self(), :clear_toast, 2800)
+           s
+         end)}
+
+      true ->
+        socket = assign(socket, :placing_order?, true)
+
+        attrs = %{
+          customer_name: socket.assigns.customer_name,
+          fulfillment: socket.assigns.fulfillment,
+          table_number: socket.assigns.table_number,
+          notes: socket.assigns.notes,
+          payment_method: :counter
+        }
+
+        case Orders.create_order(socket.assigns.cart, attrs) do
+          {:ok, order} ->
+            {:noreply,
+             socket
+             |> assign(:cart, [])
+             |> assign(:basket_open?, false)
+             |> assign(:basket_closing?, false)
+             |> assign(:placing_order?, false)
+             |> assign(:checkout_errors, %{})
+             |> push_navigate(to: ~p"/order/#{order.number}")}
+
+          {:error, %Ecto.Changeset{} = changeset} ->
+            {:noreply,
+             socket
+             |> assign(:placing_order?, false)
+             |> assign(:checkout_errors, checkout_errors_from_changeset(changeset))}
+
+          {:error, _} ->
+            {:noreply,
+             socket
+             |> assign(:placing_order?, false)
+             |> assign(:toast, "Could not place order — try again")
+             |> then(fn s ->
+               Process.send_after(self(), :clear_toast, 2400)
+               s
+             end)}
+        end
+    end
   end
 
   def handle_event("close_basket", _params, socket) do
@@ -717,22 +794,57 @@ defmodule EspresoWeb.MenuLive do
               <strong>{Menu.format_price(cart_total(@cart))}</strong>
             </div>
 
+            <fieldset class="menu-checkout-fulfillment menu-checkout-payment">
+              <legend class="menu-checkout-label">Payment</legend>
+              <div class="menu-checkout-options" role="radiogroup" aria-label="Payment">
+                <button
+                  type="button"
+                  class={["menu-checkout-option", @payment_method == :counter && "is-active"]}
+                  phx-click="set_payment_method"
+                  phx-value-method="counter"
+                  aria-pressed={to_string(@payment_method == :counter)}
+                >
+                  Pay at counter
+                </button>
+                <button
+                  type="button"
+                  class={["menu-checkout-option", @payment_method == :online && "is-active"]}
+                  phx-click="set_payment_method"
+                  phx-value-method="online"
+                  aria-pressed={to_string(@payment_method == :online)}
+                >
+                  Pay online
+                </button>
+              </div>
+              <p class="menu-basket-note menu-checkout-payment-note">
+                Online payment (GCash / cards) comes next — Pay at counter works now.
+              </p>
+            </fieldset>
+
             <%= if checkout_valid?(@fulfillment, @customer_name, @table_number) do %>
+              <button
+                type="button"
+                class="menu-basket-checkout"
+                phx-click="place_order"
+                disabled={@placing_order?}
+              >
+                {if @placing_order?, do: "Placing order…", else: place_order_label(@payment_method)}
+              </button>
               <a
                 href={CoffeeSpot.order_whatsapp_url(@cart, checkout_payload(assigns))}
-                class="menu-basket-checkout"
+                class="menu-basket-whatsapp"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Send order on WhatsApp
+                Or send on WhatsApp
               </a>
             <% else %>
               <button type="button" class="menu-basket-checkout" phx-click="validate_checkout">
-                Send order on WhatsApp
+                Place order
               </button>
             <% end %>
 
-            <p class="menu-basket-note">We’ll open WhatsApp with your order ready to send.</p>
+            <p class="menu-basket-note">You’ll get an order number to show at the counter.</p>
           </footer>
         </aside>
       </div>
@@ -930,6 +1042,20 @@ defmodule EspresoWeb.MenuLive do
         errors
     end
   end
+
+  defp checkout_errors_from_changeset(changeset) do
+    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+      Regex.replace(~r"%{(\w+)}", msg, fn _, key ->
+        opts |> Keyword.get(String.to_atom(key), key) |> to_string()
+      end)
+    end)
+    |> Enum.reduce(%{}, fn {field, messages}, acc ->
+      Map.put(acc, field, List.first(messages))
+    end)
+  end
+
+  defp place_order_label(:online), do: "Pay online"
+  defp place_order_label(_), do: "Place order · Pay at counter"
 
   defp instagram_images do
     [

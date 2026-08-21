@@ -279,7 +279,7 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, ".menu-basket-line-name", "Americano")
     assert has_element?(view, ".menu-basket-line-size", "12oz")
 
-    assert has_element?(view, "button.menu-basket-checkout", "Send order on WhatsApp")
+    assert has_element?(view, "button.menu-basket-checkout", "Place order")
 
     view
     |> form("#menu-checkout-form", %{
@@ -289,11 +289,12 @@ defmodule EspresoWeb.MenuLiveTest do
     })
     |> render_change()
 
-    assert has_element?(view, "a.menu-basket-checkout", "Send order on WhatsApp")
+    assert has_element?(view, "button.menu-basket-checkout", "Place order · Pay at counter")
+    assert has_element?(view, "a.menu-basket-whatsapp", "Or send on WhatsApp")
 
     href =
       view
-      |> element("a.menu-basket-checkout")
+      |> element("a.menu-basket-whatsapp")
       |> render()
       |> Floki.parse_fragment!()
       |> Floki.attribute("href")
@@ -305,6 +306,17 @@ defmodule EspresoWeb.MenuLiveTest do
     assert href =~ URI.encode_www_form("Juan")
     assert href =~ URI.encode_www_form("Table 7")
     assert href =~ URI.encode_www_form("less ice")
+
+    {:ok, order_view, _html} =
+      view
+      |> element("button.menu-basket-checkout", "Place order · Pay at counter")
+      |> render_click()
+      |> follow_redirect(conn)
+
+    assert has_element?(order_view, ".order-number")
+    assert has_element?(order_view, ".order-card", "Juan")
+    assert render(order_view) =~ "Table 7"
+    assert render(order_view) =~ "Pay at counter"
   end
 
   test "/menu keeps Brune header and menu shell copy", %{conn: conn} do

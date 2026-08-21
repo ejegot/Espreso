@@ -19,6 +19,8 @@ defmodule EspresoWeb.Router do
 
     live "/", HomeLive
     live "/menu", MenuLive
+    live "/order/:number", OrderLive
+    live "/orders", StaffOrdersLive
     live "/about", AboutLive
     live "/contact", ContactLive
   end
