@@ -631,6 +631,117 @@ defmodule EspresoWeb.CoreComponents do
   def brune_header(assigns) do
     ~H"""
     <header class="brune-top">
+      <div class="brune-top-mobile" aria-label="Mobile navigation">
+        <div class="brune-top-mobile-leading">
+          <details class="brune-drawer">
+            <summary class="brune-icon-btn" aria-label="Open menu">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              </svg>
+            </summary>
+            <div class="brune-drawer-panel">
+              <nav class="brune-drawer-nav" aria-label="Main">
+                <.link navigate="/" class={["brune-drawer-link", @current == "home" && "is-current"]}>
+                  Home
+                </.link>
+                <.link navigate="/menu" class={["brune-drawer-link", @current == "menu" && "is-current"]}>
+                  Menu
+                </.link>
+                <.link navigate="/about" class={["brune-drawer-link", @current == "about" && "is-current"]}>
+                  About
+                </.link>
+                <.link navigate="/contact" class={["brune-drawer-link", @current == "contact" && "is-current"]}>
+                  Contact
+                </.link>
+              </nav>
+            </div>
+          </details>
+
+          <%= if @current == "menu" do %>
+            <button
+              type="button"
+              class="brune-icon-btn"
+              aria-label="Search menu"
+              phx-click={JS.focus(to: "#menu-search-input")}
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.6" />
+                <path d="M16.2 16.2 20 20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              </svg>
+            </button>
+          <% else %>
+            <.link navigate="/menu#menu-search" class="brune-icon-btn" aria-label="Search menu">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.6" />
+                <path d="M16.2 16.2 20 20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              </svg>
+            </.link>
+          <% end %>
+        </div>
+
+        <div class="brune-top-mobile-trailing">
+          <.link navigate="/contact" class="brune-icon-btn" aria-label="Contact">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6" />
+              <circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="1.6" />
+              <path
+                d="M6.8 18.2c1.3-2 3.1-3 5.2-3s3.9 1 5.2 3"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+              />
+            </svg>
+          </.link>
+
+          <%= if @show_basket? do %>
+            <button
+              type="button"
+              class={["brune-icon-btn", "brune-icon-bag", @basket_pulse? && "brune-basket-btn-pulse"]}
+              phx-click="open_basket"
+              aria-label={"Checkout, #{@basket_count} items"}
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M7.5 8.5V7.2a4.5 4.5 0 0 1 9 0v1.3"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                />
+                <path
+                  d="M6.2 8.5h11.6l-.7 11.2a1.6 1.6 0 0 1-1.6 1.5H8.5a1.6 1.6 0 0 1-1.6-1.5L6.2 8.5Z"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              <span
+                :if={@basket_count > 0}
+                class={["brune-bag-count", @basket_pulse? && "is-pulse"]}
+              >
+                {@basket_count}
+              </span>
+            </button>
+          <% else %>
+            <.link navigate="/menu" class="brune-icon-btn brune-icon-bag" aria-label="Open menu">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M7.5 8.5V7.2a4.5 4.5 0 0 1 9 0v1.3"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                />
+                <path
+                  d="M6.2 8.5h11.6l-.7 11.2a1.6 1.6 0 0 1-1.6 1.5H8.5a1.6 1.6 0 0 1-1.6-1.5L6.2 8.5Z"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </.link>
+          <% end %>
+        </div>
+      </div>
+
       <.link navigate="/" class="brune-top-brand">CoffeeSpot</.link>
       <nav class="brune-top-nav" aria-label="Main">
         <.link navigate="/" class={["brune-top-link", @current == "home" && "is-current"]}>Home</.link>
