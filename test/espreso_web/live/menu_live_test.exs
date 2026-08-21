@@ -41,7 +41,7 @@ defmodule EspresoWeb.MenuLiveTest do
     assert html =~ "CoffeeSpot"
     assert has_element?(view, ".menu-page-brune")
     assert has_element?(view, ".brune-menu-shell")
-    assert has_element?(view, ".brune-hero-gallery")
+    assert has_element?(view, ".brune-menu-hero")
     assert has_element?(view, ".site-instagram-menu")
     refute has_element?(view, ".menu-marquee")
     refute has_element?(view, ".contact-hero")
@@ -52,10 +52,10 @@ defmodule EspresoWeb.MenuLiveTest do
 
     labels =
       view
-      |> element(".brune-menu-tabs")
+      |> element(".brune-menu-tabs-line")
       |> render()
       |> Floki.parse_fragment!()
-      |> Floki.find("button.brune-menu-tab")
+      |> Floki.find("button.brune-menu-tab-link")
       |> Enum.map(fn node -> node |> Floki.text() |> String.trim() end)
 
     assert labels == ["Hot", "Cold", "Frappe", "Soda"]
@@ -84,20 +84,20 @@ defmodule EspresoWeb.MenuLiveTest do
   test "/menu displays only the selected category", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
 
-    view |> element("button.brune-menu-tab", "Cold") |> render_click()
+    view |> element("button.brune-menu-tab-link", "Cold") |> render_click()
     html = render(view)
     assert has_element?(view, "#category-COLD")
     assert html =~ "Hazelnut"
     refute has_element?(view, "#category-HOT")
     refute html =~ "Americano"
 
-    view |> element("button.brune-menu-tab", "Frappe") |> render_click()
+    view |> element("button.brune-menu-tab-link", "Frappe") |> render_click()
     html = render(view)
     assert has_element?(view, "#category-FRAPPE")
     assert html =~ "Biscoff"
     refute has_element?(view, "#category-COLD")
 
-    view |> element("button.brune-menu-tab", "Soda") |> render_click()
+    view |> element("button.brune-menu-tab-link", "Soda") |> render_click()
     html = render(view)
     assert has_element?(view, "#category-SODA")
     assert html =~ "Hummingbird"
@@ -118,7 +118,7 @@ defmodule EspresoWeb.MenuLiveTest do
     insert_product!(food, "Choco Chip Cookies", true, [{nil, "65"}])
 
     {:ok, view, _html} = live(conn, ~p"/menu")
-    view |> element("button.brune-menu-tab", "Food") |> render_click()
+    view |> element("button.brune-menu-tab-link", "Food") |> render_click()
     html = render(view)
 
     assert has_element?(view, "#category-FOOD")
@@ -157,7 +157,7 @@ defmodule EspresoWeb.MenuLiveTest do
     insert_product!(food, "Beef Nachos", false, [{nil, "249"}])
 
     {:ok, view, _html} = live(conn, ~p"/menu")
-    view |> element("button.brune-menu-tab", "Food") |> render_click()
+    view |> element("button.brune-menu-tab-link", "Food") |> render_click()
     html = render(view)
 
     assert html =~ "Rice Meal"
@@ -196,11 +196,11 @@ defmodule EspresoWeb.MenuLiveTest do
     assert html =~ "12oz"
     assert html =~ "₱110"
 
-    view |> element("button.brune-menu-tab", "Cold") |> render_click()
+    view |> element("button.brune-menu-tab-link", "Cold") |> render_click()
     html = render(view)
     assert html =~ "₱180"
 
-    view |> element("button.brune-menu-tab", "Soda") |> render_click()
+    view |> element("button.brune-menu-tab-link", "Soda") |> render_click()
     html = render(view)
     assert html =~ "₱120"
   end
@@ -208,12 +208,12 @@ defmodule EspresoWeb.MenuLiveTest do
   test "/menu filters categories from pill tabs", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
 
-    assert has_element?(view, ".brune-menu-tab-active", "Hot")
+    assert has_element?(view, ".brune-menu-tab-link-active", "Hot")
     assert has_element?(view, "#category-HOT")
 
-    view |> element("button.brune-menu-tab", "Cold") |> render_click()
+    view |> element("button.brune-menu-tab-link", "Cold") |> render_click()
 
-    assert has_element?(view, ".brune-menu-tab-active", "Cold")
+    assert has_element?(view, ".brune-menu-tab-link-active", "Cold")
     assert has_element?(view, "#category-COLD")
     refute has_element?(view, "#category-HOT")
   end
@@ -230,8 +230,8 @@ defmodule EspresoWeb.MenuLiveTest do
   test "/menu order links open modal and toast into basket", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
 
-    assert has_element?(view, ".brune-menu-tabs")
-    assert has_element?(view, ".brune-basket-btn", "Basket")
+    assert has_element?(view, ".brune-menu-tabs-line")
+    assert has_element?(view, ".brune-basket-btn", "Checkout")
     assert has_element?(view, ".brune-basket-count", "0")
 
     view |> element("button[aria-label='Order Espresso']") |> render_click()
@@ -278,6 +278,17 @@ defmodule EspresoWeb.MenuLiveTest do
     view |> element("button.brune-basket-btn") |> render_click()
     assert has_element?(view, ".menu-basket-line-name", "Americano")
     assert has_element?(view, ".menu-basket-line-size", "12oz")
+
+    assert has_element?(view, "button.menu-basket-checkout", "Send order on WhatsApp")
+
+    view
+    |> form("#menu-checkout-form", %{
+      customer_name: "Juan",
+      table_number: "7",
+      notes: "less ice"
+    })
+    |> render_change()
+
     assert has_element?(view, "a.menu-basket-checkout", "Send order on WhatsApp")
 
     href =
@@ -291,18 +302,19 @@ defmodule EspresoWeb.MenuLiveTest do
     assert href =~ "https://wa.me/639566728906?text="
     assert href =~ URI.encode_www_form("Espresso")
     assert href =~ URI.encode_www_form("Americano")
+    assert href =~ URI.encode_www_form("Juan")
+    assert href =~ URI.encode_www_form("Table 7")
+    assert href =~ URI.encode_www_form("less ice")
   end
 
   test "/menu keeps Brune header and menu shell copy", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
 
-    assert has_element?(view, ".brune-menu-shell-title", "Our Menu")
+    assert has_element?(view, ".brune-menu-hero-title", "Our Menu")
     assert has_element?(view, ".brune-top-brand", "CoffeeSpot")
-    assert has_element?(view, ".brune-top-menu[href='/menu#menu']", "Menu")
-    assert has_element?(view, ".brune-visit")
-    assert has_element?(view, ".brune-vibes")
+    assert has_element?(view, ".brune-top-link[href='/menu']", "Menu")
     assert has_element?(view, ".brune-mega-footer")
-    assert has_element?(view, ".brune-mega-brand", "CoffeeSpot")
+    assert has_element?(view, ".brune-mega-brand", "Elilai")
     assert has_element?(view, ".brune-mega-label", "Hours")
     assert has_element?(view, ".brune-mega-label", "Contact")
     assert has_element?(view, ".brune-mega-label", "Location")

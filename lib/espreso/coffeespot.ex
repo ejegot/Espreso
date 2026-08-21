@@ -133,15 +133,21 @@ defmodule Espreso.CoffeeSpot do
   Prefills a WhatsApp chat to CoffeeSpot with the customer's basket.
 
   Each line is a map with `:name`, `:size` (optional), `:quantity`, and `:price` (Decimal).
+
+  Optional `checkout` map keys:
+  - `:customer_name` (string)
+  - `:fulfillment` (`:dine_in` or `:pickup`)
+  - `:table_number` (string, for dine-in)
+  - `:notes` (string, optional)
   """
-  def order_whatsapp_url(lines) when is_list(lines) and lines != [] do
-    "https://wa.me/#{whatsapp_digits()}?text=#{URI.encode_www_form(order_message(lines))}"
+  def order_whatsapp_url(lines, checkout \\ %{}) when is_list(lines) and lines != [] do
+    "https://wa.me/#{whatsapp_digits()}?text=#{URI.encode_www_form(order_message(lines, checkout))}"
   end
 
   @doc """
   Human-readable order message for WhatsApp handoff.
   """
-  def order_message(lines) when is_list(lines) and lines != [] do
+  def order_message(lines, checkout \\ %{}) when is_list(lines) and lines != [] do
     items =
       lines
       |> Enum.map_join("\n", &format_order_line/1)
@@ -153,12 +159,31 @@ defmodule Espreso.CoffeeSpot do
       end)
       |> Menu.format_price()
 
+    name = checkout |> Map.get(:customer_name, "") |> to_string() |> String.trim()
+    notes = checkout |> Map.get(:notes, "") |> to_string() |> String.trim()
+    fulfillment = Map.get(checkout, :fulfillment, :pickup)
+
+    type_line =
+      case fulfillment do
+        :dine_in ->
+          table = checkout |> Map.get(:table_number, "") |> to_string() |> String.trim()
+          "Type: Dine-in · Table #{table}"
+
+        _ ->
+          "Type: Pickup at counter"
+      end
+
+    name_line = if name != "", do: "Name: #{name}\n", else: ""
+    notes_block = if notes != "", do: "\n\nNotes: #{notes}", else: ""
+
     """
-    Hi CoffeeSpot! I'd like to order:
+    Hi CoffeeSpot! New order
+
+    #{name_line}#{type_line}
 
     #{items}
 
-    Total: #{total}
+    Total: #{total}#{notes_block}
     """
     |> String.trim()
   end
