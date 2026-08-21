@@ -12,7 +12,9 @@ config :espreso,
   generators: [timestamp_type: :utc_datetime],
   # Absolute URL encoded in CoffeeSpot QR codes (destination: homepage `/`).
   # Override at runtime with PUBLIC_MENU_URL (e.g. https://your-domain.com/).
-  public_menu_url: "http://localhost:4000/"
+  public_menu_url: "http://localhost:4000/",
+  # Staff board at /orders — override with STAFF_ORDERS_PASSWORD in production.
+  staff_orders_password: "coffeespot"
 
 # Configures the endpoint
 config :espreso, EspresoWeb.Endpoint,

@@ -130,3 +130,9 @@ if config_env() == :prod do
   #
   # See https://hexdocs.pm/swoosh/Swoosh.html#module-installation for details.
 end
+
+staff_password = System.get_env("STAFF_ORDERS_PASSWORD")
+
+if is_binary(staff_password) and staff_password != "" do
+  config :espreso, staff_orders_password: staff_password
+end

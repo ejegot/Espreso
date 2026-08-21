@@ -1889,6 +1889,332 @@ body:has(.menu-page-locked) {
   text-align: center;
 }
 
+.menu-checkout-payment {
+  margin-top: 0.15rem;
+}
+
+.menu-checkout-payment-note {
+  margin-top: 0.45rem;
+}
+
+.menu-basket-whatsapp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.65rem;
+  color: var(--brune-ink, #111112);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.menu-basket-whatsapp:hover {
+  color: var(--brune-sage, #3a8a3e);
+}
+
+.menu-basket-checkout:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+/* Order received */
+.order-page .order-main,
+.staff-orders-main {
+  width: min(calc(100% - 2rem), 28rem);
+  margin: 0 auto;
+  padding: 1.5rem 0 3rem;
+}
+
+.order-card,
+.staff-auth-card {
+  padding: 1.5rem 1.35rem;
+  border: 1px solid rgba(17, 17, 18, 0.08);
+  border-radius: 1.15rem;
+  background: #fff;
+  box-shadow: 0 12px 36px rgba(17, 17, 18, 0.06);
+}
+
+.order-eyebrow,
+.staff-orders-brand {
+  margin: 0 0 0.35rem;
+  color: var(--brune-muted, #6b6b6b);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.order-title,
+.order-number {
+  margin: 0;
+  color: var(--brune-ink, #111112);
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(2rem, 8vw, 2.75rem);
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+.order-lede,
+.order-status,
+.order-payment,
+.order-hint,
+.staff-auth-lede {
+  margin: 0.75rem 0 0;
+  color: var(--brune-muted, #6b6b6b);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.order-meta {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1.35rem 0 0;
+}
+
+.order-meta dt {
+  margin: 0;
+  color: var(--brune-muted, #6b6b6b);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.order-meta dd {
+  margin: 0.2rem 0 0;
+  color: var(--brune-ink, #111112);
+  font-size: 0.98rem;
+}
+
+.order-items {
+  list-style: none;
+  margin: 1.35rem 0 0;
+  padding: 0;
+  border-top: 1px solid rgba(17, 17, 18, 0.08);
+}
+
+.order-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid rgba(17, 17, 18, 0.08);
+}
+
+.order-item-name {
+  margin: 0;
+  font-weight: 600;
+}
+
+.order-item-size {
+  font-weight: 500;
+  color: var(--brune-muted, #6b6b6b);
+}
+
+.order-item-price,
+.order-total strong,
+.staff-order-total {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.order-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 1rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.order-total strong {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 1.45rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.order-actions {
+  margin-top: 1.5rem;
+}
+
+/* Staff orders */
+.staff-orders-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding: 1.15rem 1.35rem;
+  border-bottom: 1px solid rgba(17, 17, 18, 0.08);
+  background: #fff;
+}
+
+.staff-orders-title {
+  margin: 0;
+  flex: 1;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 1.75rem;
+  font-weight: 400;
+}
+
+.staff-refresh {
+  min-height: 2.25rem;
+  padding: 0.35rem 0.85rem;
+  border: 1.5px solid #b7e0b9;
+  border-radius: 999px;
+  background: #d8efd9;
+  color: #246628;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.staff-orders-main {
+  width: min(calc(100% - 2rem), 40rem);
+  padding-top: 1.25rem;
+}
+
+.staff-auth-form {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.staff-orders-section {
+  margin-bottom: 2rem;
+}
+
+.staff-orders-section h2 {
+  margin: 0 0 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.staff-empty {
+  color: var(--brune-muted, #6b6b6b);
+  font-size: 0.92rem;
+}
+
+.staff-order-card {
+  margin-bottom: 0.85rem;
+  padding: 1.1rem 1.15rem;
+  border: 1px solid rgba(17, 17, 18, 0.08);
+  border-radius: 1rem;
+  background: #fff;
+}
+
+.staff-order-card-muted {
+  opacity: 0.85;
+}
+
+.staff-order-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.staff-order-number {
+  margin: 0;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 1.35rem;
+}
+
+.staff-order-name,
+.staff-order-meta,
+.staff-order-notes,
+.staff-order-items {
+  margin: 0.35rem 0 0;
+  color: var(--brune-ink, #111112);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.staff-order-meta,
+.staff-order-notes {
+  color: var(--brune-muted, #6b6b6b);
+}
+
+.staff-order-items {
+  list-style: none;
+  padding: 0.55rem 0 0;
+}
+
+.staff-order-total {
+  margin: 0.65rem 0 0;
+}
+
+.staff-order-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
+.staff-badge {
+  display: inline-flex;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #f3f3f3;
+  color: #333;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.staff-badge--preparing {
+  background: #fff3cd;
+  color: #7a5b00;
+}
+
+.staff-badge--ready {
+  background: #d8efd9;
+  color: #246628;
+}
+
+.staff-badge--pay-paid {
+  background: #d8efd9;
+  color: #246628;
+}
+
+.staff-badge--pay-unpaid {
+  background: #fde8e6;
+  color: #8a2b22;
+}
+
+.staff-order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+}
+
+.staff-action {
+  min-height: 2.25rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--brune-line, #e0e0e0);
+  border-radius: 0.65rem;
+  background: #fff;
+  color: var(--brune-ink, #111112);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.staff-action-primary {
+  border-color: #b7e0b9;
+  background: #d8efd9;
+  color: #246628;
+}
+
 .menu-media-atmosphere,
 .menu-closing {
   padding-left: 1.15rem;
