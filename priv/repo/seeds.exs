@@ -172,3 +172,22 @@ food_products = [
 ]
 
 seed_products.(food_category, food_products)
+
+# —— Staff accounts (Phase A) ——
+alias Espreso.Accounts
+
+owner_email = System.get_env("OWNER_EMAIL") || "owner@coffeespot.local"
+owner_password = System.get_env("OWNER_PASSWORD") || "coffeespot1"
+
+case Accounts.ensure_owner!(%{
+       name: "Owner",
+       email: owner_email,
+       password: owner_password,
+       role: "owner"
+     }) do
+  {:ok, user} ->
+    IO.puts("Owner ready: #{user.email}")
+
+  {:error, changeset} ->
+    IO.puts("Owner seed skipped/failed: #{inspect(changeset.errors)}")
+end

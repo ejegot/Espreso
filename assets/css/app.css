@@ -2054,10 +2054,68 @@ body:has(.menu-page-locked) {
 
 .staff-orders-title {
   margin: 0;
-  flex: 1;
   font-family: "Instrument Serif", Georgia, serif;
   font-size: 1.75rem;
   font-weight: 400;
+}
+
+.staff-orders-user {
+  margin: 0.25rem 0 0;
+  color: var(--brune-muted, #6b6b6b);
+  font-size: 0.82rem;
+}
+
+.staff-top-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.staff-login-page .staff-login-main,
+.staff-admin-main {
+  width: min(calc(100% - 2rem), 28rem);
+  margin: 0 auto;
+  padding: 1.5rem 0 3rem;
+}
+
+.staff-admin-main {
+  width: min(calc(100% - 2rem), 40rem);
+}
+
+.staff-login-back {
+  margin: 1.25rem 0 0;
+  text-align: center;
+}
+
+.staff-admin-note {
+  margin: 0 0 0.85rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.65rem;
+  background: #d8efd9;
+  color: #246628;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.staff-admin-heading {
+  margin: 0 0 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.staff-admin-form-card {
+  margin-bottom: 1.5rem;
+}
+
+.staff-admin-edit {
+  margin-top: 0.85rem;
+}
+
+.staff-auth-form .mt-2 {
+  margin-top: 0.35rem;
 }
 
 .staff-refresh {
@@ -5785,7 +5843,7 @@ html:not(.page-is-loading) .brune-top {
 
 @media (max-width: 639px) {
   .brune-top {
-    padding: 0.35rem 0.55rem;
+    padding: 0.45rem 0.65rem;
     gap: 0;
     /* backdrop-filter creates a containing block and traps the drawer */
     backdrop-filter: none;
@@ -5796,17 +5854,19 @@ html:not(.page-is-loading) .brune-top {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
-    min-height: 2.75rem;
+    gap: 0.35rem;
+    min-height: 3.25rem;
   }
 
   .brune-top-leading {
     flex: 0 0 auto;
+    gap: 0.15rem;
   }
 
   .brune-top-trailing {
     flex: 0 0 auto;
     margin-left: auto;
+    gap: 0.15rem;
   }
 
   .brune-top-brand,
@@ -5820,6 +5880,27 @@ html:not(.page-is-loading) .brune-top {
 
   .brune-search-label {
     display: none;
+  }
+
+  .brune-icon-btn,
+  .brune-search-btn {
+    width: 3rem;
+    height: 3rem;
+    min-height: 3rem;
+  }
+
+  .brune-icon-btn svg,
+  .brune-search-btn svg {
+    width: 1.85rem;
+    height: 1.85rem;
+  }
+
+  .brune-bag-count {
+    top: 0.2rem;
+    right: 0.15rem;
+    min-width: 1.15rem;
+    height: 1.15rem;
+    font-size: 0.68rem;
   }
 }
 
