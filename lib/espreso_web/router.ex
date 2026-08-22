@@ -1,6 +1,8 @@
 defmodule EspresoWeb.Router do
   use EspresoWeb, :router
 
+  import EspresoWeb.StaffAuth
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -8,6 +10,7 @@ defmodule EspresoWeb.Router do
     plug :put_root_layout, html: {EspresoWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug :fetch_current_user
   end
 
   pipeline :api do
@@ -20,23 +23,45 @@ defmodule EspresoWeb.Router do
     live "/", HomeLive
     live "/menu", MenuLive
     live "/order/:number", OrderLive
-    live "/orders", StaffOrdersLive
     live "/about", AboutLive
     live "/contact", ContactLive
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", EspresoWeb do
-  #   pipe_through :api
-  # end
+  scope "/", EspresoWeb do
+    pipe_through [:browser, :redirect_if_staff_is_authenticated]
 
-  # Enable LiveDashboard and Swoosh mailbox preview in development
+    live_session :redirect_if_authenticated,
+      on_mount: [{EspresoWeb.StaffAuth, :redirect_if_authenticated}] do
+      live "/login", StaffLoginLive, :new
+    end
+  end
+
+  scope "/", EspresoWeb do
+    pipe_through :browser
+
+    post "/session", UserSessionController, :create
+    delete "/logout", UserSessionController, :delete
+  end
+
+  scope "/", EspresoWeb do
+    pipe_through [:browser, :require_authenticated_staff]
+
+    live_session :staff,
+      on_mount: [{EspresoWeb.StaffAuth, :ensure_staff}] do
+      live "/orders", StaffOrdersLive
+    end
+  end
+
+  scope "/", EspresoWeb do
+    pipe_through [:browser, :require_authenticated_staff, :require_owner]
+
+    live_session :owner,
+      on_mount: [{EspresoWeb.StaffAuth, :ensure_owner}] do
+      live "/admin/users", AdminUsersLive
+    end
+  end
+
   if Application.compile_env(:espreso, :dev_routes) do
-    # If you want to use the LiveDashboard in production, you should put
-    # it behind authentication and allow only admins to access it.
-    # If your application does not have an admins-only section yet,
-    # you can use Plug.BasicAuth to set up some basic authentication
-    # as long as you are also using SSL (which you should anyway).
     import Phoenix.LiveDashboard.Router
 
     scope "/dev" do
