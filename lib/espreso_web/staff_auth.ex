@@ -1,6 +1,7 @@
 defmodule EspresoWeb.StaffAuth do
   @moduledoc """
-  Session authentication for staff (barista / manager / owner).
+  Session authentication and role authorization for staff
+  (barista / manager / owner).
   """
 
   use EspresoWeb, :verified_routes
@@ -9,6 +10,7 @@ defmodule EspresoWeb.StaffAuth do
   import Phoenix.Controller
 
   alias Espreso.Accounts
+  alias Espreso.Accounts.Authorization
   alias Espreso.Accounts.User
 
   def log_in_user(conn, user, params \\ %{}) do
@@ -58,17 +60,24 @@ defmodule EspresoWeb.StaffAuth do
     end
   end
 
-  def require_owner(conn, _opts) do
+  @doc """
+  Plug that requires a specific permission atom, e.g. `:user_management`.
+  """
+  def require_permission(conn, permission) when is_atom(permission) do
     user = conn.assigns[:current_user]
 
-    if User.can_manage_users?(user) do
+    if Authorization.can?(user, permission) do
       conn
     else
       conn
-      |> put_flash(:error, "Owners only.")
+      |> put_flash(:error, "You don’t have permission to do that.")
       |> redirect(to: ~p"/staff")
       |> halt()
     end
+  end
+
+  def require_owner(conn, _opts) do
+    require_permission(conn, :user_management)
   end
 
   def on_mount(:mount_current_user, _params, session, socket) do
@@ -90,19 +99,24 @@ defmodule EspresoWeb.StaffAuth do
     end
   end
 
-  def on_mount(:ensure_owner, _params, session, socket) do
+  def on_mount({:ensure_permission, permission}, _params, session, socket)
+      when is_atom(permission) do
     socket = mount_current_user(socket, session)
 
-    if User.can_manage_users?(socket.assigns.current_user) do
+    if Authorization.can?(socket.assigns.current_user, permission) do
       {:cont, socket}
     else
       socket =
         socket
-        |> Phoenix.LiveView.put_flash(:error, "Owners only.")
+        |> Phoenix.LiveView.put_flash(:error, "You don’t have permission to do that.")
         |> Phoenix.LiveView.redirect(to: ~p"/staff")
 
       {:halt, socket}
     end
+  end
+
+  def on_mount(:ensure_owner, _params, session, socket) do
+    on_mount({:ensure_permission, :user_management}, %{}, session, socket)
   end
 
   def on_mount(:redirect_if_authenticated, _params, session, socket) do

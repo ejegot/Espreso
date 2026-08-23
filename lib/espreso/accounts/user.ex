@@ -47,7 +47,7 @@ defmodule Espreso.Accounts.User do
     |> maybe_hash_password(opts)
   end
 
-  def role_label("barista"), do: "Barista"
+  def role_label("barista"), do: "Staff"
   def role_label("manager"), do: "Manager"
   def role_label("owner"), do: "Owner"
   def role_label(other), do: other
@@ -58,11 +58,11 @@ defmodule Espreso.Accounts.User do
   def owner?(%__MODULE__{role: "owner", active: true}), do: true
   def owner?(_), do: false
 
-  def can_access_orders?(%__MODULE__{active: true, role: role}) when role in @roles, do: true
-  def can_access_orders?(_), do: false
+  def can_access_orders?(user), do: Espreso.Accounts.Authorization.can?(user, :orders)
 
-  def can_manage_users?(%__MODULE__{role: "owner", active: true}), do: true
-  def can_manage_users?(_), do: false
+  def can_manage_users?(user), do: Espreso.Accounts.Authorization.can?(user, :user_management)
+
+  def can?(user, permission), do: Espreso.Accounts.Authorization.can?(user, permission)
 
   defp maybe_clear_blank_password(changeset) do
     case get_change(changeset, :password) do

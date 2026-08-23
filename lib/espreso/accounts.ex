@@ -6,6 +6,7 @@ defmodule Espreso.Accounts do
   import Ecto.Query
 
   alias Espreso.Repo
+  alias Espreso.Accounts.Authorization
   alias Espreso.Accounts.User
 
   def get_user(id) when is_integer(id), do: Repo.get(User, id)
@@ -85,6 +86,27 @@ defmodule Espreso.Accounts do
     |> Repo.update()
   end
 
+  @doc """
+  Creates a user when the actor has `:user_management` permission (owners).
+  """
+  def create_user_as(%User{} = actor, attrs) do
+    with :ok <- Authorization.authorize(actor, :user_management) do
+      register_user(attrs)
+    end
+  end
+
+  @doc """
+  Updates a user when the actor has `:user_management` permission.
+
+  Actors cannot change their own role (blocks self escalation / demotion).
+  """
+  def update_user_as(%User{} = actor, %User{} = target, attrs) when is_map(attrs) do
+    with :ok <- Authorization.authorize(actor, :user_management) do
+      attrs = reject_self_role_change(actor, target, attrs)
+      update_user(target, attrs)
+    end
+  end
+
   def change_user_registration(%User{} = user, attrs \\ %{}) do
     User.registration_changeset(user, attrs, hash_password: false, password_required: false)
   end
@@ -92,6 +114,14 @@ defmodule Espreso.Accounts do
   def change_user(%User{} = user, attrs \\ %{}) do
     User.update_changeset(user, attrs, password_required: false, hash_password: false)
   end
+
+  defp reject_self_role_change(%User{id: id}, %User{id: id}, attrs) do
+    attrs
+    |> Map.delete("role")
+    |> Map.delete(:role)
+  end
+
+  defp reject_self_role_change(_actor, _target, attrs), do: attrs
 
   @doc """
   Authenticates by email and password.
