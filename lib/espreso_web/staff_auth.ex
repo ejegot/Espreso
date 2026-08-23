@@ -66,7 +66,7 @@ defmodule EspresoWeb.StaffAuth do
     else
       conn
       |> put_flash(:error, "Owners only.")
-      |> redirect(to: ~p"/orders")
+      |> redirect(to: ~p"/staff")
       |> halt()
     end
   end
@@ -99,7 +99,7 @@ defmodule EspresoWeb.StaffAuth do
       socket =
         socket
         |> Phoenix.LiveView.put_flash(:error, "Owners only.")
-        |> Phoenix.LiveView.redirect(to: ~p"/orders")
+        |> Phoenix.LiveView.redirect(to: ~p"/staff")
 
       {:halt, socket}
     end
@@ -139,6 +139,5 @@ defmodule EspresoWeb.StaffAuth do
 
   defp maybe_store_return_to(conn), do: conn
 
-  defp signed_in_path(%User{role: "owner"}), do: ~p"/orders"
-  defp signed_in_path(_user), do: ~p"/orders"
+  defp signed_in_path(_user), do: ~p"/staff"
 end

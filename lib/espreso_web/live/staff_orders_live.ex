@@ -47,6 +47,7 @@ defmodule EspresoWeb.StaffOrdersLive do
           <p class="staff-orders-user">{@current_user.name} · {User.role_label(@current_user.role)}</p>
         </div>
         <div class="staff-top-actions">
+          <.link navigate={~p"/staff"} class="staff-refresh">Home</.link>
           <button type="button" class="staff-refresh" phx-click="refresh">Refresh</button>
           <.link
             :if={User.can_manage_users?(@current_user)}

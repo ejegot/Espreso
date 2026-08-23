@@ -84,6 +84,7 @@ defmodule EspresoWeb.AdminUsersLive do
           <h1 class="staff-orders-title">Staff users</h1>
         </div>
         <div class="staff-top-actions">
+          <.link navigate={~p"/staff"} class="staff-refresh">Home</.link>
           <.link navigate={~p"/orders"} class="staff-refresh">Orders</.link>
           <.link href={~p"/logout"} method="delete" class="staff-refresh">Log out</.link>
         </div>
