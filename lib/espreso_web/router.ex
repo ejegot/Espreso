@@ -33,6 +33,7 @@ defmodule EspresoWeb.Router do
     live_session :redirect_if_authenticated,
       on_mount: [{EspresoWeb.StaffAuth, :redirect_if_authenticated}] do
       live "/login", StaffLoginLive, :new
+      live "/register", StaffRegisterLive, :new
     end
   end
 
@@ -48,7 +49,9 @@ defmodule EspresoWeb.Router do
 
     live_session :staff,
       on_mount: [{EspresoWeb.StaffAuth, :ensure_staff}] do
+      live "/staff", StaffHomeLive
       live "/orders", StaffOrdersLive
+      live "/pos", StaffPosLive
     end
   end
 

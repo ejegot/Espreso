@@ -22,10 +22,61 @@ defmodule Espreso.Accounts do
     |> Repo.all()
   end
 
+  def count_users do
+    Repo.aggregate(User, :count, :id)
+  end
+
+  def first_user? do
+    count_users() == 0
+  end
+
+  def registration_open? do
+    # Public self-registration is always available for staff/manager.
+    true
+  end
+
   def register_user(attrs) do
     %User{}
     |> User.registration_changeset(attrs)
     |> Repo.insert()
+  end
+
+  @doc """
+  Public self-registration.
+
+  - First account becomes **owner**
+  - Later accounts may choose **barista** or **manager** only (not owner)
+  """
+  def register_self(attrs) when is_map(attrs) do
+    name = attrs["name"] || attrs[:name]
+    email = attrs["email"] || attrs[:email]
+    password = attrs["password"] || attrs[:password]
+    requested_role = attrs["role"] || attrs[:role] || "barista"
+
+    role =
+      cond do
+        first_user?() -> "owner"
+        requested_role in ["barista", "manager"] -> requested_role
+        true -> "barista"
+      end
+
+    register_user(%{
+      "name" => name,
+      "email" => email,
+      "password" => password,
+      "role" => role
+    })
+  end
+
+  @doc """
+  Creates the first owner when no users exist yet.
+  """
+  def register_first_owner(attrs) when is_map(attrs) do
+    if first_user?() do
+      register_self(Map.put(attrs, "role", "owner"))
+    else
+      {:error, :registration_closed}
+    end
   end
 
   def update_user(%User{} = user, attrs) do
