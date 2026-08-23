@@ -14,15 +14,23 @@ defmodule EspresoWeb.StaffAuthTest do
         role: "owner"
       })
 
+    {:ok, manager} =
+      Accounts.register_user(%{
+        name: "Manager",
+        email: "manager@test.local",
+        password: "password123",
+        role: "manager"
+      })
+
     {:ok, barista} =
       Accounts.register_user(%{
-        name: "Barista",
+        name: "Staff",
         email: "barista@test.local",
         password: "password123",
         role: "barista"
       })
 
-    %{owner: owner, barista: barista}
+    %{owner: owner, manager: manager, barista: barista}
   end
 
   test "staff home and orders require login", %{conn: conn} do
@@ -79,7 +87,7 @@ defmodule EspresoWeb.StaffAuthTest do
     assert redirected_to(conn) == ~p"/staff"
   end
 
-  test "barista staff home shows Orders and POS, not Staff accounts", %{conn: conn, barista: barista} do
+  test "staff home shows Orders and POS, not Staff accounts", %{conn: conn, barista: barista} do
     conn = log_in(conn, barista)
     {:ok, view, _html} = live(conn, ~p"/staff")
 
@@ -87,6 +95,22 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(view, "a[href='/orders']", "Orders")
     assert has_element?(view, "a[href='/pos']", "POS")
     refute has_element?(view, "a[href='/admin/users']", "Staff accounts")
+  end
+
+  test "manager can access staff routes but not user management", %{
+    conn: conn,
+    manager: manager
+  } do
+    conn = log_in(conn, manager)
+
+    {:ok, home, _html} = live(conn, ~p"/staff")
+    assert has_element?(home, "a[href='/orders']", "Orders")
+    refute has_element?(home, "a[href='/admin/users']", "Staff accounts")
+
+    {:ok, orders, _html} = live(conn, ~p"/orders")
+    assert has_element?(orders, ".staff-orders-title")
+
+    assert {:error, {:redirect, %{to: "/staff"}}} = live(conn, ~p"/admin/users")
   end
 
   test "owner staff home shows Staff accounts", %{conn: conn, owner: owner} do
@@ -98,9 +122,21 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(admin, ".staff-orders-title", "Staff users")
   end
 
-  test "barista cannot open admin users", %{conn: conn, barista: barista} do
+  test "staff cannot open admin users", %{conn: conn, barista: barista} do
     conn = log_in(conn, barista)
     assert {:error, {:redirect, %{to: "/staff"}}} = live(conn, ~p"/admin/users")
+  end
+
+  test "owner cannot edit own role in admin UI", %{conn: conn, owner: owner} do
+    conn = log_in(conn, owner)
+    {:ok, view, _html} = live(conn, ~p"/admin/users")
+
+    view
+    |> element(~s(button[phx-click="edit"][phx-value-id="#{owner.id}"]))
+    |> render_click()
+
+    refute has_element?(view, "#edit-user-#{owner.id} select[name='user[role]']")
+    assert has_element?(view, "#edit-user-#{owner.id}")
   end
 
   test "pos placeholder is reachable for staff", %{conn: conn, barista: barista} do

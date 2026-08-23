@@ -54,13 +54,13 @@ defmodule EspresoWeb.StaffHomeLive do
           <% end %>
 
           <.link
-            :if={User.can_manage_users?(@current_user)}
+            :if={User.can?(@current_user, :user_management)}
             navigate={~p"/admin/users"}
             class="staff-home-card staff-home-card-owner"
           >
             <span class="staff-home-card-eyebrow">Owner</span>
             <span class="staff-home-card-title">Staff accounts</span>
-            <span class="staff-home-card-body">Create barista & manager logins</span>
+            <span class="staff-home-card-body">Create staff & manager logins</span>
           </.link>
         </div>
       </main>
