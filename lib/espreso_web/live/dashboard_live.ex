@@ -23,11 +23,11 @@ defmodule EspresoWeb.DashboardLive do
     <div class="menu-page-brune site-page staff-home-page dashboard-page">
       <header class="staff-orders-top">
         <div>
-          <p class="staff-orders-brand">CoffeeSpot</p>
-          <h1 class="staff-orders-title">Dashboard</h1>
-          <p class="staff-orders-user">
-            {@current_user.name} · {User.role_label(@current_user.role)}
+          <p class="staff-orders-brand">
+            CoffeeSpot · {User.role_label(@current_user.role)}
           </p>
+          <h1 class="staff-orders-title">Dashboard</h1>
+          <p class="staff-orders-user">{@current_user.name}</p>
         </div>
         <div class="staff-top-actions">
           <.link navigate={~p"/staff"} class="staff-refresh">Staff workspace</.link>
@@ -49,18 +49,53 @@ defmodule EspresoWeb.DashboardLive do
                   @popular_products,
                   @reports_overview
                 ) do %>
-            <%= if panel[:to] do %>
-              <.link navigate={panel.to} class="staff-home-card" id={"dashboard-panel-#{panel.id}"}>
-                <span class="staff-home-card-eyebrow">{panel.eyebrow}</span>
-                <span class="staff-home-card-title">{panel.title}</span>
-                <span class="staff-home-card-body">{panel.body}</span>
-              </.link>
-            <% else %>
-              <div class="staff-home-card staff-home-card-soon" id={"dashboard-panel-#{panel.id}"}>
-                <span class="staff-home-card-eyebrow">{panel.eyebrow}</span>
-                <span class="staff-home-card-title">{panel.title}</span>
-                <span class="staff-home-card-body">{panel.body}</span>
-              </div>
+            <%= case panel.kind do %>
+              <% :link -> %>
+                <.link
+                  navigate={panel.to}
+                  class={["staff-home-card", "dashboard-card-link", panel[:class]]}
+                  id={"dashboard-panel-#{panel.id}"}
+                >
+                  <span class="staff-home-card-eyebrow">{panel.eyebrow}</span>
+                  <span class="staff-home-card-title">{panel.title}</span>
+                  <span class="staff-home-card-body">{panel.body}</span>
+                </.link>
+              <% :metric -> %>
+                <div
+                  class="staff-home-card dashboard-card-metric-panel"
+                  id={"dashboard-panel-#{panel.id}"}
+                >
+                  <span class="staff-home-card-eyebrow">{panel.eyebrow}</span>
+                  <span class="staff-home-card-title">{panel.title}</span>
+                  <span class="staff-home-card-body dashboard-card-metric">{panel.body}</span>
+                </div>
+              <% :list -> %>
+                <div
+                  class="staff-home-card dashboard-card-metric-panel"
+                  id={"dashboard-panel-#{panel.id}"}
+                >
+                  <span class="staff-home-card-eyebrow">{panel.eyebrow}</span>
+                  <span class="staff-home-card-title">{panel.title}</span>
+                  <p :if={panel.items == []} class="staff-home-card-body">
+                    {panel.empty_body}
+                  </p>
+                  <ul :if={panel.items != []} class="dashboard-popular-list">
+                    <li :for={item <- panel.items}>
+                      <span class="dashboard-popular-name">{item.name}</span>
+                      <span class="dashboard-popular-qty">· {item.quantity}</span>
+                    </li>
+                  </ul>
+                </div>
+              <% :placeholder -> %>
+                <div
+                  class="staff-home-card staff-home-card-soon dashboard-card-soon"
+                  id={"dashboard-panel-#{panel.id}"}
+                >
+                  <span class="staff-home-soon-pill">Coming soon</span>
+                  <span class="staff-home-card-eyebrow">{panel.eyebrow}</span>
+                  <span class="staff-home-card-title">{panel.title}</span>
+                  <span class="staff-home-card-body">{panel.body}</span>
+                </div>
             <% end %>
           <% end %>
         </div>
@@ -118,25 +153,27 @@ defmodule EspresoWeb.DashboardLive do
       popular_products_panel(popular),
       reports_panel(reports),
       %{
+        kind: :placeholder,
         id: "staff-activity",
         eyebrow: "Team",
         title: "Staff Activity",
-        body: "Staff activity will appear here.",
-        to: nil
+        body: "Coming soon"
       },
       %{
+        kind: :link,
         id: "users",
         eyebrow: "Owner",
         title: "Users",
         body: "Manage staff accounts.",
-        to: ~p"/admin/users"
+        to: ~p"/admin/users",
+        class: "staff-home-card-owner"
       },
       %{
+        kind: :placeholder,
         id: "settings",
         eyebrow: "Owner",
         title: "Settings",
-        body: "Business settings will appear here.",
-        to: nil
+        body: "Coming soon"
       }
     ]
   end
@@ -146,35 +183,25 @@ defmodule EspresoWeb.DashboardLive do
       sales_panel(sales),
       orders_panel(overview),
       %{
+        kind: :placeholder,
         id: "availability",
         eyebrow: "Menu",
         title: "Availability",
-        body: "Product availability will appear here.",
-        to: nil
+        body: "Coming soon"
       },
       reports_panel(reports)
     ]
   end
 
-  defp panels_for(_staff, overview, _sales, _popular, _reports) do
-    [
-      %{
-        id: "todays-orders",
-        eyebrow: "Kitchen",
-        title: "Today’s Orders",
-        body: todays_orders_body(overview),
-        to: ~p"/orders"
-      }
-    ]
-  end
+  defp panels_for(_staff, _overview, _sales, _popular, _reports), do: []
 
   defp sales_panel(sales) do
     %{
+      kind: :metric,
       id: "sales",
-      eyebrow: "Overview",
+      eyebrow: "Today",
       title: "Sales",
-      body: sales_body(sales),
-      to: nil
+      body: sales_body(sales)
     }
   end
 
@@ -184,11 +211,11 @@ defmodule EspresoWeb.DashboardLive do
 
   defp reports_panel(reports) do
     %{
+      kind: :metric,
       id: "reports",
-      eyebrow: "Insights",
+      eyebrow: "Last 7 days",
       title: "Reports",
-      body: reports_body(reports),
-      to: nil
+      body: reports_body(reports)
     }
   end
 
@@ -200,37 +227,28 @@ defmodule EspresoWeb.DashboardLive do
 
   defp popular_products_panel(popular) do
     %{
+      kind: :list,
       id: "popular-products",
       eyebrow: "Menu",
       title: "Popular Products",
-      body: popular_products_body(popular),
-      to: nil
+      items: popular,
+      empty_body: "No paid product sales today."
     }
-  end
-
-  defp popular_products_body([]), do: "No paid product sales today."
-
-  defp popular_products_body(products) do
-    products
-    |> Enum.map(fn %{name: name, quantity: quantity} -> "#{name} (#{quantity})" end)
-    |> Enum.join(", ")
   end
 
   defp orders_panel(overview) do
     %{
+      kind: :link,
       id: "orders",
       eyebrow: "Kitchen",
       title: "Orders",
       body: orders_body(overview),
-      to: ~p"/orders"
+      to: ~p"/orders",
+      class: nil
     }
   end
 
   defp orders_body(overview) do
     "#{overview.active_count} active · #{overview.received_count} received · #{overview.preparing_count} preparing · #{overview.unpaid_active_count} unpaid"
-  end
-
-  defp todays_orders_body(overview) do
-    "#{overview.todays_count} today · #{overview.active_count} active"
   end
 end
