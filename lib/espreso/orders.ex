@@ -173,6 +173,29 @@ defmodule Espreso.Orders do
   end
 
   @doc """
+  Paid sales over the last 7 UTC calendar days (including today).
+
+  Uses `Order.total` aggregates — does not load items.
+  """
+  def reports_overview do
+    today_start = DateTime.new!(Date.utc_today(), ~T[00:00:00], "Etc/UTC")
+    period_start = DateTime.add(today_start, -6, :day)
+
+    paid_period =
+      Order
+      |> where([o], o.payment_status == "paid" and o.inserted_at >= ^period_start)
+
+    total = Repo.aggregate(paid_period, :sum, :total) || Decimal.new("0")
+    count = Repo.aggregate(paid_period, :count, :id)
+
+    %{
+      period_paid_total: total,
+      period_paid_count: count,
+      period_days: 7
+    }
+  end
+
+  @doc """
   Today's most ordered products from paid orders (UTC calendar day of `inserted_at`).
 
   Groups by item name and ranks by total quantity. Default limit is 5.

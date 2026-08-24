@@ -102,6 +102,7 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(owner_view, "#dashboard-panel-sales", "Sales")
     assert has_element?(owner_view, "#dashboard-panel-orders", "Orders")
     assert has_element?(owner_view, "#dashboard-panel-popular-products", "Popular Products")
+    assert has_element?(owner_view, "#dashboard-panel-reports", "Reports")
     assert has_element?(owner_view, "#dashboard-panel-staff-activity", "Staff Activity")
     assert has_element?(owner_view, "#dashboard-panel-users", "Users")
     assert has_element?(owner_view, "#dashboard-panel-settings", "Settings")
@@ -276,6 +277,64 @@ defmodule EspresoWeb.StaffAuthTest do
 
     {:ok, staff_view, _html} = live(log_in(conn, barista), ~p"/dashboard")
     refute has_element?(staff_view, "#dashboard-panel-popular-products")
+  end
+
+  test "dashboard Reports panel shows last-7-days paid sales for owner and manager", %{
+    conn: conn,
+    owner: owner,
+    manager: manager,
+    barista: barista
+  } do
+    alias Espreso.Menu
+    alias Espreso.Orders
+
+    {:ok, owner_empty, _html} = live(log_in(conn, owner), ~p"/dashboard")
+
+    assert has_element?(
+             owner_empty,
+             "#dashboard-panel-reports .staff-home-card-body",
+             "No paid sales in the last 7 days."
+           )
+
+    {:ok, manager_empty, _html} = live(log_in(conn, manager), ~p"/dashboard")
+
+    assert has_element?(
+             manager_empty,
+             "#dashboard-panel-reports .staff-home-card-body",
+             "No paid sales in the last 7 days."
+           )
+
+    {:ok, staff_empty, _html} = live(log_in(conn, barista), ~p"/dashboard")
+    refute has_element?(staff_empty, "#dashboard-panel-reports")
+
+    {:ok, paid} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Report Paid", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, _} = Orders.mark_paid(paid)
+
+    expected_body = "#{Menu.format_price(Decimal.new("75"))} last 7 days · 1 paid orders"
+
+    {:ok, owner_view, _html} = live(log_in(conn, owner), ~p"/dashboard")
+
+    assert has_element?(
+             owner_view,
+             "#dashboard-panel-reports .staff-home-card-body",
+             expected_body
+           )
+
+    {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/dashboard")
+
+    assert has_element?(
+             manager_view,
+             "#dashboard-panel-reports .staff-home-card-body",
+             expected_body
+           )
+
+    {:ok, staff_view, _html} = live(log_in(conn, barista), ~p"/dashboard")
+    refute has_element?(staff_view, "#dashboard-panel-reports")
   end
 
   test "dashboard todays orders preview empty state for all roles", %{
