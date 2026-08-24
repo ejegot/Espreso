@@ -120,6 +120,64 @@ defmodule EspresoWeb.StaffAuthTest do
     refute has_element?(staff_view, "#dashboard-panel-reports")
   end
 
+  test "dashboard Orders panels show real overview counts", %{
+    conn: conn,
+    owner: owner,
+    manager: manager,
+    barista: barista
+  } do
+    alias Espreso.Orders
+
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, _} =
+      Orders.create_order(lines, %{
+        customer_name: "Ava",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, preparing} =
+      Orders.create_order(lines, %{
+        customer_name: "Ben",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, _} = Orders.update_status(preparing, "preparing")
+
+    expected_orders_body = "2 active · 1 received · 1 preparing · 2 unpaid"
+    expected_todays_body = "2 today · 2 active"
+
+    {:ok, owner_view, _html} = live(log_in(conn, owner), ~p"/dashboard")
+
+    assert has_element?(
+             owner_view,
+             "#dashboard-panel-orders .staff-home-card-body",
+             expected_orders_body
+           )
+
+    assert has_element?(owner_view, "#dashboard-panel-orders[href='/orders']")
+
+    {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/dashboard")
+
+    assert has_element?(
+             manager_view,
+             "#dashboard-panel-orders .staff-home-card-body",
+             expected_orders_body
+           )
+
+    {:ok, staff_view, _html} = live(log_in(conn, barista), ~p"/dashboard")
+
+    assert has_element?(
+             staff_view,
+             "#dashboard-panel-todays-orders .staff-home-card-body",
+             expected_todays_body
+           )
+
+    assert has_element?(staff_view, "#dashboard-panel-todays-orders[href='/orders']")
+  end
+
   test "staff workspace remains available after dashboard login destination", %{
     conn: conn,
     barista: barista

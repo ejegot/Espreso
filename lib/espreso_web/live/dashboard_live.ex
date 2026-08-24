@@ -2,12 +2,14 @@ defmodule EspresoWeb.DashboardLive do
   use EspresoWeb, :live_view
 
   alias Espreso.Accounts.User
+  alias Espreso.Orders
 
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
      socket
-     |> assign(:page_title, "Dashboard"), layout: false}
+     |> assign(:page_title, "Dashboard")
+     |> assign(:order_overview, Orders.dashboard_overview()), layout: false}
   end
 
   @impl true
@@ -34,7 +36,7 @@ defmodule EspresoWeb.DashboardLive do
         </p>
 
         <div class="staff-home-grid" id="dashboard-panels">
-          <%= for panel <- panels_for(@current_user.role) do %>
+          <%= for panel <- panels_for(@current_user.role, @order_overview) do %>
             <%= if panel[:to] do %>
               <.link navigate={panel.to} class="staff-home-card" id={"dashboard-panel-#{panel.id}"}>
                 <span class="staff-home-card-eyebrow">{panel.eyebrow}</span>
@@ -59,7 +61,7 @@ defmodule EspresoWeb.DashboardLive do
   defp dashboard_lede("manager"), do: "Day-to-day operations — orders, availability, and reports."
   defp dashboard_lede(_), do: "Your shift overview — today’s orders."
 
-  defp panels_for("owner") do
+  defp panels_for("owner", overview) do
     [
       %{
         id: "sales",
@@ -68,13 +70,7 @@ defmodule EspresoWeb.DashboardLive do
         body: "Sales overview will appear here.",
         to: nil
       },
-      %{
-        id: "orders",
-        eyebrow: "Kitchen",
-        title: "Orders",
-        body: "Open the live order queue.",
-        to: ~p"/orders"
-      },
+      orders_panel(overview),
       %{
         id: "popular-products",
         eyebrow: "Menu",
@@ -106,7 +102,7 @@ defmodule EspresoWeb.DashboardLive do
     ]
   end
 
-  defp panels_for("manager") do
+  defp panels_for("manager", overview) do
     [
       %{
         id: "sales",
@@ -115,13 +111,7 @@ defmodule EspresoWeb.DashboardLive do
         body: "Sales overview will appear here.",
         to: nil
       },
-      %{
-        id: "orders",
-        eyebrow: "Kitchen",
-        title: "Orders",
-        body: "Open the live order queue.",
-        to: ~p"/orders"
-      },
+      orders_panel(overview),
       %{
         id: "availability",
         eyebrow: "Menu",
@@ -139,15 +129,33 @@ defmodule EspresoWeb.DashboardLive do
     ]
   end
 
-  defp panels_for(_staff) do
+  defp panels_for(_staff, overview) do
     [
       %{
         id: "todays-orders",
         eyebrow: "Kitchen",
         title: "Today’s Orders",
-        body: "Open today’s order queue.",
+        body: todays_orders_body(overview),
         to: ~p"/orders"
       }
     ]
+  end
+
+  defp orders_panel(overview) do
+    %{
+      id: "orders",
+      eyebrow: "Kitchen",
+      title: "Orders",
+      body: orders_body(overview),
+      to: ~p"/orders"
+    }
+  end
+
+  defp orders_body(overview) do
+    "#{overview.active_count} active · #{overview.received_count} received · #{overview.preparing_count} preparing · #{overview.unpaid_active_count} unpaid"
+  end
+
+  defp todays_orders_body(overview) do
+    "#{overview.todays_count} today · #{overview.active_count} active"
   end
 end

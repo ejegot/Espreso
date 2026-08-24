@@ -1,6 +1,8 @@
 defmodule Espreso.OrdersTest do
   use Espreso.DataCase, async: true
 
+  import Ecto.Query
+
   alias Espreso.Orders
 
   test "create_order assigns CS number and stores lines" do
@@ -61,5 +63,71 @@ defmodule Espreso.OrdersTest do
 
     assert [%{number: number}] = Orders.list_active_orders()
     assert number == order.number
+  end
+
+  test "dashboard_overview returns zeros when empty" do
+    assert Orders.dashboard_overview() == %{
+             active_count: 0,
+             received_count: 0,
+             preparing_count: 0,
+             unpaid_active_count: 0,
+             todays_count: 0
+           }
+  end
+
+  test "dashboard_overview counts received, preparing, unpaid, and today" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, received} =
+      Orders.create_order(lines, %{
+        customer_name: "Ria",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, preparing} =
+      Orders.create_order(lines, %{
+        customer_name: "Pat",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, preparing} = Orders.update_status(preparing, "preparing")
+
+    {:ok, paid_active} =
+      Orders.create_order(lines, %{
+        customer_name: "Kim",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, _paid_active} = Orders.mark_paid(paid_active)
+
+    {:ok, ready} =
+      Orders.create_order(lines, %{
+        customer_name: "Lex",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, ready} = Orders.update_status(ready, "ready")
+
+    yesterday = DateTime.add(DateTime.utc_now(), -86_400, :second)
+
+    {1, _} =
+      Espreso.Repo.update_all(
+        from(o in Espreso.Orders.Order, where: o.id == ^ready.id),
+        set: [inserted_at: yesterday, updated_at: yesterday]
+      )
+
+    overview = Orders.dashboard_overview()
+
+    assert overview.active_count == 3
+    assert overview.received_count == 2
+    assert overview.preparing_count == 1
+    assert overview.unpaid_active_count == 2
+    assert overview.todays_count == 3
+    assert received.status == "received"
+    assert preparing.status == "preparing"
   end
 end
