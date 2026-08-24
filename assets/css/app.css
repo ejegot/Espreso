@@ -2421,6 +2421,10 @@ body:has(.menu-page-locked) {
   padding: 1.35rem 0 3rem;
 }
 
+.dashboard-page .staff-home-main {
+  width: min(calc(100% - 2rem), 40rem);
+}
+
 .staff-home-lede {
   margin: 0 0 1.15rem;
   color: var(--brune-muted, #6b6b6b);
@@ -2437,6 +2441,7 @@ body:has(.menu-page-locked) {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  flex-wrap: wrap;
   margin-bottom: 0.85rem;
 }
 
@@ -2447,6 +2452,16 @@ body:has(.menu-page-locked) {
 .staff-home-grid {
   display: grid;
   gap: 0.85rem;
+}
+
+@media (min-width: 640px) {
+  .dashboard-page .staff-home-main {
+    width: min(calc(100% - 2rem), 48rem);
+  }
+
+  .dashboard-page .staff-home-grid {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .staff-home-card {
@@ -2463,15 +2478,36 @@ body:has(.menu-page-locked) {
   transition: transform 0.15s ease, border-color 0.15s ease;
 }
 
-.staff-home-card:hover,
-.staff-home-card:focus-visible {
+a.staff-home-card:hover,
+a.staff-home-card:focus-visible {
   border-color: #b7e0b9;
   transform: translateY(-1px);
   outline: none;
 }
 
+.dashboard-page .staff-home-card:not(a) {
+  cursor: default;
+}
+
+.dashboard-page .staff-home-card:not(a):hover,
+.dashboard-page .staff-home-card:not(a):focus-visible {
+  transform: none;
+  border-color: rgba(17, 17, 18, 0.08);
+}
+
+.dashboard-page a.dashboard-card-link:hover,
+.dashboard-page a.dashboard-card-link:focus-visible {
+  border-color: #b7e0b9;
+  transform: translateY(-1px);
+}
+
 .staff-home-card-soon {
   opacity: 0.92;
+}
+
+.dashboard-page .dashboard-card-soon {
+  opacity: 0.78;
+  background: #fafafa;
 }
 
 .staff-home-card-owner {
@@ -2498,6 +2534,36 @@ body:has(.menu-page-locked) {
   color: var(--brune-muted, #6b6b6b);
   font-size: 0.95rem;
   line-height: 1.45;
+}
+
+.dashboard-page .dashboard-card-metric {
+  color: var(--brune-ink, #111112);
+  font-size: 1.12rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.dashboard-popular-list {
+  list-style: none;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.dashboard-popular-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  color: var(--brune-ink, #111112);
+  font-size: 1.02rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.dashboard-popular-qty {
+  color: var(--brune-muted, #6b6b6b);
+  font-weight: 500;
 }
 
 .staff-home-soon-pill {
