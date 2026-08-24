@@ -47,6 +47,11 @@ defmodule EspresoWeb.Router do
   scope "/", EspresoWeb do
     pipe_through [:browser, :require_authenticated_staff]
 
+    live_session :dashboard,
+      on_mount: [{EspresoWeb.StaffAuth, {:ensure_permission, :dashboard}}] do
+      live "/dashboard", DashboardLive
+    end
+
     live_session :staff,
       on_mount: [{EspresoWeb.StaffAuth, :ensure_staff}] do
       live "/staff", StaffHomeLive

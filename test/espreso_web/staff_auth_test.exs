@@ -38,7 +38,7 @@ defmodule EspresoWeb.StaffAuthTest do
     assert {:error, {:redirect, %{to: "/login"}}} = live(conn, ~p"/orders")
   end
 
-  test "login lands on staff home", %{conn: conn, barista: barista} do
+  test "login lands on dashboard", %{conn: conn, barista: barista} do
     {:ok, _view, html} = live(conn, ~p"/login")
     assert html =~ "Hello, welcome back"
 
@@ -47,7 +47,7 @@ defmodule EspresoWeb.StaffAuthTest do
         "user" => %{"email" => barista.email, "password" => "password123"}
       })
 
-    assert redirected_to(conn) == ~p"/staff"
+    assert redirected_to(conn) == ~p"/dashboard"
     assert get_session(conn, :user_id) == barista.id
   end
 
@@ -84,7 +84,52 @@ defmodule EspresoWeb.StaffAuthTest do
         "user" => %{"email" => "newstaff@test.local", "password" => "password123"}
       })
 
-    assert redirected_to(conn) == ~p"/staff"
+    assert redirected_to(conn) == ~p"/dashboard"
+  end
+
+  test "dashboard requires login", %{conn: conn} do
+    assert {:error, {:redirect, %{to: "/login"}}} = live(conn, ~p"/dashboard")
+  end
+
+  test "authenticated staff can open role-aware dashboard", %{
+    conn: conn,
+    owner: owner,
+    manager: manager,
+    barista: barista
+  } do
+    {:ok, owner_view, _html} = live(log_in(conn, owner), ~p"/dashboard")
+    assert has_element?(owner_view, ".staff-orders-title", "Dashboard")
+    assert has_element?(owner_view, "#dashboard-panel-sales", "Sales")
+    assert has_element?(owner_view, "#dashboard-panel-orders", "Orders")
+    assert has_element?(owner_view, "#dashboard-panel-popular-products", "Popular Products")
+    assert has_element?(owner_view, "#dashboard-panel-staff-activity", "Staff Activity")
+    assert has_element?(owner_view, "#dashboard-panel-users", "Users")
+    assert has_element?(owner_view, "#dashboard-panel-settings", "Settings")
+
+    {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/dashboard")
+    assert has_element?(manager_view, "#dashboard-panel-sales", "Sales")
+    assert has_element?(manager_view, "#dashboard-panel-orders", "Orders")
+    assert has_element?(manager_view, "#dashboard-panel-availability", "Availability")
+    assert has_element?(manager_view, "#dashboard-panel-reports", "Reports")
+    refute has_element?(manager_view, "#dashboard-panel-users")
+    refute has_element?(manager_view, "#dashboard-panel-settings")
+
+    {:ok, staff_view, _html} = live(log_in(conn, barista), ~p"/dashboard")
+    assert has_element?(staff_view, "#dashboard-panel-todays-orders", "Today’s Orders")
+    refute has_element?(staff_view, "#dashboard-panel-sales")
+    refute has_element?(staff_view, "#dashboard-panel-reports")
+  end
+
+  test "staff workspace remains available after dashboard login destination", %{
+    conn: conn,
+    barista: barista
+  } do
+    conn = log_in(conn, barista)
+    {:ok, view, _html} = live(conn, ~p"/staff")
+
+    assert has_element?(view, ".staff-orders-title", "Home")
+    assert has_element?(view, "a[href='/orders']", "Orders")
+    assert has_element?(view, "a[href='/pos']", "POS")
   end
 
   test "staff home shows Orders and POS, not Staff accounts", %{conn: conn, barista: barista} do
