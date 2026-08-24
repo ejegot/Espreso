@@ -12,7 +12,8 @@ defmodule EspresoWeb.DashboardLive do
      |> assign(:page_title, "Dashboard")
      |> assign(:order_overview, Orders.dashboard_overview())
      |> assign(:todays_orders, Orders.list_todays_orders())
-     |> assign(:sales_overview, Orders.sales_overview()), layout: false}
+     |> assign(:sales_overview, Orders.sales_overview())
+     |> assign(:popular_products, Orders.popular_products()), layout: false}
   end
 
   @impl true
@@ -39,7 +40,13 @@ defmodule EspresoWeb.DashboardLive do
         </p>
 
         <div class="staff-home-grid" id="dashboard-panels">
-          <%= for panel <- panels_for(@current_user.role, @order_overview, @sales_overview) do %>
+          <%= for panel <-
+                panels_for(
+                  @current_user.role,
+                  @order_overview,
+                  @sales_overview,
+                  @popular_products
+                ) do %>
             <%= if panel[:to] do %>
               <.link navigate={panel.to} class="staff-home-card" id={"dashboard-panel-#{panel.id}"}>
                 <span class="staff-home-card-eyebrow">{panel.eyebrow}</span>
@@ -102,17 +109,11 @@ defmodule EspresoWeb.DashboardLive do
   defp dashboard_lede("manager"), do: "Day-to-day operations — orders, availability, and reports."
   defp dashboard_lede(_), do: "Your shift overview — today’s orders."
 
-  defp panels_for("owner", overview, sales) do
+  defp panels_for("owner", overview, sales, popular) do
     [
       sales_panel(sales),
       orders_panel(overview),
-      %{
-        id: "popular-products",
-        eyebrow: "Menu",
-        title: "Popular Products",
-        body: "Popular products will appear here.",
-        to: nil
-      },
+      popular_products_panel(popular),
       %{
         id: "staff-activity",
         eyebrow: "Team",
@@ -137,7 +138,7 @@ defmodule EspresoWeb.DashboardLive do
     ]
   end
 
-  defp panels_for("manager", overview, sales) do
+  defp panels_for("manager", overview, sales, _popular) do
     [
       sales_panel(sales),
       orders_panel(overview),
@@ -158,7 +159,7 @@ defmodule EspresoWeb.DashboardLive do
     ]
   end
 
-  defp panels_for(_staff, overview, _sales) do
+  defp panels_for(_staff, overview, _sales, _popular) do
     [
       %{
         id: "todays-orders",
@@ -182,6 +183,24 @@ defmodule EspresoWeb.DashboardLive do
 
   defp sales_body(%{todays_paid_total: total, todays_paid_count: count}) do
     "#{Menu.format_price(total)} today · #{count} paid orders"
+  end
+
+  defp popular_products_panel(popular) do
+    %{
+      id: "popular-products",
+      eyebrow: "Menu",
+      title: "Popular Products",
+      body: popular_products_body(popular),
+      to: nil
+    }
+  end
+
+  defp popular_products_body([]), do: "No paid product sales today."
+
+  defp popular_products_body(products) do
+    products
+    |> Enum.map(fn %{name: name, quantity: quantity} -> "#{name} (#{quantity})" end)
+    |> Enum.join(", ")
   end
 
   defp orders_panel(overview) do

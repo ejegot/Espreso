@@ -172,6 +172,25 @@ defmodule Espreso.Orders do
     }
   end
 
+  @doc """
+  Today's most ordered products from paid orders (UTC calendar day of `inserted_at`).
+
+  Groups by item name and ranks by total quantity. Default limit is 5.
+  """
+  def popular_products(limit \\ 5) when is_integer(limit) and limit > 0 do
+    today_start = DateTime.new!(Date.utc_today(), ~T[00:00:00], "Etc/UTC")
+
+    from(i in OrderItem,
+      join: o in assoc(i, :order),
+      where: o.payment_status == "paid" and o.inserted_at >= ^today_start,
+      group_by: i.name,
+      order_by: [desc: sum(i.quantity), asc: i.name],
+      limit: ^limit,
+      select: %{name: i.name, quantity: sum(i.quantity)}
+    )
+    |> Repo.all()
+  end
+
   defp count_orders(opts) do
     Order
     |> then(fn query ->

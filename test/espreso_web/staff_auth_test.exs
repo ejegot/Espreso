@@ -230,6 +230,54 @@ defmodule EspresoWeb.StaffAuthTest do
     refute has_element?(staff_view, "#dashboard-panel-sales")
   end
 
+  test "dashboard Popular Products is owner-only with real or empty data", %{
+    conn: conn,
+    owner: owner,
+    manager: manager,
+    barista: barista
+  } do
+    alias Espreso.Orders
+
+    {:ok, owner_empty, _html} = live(log_in(conn, owner), ~p"/dashboard")
+
+    assert has_element?(
+             owner_empty,
+             "#dashboard-panel-popular-products .staff-home-card-body",
+             "No paid product sales today."
+           )
+
+    {:ok, manager_empty, _html} = live(log_in(conn, manager), ~p"/dashboard")
+    refute has_element?(manager_empty, "#dashboard-panel-popular-products")
+
+    {:ok, staff_empty, _html} = live(log_in(conn, barista), ~p"/dashboard")
+    refute has_element?(staff_empty, "#dashboard-panel-popular-products")
+
+    {:ok, paid} =
+      Orders.create_order(
+        [
+          %{name: "Americano", size: "12oz", quantity: 3, price: Decimal.new("120")},
+          %{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}
+        ],
+        %{customer_name: "Pop", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, _} = Orders.mark_paid(paid)
+
+    {:ok, owner_view, _html} = live(log_in(conn, owner), ~p"/dashboard")
+
+    assert has_element?(
+             owner_view,
+             "#dashboard-panel-popular-products .staff-home-card-body",
+             "Americano (3), Espresso (1)"
+           )
+
+    {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/dashboard")
+    refute has_element?(manager_view, "#dashboard-panel-popular-products")
+
+    {:ok, staff_view, _html} = live(log_in(conn, barista), ~p"/dashboard")
+    refute has_element?(staff_view, "#dashboard-panel-popular-products")
+  end
+
   test "dashboard todays orders preview empty state for all roles", %{
     conn: conn,
     owner: owner,
