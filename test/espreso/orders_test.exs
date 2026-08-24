@@ -249,4 +249,67 @@ defmodule Espreso.OrdersTest do
     assert Decimal.equal?(sales.todays_paid_total, Decimal.new("320"))
     assert unpaid_today.payment_status == "unpaid"
   end
+
+  test "popular_products returns empty when none qualify" do
+    assert Orders.popular_products() == []
+  end
+
+  test "popular_products ranks paid today by quantity and respects filters/limit" do
+    {:ok, unpaid} =
+      Orders.create_order(
+        [
+          %{name: "Espresso", size: nil, quantity: 5, price: Decimal.new("75")}
+        ],
+        %{customer_name: "Unpaid", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, paid_low} =
+      Orders.create_order(
+        [
+          %{name: "Latte", size: "12oz", quantity: 1, price: Decimal.new("150")},
+          %{name: "Americano", size: "8oz", quantity: 2, price: Decimal.new("110")}
+        ],
+        %{customer_name: "Paid Low", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, paid_high} =
+      Orders.create_order(
+        [
+          %{name: "Americano", size: "12oz", quantity: 3, price: Decimal.new("120")},
+          %{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}
+        ],
+        %{customer_name: "Paid High", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, yesterday_paid} =
+      Orders.create_order(
+        [%{name: "Mocha", size: "12oz", quantity: 10, price: Decimal.new("160")}],
+        %{customer_name: "Yesterday", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, _} = Orders.mark_paid(paid_low)
+    {:ok, _} = Orders.mark_paid(paid_high)
+    {:ok, yesterday_paid} = Orders.mark_paid(yesterday_paid)
+
+    yesterday = DateTime.add(DateTime.utc_now(), -86_400, :second) |> DateTime.truncate(:second)
+
+    {1, _} =
+      Espreso.Repo.update_all(
+        from(o in Espreso.Orders.Order, where: o.id == ^yesterday_paid.id),
+        set: [inserted_at: yesterday, updated_at: yesterday]
+      )
+
+    popular = Orders.popular_products()
+
+    assert popular == [
+             %{name: "Americano", quantity: 5},
+             %{name: "Espresso", quantity: 1},
+             %{name: "Latte", quantity: 1}
+           ]
+
+    assert unpaid.payment_status == "unpaid"
+    refute Enum.any?(popular, &(&1.name == "Mocha"))
+
+    assert Orders.popular_products(1) == [%{name: "Americano", quantity: 5}]
+  end
 end
