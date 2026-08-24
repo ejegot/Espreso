@@ -135,6 +135,21 @@ defmodule Espreso.Orders do
     }
   end
 
+  @doc """
+  Recent orders placed today (UTC calendar day of `inserted_at`).
+
+  Newest first. Does not preload items. Default limit is 5.
+  """
+  def list_todays_orders(limit \\ 5) when is_integer(limit) and limit > 0 do
+    today_start = DateTime.new!(Date.utc_today(), ~T[00:00:00], "Etc/UTC")
+
+    Order
+    |> where([o], o.inserted_at >= ^today_start)
+    |> order_by([o], desc: o.inserted_at)
+    |> limit(^limit)
+    |> Repo.all()
+  end
+
   defp count_orders(opts) do
     Order
     |> then(fn query ->

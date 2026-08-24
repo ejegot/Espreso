@@ -9,7 +9,8 @@ defmodule EspresoWeb.DashboardLive do
     {:ok,
      socket
      |> assign(:page_title, "Dashboard")
-     |> assign(:order_overview, Orders.dashboard_overview()), layout: false}
+     |> assign(:order_overview, Orders.dashboard_overview())
+     |> assign(:todays_orders, Orders.list_todays_orders()), layout: false}
   end
 
   @impl true
@@ -52,6 +53,44 @@ defmodule EspresoWeb.DashboardLive do
             <% end %>
           <% end %>
         </div>
+
+        <section
+          id="dashboard-todays-orders-preview"
+          class="staff-orders-section dashboard-todays-preview"
+        >
+          <div class="dashboard-todays-preview-head">
+            <h2>Today’s Orders</h2>
+            <.link navigate={~p"/orders"} class="staff-refresh">Open order queue</.link>
+          </div>
+
+          <p :if={@todays_orders == []} class="staff-empty">No orders yet today.</p>
+
+          <article
+            :for={order <- @todays_orders}
+            class="staff-order-card"
+            id={"dashboard-preview-order-#{order.id}"}
+          >
+            <header class="staff-order-head">
+              <div>
+                <p class="staff-order-number">{order.number}</p>
+                <p class="staff-order-name">{order.customer_name}</p>
+              </div>
+              <div class="staff-order-badges">
+                <span class={"staff-badge staff-badge--#{order.status}"}>
+                  {Orders.status_label(order.status)}
+                </span>
+                <span class={"staff-badge staff-badge--pay-#{order.payment_status}"}>
+                  {Orders.payment_label(order)}
+                </span>
+              </div>
+            </header>
+
+            <p class="staff-order-meta">
+              {Orders.fulfillment_label(order.fulfillment)}
+              <span :if={order.table_number}>· Table {order.table_number}</span>
+            </p>
+          </article>
+        </section>
       </main>
     </div>
     """

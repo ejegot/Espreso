@@ -178,6 +178,80 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(staff_view, "#dashboard-panel-todays-orders[href='/orders']")
   end
 
+  test "dashboard todays orders preview empty state for all roles", %{
+    conn: conn,
+    owner: owner,
+    manager: manager,
+    barista: barista
+  } do
+    for user <- [owner, manager, barista] do
+      {:ok, view, _html} = live(log_in(conn, user), ~p"/dashboard")
+      assert has_element?(view, "#dashboard-todays-orders-preview", "Today’s Orders")
+
+      assert has_element?(
+               view,
+               "#dashboard-todays-orders-preview .staff-empty",
+               "No orders yet today."
+             )
+
+      assert has_element?(
+               view,
+               "#dashboard-todays-orders-preview a[href='/orders']",
+               "Open order queue"
+             )
+    end
+  end
+
+  test "dashboard todays orders preview shows real orders for all roles", %{
+    conn: conn,
+    owner: owner,
+    manager: manager,
+    barista: barista
+  } do
+    alias Espreso.Orders
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Cora",
+          fulfillment: :dine_in,
+          table_number: "8",
+          payment_method: :counter
+        }
+      )
+
+    {:ok, preparing} = Orders.update_status(order, "preparing")
+
+    for user <- [owner, manager, barista] do
+      {:ok, view, _html} = live(log_in(conn, user), ~p"/dashboard")
+
+      assert has_element?(view, "#dashboard-todays-orders-preview")
+
+      assert has_element?(
+               view,
+               "#dashboard-preview-order-#{preparing.id} .staff-order-number",
+               preparing.number
+             )
+
+      assert has_element?(
+               view,
+               "#dashboard-preview-order-#{preparing.id} .staff-order-name",
+               "Cora"
+             )
+
+      assert has_element?(
+               view,
+               "#dashboard-preview-order-#{preparing.id} .staff-badge--preparing",
+               "Preparing"
+             )
+
+      assert has_element?(view, "#dashboard-todays-orders-preview a[href='/orders']")
+      refute has_element?(view, "#dashboard-preview-order-#{preparing.id} .staff-order-items")
+      refute has_element?(view, "#dashboard-preview-order-#{preparing.id} button")
+    end
+  end
+
   test "staff workspace remains available after dashboard login destination", %{
     conn: conn,
     barista: barista
