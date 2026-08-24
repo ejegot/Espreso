@@ -10,7 +10,8 @@ defmodule Espreso.CoffeeSpot do
   def address, do: "84 Lilac St., Concepcion Dos, Marikina City, Philippines, 1811"
 
   def address_display,
-    do: "CoffeeSpot – Lilac, Marikina, 84 Lilac St. Concepcion Dos, Marikina City, Philippines, 1811"
+    do:
+      "CoffeeSpot – Lilac, Marikina, 84 Lilac St. Concepcion Dos, Marikina City, Philippines, 1811"
 
   def place_line, do: "CoffeeSpot · Lilac, Marikina"
 

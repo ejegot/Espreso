@@ -109,7 +109,13 @@ defmodule EspresoWeb.HomeLive do
 
         <ul class="site-instagram-grid">
           <li :for={src <- @instagram_images} class="site-instagram-cell">
-            <a href={CoffeeSpot.instagram_url()} target="_blank" rel="noopener noreferrer" tabindex="-1" aria-hidden="true">
+            <a
+              href={CoffeeSpot.instagram_url()}
+              target="_blank"
+              rel="noopener noreferrer"
+              tabindex="-1"
+              aria-hidden="true"
+            >
               <img src={src} alt="" loading="lazy" />
             </a>
           </li>
@@ -119,13 +125,31 @@ defmodule EspresoWeb.HomeLive do
       <%!-- Socials --%>
       <section class="brune-socials" aria-label="Follow CoffeeSpot">
         <div class="brune-socials-grid">
-          <a href={CoffeeSpot.facebook_url()} target="_blank" rel="noopener noreferrer" class="brune-social-card" aria-label="Facebook">
+          <a
+            href={CoffeeSpot.facebook_url()}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="brune-social-card"
+            aria-label="Facebook"
+          >
             <.social_icon name={:facebook} />
           </a>
-          <a href={CoffeeSpot.tiktok_url()} target="_blank" rel="noopener noreferrer" class="brune-social-card" aria-label="TikTok">
+          <a
+            href={CoffeeSpot.tiktok_url()}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="brune-social-card"
+            aria-label="TikTok"
+          >
             <.social_icon name={:tiktok} />
           </a>
-          <a href={CoffeeSpot.instagram_url()} target="_blank" rel="noopener noreferrer" class="brune-social-card" aria-label="Instagram">
+          <a
+            href={CoffeeSpot.instagram_url()}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="brune-social-card"
+            aria-label="Instagram"
+          >
             <.social_icon name={:instagram} />
           </a>
         </div>
@@ -144,17 +168,23 @@ defmodule EspresoWeb.HomeLive do
           <div class="brune-mega-block">
             <p class="brune-mega-label">Contact</p>
             <a href={CoffeeSpot.email_url()} class="brune-mega-link">{CoffeeSpot.email()}</a>
-            <a href={"tel:#{CoffeeSpot.phone_tel()}"} class="brune-mega-link">{CoffeeSpot.phone_display()}</a>
+            <a href={"tel:#{CoffeeSpot.phone_tel()}"} class="brune-mega-link">
+              {CoffeeSpot.phone_display()}
+            </a>
           </div>
 
           <div class="brune-mega-block">
             <p class="brune-mega-label">Location</p>
-            <a href={CoffeeSpot.map_link_url()} target="_blank" rel="noopener noreferrer" class="brune-mega-link">
+            <a
+              href={CoffeeSpot.map_link_url()}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="brune-mega-link"
+            >
               {CoffeeSpot.address_short()}
             </a>
           </div>
         </div>
-
       </footer>
     </div>
     """

@@ -62,13 +62,13 @@ defmodule EspresoWeb.MenuLive do
   @impl true
   def handle_event("select_category", %{"name" => name}, socket) do
     if Enum.any?(socket.assigns.categories, &(&1.name == name)) do
-        {:noreply,
-         socket
-         |> assign(:selected_category, name)
-         |> assign(:search, "")
-         |> assign(:detail, nil)
-         |> assign(:detail_closing?, false)
-         |> push_event("scroll_to_category", %{name: name})}
+      {:noreply,
+       socket
+       |> assign(:selected_category, name)
+       |> assign(:search, "")
+       |> assign(:detail, nil)
+       |> assign(:detail_closing?, false)
+       |> push_event("scroll_to_category", %{name: name})}
     else
       {:noreply, socket}
     end
@@ -121,7 +121,8 @@ defmodule EspresoWeb.MenuLive do
     detail = socket.assigns.detail
 
     if detail && !socket.assigns.detail_closing? do
-      {:noreply, assign(socket, :detail, %{detail | selected_price_id: String.to_integer(price_id)})}
+      {:noreply,
+       assign(socket, :detail, %{detail | selected_price_id: String.to_integer(price_id)})}
     else
       {:noreply, socket}
     end
@@ -142,7 +143,12 @@ defmodule EspresoWeb.MenuLive do
     detail = socket.assigns.detail
 
     if detail && !socket.assigns.detail_closing? do
-      with %{product: product, category_name: category_name, selected_price_id: price_id, quantity: qty} <- detail,
+      with %{
+             product: product,
+             category_name: category_name,
+             selected_price_id: price_id,
+             quantity: qty
+           } <- detail,
            %{} = price <- Enum.find(product.product_prices, &(&1.id == price_id)) do
         cart =
           add_line(
@@ -152,6 +158,7 @@ defmodule EspresoWeb.MenuLive do
             qty,
             Menu.product_image(category_name, product.name)
           )
+
         Process.send_after(self(), :clear_toast, 2000)
 
         {:noreply,
@@ -336,163 +343,177 @@ defmodule EspresoWeb.MenuLive do
       class={["menu-live-root", (@detail || @basket_open?) && "menu-page-locked"]}
     >
       <div class="menu-page menu-page-brune site-page">
-      <.brune_header
-        current="menu"
-        show_basket?={true}
-        basket_count={cart_count(@cart)}
-        basket_pulse?={@basket_pulse?}
-      />
+        <.brune_header
+          current="menu"
+          show_basket?={true}
+          basket_count={cart_count(@cart)}
+          basket_pulse?={@basket_pulse?}
+        />
 
-      <%!-- Menu header with cups illustration --%>
-      <section class="brune-menu-hero" aria-labelledby="brune-menu-title">
-        <div class="brune-menu-hero-copy">
-          <h1 id="brune-menu-title" class="brune-menu-hero-title">Our Menu</h1>
-          <p class="brune-menu-hero-lede">
-            We have drink for every taste and a place for every occasion.
-          </p>
-        </div>
-        <div class="brune-menu-hero-art" aria-hidden="true">
-          <.brune_cups />
-        </div>
-      </section>
+        <%!-- Menu header with cups illustration --%>
+        <section class="brune-menu-hero" aria-labelledby="brune-menu-title">
+          <div class="brune-menu-hero-copy">
+            <h1 id="brune-menu-title" class="brune-menu-hero-title">Our Menu</h1>
+            <p class="brune-menu-hero-lede">
+              We have drink for every taste and a place for every occasion.
+            </p>
+          </div>
+          <div class="brune-menu-hero-art" aria-hidden="true">
+            <.brune_cups />
+          </div>
+        </section>
 
-      <section class="brune-menu-shell" id="menu">
-        <%!-- Search --%>
-        <div id="menu-search" class="brune-menu-search">
-          <form phx-change="search" phx-submit="search">
-            <div class="brune-search-wrap">
-              <span class="brune-search-icon" aria-hidden="true">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
-                </svg>
-              </span>
-              <input
-                id="menu-search-input"
-                type="text"
-                name="search"
-                value={@search}
-                placeholder="Search menu..."
-                class="brune-search-input"
-                autocomplete="off"
-                phx-debounce="200"
-              />
-            </div>
-          </form>
-        </div>
-
-        <nav class="brune-menu-tabs-line" aria-label="Menu categories">
-          <button
-            :for={category <- @categories}
-            type="button"
-            phx-click="select_category"
-            phx-value-name={category.name}
-            class={[
-              "brune-menu-tab-link",
-              @selected_category == category.name && "brune-menu-tab-link-active"
-            ]}
-            aria-pressed={to_string(@selected_category == category.name)}
-          >
-            {category_nav_label(category.name)}
-          </button>
-        </nav>
-
-        <.brune_student_promo />
-
-        <div class="brune-menu-body" id="menu-items">
-          <section
-            :for={category <- visible_categories(@categories, @selected_category, @search)}
-            class={"brune-menu-section brune-menu-section--#{section_tone(category.name)}"}
-            id={"category-#{category.name}"}
-            data-category={category.name}
-          >
-            <h2 class="brune-menu-category-title">{category_nav_label(category.name)}</h2>
-            <div :for={group <- category.groups} class="brune-menu-group">
-              <p :if={group.name} class="brune-menu-subgroup">{group.name}</p>
-
-              <ul class="brune-menu-items">
-                <li :for={product <- group.products} class="brune-menu-item">
-                  <article class="brune-menu-item-card">
-                    <div class="brune-menu-item-thumb">
-                      <img
-                        src={Menu.product_image(category.name, product.name)}
-                        alt={product.name}
-                        class="brune-menu-item-photo"
-                        loading="lazy"
-                      />
-                    </div>
-                    <div class="brune-menu-item-body">
-                      <div class="brune-menu-item-top">
-                        <h3 class="brune-menu-item-name">{product.name}</h3>
-                        <p class="brune-menu-item-price">{card_price_label(product)}</p>
-                      </div>
-                      <p class="brune-menu-item-blurb">{product_blurb(product, category.name)}</p>
-                      <button
-                        type="button"
-                        class="brune-order-link"
-                        phx-click="open_detail"
-                        phx-value-id={product.id}
-                        aria-label={"Order #{product.name}"}
-                      >
-                        Order <span aria-hidden="true">›</span>
-                      </button>
-                    </div>
-                  </article>
-                </li>
-              </ul>
-            </div>
-          </section>
-        </div>
-      </section>
-
-      <%!-- Instagram --%>
-      <section class="site-instagram site-instagram-menu" aria-labelledby="menu-instagram-title">
-        <header class="site-instagram-head">
-          <h2 id="menu-instagram-title" class="site-instagram-title">
-            <a href={CoffeeSpot.instagram_url()} target="_blank" rel="noopener noreferrer">
-              Check us out on Instagram
-            </a>
-          </h2>
-        </header>
-        <ul class="site-instagram-grid">
-          <li :for={src <- instagram_images()} class="site-instagram-cell">
-            <a href={CoffeeSpot.instagram_url()} target="_blank" rel="noopener noreferrer" tabindex="-1" aria-hidden="true">
-              <img src={src} alt="" loading="lazy" />
-            </a>
-          </li>
-        </ul>
-      </section>
-
-      <footer class="brune-mega-footer" aria-label="CoffeeSpot footer">
-        <p class="brune-mega-brand">Elilai</p>
-
-        <div class="brune-mega-grid">
-          <div class="brune-mega-block">
-            <p class="brune-mega-label">Hours</p>
-            <p :for={line <- CoffeeSpot.hours_lines()} class="brune-mega-text">{line}</p>
+        <section class="brune-menu-shell" id="menu">
+          <%!-- Search --%>
+          <div id="menu-search" class="brune-menu-search">
+            <form phx-change="search" phx-submit="search">
+              <div class="brune-search-wrap">
+                <span class="brune-search-icon" aria-hidden="true">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+                  </svg>
+                </span>
+                <input
+                  id="menu-search-input"
+                  type="text"
+                  name="search"
+                  value={@search}
+                  placeholder="Search menu..."
+                  class="brune-search-input"
+                  autocomplete="off"
+                  phx-debounce="200"
+                />
+              </div>
+            </form>
           </div>
 
-          <div class="brune-mega-block">
-            <p class="brune-mega-label">Contact</p>
-            <a href={CoffeeSpot.email_url()} class="brune-mega-link">{CoffeeSpot.email()}</a>
-            <a href={"tel:#{CoffeeSpot.phone_tel()}"} class="brune-mega-link">
-              {CoffeeSpot.phone_display()}
-            </a>
-          </div>
-
-          <div class="brune-mega-block">
-            <p class="brune-mega-label">Location</p>
-            <a
-              href={CoffeeSpot.map_link_url()}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="brune-mega-link"
+          <nav class="brune-menu-tabs-line" aria-label="Menu categories">
+            <button
+              :for={category <- @categories}
+              type="button"
+              phx-click="select_category"
+              phx-value-name={category.name}
+              class={[
+                "brune-menu-tab-link",
+                @selected_category == category.name && "brune-menu-tab-link-active"
+              ]}
+              aria-pressed={to_string(@selected_category == category.name)}
             >
-              {CoffeeSpot.address_short()}
-            </a>
-          </div>
-        </div>
+              {category_nav_label(category.name)}
+            </button>
+          </nav>
 
-      </footer>
+          <.brune_student_promo />
+
+          <div class="brune-menu-body" id="menu-items">
+            <section
+              :for={category <- visible_categories(@categories, @selected_category, @search)}
+              class={"brune-menu-section brune-menu-section--#{section_tone(category.name)}"}
+              id={"category-#{category.name}"}
+              data-category={category.name}
+            >
+              <h2 class="brune-menu-category-title">{category_nav_label(category.name)}</h2>
+              <div :for={group <- category.groups} class="brune-menu-group">
+                <p :if={group.name} class="brune-menu-subgroup">{group.name}</p>
+
+                <ul class="brune-menu-items">
+                  <li :for={product <- group.products} class="brune-menu-item">
+                    <article class="brune-menu-item-card">
+                      <div class="brune-menu-item-thumb">
+                        <img
+                          src={Menu.product_image(category.name, product.name)}
+                          alt={product.name}
+                          class="brune-menu-item-photo"
+                          loading="lazy"
+                        />
+                      </div>
+                      <div class="brune-menu-item-body">
+                        <div class="brune-menu-item-top">
+                          <h3 class="brune-menu-item-name">{product.name}</h3>
+                          <p class="brune-menu-item-price">{card_price_label(product)}</p>
+                        </div>
+                        <p class="brune-menu-item-blurb">{product_blurb(product, category.name)}</p>
+                        <button
+                          type="button"
+                          class="brune-order-link"
+                          phx-click="open_detail"
+                          phx-value-id={product.id}
+                          aria-label={"Order #{product.name}"}
+                        >
+                          Order <span aria-hidden="true">›</span>
+                        </button>
+                      </div>
+                    </article>
+                  </li>
+                </ul>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <%!-- Instagram --%>
+        <section class="site-instagram site-instagram-menu" aria-labelledby="menu-instagram-title">
+          <header class="site-instagram-head">
+            <h2 id="menu-instagram-title" class="site-instagram-title">
+              <a href={CoffeeSpot.instagram_url()} target="_blank" rel="noopener noreferrer">
+                Check us out on Instagram
+              </a>
+            </h2>
+          </header>
+          <ul class="site-instagram-grid">
+            <li :for={src <- instagram_images()} class="site-instagram-cell">
+              <a
+                href={CoffeeSpot.instagram_url()}
+                target="_blank"
+                rel="noopener noreferrer"
+                tabindex="-1"
+                aria-hidden="true"
+              >
+                <img src={src} alt="" loading="lazy" />
+              </a>
+            </li>
+          </ul>
+        </section>
+
+        <footer class="brune-mega-footer" aria-label="CoffeeSpot footer">
+          <p class="brune-mega-brand">Elilai</p>
+
+          <div class="brune-mega-grid">
+            <div class="brune-mega-block">
+              <p class="brune-mega-label">Hours</p>
+              <p :for={line <- CoffeeSpot.hours_lines()} class="brune-mega-text">{line}</p>
+            </div>
+
+            <div class="brune-mega-block">
+              <p class="brune-mega-label">Contact</p>
+              <a href={CoffeeSpot.email_url()} class="brune-mega-link">{CoffeeSpot.email()}</a>
+              <a href={"tel:#{CoffeeSpot.phone_tel()}"} class="brune-mega-link">
+                {CoffeeSpot.phone_display()}
+              </a>
+            </div>
+
+            <div class="brune-mega-block">
+              <p class="brune-mega-label">Location</p>
+              <a
+                href={CoffeeSpot.map_link_url()}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="brune-mega-link"
+              >
+                {CoffeeSpot.address_short()}
+              </a>
+            </div>
+          </div>
+        </footer>
       </div>
 
       <div
@@ -555,10 +576,7 @@ defmodule EspresoWeb.MenuLive do
 
             <div class="menu-buy-about">
               <p class="menu-detail-label">About</p>
-              <p
-                :if={description?(@detail.product.description)}
-                class="menu-detail-description"
-              >
+              <p :if={description?(@detail.product.description)} class="menu-detail-description">
                 {@detail.product.description}
               </p>
               <p :if={!description?(@detail.product.description)} class="menu-detail-description">
@@ -603,12 +621,7 @@ defmodule EspresoWeb.MenuLive do
         </div>
       </div>
 
-      <div
-        :if={@toast}
-        class="menu-toast"
-        role="status"
-        aria-live="polite"
-      >
+      <div :if={@toast} class="menu-toast" role="status" aria-live="polite">
         {@toast}
         <button type="button" class="menu-toast-action" phx-click="open_basket">
           View
@@ -622,7 +635,12 @@ defmodule EspresoWeb.MenuLive do
         phx-window-keydown="close_basket"
         phx-key="Escape"
       >
-        <button type="button" class="menu-basket-backdrop" phx-click="close_basket" aria-label="Close basket">
+        <button
+          type="button"
+          class="menu-basket-backdrop"
+          phx-click="close_basket"
+          aria-label="Close basket"
+        >
         </button>
         <aside
           id="menu-basket-panel"
@@ -645,7 +663,12 @@ defmodule EspresoWeb.MenuLive do
                 {cart_count(@cart)} {if cart_count(@cart) == 1, do: "item", else: "items"}
               </p>
             </div>
-            <button type="button" class="menu-basket-close" phx-click="close_basket" aria-label="Close">
+            <button
+              type="button"
+              class="menu-basket-close"
+              phx-click="close_basket"
+              aria-label="Close"
+            >
               ✕
             </button>
           </header>
@@ -661,11 +684,7 @@ defmodule EspresoWeb.MenuLive do
           <ul :if={@cart != []} class="menu-basket-list">
             <li :for={line <- @cart} class="menu-basket-line">
               <div class="menu-basket-line-visual">
-                <img
-                  src={line.image}
-                  alt=""
-                  class="menu-basket-line-photo"
-                />
+                <img src={line.image} alt="" class="menu-basket-line-photo" />
               </div>
               <div class="menu-basket-line-main">
                 <div class="menu-basket-line-top">
@@ -714,7 +733,12 @@ defmodule EspresoWeb.MenuLive do
           </ul>
 
           <footer :if={@cart != []} class="menu-basket-footer">
-            <form id="menu-checkout-form" class="menu-checkout" phx-change="update_checkout" phx-submit="validate_checkout">
+            <form
+              id="menu-checkout-form"
+              class="menu-checkout"
+              phx-change="update_checkout"
+              phx-submit="validate_checkout"
+            >
               <fieldset class="menu-checkout-fulfillment">
                 <legend class="menu-checkout-label">How will you get it?</legend>
                 <div class="menu-checkout-options" role="radiogroup" aria-label="Fulfillment">
@@ -777,7 +801,9 @@ defmodule EspresoWeb.MenuLive do
               </div>
 
               <div class="menu-checkout-field">
-                <label class="menu-checkout-label" for="checkout-notes">Notes <span class="menu-checkout-optional">(optional)</span></label>
+                <label class="menu-checkout-label" for="checkout-notes">
+                  Notes <span class="menu-checkout-optional">(optional)</span>
+                </label>
                 <textarea
                   id="checkout-notes"
                   name="notes"
@@ -863,9 +889,11 @@ defmodule EspresoWeb.MenuLive do
       |> Enum.map(fn category ->
         filtered_groups =
           Enum.map(category.groups, fn group ->
-            filtered = Enum.filter(group.products, fn product ->
-              String.downcase(product.name) |> String.contains?(query)
-            end)
+            filtered =
+              Enum.filter(group.products, fn product ->
+                String.downcase(product.name) |> String.contains?(query)
+              end)
+
             %{group | products: filtered}
           end)
           |> Enum.reject(fn group -> group.products == [] end)

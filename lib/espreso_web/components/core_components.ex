@@ -635,32 +635,60 @@ defmodule EspresoWeb.CoreComponents do
         <div class="brune-top-leading">
           <div class="brune-drawer">
             <input type="checkbox" id="brune-nav-drawer" class="brune-drawer-toggle" />
-            <label for="brune-nav-drawer" class="brune-icon-btn brune-drawer-open" aria-label="Open menu">
+            <label
+              for="brune-nav-drawer"
+              class="brune-icon-btn brune-drawer-open"
+              aria-label="Open menu"
+            >
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                <path
+                  d="M4 7h16M4 12h16M4 17h16"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                />
               </svg>
             </label>
             <div class="brune-drawer-layer">
-              <label for="brune-nav-drawer" class="brune-drawer-scrim" aria-label="Close menu"></label>
+              <label for="brune-nav-drawer" class="brune-drawer-scrim" aria-label="Close menu">
+              </label>
               <nav class="brune-drawer-panel" aria-label="Main">
                 <div class="brune-drawer-panel-head">
                   <p class="brune-drawer-brand">CoffeeSpot</p>
-                  <label for="brune-nav-drawer" class="brune-icon-btn brune-drawer-close" aria-label="Close menu">
+                  <label
+                    for="brune-nav-drawer"
+                    class="brune-icon-btn brune-drawer-close"
+                    aria-label="Close menu"
+                  >
                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                      <path
+                        d="M6 6l12 12M18 6 6 18"
+                        stroke="currentColor"
+                        stroke-width="1.6"
+                        stroke-linecap="round"
+                      />
                     </svg>
                   </label>
                 </div>
                 <.link navigate="/" class={["brune-drawer-link", @current == "home" && "is-current"]}>
                   Home
                 </.link>
-                <.link navigate="/menu" class={["brune-drawer-link", @current == "menu" && "is-current"]}>
+                <.link
+                  navigate="/menu"
+                  class={["brune-drawer-link", @current == "menu" && "is-current"]}
+                >
                   Menu
                 </.link>
-                <.link navigate="/about" class={["brune-drawer-link", @current == "about" && "is-current"]}>
+                <.link
+                  navigate="/about"
+                  class={["brune-drawer-link", @current == "about" && "is-current"]}
+                >
                   About
                 </.link>
-                <.link navigate="/contact" class={["brune-drawer-link", @current == "contact" && "is-current"]}>
+                <.link
+                  navigate="/contact"
+                  class={["brune-drawer-link", @current == "contact" && "is-current"]}
+                >
                   Contact
                 </.link>
               </nav>
@@ -676,7 +704,12 @@ defmodule EspresoWeb.CoreComponents do
             >
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.6" />
-                <path d="M16.2 16.2 20 20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                <path
+                  d="M16.2 16.2 20 20"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                />
               </svg>
               <span class="brune-search-label">Search</span>
             </button>
@@ -684,7 +717,12 @@ defmodule EspresoWeb.CoreComponents do
             <.link navigate="/menu#menu-search" class="brune-search-btn" aria-label="Search menu">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.6" />
-                <path d="M16.2 16.2 20 20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                <path
+                  d="M16.2 16.2 20 20"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                />
               </svg>
               <span class="brune-search-label">Search</span>
             </.link>
@@ -754,10 +792,18 @@ defmodule EspresoWeb.CoreComponents do
       </div>
 
       <nav class="brune-top-nav" aria-label="Main">
-        <.link navigate="/" class={["brune-top-link", @current == "home" && "is-current"]}>Home</.link>
-        <.link navigate="/menu" class={["brune-top-link", @current == "menu" && "is-current"]}>Menu</.link>
-        <.link navigate="/about" class={["brune-top-link", @current == "about" && "is-current"]}>About</.link>
-        <.link navigate="/contact" class={["brune-top-link", @current == "contact" && "is-current"]}>Contact</.link>
+        <.link navigate="/" class={["brune-top-link", @current == "home" && "is-current"]}>
+          Home
+        </.link>
+        <.link navigate="/menu" class={["brune-top-link", @current == "menu" && "is-current"]}>
+          Menu
+        </.link>
+        <.link navigate="/about" class={["brune-top-link", @current == "about" && "is-current"]}>
+          About
+        </.link>
+        <.link navigate="/contact" class={["brune-top-link", @current == "contact" && "is-current"]}>
+          Contact
+        </.link>
       </nav>
     </header>
     """
@@ -892,7 +938,15 @@ defmodule EspresoWeb.CoreComponents do
   def social_icon(%{name: :instagram} = assigns) do
     ~H"""
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="3.6" y="3.6" width="16.8" height="16.8" rx="5" stroke="currentColor" stroke-width="1.7" />
+      <rect
+        x="3.6"
+        y="3.6"
+        width="16.8"
+        height="16.8"
+        rx="5"
+        stroke="currentColor"
+        stroke-width="1.7"
+      />
       <circle cx="12" cy="12" r="3.85" stroke="currentColor" stroke-width="1.7" />
       <circle cx="17.15" cy="6.85" r="1.05" fill="currentColor" />
     </svg>
@@ -927,7 +981,16 @@ defmodule EspresoWeb.CoreComponents do
           <stop offset="100%" stop-color="#8134af" />
         </linearGradient>
       </defs>
-      <rect x="3.5" y="3.5" width="17" height="17" rx="4.5" fill="none" stroke="url(#ig-grad)" stroke-width="1.8" />
+      <rect
+        x="3.5"
+        y="3.5"
+        width="17"
+        height="17"
+        rx="4.5"
+        fill="none"
+        stroke="url(#ig-grad)"
+        stroke-width="1.8"
+      />
       <circle cx="12" cy="12" r="4" fill="none" stroke="url(#ig-grad)" stroke-width="1.8" />
       <circle cx="17.2" cy="6.8" r="1.15" fill="url(#ig-grad)" />
     </svg>

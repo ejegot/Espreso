@@ -31,7 +31,9 @@ defmodule EspresoWeb.OrderLive do
         <div :if={is_nil(@order)} class="order-card">
           <p class="order-eyebrow">Order</p>
           <h1 class="order-title">Order not found</h1>
-          <p class="order-lede">Check the number on your screen, or place a new order from the menu.</p>
+          <p class="order-lede">
+            Check the number on your screen, or place a new order from the menu.
+          </p>
           <.link navigate={~p"/menu"} class="brune-primary-btn">Back to menu</.link>
         </div>
 
@@ -52,7 +54,7 @@ defmodule EspresoWeb.OrderLive do
               <dt>Type</dt>
               <dd>
                 {Orders.fulfillment_label(@order.fulfillment)}
-                <span :if={@order.table_number}> · Table {@order.table_number}</span>
+                <span :if={@order.table_number}>· Table {@order.table_number}</span>
               </dd>
             </div>
             <div :if={@order.notes}>

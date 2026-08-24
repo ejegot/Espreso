@@ -46,9 +46,21 @@ defmodule EspresoWeb.HomeLiveTest do
     {:ok, view, html} = live(conn, ~p"/")
 
     assert html =~ "bold coffee meets good vibes"
-    assert has_element?(view, ".brune-hero-shot img[src='/images/coffeespot/cafe-atmosphere-01.jpg']")
-    assert has_element?(view, ".brune-hero-shot img[src='/images/coffeespot/visit-interior-01.jpg']")
-    assert has_element?(view, ".brune-hero-shot img[src='/images/coffeespot/cold-signature-01.jpg']")
+
+    assert has_element?(
+             view,
+             ".brune-hero-shot img[src='/images/coffeespot/cafe-atmosphere-01.jpg']"
+           )
+
+    assert has_element?(
+             view,
+             ".brune-hero-shot img[src='/images/coffeespot/visit-interior-01.jpg']"
+           )
+
+    assert has_element?(
+             view,
+             ".brune-hero-shot img[src='/images/coffeespot/cold-signature-01.jpg']"
+           )
   end
 
   test "homepage menu tabs filter categories", %{conn: conn} do

@@ -113,39 +113,54 @@ defmodule Espreso.Menu do
     {"HOT", "Americano"} => "Smooth espresso diluted with hot water for a clean, bold flavor.",
     {"HOT", "Café Latte"} => "Velvety steamed milk blended with a shot of rich espresso.",
     {"HOT", "Cappuccino"} => "Equal parts espresso, steamed milk, and silky foam — a classic.",
-    {"HOT", "Spanish Latte"} => "Espresso sweetened with condensed milk for a creamy, indulgent sip.",
+    {"HOT", "Spanish Latte"} =>
+      "Espresso sweetened with condensed milk for a creamy, indulgent sip.",
     {"HOT", "Mocha Latte"} => "Rich chocolate meets espresso and steamed milk — a cozy favorite.",
-    {"HOT", "Caramel Macchiato"} => "Espresso marked with vanilla milk and drizzled with buttery caramel.",
-    {"HOT", "Butter Scotch"} => "Sweet butterscotch syrup stirred into warm espresso and steamed milk.",
+    {"HOT", "Caramel Macchiato"} =>
+      "Espresso marked with vanilla milk and drizzled with buttery caramel.",
+    {"HOT", "Butter Scotch"} =>
+      "Sweet butterscotch syrup stirred into warm espresso and steamed milk.",
     {"HOT", "Matcha Latte"} => "Premium Japanese matcha whisked with creamy steamed milk.",
-    {"HOT", "Hot Belagio Chocolate"} => "A luxuriously thick and creamy European-style hot chocolate.",
+    {"HOT", "Hot Belagio Chocolate"} =>
+      "A luxuriously thick and creamy European-style hot chocolate.",
     # COLD
     {"COLD", "Americano"} => "Chilled espresso over ice for a refreshing, no-fuss coffee.",
     {"COLD", "Café Latte"} => "Espresso poured over ice and topped with cold, creamy milk.",
-    {"COLD", "Mocha Latte"} => "Iced espresso swirled with chocolate and milk — smooth and sweet.",
+    {"COLD", "Mocha Latte"} =>
+      "Iced espresso swirled with chocolate and milk — smooth and sweet.",
     {"COLD", "Hazelnut"} => "Nutty hazelnut flavor blended into iced espresso and cold milk.",
     {"COLD", "Macadamia"} => "A buttery macadamia twist on classic iced coffee.",
     {"COLD", "Roasted Almond"} => "Toasted almond notes layered into a chilled espresso drink.",
     {"COLD", "English Toffee"} => "Sweet toffee and espresso over ice — rich and satisfying.",
-    {"COLD", "Caramel Macchiato"} => "Iced vanilla milk with espresso and a caramel ribbon on top.",
-    {"COLD", "Spanish Latte"} => "Iced espresso with condensed milk — sweet, creamy, and refreshing.",
+    {"COLD", "Caramel Macchiato"} =>
+      "Iced vanilla milk with espresso and a caramel ribbon on top.",
+    {"COLD", "Spanish Latte"} =>
+      "Iced espresso with condensed milk — sweet, creamy, and refreshing.",
     {"COLD", "Butter Scotch"} => "Butterscotch and espresso over ice for a smooth, sweet treat.",
-    {"COLD", "Matcha Caramel"} => "Earthy matcha meets buttery caramel over ice — unique and delicious.",
-    {"COLD", "Strawberry Matcha"} => "Fresh strawberry layered with iced matcha — fruity and vibrant.",
+    {"COLD", "Matcha Caramel"} =>
+      "Earthy matcha meets buttery caramel over ice — unique and delicious.",
+    {"COLD", "Strawberry Matcha"} =>
+      "Fresh strawberry layered with iced matcha — fruity and vibrant.",
     {"COLD", "Choco Berry"} => "Chocolate and mixed berry flavors blended into a chilled drink.",
     # FRAPPE
-    {"FRAPPE", "Salted Caramel"} => "Sweet caramel with a hint of sea salt blended into a frosty frappe.",
+    {"FRAPPE", "Salted Caramel"} =>
+      "Sweet caramel with a hint of sea salt blended into a frosty frappe.",
     {"FRAPPE", "Mocha"} => "Chocolate and coffee blended with ice into a creamy, frozen treat.",
     {"FRAPPE", "Butter Scotch"} => "Rich butterscotch flavor in a thick, icy blended frappe.",
     {"FRAPPE", "Mocha Crumble"} => "Mocha frappe loaded with crunchy cookie crumble on top.",
-    {"FRAPPE", "Biscoff"} => "The beloved Biscoff cookie flavor blended into a smooth, spiced frappe.",
-    {"FRAPPE", "Cookies & Cream"} => "Crushed cookies blended with vanilla cream — a dessert in a cup.",
+    {"FRAPPE", "Biscoff"} =>
+      "The beloved Biscoff cookie flavor blended into a smooth, spiced frappe.",
+    {"FRAPPE", "Cookies & Cream"} =>
+      "Crushed cookies blended with vanilla cream — a dessert in a cup.",
     {"FRAPPE", "Matcha"} => "Premium matcha blended with ice and milk for a refreshing treat.",
-    {"FRAPPE", "Double Chocolate"} => "Double the chocolate, double the indulgence — thick and frosty.",
-    {"FRAPPE", "Vanilla Bean Hazelnut"} => "Real vanilla bean and hazelnut blended into a creamy frappe.",
+    {"FRAPPE", "Double Chocolate"} =>
+      "Double the chocolate, double the indulgence — thick and frosty.",
+    {"FRAPPE", "Vanilla Bean Hazelnut"} =>
+      "Real vanilla bean and hazelnut blended into a creamy frappe.",
     {"FRAPPE", "Strawberry"} => "Sweet strawberry blended into a pink, fruity frozen delight.",
     # SODA
-    {"SODA", "Tropical Passion Fruit"} => "Tangy passion fruit fizzing with sparkling soda — bright and tropical.",
+    {"SODA", "Tropical Passion Fruit"} =>
+      "Tangy passion fruit fizzing with sparkling soda — bright and tropical.",
     {"SODA", "Green Apple Campaign"} => "Crisp green apple soda with a refreshing tart finish.",
     {"SODA", "Minty Peach"} => "Cool mint meets sweet peach in a sparkling, refreshing drink.",
     {"SODA", "Scarlet Berry"} => "A vibrant berry soda with a deep, fruity sweetness.",
@@ -153,32 +168,41 @@ defmodule Espreso.Menu do
     {"SODA", "Peach Berry"} => "Juicy peach and mixed berries in a sparkling, fruity cooler.",
     {"SODA", "Hummingbird"} => "A house-special citrus and floral soda — light and uplifting.",
     # FOOD — Rice Meals
-    {"FOOD", "Chicken Flakes"} => "Tender shredded chicken served with garlic rice and a fried egg.",
-    {"FOOD", "Beef Tapa"} => "Sweet-cured beef strips with garlic rice and egg — a Filipino classic.",
-    {"FOOD", "Corned Beef"} => "Savory corned beef sautéed with onions, served with rice and egg.",
+    {"FOOD", "Chicken Flakes"} =>
+      "Tender shredded chicken served with garlic rice and a fried egg.",
+    {"FOOD", "Beef Tapa"} =>
+      "Sweet-cured beef strips with garlic rice and egg — a Filipino classic.",
+    {"FOOD", "Corned Beef"} =>
+      "Savory corned beef sautéed with onions, served with rice and egg.",
     {"FOOD", "Spam"} => "Pan-fried Spam slices with garlic rice and a sunny-side-up egg.",
     {"FOOD", "Pork Liempo"} => "Juicy grilled pork belly with garlic rice and a fried egg.",
     {"FOOD", "Spam Musubi"} => "Spam on sushi rice wrapped in nori — a quick, savory bite.",
     {"FOOD", "Nugget"} => "Golden crispy chicken nuggets served with your choice of dip.",
     # FOOD — Appetizers
     {"FOOD", "Solo Fries"} => "A generous serving of crispy, golden french fries.",
-    {"FOOD", "Fries w/ Nuggets"} => "Crispy fries paired with golden chicken nuggets — a perfect combo.",
+    {"FOOD", "Fries w/ Nuggets"} =>
+      "Crispy fries paired with golden chicken nuggets — a perfect combo.",
     {"FOOD", "Beef Nachos"} => "Tortilla chips loaded with seasoned beef, cheese, and salsa.",
-    {"FOOD", "Quesadillas"} => "Grilled flour tortilla filled with melted cheese and savory filling.",
+    {"FOOD", "Quesadillas"} =>
+      "Grilled flour tortilla filled with melted cheese and savory filling.",
     {"FOOD", "Chicken & Chips"} => "Crispy chicken tenders served with a side of seasoned fries.",
     {"FOOD", "Spam & Chips"} => "Pan-fried Spam slices paired with crispy seasoned fries.",
     # FOOD — Muffins
     {"FOOD", "BNN Cream Cheese"} => "Moist banana muffin topped with a rich cream cheese swirl.",
-    {"FOOD", "BNN Choco Overload"} => "Banana muffin loaded with chocolate chips and cocoa drizzle.",
+    {"FOOD", "BNN Choco Overload"} =>
+      "Banana muffin loaded with chocolate chips and cocoa drizzle.",
     {"FOOD", "BNN Biscoff"} => "Banana muffin with Biscoff spread and cookie crumble topping.",
     {"FOOD", "Choco Chips"} => "A classic chocolate chip muffin — soft, warm, and sweet.",
     {"FOOD", "Red Velvet"} => "Rich red velvet muffin with a hint of cocoa and cream cheese.",
     # FOOD — Cakes / Breads
-    {"FOOD", "Dark Choco Dream Cake"} => "Dense, fudgy dark chocolate cake — a chocoholic's dream.",
+    {"FOOD", "Dark Choco Dream Cake"} =>
+      "Dense, fudgy dark chocolate cake — a chocoholic's dream.",
     {"FOOD", "Choco Chip Cookies"} => "Freshly baked cookies packed with melty chocolate chips.",
-    {"FOOD", "BNN Moist Slice"} => "A thick slice of ultra-moist banana bread — homestyle comfort.",
+    {"FOOD", "BNN Moist Slice"} =>
+      "A thick slice of ultra-moist banana bread — homestyle comfort.",
     {"FOOD", "Choco Moist Slice"} => "Rich chocolate banana bread — soft, moist, and indulgent.",
-    {"FOOD", "Carrot Moist Slice"} => "Spiced carrot bread with a moist crumb and subtle sweetness."
+    {"FOOD", "Carrot Moist Slice"} =>
+      "Spiced carrot bread with a moist crumb and subtle sweetness."
   }
 
   @food_subcategories [

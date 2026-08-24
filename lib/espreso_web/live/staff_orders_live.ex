@@ -44,7 +44,9 @@ defmodule EspresoWeb.StaffOrdersLive do
         <div>
           <p class="staff-orders-brand">CoffeeSpot</p>
           <h1 class="staff-orders-title">Orders</h1>
-          <p class="staff-orders-user">{@current_user.name} · {User.role_label(@current_user.role)}</p>
+          <p class="staff-orders-user">
+            {@current_user.name} · {User.role_label(@current_user.role)}
+          </p>
         </div>
         <div class="staff-top-actions">
           <.link navigate={~p"/staff"} class="staff-refresh">Home</.link>
@@ -83,15 +85,14 @@ defmodule EspresoWeb.StaffOrdersLive do
 
               <p class="staff-order-meta">
                 {Orders.fulfillment_label(order.fulfillment)}
-                <span :if={order.table_number}> · Table {order.table_number}</span>
+                <span :if={order.table_number}>· Table {order.table_number}</span>
               </p>
               <p :if={order.notes} class="staff-order-notes">Notes: {order.notes}</p>
 
               <ul class="staff-order-items">
                 <li :for={item <- order.items}>
                   {item.quantity}× {item.name}
-                  <span :if={item.size}>({item.size})</span>
-                  — {Menu.format_price(item.line_total)}
+                  <span :if={item.size}>({item.size})</span> — {Menu.format_price(item.line_total)}
                 </li>
               </ul>
 
@@ -138,7 +139,7 @@ defmodule EspresoWeb.StaffOrdersLive do
               <p class="staff-order-number">{order.number} · {order.customer_name}</p>
               <p class="staff-order-meta">
                 {Orders.fulfillment_label(order.fulfillment)}
-                <span :if={order.table_number}> · Table {order.table_number}</span>
+                <span :if={order.table_number}>· Table {order.table_number}</span>
                 · {Orders.payment_label(order)}
               </p>
             </article>
