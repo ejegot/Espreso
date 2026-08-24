@@ -110,6 +110,7 @@ defmodule Espreso.MenuTest do
 
     test "returns a category fallback for unknown item names" do
       src = Menu.product_image("SODA", "Mystery Fizz")
+
       assert src in [
                "/images/coffeespot/menu-drink-01.jpg",
                "/images/coffeespot/IMG_3481.JPG"

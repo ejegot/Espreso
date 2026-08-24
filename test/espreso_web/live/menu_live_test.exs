@@ -68,14 +68,17 @@ defmodule EspresoWeb.MenuLiveTest do
     assert html =~ "Americano"
     assert html =~ "Espresso"
     assert has_element?(view, "#category-HOT")
+
     assert has_element?(
              view,
              ~s(.brune-menu-item-photo[src="/images/coffeespot/coffee-espresso-01.jpg"][alt="Americano"])
            )
+
     assert has_element?(
              view,
              ~s(.brune-menu-item-photo[src="/images/coffeespot/coffee-espresso-01.jpg"][alt="Espresso"])
            )
+
     refute has_element?(view, ".menu-card-initial")
     refute has_element?(view, "#category-COLD")
     refute html =~ "Hazelnut"
@@ -239,10 +242,12 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, ".menu-buy-modal")
     assert has_element?(view, ".menu-buy-handle")
     assert has_element?(view, "#menu-detail-title", "Espresso")
+
     assert has_element?(
              view,
              ~s(.menu-buy-photo[src="/images/coffeespot/coffee-espresso-01.jpg"][alt="Espresso"])
            )
+
     assert has_element?(view, "button.menu-buy-now", "Add to basket")
 
     view |> element("button.menu-buy-now", "Add to basket") |> render_click()
@@ -255,6 +260,7 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#menu-basket")
     assert has_element?(view, ".menu-basket-count-label", "1 item")
     assert has_element?(view, ".menu-basket-line-name", "Espresso")
+
     assert has_element?(
              view,
              ~s(.menu-basket-line-photo[src="/images/coffeespot/coffee-espresso-01.jpg"])
@@ -358,7 +364,6 @@ defmodule EspresoWeb.MenuLiveTest do
         price: Decimal.new(price)
       })
       |> Repo.insert!()
-
     end)
 
     product

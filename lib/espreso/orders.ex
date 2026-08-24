@@ -17,8 +17,13 @@ defmodule Espreso.Orders do
   `:table_number`, `:notes`, `:payment_method` (`:counter` | `:online`).
   """
   def create_order(lines, attrs) when is_list(lines) and lines != [] do
-    fulfillment = normalize_fulfillment(Map.get(attrs, :fulfillment) || Map.get(attrs, "fulfillment"))
-    payment_method = normalize_payment_method(Map.get(attrs, :payment_method) || Map.get(attrs, "payment_method"))
+    fulfillment =
+      normalize_fulfillment(Map.get(attrs, :fulfillment) || Map.get(attrs, "fulfillment"))
+
+    payment_method =
+      normalize_payment_method(
+        Map.get(attrs, :payment_method) || Map.get(attrs, "payment_method")
+      )
 
     total =
       Enum.reduce(lines, Decimal.new(0), fn line, acc ->

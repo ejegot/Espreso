@@ -184,8 +184,7 @@ defmodule EspresoWeb.StaffRegisterLive do
           </.form>
 
           <p class="staff-auth-switch">
-            Already have an account?
-            <.link navigate={~p"/login"}>Sign In</.link>
+            Already have an account? <.link navigate={~p"/login"}>Sign In</.link>
           </p>
 
           <p class="staff-auth-site-link">

@@ -20,11 +20,7 @@ defmodule EspresoWeb.StaffLoginLive do
     ~H"""
     <div class="staff-auth-page">
       <aside class="staff-auth-visual" aria-hidden="true">
-        <img
-          src={~p"/images/coffeespot/cold-signature-01.jpg"}
-          alt=""
-          class="staff-auth-visual-img"
-        />
+        <img src={~p"/images/coffeespot/cold-signature-01.jpg"} alt="" class="staff-auth-visual-img" />
         <div class="staff-auth-visual-shade"></div>
         <figure class="staff-auth-quote">
           <blockquote>
@@ -107,8 +103,7 @@ defmodule EspresoWeb.StaffLoginLive do
           </.form>
 
           <p class="staff-auth-switch">
-            Don’t have an account?
-            <.link navigate={~p"/register"}>Sign Up</.link>
+            Don’t have an account? <.link navigate={~p"/register"}>Sign Up</.link>
           </p>
 
           <p class="staff-auth-site-link">

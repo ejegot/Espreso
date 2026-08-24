@@ -35,7 +35,9 @@ defmodule EspresoWeb.ContactLive do
 
           <div class="brune-contact-block">
             <p class="brune-contact-label">Reach us</p>
-            <a href={"tel:#{CoffeeSpot.phone_tel()}"} class="brune-contact-value">{CoffeeSpot.phone_display()}</a>
+            <a href={"tel:#{CoffeeSpot.phone_tel()}"} class="brune-contact-value">
+              {CoffeeSpot.phone_display()}
+            </a>
             <a href={CoffeeSpot.email_url()} class="brune-contact-value">{CoffeeSpot.email()}</a>
           </div>
 
@@ -70,7 +72,13 @@ defmodule EspresoWeb.ContactLive do
 
             <div class="brune-contact-field">
               <label for="contact-message" class="brune-contact-field-label">Message</label>
-              <textarea id="contact-message" name="message" rows="4" class="brune-contact-textarea" required></textarea>
+              <textarea
+                id="contact-message"
+                name="message"
+                rows="4"
+                class="brune-contact-textarea"
+                required
+              ></textarea>
             </div>
 
             <button type="submit" class="brune-contact-submit">Send Message</button>
@@ -89,7 +97,13 @@ defmodule EspresoWeb.ContactLive do
         </header>
         <ul class="site-instagram-grid">
           <li :for={src <- @instagram_images} class="site-instagram-cell">
-            <a href={CoffeeSpot.instagram_url()} target="_blank" rel="noopener noreferrer" tabindex="-1" aria-hidden="true">
+            <a
+              href={CoffeeSpot.instagram_url()}
+              target="_blank"
+              rel="noopener noreferrer"
+              tabindex="-1"
+              aria-hidden="true"
+            >
               <img src={src} alt="" loading="lazy" />
             </a>
           </li>
@@ -109,17 +123,23 @@ defmodule EspresoWeb.ContactLive do
           <div class="brune-mega-block">
             <p class="brune-mega-label">Contact</p>
             <a href={CoffeeSpot.email_url()} class="brune-mega-link">{CoffeeSpot.email()}</a>
-            <a href={"tel:#{CoffeeSpot.phone_tel()}"} class="brune-mega-link">{CoffeeSpot.phone_display()}</a>
+            <a href={"tel:#{CoffeeSpot.phone_tel()}"} class="brune-mega-link">
+              {CoffeeSpot.phone_display()}
+            </a>
           </div>
 
           <div class="brune-mega-block">
             <p class="brune-mega-label">Location</p>
-            <a href={CoffeeSpot.map_link_url()} target="_blank" rel="noopener noreferrer" class="brune-mega-link">
+            <a
+              href={CoffeeSpot.map_link_url()}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="brune-mega-link"
+            >
               {CoffeeSpot.address_short()}
             </a>
           </div>
         </div>
-
       </footer>
     </div>
     """
