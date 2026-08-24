@@ -153,5 +153,5 @@ defmodule EspresoWeb.StaffAuth do
 
   defp maybe_store_return_to(conn), do: conn
 
-  defp signed_in_path(_user), do: ~p"/staff"
+  defp signed_in_path(_user), do: ~p"/dashboard"
 end
