@@ -130,4 +130,65 @@ defmodule Espreso.OrdersTest do
     assert received.status == "received"
     assert preparing.status == "preparing"
   end
+
+  test "list_todays_orders returns empty when none today" do
+    assert Orders.list_todays_orders() == []
+  end
+
+  test "list_todays_orders filters today only, newest first, and respects limit" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, older_today} =
+      Orders.create_order(lines, %{
+        customer_name: "Older",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, newer_today} =
+      Orders.create_order(lines, %{
+        customer_name: "Newer",
+        fulfillment: :dine_in,
+        table_number: "3",
+        payment_method: :counter
+      })
+
+    {:ok, yesterday_order} =
+      Orders.create_order(lines, %{
+        customer_name: "Yesterday",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    earlier_today = DateTime.add(now, -60, :second)
+    yesterday = DateTime.add(now, -86_400, :second)
+
+    {1, _} =
+      Espreso.Repo.update_all(
+        from(o in Espreso.Orders.Order, where: o.id == ^older_today.id),
+        set: [inserted_at: earlier_today, updated_at: earlier_today]
+      )
+
+    {1, _} =
+      Espreso.Repo.update_all(
+        from(o in Espreso.Orders.Order, where: o.id == ^newer_today.id),
+        set: [inserted_at: now, updated_at: now]
+      )
+
+    {1, _} =
+      Espreso.Repo.update_all(
+        from(o in Espreso.Orders.Order, where: o.id == ^yesterday_order.id),
+        set: [inserted_at: yesterday, updated_at: yesterday]
+      )
+
+    todays = Orders.list_todays_orders()
+    assert Enum.map(todays, & &1.id) == [newer_today.id, older_today.id]
+    refute Enum.any?(todays, &(&1.id == yesterday_order.id))
+    refute Enum.any?(todays, &Ecto.assoc_loaded?(&1.items))
+
+    limited = Orders.list_todays_orders(1)
+    assert length(limited) == 1
+    assert hd(limited).id == newer_today.id
+  end
 end

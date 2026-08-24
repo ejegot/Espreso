@@ -2428,6 +2428,22 @@ body:has(.menu-page-locked) {
   line-height: 1.45;
 }
 
+.dashboard-todays-preview {
+  margin-top: 1.75rem;
+}
+
+.dashboard-todays-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.dashboard-todays-preview-head h2 {
+  margin: 0;
+}
+
 .staff-home-grid {
   display: grid;
   gap: 0.85rem;
