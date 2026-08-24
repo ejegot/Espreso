@@ -312,4 +312,87 @@ defmodule Espreso.OrdersTest do
 
     assert Orders.popular_products(1) == [%{name: "Americano", quantity: 5}]
   end
+
+  test "reports_overview returns zeros when empty" do
+    reports = Orders.reports_overview()
+    assert reports.period_paid_count == 0
+    assert reports.period_days == 7
+    assert Decimal.equal?(reports.period_paid_total, Decimal.new("0"))
+  end
+
+  test "reports_overview includes paid orders across last 7 UTC days only" do
+    lines_75 = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+    lines_120 = [%{name: "Americano", size: "12oz", quantity: 1, price: Decimal.new("120")}]
+    lines_200 = [%{name: "Latte", size: "12oz", quantity: 1, price: Decimal.new("200")}]
+
+    {:ok, unpaid_today} =
+      Orders.create_order(lines_75, %{
+        customer_name: "Unpaid Today",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, paid_today} =
+      Orders.create_order(lines_120, %{
+        customer_name: "Paid Today",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, paid_mid} =
+      Orders.create_order(lines_200, %{
+        customer_name: "Paid Mid",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, paid_edge} =
+      Orders.create_order(lines_75, %{
+        customer_name: "Paid Edge",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, paid_old} =
+      Orders.create_order(lines_200, %{
+        customer_name: "Paid Old",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, _} = Orders.mark_paid(paid_today)
+    {:ok, paid_mid} = Orders.mark_paid(paid_mid)
+    {:ok, paid_edge} = Orders.mark_paid(paid_edge)
+    {:ok, paid_old} = Orders.mark_paid(paid_old)
+
+    today_start = DateTime.new!(Date.utc_today(), ~T[00:00:00], "Etc/UTC")
+    mid_window = DateTime.add(today_start, -3, :day)
+    edge_window = DateTime.add(today_start, -6, :day)
+    too_old = DateTime.add(today_start, -7, :day)
+
+    {1, _} =
+      Espreso.Repo.update_all(
+        from(o in Espreso.Orders.Order, where: o.id == ^paid_mid.id),
+        set: [inserted_at: mid_window, updated_at: mid_window]
+      )
+
+    {1, _} =
+      Espreso.Repo.update_all(
+        from(o in Espreso.Orders.Order, where: o.id == ^paid_edge.id),
+        set: [inserted_at: edge_window, updated_at: edge_window]
+      )
+
+    {1, _} =
+      Espreso.Repo.update_all(
+        from(o in Espreso.Orders.Order, where: o.id == ^paid_old.id),
+        set: [inserted_at: too_old, updated_at: too_old]
+      )
+
+    reports = Orders.reports_overview()
+
+    assert reports.period_days == 7
+    assert reports.period_paid_count == 3
+    assert Decimal.equal?(reports.period_paid_total, Decimal.new("395"))
+    assert unpaid_today.payment_status == "unpaid"
+  end
 end
