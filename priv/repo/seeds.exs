@@ -191,3 +191,47 @@ case Accounts.ensure_owner!(%{
   {:error, changeset} ->
     IO.puts("Owner seed skipped/failed: #{inspect(changeset.errors)}")
 end
+
+# —— Local dashboard role-testing accounts (dev/test only) ——
+# Idempotent: create if missing; never update existing users.
+dashboard_seed_accounts = [
+  %{
+    name: "Dashboard Owner",
+    email: "owner.dashboard@test.local",
+    password: "Dashboard123!",
+    role: "owner",
+    active: true
+  },
+  %{
+    name: "Dashboard Manager",
+    email: "manager.dashboard@test.local",
+    password: "Dashboard123!",
+    role: "manager",
+    active: true
+  },
+  %{
+    name: "Dashboard Staff",
+    email: "staff.dashboard@test.local",
+    password: "Dashboard123!",
+    role: "barista",
+    active: true
+  }
+]
+
+for attrs <- dashboard_seed_accounts do
+  case Accounts.get_user_by_email(attrs.email) do
+    %Accounts.User{} = user ->
+      IO.puts("Dashboard seed account already exists: #{user.email} (#{user.role})")
+
+    nil ->
+      case Accounts.register_user(attrs) do
+        {:ok, user} ->
+          IO.puts("Dashboard seed account created: #{user.email} (#{user.role})")
+
+        {:error, changeset} ->
+          IO.puts(
+            "Dashboard seed account failed for #{attrs.email}: #{inspect(changeset.errors)}"
+          )
+      end
+  end
+end
