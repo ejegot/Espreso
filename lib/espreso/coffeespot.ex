@@ -1,19 +1,24 @@
 defmodule Espreso.CoffeeSpot do
   @moduledoc """
   Public CoffeeSpot – Lilac Marikina contact, place, and about details.
+
+  Contact, hours, and social URLs are loaded from `Espreso.BusinessSettings`.
+  Marketing copy (tagline, vibes, intro, reviews, promos) stays hardcoded here.
   """
 
+  alias Espreso.BusinessSettings
   alias Espreso.Menu
+
+  def business_name, do: settings().business_name
 
   def location, do: "Lilac, Marikina"
 
-  def address, do: "84 Lilac St., Concepcion Dos, Marikina City, Philippines, 1811"
+  def address, do: settings().address
 
   def address_display,
-    do:
-      "CoffeeSpot – Lilac, Marikina, 84 Lilac St. Concepcion Dos, Marikina City, Philippines, 1811"
+    do: "#{business_name()} – #{location()}, #{address_without_postal()}"
 
-  def place_line, do: "CoffeeSpot · Lilac, Marikina"
+  def place_line, do: "#{business_name()} · #{location()}"
 
   def tagline, do: "The place where bold coffee meets good vibes."
 
@@ -23,19 +28,12 @@ defmodule Espreso.CoffeeSpot do
     do:
       "Unmatched vibes, great coffee, and a vibrant space that's all about community and creativity."
 
-  def address_short, do: "84 Lilac St., Concepcion Dos, Marikina City, Philippines"
+  def address_short, do: address_without_postal()
 
   @doc """
   Short lines for the Brune-style visit strip and footer hours column.
   """
-  def hours_lines do
-    [
-      "Mon–Thu · 8:00 AM – 12:00 AM",
-      "Fri–Sun · 8:00 AM – 10:00 PM",
-      "Student Hour · Mon–Thu, 2:00 PM – 5:00 PM",
-      "Holiday hours on Instagram"
-    ]
-  end
+  def hours_lines, do: settings().hours_lines
 
   @doc """
   Featured promo cards for the Home page "What's brewing" section.
@@ -77,12 +75,11 @@ defmodule Espreso.CoffeeSpot do
   def hours_note, do: "Hours · check Instagram for holiday updates"
 
   def map_embed_url,
-    do:
-      "https://maps.google.com/maps?q=#{URI.encode_www_form("84 Lilac St Concepcion Dos Marikina City 1811")}&z=16&output=embed"
+    do: "https://maps.google.com/maps?q=#{URI.encode_www_form(map_query())}&z=16&output=embed"
 
   def map_link_url,
     do:
-      "https://www.google.com/maps/search/?api=1&query=#{URI.encode_www_form("84 Lilac St Concepcion Dos Marikina City")}"
+      "https://www.google.com/maps/search/?api=1&query=#{URI.encode_www_form(map_query_short())}"
 
   def intro,
     do:
@@ -121,9 +118,9 @@ defmodule Espreso.CoffeeSpot do
     ]
   end
 
-  def phone_display, do: "+639566728906"
+  def phone_display, do: settings().phone
 
-  def phone_tel, do: "+639566728906"
+  def phone_tel, do: settings().phone
 
   @doc """
   Digits-only phone for WhatsApp (`wa.me`), e.g. `639566728906`.
@@ -178,7 +175,7 @@ defmodule Espreso.CoffeeSpot do
     notes_block = if notes != "", do: "\n\nNotes: #{notes}", else: ""
 
     """
-    Hi CoffeeSpot! New order
+    Hi #{business_name()}! New order
 
     #{name_line}#{type_line}
 
@@ -196,21 +193,45 @@ defmodule Espreso.CoffeeSpot do
     "• #{qty}x #{name}#{size_part} — #{Menu.format_price(line_total)}"
   end
 
-  def email, do: "elilaicorp.ph@gmail.com"
+  def email, do: settings().email
 
-  def email_url, do: "mailto:elilaicorp.ph@gmail.com"
+  def email_url, do: "mailto:#{email()}"
 
-  def instagram_handle, do: "coffeespot_lilac.marikina"
+  def instagram_handle do
+    case URI.parse(instagram_url()) do
+      %URI{path: path} when is_binary(path) ->
+        path |> String.trim("/") |> String.split("/") |> List.last() ||
+          "coffeespot_lilac.marikina"
 
-  def instagram_url, do: "https://www.instagram.com/coffeespot_lilac.marikina/"
+      _ ->
+        "coffeespot_lilac.marikina"
+    end
+  end
+
+  def instagram_url, do: settings().instagram_url
 
   def facebook_label, do: "Coffee Spot-Lilac, Marikina"
 
-  def facebook_url, do: "https://www.facebook.com/profile.php?id=61572602608495"
+  def facebook_url, do: settings().facebook_url
 
-  def tiktok_handle, do: "coffeespotlilac_"
+  def tiktok_handle do
+    case URI.parse(tiktok_url()) do
+      %URI{path: path} when is_binary(path) ->
+        path
+        |> String.trim("/")
+        |> String.split("/")
+        |> List.last()
+        |> then(fn
+          nil -> "coffeespotlilac_"
+          handle -> String.trim_leading(handle, "@")
+        end)
 
-  def tiktok_url, do: "https://www.tiktok.com/@coffeespotlilac_"
+      _ ->
+        "coffeespotlilac_"
+    end
+  end
+
+  def tiktok_url, do: settings().tiktok_url
 
   @doc """
   Public social profiles for header icon links.
@@ -261,5 +282,26 @@ defmodule Espreso.CoffeeSpot do
         external?: false
       }
     ]
+  end
+
+  defp settings, do: BusinessSettings.get()
+
+  defp address_without_postal do
+    address()
+    |> String.replace(~r/,\s*\d{4}\s*$/, "")
+    |> String.trim()
+  end
+
+  defp map_query, do: maps_query(address())
+
+  defp map_query_short, do: maps_query(address_without_postal())
+
+  defp maps_query(value) do
+    value
+    |> String.replace(~r/,\s*Philippines/i, "")
+    |> String.replace(~r/Philippines/i, "")
+    |> String.replace(~r"[.,]", "")
+    |> String.replace(~r/\s+/, " ")
+    |> String.trim()
   end
 end

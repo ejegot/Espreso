@@ -113,12 +113,8 @@ defmodule EspresoWeb.StaffAuthTest do
 
     assert has_element?(owner_view, "#dashboard-panel-users.staff-home-card-owner", "Users")
     assert has_element?(owner_view, "#dashboard-panel-settings", "Settings")
-
-    assert has_element?(
-             owner_view,
-             "#dashboard-panel-settings .staff-home-soon-pill",
-             "Coming soon"
-           )
+    assert has_element?(owner_view, "#dashboard-panel-settings[href='/admin/settings']")
+    refute has_element?(owner_view, "#dashboard-panel-settings .staff-home-soon-pill")
 
     {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/dashboard")
     assert has_element?(manager_view, "#dashboard-panel-sales", "Sales")
@@ -140,6 +136,7 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(staff_view, "#dashboard-todays-orders-preview", "Today’s Orders")
     refute has_element?(staff_view, "#dashboard-panel-sales")
     refute has_element?(staff_view, "#dashboard-panel-reports")
+    refute has_element?(staff_view, "#dashboard-panel-settings")
   end
 
   test "dashboard Orders panels show real overview counts", %{

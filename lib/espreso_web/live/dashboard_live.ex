@@ -169,11 +169,13 @@ defmodule EspresoWeb.DashboardLive do
         class: "staff-home-card-owner"
       },
       %{
-        kind: :placeholder,
+        kind: :link,
         id: "settings",
         eyebrow: "Owner",
         title: "Settings",
-        body: "Coming soon"
+        body: "Business contact, hours, and social links.",
+        to: ~p"/admin/settings",
+        class: "staff-home-card-owner"
       }
     ]
   end

@@ -12,8 +12,13 @@
 
 import Ecto.Query
 
+alias Espreso.BusinessSettings
 alias Espreso.Repo
 alias Espreso.Menu.{Category, Product, ProductPrice}
+
+# —— Business settings (singleton) ——
+settings = BusinessSettings.ensure_defaults!()
+IO.puts("Business settings ready: #{settings.business_name}")
 
 find_or_create_category = fn name ->
   case Repo.get_by(Category, name: name) do

@@ -69,6 +69,15 @@ defmodule EspresoWeb.Router do
     end
   end
 
+  scope "/", EspresoWeb do
+    pipe_through [:browser, :require_authenticated_staff]
+
+    live_session :business_settings,
+      on_mount: [{EspresoWeb.StaffAuth, {:ensure_permission, :business_settings}}] do
+      live "/admin/settings", AdminSettingsLive
+    end
+  end
+
   if Application.compile_env(:espreso, :dev_routes) do
     import Phoenix.LiveDashboard.Router
 
