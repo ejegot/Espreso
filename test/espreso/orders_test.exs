@@ -191,4 +191,62 @@ defmodule Espreso.OrdersTest do
     assert length(limited) == 1
     assert hd(limited).id == newer_today.id
   end
+
+  test "sales_overview returns zeros when empty" do
+    sales = Orders.sales_overview()
+    assert sales.todays_paid_count == 0
+    assert Decimal.equal?(sales.todays_paid_total, Decimal.new("0"))
+  end
+
+  test "sales_overview includes only today's paid order totals" do
+    lines_75 = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+    lines_120 = [%{name: "Americano", size: "12oz", quantity: 1, price: Decimal.new("120")}]
+    lines_200 = [%{name: "Latte", size: "12oz", quantity: 1, price: Decimal.new("200")}]
+
+    {:ok, unpaid_today} =
+      Orders.create_order(lines_75, %{
+        customer_name: "Unpaid",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, paid_a} =
+      Orders.create_order(lines_120, %{
+        customer_name: "Paid A",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, paid_b} =
+      Orders.create_order(lines_200, %{
+        customer_name: "Paid B",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, yesterday_paid} =
+      Orders.create_order(lines_75, %{
+        customer_name: "Yesterday Paid",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, _} = Orders.mark_paid(paid_a)
+    {:ok, _} = Orders.mark_paid(paid_b)
+    {:ok, yesterday_paid} = Orders.mark_paid(yesterday_paid)
+
+    yesterday = DateTime.add(DateTime.utc_now(), -86_400, :second) |> DateTime.truncate(:second)
+
+    {1, _} =
+      Espreso.Repo.update_all(
+        from(o in Espreso.Orders.Order, where: o.id == ^yesterday_paid.id),
+        set: [inserted_at: yesterday, updated_at: yesterday]
+      )
+
+    sales = Orders.sales_overview()
+
+    assert sales.todays_paid_count == 2
+    assert Decimal.equal?(sales.todays_paid_total, Decimal.new("320"))
+    assert unpaid_today.payment_status == "unpaid"
+  end
 end

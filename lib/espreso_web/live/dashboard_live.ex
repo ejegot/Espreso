@@ -2,6 +2,7 @@ defmodule EspresoWeb.DashboardLive do
   use EspresoWeb, :live_view
 
   alias Espreso.Accounts.User
+  alias Espreso.Menu
   alias Espreso.Orders
 
   @impl true
@@ -10,7 +11,8 @@ defmodule EspresoWeb.DashboardLive do
      socket
      |> assign(:page_title, "Dashboard")
      |> assign(:order_overview, Orders.dashboard_overview())
-     |> assign(:todays_orders, Orders.list_todays_orders()), layout: false}
+     |> assign(:todays_orders, Orders.list_todays_orders())
+     |> assign(:sales_overview, Orders.sales_overview()), layout: false}
   end
 
   @impl true
@@ -37,7 +39,7 @@ defmodule EspresoWeb.DashboardLive do
         </p>
 
         <div class="staff-home-grid" id="dashboard-panels">
-          <%= for panel <- panels_for(@current_user.role, @order_overview) do %>
+          <%= for panel <- panels_for(@current_user.role, @order_overview, @sales_overview) do %>
             <%= if panel[:to] do %>
               <.link navigate={panel.to} class="staff-home-card" id={"dashboard-panel-#{panel.id}"}>
                 <span class="staff-home-card-eyebrow">{panel.eyebrow}</span>
@@ -100,15 +102,9 @@ defmodule EspresoWeb.DashboardLive do
   defp dashboard_lede("manager"), do: "Day-to-day operations — orders, availability, and reports."
   defp dashboard_lede(_), do: "Your shift overview — today’s orders."
 
-  defp panels_for("owner", overview) do
+  defp panels_for("owner", overview, sales) do
     [
-      %{
-        id: "sales",
-        eyebrow: "Overview",
-        title: "Sales",
-        body: "Sales overview will appear here.",
-        to: nil
-      },
+      sales_panel(sales),
       orders_panel(overview),
       %{
         id: "popular-products",
@@ -141,15 +137,9 @@ defmodule EspresoWeb.DashboardLive do
     ]
   end
 
-  defp panels_for("manager", overview) do
+  defp panels_for("manager", overview, sales) do
     [
-      %{
-        id: "sales",
-        eyebrow: "Overview",
-        title: "Sales",
-        body: "Sales overview will appear here.",
-        to: nil
-      },
+      sales_panel(sales),
       orders_panel(overview),
       %{
         id: "availability",
@@ -168,7 +158,7 @@ defmodule EspresoWeb.DashboardLive do
     ]
   end
 
-  defp panels_for(_staff, overview) do
+  defp panels_for(_staff, overview, _sales) do
     [
       %{
         id: "todays-orders",
@@ -178,6 +168,20 @@ defmodule EspresoWeb.DashboardLive do
         to: ~p"/orders"
       }
     ]
+  end
+
+  defp sales_panel(sales) do
+    %{
+      id: "sales",
+      eyebrow: "Overview",
+      title: "Sales",
+      body: sales_body(sales),
+      to: nil
+    }
+  end
+
+  defp sales_body(%{todays_paid_total: total, todays_paid_count: count}) do
+    "#{Menu.format_price(total)} today · #{count} paid orders"
   end
 
   defp orders_panel(overview) do

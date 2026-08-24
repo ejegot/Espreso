@@ -150,6 +150,28 @@ defmodule Espreso.Orders do
     |> Repo.all()
   end
 
+  @doc """
+  Today's paid sales for the dashboard (UTC calendar day of `inserted_at`).
+
+  Only `payment_status == "paid"` orders are included. Uses `Order.total`
+  aggregates — does not load items.
+  """
+  def sales_overview do
+    today_start = DateTime.new!(Date.utc_today(), ~T[00:00:00], "Etc/UTC")
+
+    paid_today =
+      Order
+      |> where([o], o.payment_status == "paid" and o.inserted_at >= ^today_start)
+
+    total = Repo.aggregate(paid_today, :sum, :total) || Decimal.new("0")
+    count = Repo.aggregate(paid_today, :count, :id)
+
+    %{
+      todays_paid_total: total,
+      todays_paid_count: count
+    }
+  end
+
   defp count_orders(opts) do
     Order
     |> then(fn query ->
