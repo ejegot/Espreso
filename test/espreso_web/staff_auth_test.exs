@@ -488,11 +488,12 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(view, "#edit-user-#{owner.id}")
   end
 
-  test "pos placeholder is reachable for staff", %{conn: conn, barista: barista} do
+  test "pos is reachable for staff", %{conn: conn, barista: barista} do
     conn = log_in(conn, barista)
     {:ok, view, _html} = live(conn, ~p"/pos")
     assert has_element?(view, ".staff-orders-title", "POS")
-    assert render(view) =~ "Coming soon"
+    assert has_element?(view, "#pos-catalog")
+    refute render(view) =~ "Coming soon"
   end
 
   defp log_in(conn, user) do
