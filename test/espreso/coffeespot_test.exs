@@ -1,6 +1,8 @@
 defmodule Espreso.CoffeeSpotTest do
-  use ExUnit.Case, async: true
+  use Espreso.DataCase, async: true
 
+  alias Espreso.Accounts
+  alias Espreso.BusinessSettings
   alias Espreso.CoffeeSpot
 
   test "order_message lists lines with sizes and total" do
@@ -58,5 +60,60 @@ defmodule Espreso.CoffeeSpotTest do
     assert url =~ URI.encode_www_form("Espresso")
     assert url =~ URI.encode_www_form("₱75")
     assert url =~ URI.encode_www_form("Table 3")
+  end
+
+  test "contact helpers resolve from default business settings" do
+    defaults = BusinessSettings.defaults()
+
+    assert CoffeeSpot.business_name() == defaults.business_name
+    assert CoffeeSpot.address() == defaults.address
+    assert CoffeeSpot.address_short() == "84 Lilac St., Concepcion Dos, Marikina City, Philippines"
+    assert CoffeeSpot.phone_display() == defaults.phone
+    assert CoffeeSpot.email() == defaults.email
+    assert CoffeeSpot.hours_lines() == defaults.hours_lines
+    assert CoffeeSpot.instagram_url() == defaults.instagram_url
+    assert CoffeeSpot.facebook_url() == defaults.facebook_url
+    assert CoffeeSpot.tiktok_url() == defaults.tiktok_url
+    assert CoffeeSpot.email_url() == "mailto:#{defaults.email}"
+  end
+
+  test "contact helpers reflect owner updates" do
+    {:ok, owner} =
+      Accounts.register_user(%{
+        name: "Owner",
+        email: "owner.coffeespot@test.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    assert {:ok, _} =
+             BusinessSettings.update_as(owner, %{
+               "business_name" => "Lilac Spot",
+               "address" => "100 Test St., Marikina City, Philippines, 1800",
+               "phone" => "+639111111111",
+               "email" => "desk@lilac.local",
+               "hours_text" => "Open daily",
+               "instagram_url" => "https://www.instagram.com/lilacspot/",
+               "facebook_url" => "https://www.facebook.com/lilacspot",
+               "tiktok_url" => "https://www.tiktok.com/@lilacspot"
+             })
+
+    assert CoffeeSpot.business_name() == "Lilac Spot"
+    assert CoffeeSpot.phone_tel() == "+639111111111"
+    assert CoffeeSpot.email() == "desk@lilac.local"
+    assert CoffeeSpot.hours_lines() == ["Open daily"]
+    assert CoffeeSpot.instagram_url() == "https://www.instagram.com/lilacspot/"
+
+    url =
+      CoffeeSpot.order_whatsapp_url(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "A", fulfillment: :pickup}
+      )
+
+    assert String.starts_with?(url, "https://wa.me/639111111111?text=")
+    assert CoffeeSpot.order_message(
+             [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+             %{}
+           ) =~ "Hi Lilac Spot! New order"
   end
 end
