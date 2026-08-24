@@ -14,7 +14,8 @@ defmodule Espreso.Orders do
 
   `lines` — maps with `:name`, `:size`, `:quantity`, `:price` (Decimal).
   `attrs` — `:customer_name`, `:fulfillment` (`:dine_in` | `:pickup` or strings),
-  `:table_number`, `:notes`, `:payment_method` (`:counter` | `:online`).
+  `:table_number`, `:notes`, `:payment_method` (`:counter` | `:online`),
+  `:source` (`:customer` | `:pos` or strings; default `"customer"`).
   """
   def create_order(lines, attrs) when is_list(lines) and lines != [] do
     fulfillment =
@@ -24,6 +25,8 @@ defmodule Espreso.Orders do
       normalize_payment_method(
         Map.get(attrs, :payment_method) || Map.get(attrs, "payment_method")
       )
+
+    source = normalize_source(Map.get(attrs, :source) || Map.get(attrs, "source"))
 
     total =
       Enum.reduce(lines, Decimal.new(0), fn line, acc ->
@@ -40,6 +43,7 @@ defmodule Espreso.Orders do
       notes: blank_to_nil(Map.get(attrs, :notes) || Map.get(attrs, "notes")),
       payment_method: payment_method,
       payment_status: payment_status,
+      source: source,
       status: "received",
       total: total
     }
@@ -284,6 +288,9 @@ defmodule Espreso.Orders do
 
   defp normalize_payment_method(value) when value in [:online, "online"], do: "online"
   defp normalize_payment_method(_), do: "counter"
+
+  defp normalize_source(value) when value in [:pos, "pos"], do: "pos"
+  defp normalize_source(_), do: "customer"
 
   defp blank_to_nil(nil), do: nil
   defp blank_to_nil(""), do: nil

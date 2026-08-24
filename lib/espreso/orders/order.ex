@@ -8,6 +8,7 @@ defmodule Espreso.Orders.Order do
   @payment_methods ~w(counter online)
   @payment_statuses ~w(unpaid paid)
   @fulfillments ~w(dine_in pickup)
+  @sources ~w(customer pos)
 
   schema "orders" do
     field :number, :string
@@ -18,6 +19,7 @@ defmodule Espreso.Orders.Order do
     field :status, :string, default: "received"
     field :payment_method, :string, default: "counter"
     field :payment_status, :string, default: "unpaid"
+    field :source, :string, default: "customer"
     field :total, :decimal
 
     has_many :items, OrderItem
@@ -29,6 +31,7 @@ defmodule Espreso.Orders.Order do
   def payment_methods, do: @payment_methods
   def payment_statuses, do: @payment_statuses
   def fulfillments, do: @fulfillments
+  def sources, do: @sources
 
   def changeset(order, attrs) do
     order
@@ -41,6 +44,7 @@ defmodule Espreso.Orders.Order do
       :status,
       :payment_method,
       :payment_status,
+      :source,
       :total
     ])
     |> validate_required([
@@ -49,6 +53,7 @@ defmodule Espreso.Orders.Order do
       :status,
       :payment_method,
       :payment_status,
+      :source,
       :total
     ])
     |> update_change(:customer_name, &String.trim/1)
@@ -57,6 +62,7 @@ defmodule Espreso.Orders.Order do
     |> validate_inclusion(:status, @statuses)
     |> validate_inclusion(:payment_method, @payment_methods)
     |> validate_inclusion(:payment_status, @payment_statuses)
+    |> validate_inclusion(:source, @sources)
     |> validate_fulfillment_table()
     |> validate_number(:total, greater_than_or_equal_to: 0)
     |> unique_constraint(:number)

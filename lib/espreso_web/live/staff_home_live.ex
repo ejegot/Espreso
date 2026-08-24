@@ -8,7 +8,7 @@ defmodule EspresoWeb.StaffHomeLive do
     {:ok,
      socket
      |> assign(:page_title, "Staff")
-     |> assign(:pos_ready?, false), layout: false}
+     |> assign(:pos_ready?, true), layout: false}
   end
 
   @impl true

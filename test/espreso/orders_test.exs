@@ -27,8 +27,26 @@ defmodule Espreso.OrdersTest do
     assert order.payment_method == "counter"
     assert order.payment_status == "unpaid"
     assert order.status == "received"
+    assert order.source == "customer"
     assert Decimal.equal?(order.total, Decimal.new("315"))
     assert length(order.items) == 2
+  end
+
+  test "create_order accepts source pos" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    assert {:ok, order} =
+             Orders.create_order(lines, %{
+               customer_name: "Walk-in",
+               fulfillment: :pickup,
+               payment_method: :counter,
+               source: :pos
+             })
+
+    assert order.source == "pos"
+    assert order.fulfillment == "pickup"
+    assert order.payment_status == "unpaid"
+    assert order.status == "received"
   end
 
   test "create_order requires table for dine-in" do
