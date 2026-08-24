@@ -116,6 +116,48 @@ defmodule Espreso.Orders do
     |> Repo.all()
   end
 
+  @doc """
+  Read-only order counts for the staff dashboard.
+
+  Uses aggregate queries only (no order/item preloads).
+  `todays_count` is based on UTC calendar day of `inserted_at`.
+  """
+  def dashboard_overview do
+    active_statuses = ["received", "preparing"]
+    today_start = DateTime.new!(Date.utc_today(), ~T[00:00:00], "Etc/UTC")
+
+    %{
+      active_count: count_orders(status: active_statuses),
+      received_count: count_orders(status: ["received"]),
+      preparing_count: count_orders(status: ["preparing"]),
+      unpaid_active_count: count_orders(status: active_statuses, payment_status: "unpaid"),
+      todays_count: count_orders(inserted_at_gte: today_start)
+    }
+  end
+
+  defp count_orders(opts) do
+    Order
+    |> then(fn query ->
+      case Keyword.get(opts, :status) do
+        statuses when is_list(statuses) -> where(query, [o], o.status in ^statuses)
+        _ -> query
+      end
+    end)
+    |> then(fn query ->
+      case Keyword.get(opts, :payment_status) do
+        status when is_binary(status) -> where(query, [o], o.payment_status == ^status)
+        _ -> query
+      end
+    end)
+    |> then(fn query ->
+      case Keyword.get(opts, :inserted_at_gte) do
+        %DateTime{} = dt -> where(query, [o], o.inserted_at >= ^dt)
+        _ -> query
+      end
+    end)
+    |> Repo.aggregate(:count, :id)
+  end
+
   def update_status(%Order{} = order, status) when status in ["received", "preparing", "ready"] do
     order
     |> Order.status_changeset(status)
