@@ -3166,6 +3166,423 @@ a.staff-home-card:focus-visible {
   color: #246628;
 }
 
+/* —— Staff UX V3.1 shared shell —— */
+.staff-app {
+  --cs-orange: #f85020;
+  --cs-brown: #382010;
+  --cs-beige: #b0a098;
+  --cs-cream: #faf7f4;
+  --cs-surface: #ffffff;
+  --cs-line: rgba(56, 32, 16, 0.12);
+  min-height: 100vh;
+  background: var(--cs-cream);
+  color: var(--cs-brown);
+}
+
+.staff-shell {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  border-bottom: 1px solid var(--cs-line);
+  background: color-mix(in srgb, var(--cs-surface) 94%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.staff-shell-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem 1rem;
+  padding: 0.85rem 1.15rem 0.55rem;
+}
+
+.staff-shell-brand {
+  margin: 0;
+  color: var(--cs-beige);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.staff-shell-title {
+  margin: 0.15rem 0 0;
+  color: var(--cs-brown);
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.staff-shell-user {
+  margin: 0.2rem 0 0;
+  color: var(--cs-beige);
+  font-size: 0.84rem;
+}
+
+.staff-shell-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.staff-shell-tool,
+.staff-shell-logout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--cs-line);
+  border-radius: 0.75rem;
+  background: var(--cs-surface);
+  color: var(--cs-brown);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.staff-shell-tool:hover,
+.staff-shell-tool:focus-visible,
+.staff-shell-logout:hover,
+.staff-shell-logout:focus-visible {
+  border-color: var(--cs-beige);
+  outline: none;
+}
+
+.staff-shell-nav {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding: 0 1.15rem 0.85rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.staff-shell-nav-link {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  color: var(--cs-brown);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.staff-shell-nav-link:hover,
+.staff-shell-nav-link:focus-visible {
+  background: color-mix(in srgb, var(--cs-beige) 22%, #fff);
+  outline: none;
+}
+
+.staff-shell-nav-link.is-active {
+  background: var(--cs-orange);
+  color: #fff;
+}
+
+.staff-shell-body {
+  width: 100%;
+}
+
+.staff-app .staff-home-main,
+.staff-app .staff-admin-main,
+.staff-app .staff-pos-main {
+  width: min(calc(100% - 2rem), 72rem);
+  margin: 0 auto;
+  padding: 1.25rem 0 3rem;
+}
+
+.staff-app .staff-home-lede,
+.staff-app .staff-auth-lede {
+  color: color-mix(in srgb, var(--cs-brown) 70%, var(--cs-beige));
+}
+
+/* —— Staff Orders UI/UX V2 (board styles; tokens inherit from .staff-app) —— */
+.staff-orders-page {
+  --cs-brown: #382010;
+  --cs-orange: #f85020;
+  --cs-beige: #b0a098;
+  --cs-cream: #faf7f4;
+  --cs-surface: #ffffff;
+  --cs-line: rgba(56, 32, 16, 0.12);
+  color: var(--cs-brown);
+}
+
+.staff-orders-page .staff-orders-top {
+  display: none;
+}
+
+.staff-orders-page .staff-orders-brand {
+  color: var(--cs-beige);
+  letter-spacing: 0.16em;
+}
+
+.staff-orders-page .staff-orders-title {
+  color: var(--cs-brown);
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.staff-orders-page .staff-orders-user {
+  color: var(--cs-beige);
+  font-size: 0.84rem;
+}
+
+.staff-orders-page .staff-refresh {
+  min-height: 2.5rem;
+  border: 1px solid var(--cs-line);
+  border-radius: 0.75rem;
+  background: var(--cs-surface);
+  color: var(--cs-brown);
+  font-weight: 600;
+}
+
+.staff-orders-page .staff-refresh:hover,
+.staff-orders-page .staff-refresh:focus-visible {
+  border-color: var(--cs-beige);
+  outline: none;
+}
+
+.staff-orders-page .staff-orders-main {
+  width: min(calc(100% - 2rem), 72rem);
+  margin: 0 auto;
+  padding: 1.25rem 0 3rem;
+}
+
+.staff-orders-page .staff-admin-note {
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--cs-orange) 28%, transparent);
+  background: color-mix(in srgb, var(--cs-orange) 10%, #fff);
+  color: var(--cs-brown);
+}
+
+.staff-orders-page .staff-orders-board {
+  display: grid;
+  gap: 1.25rem;
+}
+
+@media (min-width: 900px) {
+  .staff-orders-page .staff-orders-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 1.35rem;
+  }
+
+  .staff-orders-page .staff-orders-section--unpaid {
+    grid-column: 1 / -1;
+  }
+}
+
+.staff-orders-page .staff-orders-section {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--cs-line);
+  border-radius: 1rem;
+  background: var(--cs-surface);
+}
+
+.staff-orders-page .staff-orders-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.staff-orders-page .staff-orders-section h2 {
+  margin: 0;
+  color: var(--cs-brown);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.staff-orders-page .staff-orders-count {
+  display: inline-flex;
+  min-width: 1.6rem;
+  height: 1.6rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--cs-beige) 28%, #fff);
+  color: var(--cs-brown);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.staff-orders-page .staff-orders-section--new {
+  border-top: 3px solid var(--cs-orange);
+}
+
+.staff-orders-page .staff-orders-section--preparing {
+  border-top: 3px solid var(--cs-beige);
+}
+
+.staff-orders-page .staff-orders-section--ready {
+  border-top: 3px solid color-mix(in srgb, var(--cs-brown) 55%, var(--cs-beige));
+}
+
+.staff-orders-page .staff-orders-section--unpaid {
+  border: 1.5px solid color-mix(in srgb, var(--cs-orange) 45%, var(--cs-line));
+  border-top: 3px solid var(--cs-orange);
+  background: color-mix(in srgb, var(--cs-orange) 5%, #fff);
+}
+
+.staff-orders-page .staff-orders-section--unpaid .staff-orders-count {
+  background: color-mix(in srgb, var(--cs-orange) 16%, #fff);
+  color: var(--cs-orange);
+}
+
+.staff-orders-page .staff-empty {
+  margin: 0;
+  color: var(--cs-beige);
+  font-size: 0.92rem;
+}
+
+.staff-orders-page .staff-order-card {
+  margin-bottom: 0.75rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid var(--cs-line);
+  border-radius: 0.85rem;
+  background: #fff;
+  box-shadow: none;
+}
+
+.staff-orders-page .staff-order-card:last-child {
+  margin-bottom: 0;
+}
+
+.staff-orders-page .staff-order-card--received {
+  border-left: 3px solid var(--cs-orange);
+}
+
+.staff-orders-page .staff-order-card--preparing {
+  border-left: 3px solid var(--cs-beige);
+}
+
+.staff-orders-page .staff-order-card--unpaid {
+  border-left: 3px solid var(--cs-orange);
+  background: #fff;
+}
+
+.staff-orders-page .staff-order-card-muted {
+  opacity: 1;
+  background: color-mix(in srgb, var(--cs-cream) 70%, #fff);
+}
+
+.staff-orders-page .staff-order-number {
+  color: var(--cs-brown);
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.staff-orders-page .staff-order-name {
+  color: var(--cs-brown);
+  font-size: 0.98rem;
+  font-weight: 600;
+}
+
+.staff-orders-page .staff-order-meta,
+.staff-orders-page .staff-order-notes,
+.staff-orders-page .staff-order-items {
+  color: color-mix(in srgb, var(--cs-brown) 62%, var(--cs-beige));
+}
+
+.staff-orders-page .staff-order-total {
+  margin-top: 0.75rem;
+  color: var(--cs-brown);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.staff-orders-page .staff-badge {
+  background: color-mix(in srgb, var(--cs-beige) 22%, #fff);
+  color: var(--cs-brown);
+}
+
+.staff-orders-page .staff-badge--received {
+  background: color-mix(in srgb, var(--cs-orange) 14%, #fff);
+  color: var(--cs-orange);
+}
+
+.staff-orders-page .staff-badge--preparing {
+  background: color-mix(in srgb, var(--cs-beige) 35%, #fff);
+  color: var(--cs-brown);
+}
+
+.staff-orders-page .staff-badge--ready,
+.staff-orders-page .staff-badge--completed {
+  background: color-mix(in srgb, var(--cs-brown) 10%, #fff);
+  color: var(--cs-brown);
+}
+
+.staff-orders-page .staff-badge--pay-paid {
+  background: color-mix(in srgb, var(--cs-beige) 30%, #fff);
+  color: var(--cs-brown);
+}
+
+.staff-orders-page .staff-badge--pay-unpaid {
+  background: color-mix(in srgb, var(--cs-orange) 16%, #fff);
+  color: var(--cs-orange);
+}
+
+.staff-orders-page .staff-order-actions {
+  gap: 0.5rem;
+  margin-top: 0.95rem;
+}
+
+.staff-orders-page .staff-action {
+  min-height: 2.75rem;
+  padding: 0.55rem 0.95rem;
+  border: 1px solid var(--cs-line);
+  border-radius: 0.75rem;
+  background: #fff;
+  color: var(--cs-brown);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.staff-orders-page .staff-action-primary {
+  border-color: var(--cs-orange);
+  background: var(--cs-orange);
+  color: #fff;
+}
+
+.staff-orders-page .staff-action-primary:hover,
+.staff-orders-page .staff-action-primary:focus-visible {
+  filter: brightness(0.96);
+  outline: none;
+}
+
+.staff-orders-page .staff-action-muted {
+  border-color: transparent;
+  background: transparent;
+  color: var(--cs-beige);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.staff-orders-page .staff-action-muted:hover,
+.staff-orders-page .staff-action-muted:focus-visible {
+  color: var(--cs-brown);
+  outline: none;
+}
+
 .menu-media-atmosphere,
 .menu-closing {
   padding-left: 1.15rem;

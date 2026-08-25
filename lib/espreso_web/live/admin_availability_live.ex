@@ -1,7 +1,6 @@
 defmodule EspresoWeb.AdminAvailabilityLive do
   use EspresoWeb, :live_view
 
-  alias Espreso.Accounts.User
   alias Espreso.Menu
 
   @impl true
@@ -54,22 +53,7 @@ defmodule EspresoWeb.AdminAvailabilityLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="menu-page-brune site-page staff-admin-page">
-      <header class="staff-orders-top">
-        <div>
-          <p class="staff-orders-brand">CoffeeSpot</p>
-          <h1 class="staff-orders-title">Availability</h1>
-          <p class="staff-orders-user">
-            {@current_user.name} · {User.role_label(@current_user.role)}
-          </p>
-        </div>
-        <div class="staff-top-actions">
-          <.link navigate={~p"/dashboard"} class="staff-refresh">Dashboard</.link>
-          <.link navigate={~p"/staff"} class="staff-refresh">Home</.link>
-          <.link href={~p"/logout"} method="delete" class="staff-refresh">Log out</.link>
-        </div>
-      </header>
-
+    <.staff_shell current={:availability} current_user={@current_user} page_title="Availability">
       <main class="staff-orders-main staff-admin-main">
         <p :if={@flash_note} class="staff-admin-note" id="availability-flash">{@flash_note}</p>
         <p class="staff-auth-lede">
@@ -116,7 +100,7 @@ defmodule EspresoWeb.AdminAvailabilityLive do
           </article>
         </section>
       </main>
-    </div>
+    </.staff_shell>
     """
   end
 end
