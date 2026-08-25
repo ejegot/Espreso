@@ -17,6 +17,7 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:selected_category, selected)
      |> assign(:cart, [])
      |> assign(:customer_name, "Walk-in")
+     |> assign(:payment_choice, :unpaid)
      |> assign(:size_picker, nil)
      |> assign(:last_order, nil)
      |> assign(:error, nil), layout: false}
@@ -96,7 +97,18 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:size_picker, nil)
      |> assign(:last_order, nil)
      |> assign(:error, nil)
+     |> assign(:payment_choice, :unpaid)
      |> assign(:customer_name, "Walk-in")}
+  end
+
+  def handle_event("set_payment_choice", %{"choice" => choice}, socket) do
+    choice =
+      case choice do
+        "paid" -> :paid
+        _ -> :unpaid
+      end
+
+    {:noreply, assign(socket, :payment_choice, choice)}
   end
 
   def handle_event("place_order", _params, socket) do
@@ -119,6 +131,7 @@ defmodule EspresoWeb.StaffPosLive do
         customer_name: socket.assigns.customer_name,
         fulfillment: :pickup,
         payment_method: :counter,
+        payment_status: socket.assigns.payment_choice,
         source: :pos
       }
 
@@ -130,6 +143,7 @@ defmodule EspresoWeb.StaffPosLive do
            |> assign(:size_picker, nil)
            |> assign(:error, nil)
            |> assign(:last_order, order)
+           |> assign(:payment_choice, :unpaid)
            |> assign(:categories, Menu.list_menu())}
 
         {:error, :empty_cart} ->
@@ -208,6 +222,7 @@ defmodule EspresoWeb.StaffPosLive do
                 <p class="staff-order-number">{@last_order.number}</p>
                 <p class="staff-order-meta">
                   Status: {Orders.status_label(@last_order.status)} · {@last_order.customer_name}
+                  · {Orders.payment_label(@last_order)}
                 </p>
                 <div class="staff-pos-success-actions">
                   <button
@@ -289,6 +304,34 @@ defmodule EspresoWeb.StaffPosLive do
                     <span>Total</span>
                     <span id="pos-total">{Menu.format_price(cart_total(@cart))}</span>
                   </div>
+                </div>
+
+                <div
+                  class="menu-checkout-options staff-pos-payment"
+                  id="pos-payment-choice"
+                  role="radiogroup"
+                  aria-label="Payment"
+                >
+                  <button
+                    type="button"
+                    class={["menu-checkout-option", @payment_choice == :unpaid && "is-active"]}
+                    id="pos-payment-unpaid"
+                    phx-click="set_payment_choice"
+                    phx-value-choice="unpaid"
+                    aria-pressed={to_string(@payment_choice == :unpaid)}
+                  >
+                    Unpaid
+                  </button>
+                  <button
+                    type="button"
+                    class={["menu-checkout-option", @payment_choice == :paid && "is-active"]}
+                    id="pos-payment-paid"
+                    phx-click="set_payment_choice"
+                    phx-value-choice="paid"
+                    aria-pressed={to_string(@payment_choice == :paid)}
+                  >
+                    Paid
+                  </button>
                 </div>
 
                 <button

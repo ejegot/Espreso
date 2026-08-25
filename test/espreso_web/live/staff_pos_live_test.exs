@@ -174,6 +174,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     assert has_element?(view, "#pos-confirmation")
     assert has_element?(view, "#pos-confirmation", "Received")
+    assert has_element?(view, "#pos-confirmation", "Pay at counter")
     assert has_element?(view, "#pos-confirmation a[href='/orders']", "View Orders")
     assert has_element?(view, "#pos-new-order", "New Order")
     refute has_element?(view, "#pos-place-order")
@@ -198,7 +199,34 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     assert has_element?(view, "#pos-cart-empty")
     assert has_element?(view, "#pos-place-order[disabled]")
+    assert has_element?(view, "#pos-payment-unpaid.is-active", "Unpaid")
     refute has_element?(view, "#pos-confirmation")
+  end
+
+  test "POS defaults to unpaid and can place paid counter order", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    assert has_element?(view, "#pos-payment-unpaid.is-active", "Unpaid")
+    refute has_element?(view, "#pos-payment-paid.is-active")
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-payment-paid") |> render_click()
+
+    assert has_element?(view, "#pos-payment-paid.is-active", "Paid")
+
+    view |> element("#pos-place-order") |> render_click()
+
+    assert has_element?(view, "#pos-confirmation", "Paid at counter")
+
+    [order] = Orders.list_active_orders()
+    assert order.source == "pos"
+    assert order.payment_method == "counter"
+    assert order.payment_status == "paid"
+    assert order.status == "received"
   end
 
   test "staff home POS card is ready (not Soon)", %{conn: conn, barista: barista} do

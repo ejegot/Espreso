@@ -108,4 +108,54 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     refute has_element?(view, "#cancel-order-#{order.id}")
     assert has_element?(view, ".staff-order-number", order.number)
   end
+
+  test "ready unpaid order can be marked paid", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Ready Unpaid",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    view
+    |> element("button", "Ready")
+    |> render_click()
+
+    assert has_element?(view, "#ready-mark-paid-#{order.id}", "Mark paid")
+
+    view |> element("#ready-mark-paid-#{order.id}") |> render_click()
+
+    assert has_element?(view, "#orders-flash", "#{order.number} marked paid.")
+    refute has_element?(view, "#ready-mark-paid-#{order.id}")
+    assert has_element?(view, ".staff-order-number", order.number)
+
+    reloaded = Orders.get_order_by_number!(order.number)
+    assert reloaded.payment_status == "paid"
+    assert reloaded.payment_method == "counter"
+  end
+
+  test "ready paid order does not show Mark paid", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Ready Paid",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, _} = Orders.mark_paid(order)
+    {:ok, _} = Orders.update_status(order, "ready")
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    assert has_element?(view, ".staff-order-number", order.number)
+    refute has_element?(view, "#ready-mark-paid-#{order.id}")
+  end
 end
