@@ -146,9 +146,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
   test "empty cart cannot be submitted", %{conn: conn, barista: barista} do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
-    view |> element("#pos-place-order") |> render_click()
-
-    assert has_element?(view, "#pos-error", "Add at least one item before placing an order.")
+    assert has_element?(view, "#pos-place-order[disabled]")
     refute has_element?(view, "#pos-confirmation")
   end
 
@@ -176,8 +174,9 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     assert has_element?(view, "#pos-confirmation")
     assert has_element?(view, "#pos-confirmation", "Received")
-    assert has_element?(view, "#pos-confirmation a[href='/orders']")
-    assert has_element?(view, "#pos-cart-empty")
+    assert has_element?(view, "#pos-confirmation a[href='/orders']", "View Orders")
+    assert has_element?(view, "#pos-new-order", "New Order")
+    refute has_element?(view, "#pos-place-order")
 
     html = render(view)
     assert html =~ ~r/CS-\d+/
@@ -194,6 +193,12 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     names = Enum.map(order.items, & &1.name) |> Enum.sort()
     assert names == ["Americano", "Espresso"]
+
+    view |> element("#pos-new-order") |> render_click()
+
+    assert has_element?(view, "#pos-cart-empty")
+    assert has_element?(view, "#pos-place-order[disabled]")
+    refute has_element?(view, "#pos-confirmation")
   end
 
   test "staff home POS card is ready (not Soon)", %{conn: conn, barista: barista} do
