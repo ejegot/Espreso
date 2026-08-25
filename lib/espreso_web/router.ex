@@ -76,6 +76,11 @@ defmodule EspresoWeb.Router do
       on_mount: [{EspresoWeb.StaffAuth, {:ensure_permission, :business_settings}}] do
       live "/admin/settings", AdminSettingsLive
     end
+
+    live_session :product_availability,
+      on_mount: [{EspresoWeb.StaffAuth, {:ensure_permission, :product_availability}}] do
+      live "/admin/availability", AdminAvailabilityLive
+    end
   end
 
   if Application.compile_env(:espreso, :dev_routes) do
