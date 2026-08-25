@@ -4,7 +4,7 @@ defmodule Espreso.Orders.Order do
 
   alias Espreso.Orders.OrderItem
 
-  @statuses ~w(received preparing ready)
+  @statuses ~w(received preparing ready cancelled)
   @payment_methods ~w(counter online)
   @payment_statuses ~w(unpaid paid)
   @fulfillments ~w(dine_in pickup)
@@ -72,6 +72,13 @@ defmodule Espreso.Orders.Order do
     order
     |> change(%{status: status})
     |> validate_inclusion(:status, @statuses)
+  end
+
+  @doc """
+  Sets status to cancelled. Callers must enforce business rules in the context.
+  """
+  def cancel_changeset(order) do
+    status_changeset(order, "cancelled")
   end
 
   def payment_changeset(order, attrs) do

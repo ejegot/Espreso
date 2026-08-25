@@ -10,6 +10,7 @@ defmodule EspresoWeb.StaffOrdersLive do
     {:ok,
      socket
      |> assign(:page_title, "Orders")
+     |> assign(:flash_note, nil)
      |> load_orders(), layout: false}
   end
 
@@ -22,7 +23,7 @@ defmodule EspresoWeb.StaffOrdersLive do
     order = Espreso.Repo.get!(Espreso.Orders.Order, id)
 
     case Orders.update_status(order, status) do
-      {:ok, _} -> {:noreply, load_orders(socket)}
+      {:ok, _} -> {:noreply, load_orders(assign(socket, :flash_note, nil))}
       {:error, _} -> {:noreply, socket}
     end
   end
@@ -31,8 +32,29 @@ defmodule EspresoWeb.StaffOrdersLive do
     order = Espreso.Repo.get!(Espreso.Orders.Order, id)
 
     case Orders.mark_paid(order) do
-      {:ok, _} -> {:noreply, load_orders(socket)}
+      {:ok, _} -> {:noreply, load_orders(assign(socket, :flash_note, nil))}
       {:error, _} -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("cancel_order", %{"id" => id}, socket) do
+    order = Espreso.Repo.get!(Espreso.Orders.Order, id)
+
+    case Orders.cancel_order(order) do
+      {:ok, cancelled} ->
+        {:noreply,
+         socket
+         |> assign(:flash_note, "#{cancelled.number} cancelled.")
+         |> load_orders()}
+
+      {:error, :paid} ->
+        {:noreply, assign(socket, :flash_note, "Paid orders cannot be cancelled.")}
+
+      {:error, :invalid_status} ->
+        {:noreply, assign(socket, :flash_note, "This order can no longer be cancelled.")}
+
+      {:error, _} ->
+        {:noreply, assign(socket, :flash_note, "Could not cancel order.")}
     end
   end
 
@@ -63,6 +85,8 @@ defmodule EspresoWeb.StaffOrdersLive do
       </header>
 
       <main class="staff-orders-main">
+        <p :if={@flash_note} class="staff-admin-note" id="orders-flash">{@flash_note}</p>
+
         <div class="staff-orders-board">
           <section class="staff-orders-section">
             <h2>Active</h2>
@@ -127,6 +151,16 @@ defmodule EspresoWeb.StaffOrdersLive do
                   phx-value-status="ready"
                 >
                   Ready
+                </button>
+                <button
+                  :if={order.payment_status == "unpaid" and order.status in ["received", "preparing"]}
+                  type="button"
+                  class="staff-action"
+                  id={"cancel-order-#{order.id}"}
+                  phx-click="cancel_order"
+                  phx-value-id={order.id}
+                >
+                  Cancel
                 </button>
               </div>
             </article>
