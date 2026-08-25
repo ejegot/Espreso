@@ -821,4 +821,112 @@ defmodule Espreso.OrdersTest do
     assert reports.period_paid_count == 2
     assert Decimal.equal?(reports.period_paid_total, Decimal.new("235"))
   end
+
+  test "list_todays_unpaid includes today's unpaid statuses and excludes paid, cancelled, and yesterday" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+    today_start = Orders.shop_day_start_utc()
+    yesterday = DateTime.add(today_start, -60, :second)
+
+    {:ok, received} =
+      Orders.create_order(lines, %{
+        customer_name: "Unpaid Received",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, preparing} =
+      Orders.create_order(lines, %{
+        customer_name: "Unpaid Preparing",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, preparing} = Orders.update_status(preparing, "preparing")
+
+    {:ok, ready} =
+      Orders.create_order(lines, %{
+        customer_name: "Unpaid Ready",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, ready} = Orders.update_status(ready, "ready")
+
+    {:ok, completed} =
+      Orders.create_order(lines, %{
+        customer_name: "Unpaid Completed",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, completed} = Orders.update_status(completed, "ready")
+    {:ok, completed} = Orders.complete_order(completed)
+
+    {:ok, paid} =
+      Orders.create_order(lines, %{
+        customer_name: "Paid Today",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, _} = Orders.mark_paid(paid)
+
+    {:ok, cancelled} =
+      Orders.create_order(lines, %{
+        customer_name: "Cancelled Unpaid",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, _} = Orders.cancel_order(cancelled)
+
+    {:ok, yesterday_unpaid} =
+      Orders.create_order(lines, %{
+        customer_name: "Yesterday Unpaid",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {1, _} =
+      Espreso.Repo.update_all(
+        from(o in Espreso.Orders.Order, where: o.id == ^yesterday_unpaid.id),
+        set: [inserted_at: yesterday, updated_at: yesterday]
+      )
+
+    # Ensure deterministic newest-first ordering among today's unpaid.
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    {1, _} =
+      Espreso.Repo.update_all(
+        from(o in Espreso.Orders.Order, where: o.id == ^completed.id),
+        set: [inserted_at: now, updated_at: now]
+      )
+
+    {1, _} =
+      Espreso.Repo.update_all(
+        from(o in Espreso.Orders.Order, where: o.id == ^ready.id),
+        set: [inserted_at: DateTime.add(now, -10, :second), updated_at: DateTime.add(now, -10, :second)]
+      )
+
+    {1, _} =
+      Espreso.Repo.update_all(
+        from(o in Espreso.Orders.Order, where: o.id == ^preparing.id),
+        set: [inserted_at: DateTime.add(now, -20, :second), updated_at: DateTime.add(now, -20, :second)]
+      )
+
+    {1, _} =
+      Espreso.Repo.update_all(
+        from(o in Espreso.Orders.Order, where: o.id == ^received.id),
+        set: [inserted_at: DateTime.add(now, -30, :second), updated_at: DateTime.add(now, -30, :second)]
+      )
+
+    unpaid = Orders.list_todays_unpaid()
+    unpaid_ids = Enum.map(unpaid, & &1.id)
+
+    assert unpaid_ids == [completed.id, ready.id, preparing.id, received.id]
+    refute paid.id in unpaid_ids
+    refute cancelled.id in unpaid_ids
+    refute yesterday_unpaid.id in unpaid_ids
+    refute Enum.any?(unpaid, &Ecto.assoc_loaded?(&1.items))
+  end
 end
