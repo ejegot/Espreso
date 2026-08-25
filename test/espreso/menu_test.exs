@@ -89,6 +89,66 @@ defmodule Espreso.MenuTest do
     |> Repo.insert!()
   end
 
+  describe "list_products_for_availability/0 and update_availability_as/3" do
+    test "includes unavailable products and preserves category order" do
+      hot = insert_category!("HOT")
+      cold = insert_category!("COLD")
+      insert_product!(hot, "Espresso", true, [{nil, "75"}])
+      insert_product!(hot, "Secret Blend", false, [{nil, "999"}])
+      insert_product!(cold, "Hazelnut", false, [{"16oz", "180"}])
+
+      names =
+        Menu.list_products_for_availability()
+        |> Enum.map(& &1.name)
+
+      assert names == ["HOT", "COLD"]
+
+      hot_board =
+        Menu.list_products_for_availability()
+        |> Enum.find(&(&1.name == "HOT"))
+
+      assert Enum.map(hot_board.products, & &1.name) == ["Espresso", "Secret Blend"]
+      assert Enum.any?(hot_board.products, &(&1.name == "Secret Blend" and &1.available == false))
+    end
+
+    test "manager and owner can toggle availability; barista is denied" do
+      hot = insert_category!("HOT")
+      product = insert_product!(hot, "Espresso", true, [{nil, "75"}])
+
+      owner = register!("Owner", "owner.avail@test.local", "owner")
+      manager = register!("Manager", "manager.avail@test.local", "manager")
+      barista = register!("Staff", "staff.avail@test.local", "barista")
+
+      assert {:ok, unavailable} = Menu.update_availability_as(manager, product.id, false)
+      assert unavailable.available == false
+
+      hot_after_86 = Menu.list_menu() |> Enum.find(&(&1.name == "HOT"))
+      refute hot_after_86 && Enum.any?(hot_after_86.products, &(&1.id == product.id))
+
+      assert {:ok, available} = Menu.update_availability_as(owner, product.id, true)
+      assert available.available == true
+
+      hot_restored = Menu.list_menu() |> Enum.find(&(&1.name == "HOT"))
+      assert hot_restored
+      assert Enum.any?(hot_restored.products, &(&1.id == product.id))
+
+      assert {:error, :unauthorized} = Menu.update_availability_as(barista, product.id, false)
+      assert Repo.get!(Product, product.id).available == true
+    end
+  end
+
+  defp register!(name, email, role) do
+    {:ok, user} =
+      Espreso.Accounts.register_user(%{
+        name: name,
+        email: email,
+        password: "password123",
+        role: role
+      })
+
+    user
+  end
+
   describe "public_url/0" do
     test "returns the configured public homepage URL for QR deployment" do
       assert Menu.public_url() == "http://localhost:4000/"

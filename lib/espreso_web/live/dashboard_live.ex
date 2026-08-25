@@ -152,6 +152,7 @@ defmodule EspresoWeb.DashboardLive do
       orders_panel(overview),
       popular_products_panel(popular),
       reports_panel(reports),
+      availability_panel(),
       %{
         kind: :placeholder,
         id: "staff-activity",
@@ -184,18 +185,24 @@ defmodule EspresoWeb.DashboardLive do
     [
       sales_panel(sales),
       orders_panel(overview),
-      %{
-        kind: :placeholder,
-        id: "availability",
-        eyebrow: "Menu",
-        title: "Availability",
-        body: "Coming soon"
-      },
+      availability_panel(),
       reports_panel(reports)
     ]
   end
 
   defp panels_for(_staff, _overview, _sales, _popular, _reports), do: []
+
+  defp availability_panel do
+    %{
+      kind: :link,
+      id: "availability",
+      eyebrow: "Menu",
+      title: "Availability",
+      body: "86 sold-out items and restore them.",
+      to: ~p"/admin/availability",
+      class: nil
+    }
+  end
 
   defp sales_panel(sales) do
     %{

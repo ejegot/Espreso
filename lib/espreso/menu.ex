@@ -5,8 +5,10 @@ defmodule Espreso.Menu do
 
   import Ecto.Query
 
+  alias Espreso.Accounts.Authorization
+  alias Espreso.Accounts.User
   alias Espreso.Repo
-  alias Espreso.Menu.Category
+  alias Espreso.Menu.{Category, Product}
 
   @category_order ~w(HOT COLD FRAPPE SODA FOOD)
 
@@ -255,6 +257,47 @@ defmodule Espreso.Menu do
     |> Enum.reject(&(&1.products == []))
     |> Enum.sort_by(&category_position/1)
     |> Enum.map(&decorate_category/1)
+  end
+
+  @doc """
+  Categories with ALL products (including unavailable), for the 86 board.
+
+  Preserves category and product ordering used by the public menu.
+  """
+  def list_products_for_availability do
+    Category
+    |> preload(:products)
+    |> Repo.all()
+    |> Enum.map(fn category ->
+      products =
+        category.products
+        |> Enum.sort_by(& &1.id)
+
+      %{category | products: products}
+    end)
+    |> Enum.reject(&(&1.products == []))
+    |> Enum.sort_by(&category_position/1)
+  end
+
+  @doc """
+  Sets product availability when the actor has `:product_availability`.
+  """
+  def update_availability_as(%User{} = actor, product_id, available)
+      when is_integer(product_id) and is_boolean(available) do
+    with :ok <- Authorization.authorize(actor, :product_availability),
+         %Product{} = product <- Repo.get(Product, product_id) do
+      product
+      |> Product.changeset(%{available: available})
+      |> Repo.update()
+    else
+      nil -> {:error, :not_found}
+      {:error, :unauthorized} = err -> err
+    end
+  end
+
+  def update_availability_as(%User{} = actor, %Product{} = product, available)
+      when is_boolean(available) do
+    update_availability_as(actor, product.id, available)
   end
 
   @doc """
