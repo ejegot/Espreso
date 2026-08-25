@@ -79,12 +79,14 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/orders")
     assert has_element?(view, "#cancel-order-#{order.id}")
+    assert has_element?(view, "#unpaid-mark-paid-#{order.id}")
 
     view
-    |> element("button", "Mark paid")
+    |> element("#unpaid-mark-paid-#{order.id}")
     |> render_click()
 
     refute has_element?(view, "#cancel-order-#{order.id}")
+    refute has_element?(view, "#unpaid-order-#{order.id}")
     assert has_element?(view, ".staff-badge--pay-paid")
   end
 
@@ -185,7 +187,8 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     assert has_element?(view, "#orders-flash", "#{order.number} picked up.")
     refute has_element?(view, "#ready-complete-#{order.id}")
-    refute has_element?(view, ".staff-order-number", order.number)
+    refute has_element?(view, ".staff-order-card-muted .staff-order-number", order.number)
+    assert has_element?(view, "#unpaid-order-#{order.id}")
 
     reloaded = Orders.get_order_by_number!(order.number)
     assert reloaded.status == "completed"
@@ -209,7 +212,9 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     assert {:ok, _} = Orders.complete_order(order)
     html = render(view)
-    refute html =~ order.number
+    refute has_element?(view, "#ready-complete-#{order.id}")
+    assert has_element?(view, "#unpaid-order-#{order.id}")
+    assert html =~ order.number
   end
 
   test "board reloads from PubSub without clicking Refresh", %{conn: conn} do
@@ -254,5 +259,40 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     assert has_element?(view, ".staff-order-number", order.number)
     assert has_element?(view, ".staff-order-name", "Refresh Keep")
+  end
+
+  test "Unpaid Orders section lists today's unpaid and Mark paid removes it", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    assert has_element?(view, "#unpaid-orders-empty", "No unpaid orders today.")
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Unpaid Visible",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, _} = Orders.update_status(order, "ready")
+    {:ok, _} = Orders.complete_order(order)
+
+    html = render(view)
+    assert html =~ "Unpaid Orders"
+    assert has_element?(view, "#unpaid-order-#{order.id}")
+    assert has_element?(view, "#unpaid-order-#{order.id} .staff-order-number", order.number)
+    assert has_element?(view, "#unpaid-order-#{order.id} .staff-order-name", "Unpaid Visible")
+    assert has_element?(view, "#unpaid-order-#{order.id} .staff-badge--completed", "Picked up")
+    assert has_element?(view, "#unpaid-order-#{order.id} .staff-badge--pay-unpaid")
+    assert has_element?(view, "#unpaid-order-#{order.id} .staff-order-total", "₱75")
+    assert has_element?(view, "#unpaid-mark-paid-#{order.id}", "Mark paid")
+    refute has_element?(view, "#unpaid-orders-empty")
+
+    view |> element("#unpaid-mark-paid-#{order.id}") |> render_click()
+
+    assert has_element?(view, "#orders-flash", "#{order.number} marked paid.")
+    refute has_element?(view, "#unpaid-order-#{order.id}")
+    assert has_element?(view, "#unpaid-orders-empty", "No unpaid orders today.")
   end
 end

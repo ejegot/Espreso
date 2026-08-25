@@ -193,6 +193,25 @@ defmodule Espreso.Orders do
   end
 
   @doc """
+  Unpaid orders from the current Asia/Manila shop day.
+
+  Includes received, preparing, ready, and completed. Excludes cancelled and paid.
+  Newest first. Does not preload items.
+  """
+  def list_todays_unpaid do
+    today_start = shop_day_start_utc()
+
+    Order
+    |> where(
+      [o],
+      o.inserted_at >= ^today_start and o.payment_status == "unpaid" and
+        o.status in ^["received", "preparing", "ready", "completed"]
+    )
+    |> order_by([o], desc: o.inserted_at)
+    |> Repo.all()
+  end
+
+  @doc """
   Today's paid sales for the dashboard (current Asia/Manila shop day).
 
   Only `payment_status == "paid"` orders are included. Uses `Order.total`

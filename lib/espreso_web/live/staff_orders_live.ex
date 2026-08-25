@@ -236,6 +236,47 @@ defmodule EspresoWeb.StaffOrdersLive do
               </div>
             </article>
           </section>
+
+          <section class="staff-orders-section" id="unpaid-orders">
+            <h2>Unpaid Orders</h2>
+            <p :if={@unpaid_orders == []} class="staff-empty" id="unpaid-orders-empty">
+              No unpaid orders today.
+            </p>
+            <article
+              :for={order <- @unpaid_orders}
+              class="staff-order-card"
+              id={"unpaid-order-#{order.id}"}
+            >
+              <header class="staff-order-head">
+                <div>
+                  <p class="staff-order-number">{order.number}</p>
+                  <p class="staff-order-name">{order.customer_name}</p>
+                </div>
+                <div class="staff-order-badges">
+                  <span class={"staff-badge staff-badge--#{order.status}"}>
+                    {Orders.status_label(order.status)}
+                  </span>
+                  <span class={"staff-badge staff-badge--pay-#{order.payment_status}"}>
+                    {Orders.payment_label(order)}
+                  </span>
+                </div>
+              </header>
+
+              <p class="staff-order-total">Total {Orders.format_total(order)}</p>
+
+              <div class="staff-order-actions">
+                <button
+                  type="button"
+                  class="staff-action"
+                  id={"unpaid-mark-paid-#{order.id}"}
+                  phx-click="mark_paid"
+                  phx-value-id={order.id}
+                >
+                  Mark paid
+                </button>
+              </div>
+            </article>
+          </section>
         </div>
       </main>
     </div>
@@ -246,5 +287,6 @@ defmodule EspresoWeb.StaffOrdersLive do
     socket
     |> assign(:active_orders, Orders.list_active_orders())
     |> assign(:ready_orders, Orders.list_recent_ready())
+    |> assign(:unpaid_orders, Orders.list_todays_unpaid())
   end
 end
