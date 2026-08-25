@@ -7,11 +7,18 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    if connected?(socket), do: Orders.subscribe()
+
     {:ok,
      socket
      |> assign(:page_title, "Orders")
      |> assign(:flash_note, nil)
      |> load_orders(), layout: false}
+  end
+
+  @impl true
+  def handle_info({:order_changed, _order}, socket) do
+    {:noreply, load_orders(socket)}
   end
 
   @impl true
