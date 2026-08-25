@@ -280,6 +280,17 @@ defmodule EspresoWeb.MenuLive do
              |> assign(:checkout_errors, %{})
              |> push_navigate(to: ~p"/order/#{order.number}")}
 
+          {:error, {:unavailable, names}} ->
+            {:noreply,
+             socket
+             |> assign(:placing_order?, false)
+             |> assign(:checkout_errors, %{})
+             |> assign(:toast, unavailable_toast(names))
+             |> then(fn s ->
+               Process.send_after(self(), :clear_toast, 3200)
+               s
+             end)}
+
           {:error, %Ecto.Changeset{} = changeset} ->
             {:noreply,
              socket
@@ -1085,6 +1096,12 @@ defmodule EspresoWeb.MenuLive do
 
   defp place_order_label(:online), do: "Pay online"
   defp place_order_label(_), do: "Place order · Pay at counter"
+
+  defp unavailable_toast([name]), do: "#{name} is no longer available. Update your basket and try again."
+
+  defp unavailable_toast(names) when is_list(names) do
+    "#{Enum.join(names, ", ")} are no longer available. Update your basket and try again."
+  end
 
   defp instagram_images do
     [

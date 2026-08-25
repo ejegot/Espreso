@@ -4,6 +4,7 @@ defmodule EspresoWeb.MenuLiveTest do
   import Phoenix.LiveViewTest
 
   alias Espreso.Menu.{Category, Product, ProductPrice}
+  alias Espreso.Orders
   alias Espreso.Repo
 
   setup do
@@ -323,6 +324,37 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(order_view, ".order-card", "Juan")
     assert render(order_view) =~ "Table 7"
     assert render(order_view) =~ "Pay at counter"
+  end
+
+  test "/menu rejects place when a cart product becomes unavailable", %{
+    conn: conn,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+
+    view |> element("button[aria-label='Order Espresso']") |> render_click()
+    view |> element("button.menu-buy-now", "Add to basket") |> render_click()
+
+    view |> element("button.brune-icon-bag") |> render_click()
+
+    view
+    |> form("#menu-checkout-form", %{
+      customer_name: "Mia",
+      table_number: "3"
+    })
+    |> render_change()
+
+    espresso
+    |> Product.changeset(%{available: false})
+    |> Repo.update!()
+
+    view
+    |> element("button.menu-basket-checkout", "Place order · Pay at counter")
+    |> render_click()
+
+    assert has_element?(view, ".menu-toast", "Espresso is no longer available")
+    assert has_element?(view, ".menu-basket-line-name", "Espresso")
+    assert Orders.list_active_orders() == []
   end
 
   test "/menu keeps Brune header and menu shell copy", %{conn: conn} do

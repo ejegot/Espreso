@@ -302,6 +302,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     cart = [
       %{
         key: "#{espresso.id}-#{price.id}",
+        product_id: espresso.id,
         name: espresso.name,
         size: price.size,
         quantity: 1,
@@ -323,6 +324,35 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert next.assigns.error == "Could not place order. Check items and try again."
     assert next.assigns.cart == cart
     assert Orders.list_active_orders() == []
+  end
+
+  test "unavailable product at place shows error, keeps cart, and resets placing_order?", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+
+    espresso
+    |> Product.changeset(%{available: false})
+    |> Repo.update!()
+
+    view |> element("#pos-place-order") |> render_click()
+
+    assert has_element?(view, "#pos-error", "Espresso is no longer available")
+    assert has_element?(view, "#pos-cart-lines", "Espresso")
+    refute has_element?(view, "#pos-confirmation")
+    assert Orders.list_active_orders() == []
+
+    Repo.get!(Product, espresso.id)
+    |> Product.changeset(%{available: true})
+    |> Repo.update!()
+
+    view |> element("#pos-place-order") |> render_click()
+
+    assert has_element?(view, "#pos-confirmation")
+    assert length(Orders.list_active_orders()) == 1
   end
 
   test "staff home POS card is ready (not Soon)", %{conn: conn, barista: barista} do

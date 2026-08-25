@@ -148,6 +148,93 @@ defmodule Espreso.OrdersTest do
     assert online.payment_status == "unpaid"
   end
 
+  test "create_order rejects unavailable products and creates nothing" do
+    alias Espreso.Menu.{Category, Product, ProductPrice}
+    alias Espreso.Repo
+
+    category =
+      %Category{}
+      |> Category.changeset(%{name: "HOT"})
+      |> Repo.insert!()
+
+    available =
+      %Product{}
+      |> Product.changeset(%{name: "Latte", category_id: category.id, available: true})
+      |> Repo.insert!()
+
+    %ProductPrice{}
+    |> ProductPrice.changeset(%{
+      product_id: available.id,
+      size: nil,
+      price: Decimal.new("120")
+    })
+    |> Repo.insert!()
+
+    unavailable =
+      %Product{}
+      |> Product.changeset(%{name: "Mocha", category_id: category.id, available: false})
+      |> Repo.insert!()
+
+    %ProductPrice{}
+    |> ProductPrice.changeset(%{
+      product_id: unavailable.id,
+      size: nil,
+      price: Decimal.new("140")
+    })
+    |> Repo.insert!()
+
+    assert {:ok, order} =
+             Orders.create_order(
+               [
+                 %{
+                   product_id: available.id,
+                   name: available.name,
+                   size: nil,
+                   quantity: 1,
+                   price: Decimal.new("120")
+                 }
+               ],
+               %{
+                 customer_name: "Avail Ok",
+                 fulfillment: :pickup,
+                 payment_method: :counter
+               }
+             )
+
+    assert order.status == "received"
+
+    before_count = Repo.aggregate(Espreso.Orders.Order, :count, :id)
+    before_items = Repo.aggregate(Espreso.Orders.OrderItem, :count, :id)
+
+    assert {:error, {:unavailable, ["Mocha"]}} =
+             Orders.create_order(
+               [
+                 %{
+                   product_id: available.id,
+                   name: available.name,
+                   size: nil,
+                   quantity: 1,
+                   price: Decimal.new("120")
+                 },
+                 %{
+                   product_id: unavailable.id,
+                   name: unavailable.name,
+                   size: nil,
+                   quantity: 1,
+                   price: Decimal.new("140")
+                 }
+               ],
+               %{
+                 customer_name: "Partial Fail",
+                 fulfillment: :pickup,
+                 payment_method: :counter
+               }
+             )
+
+    assert Repo.aggregate(Espreso.Orders.Order, :count, :id) == before_count
+    assert Repo.aggregate(Espreso.Orders.OrderItem, :count, :id) == before_items
+  end
+
   test "complete_order marks ready orders picked up without changing payment" do
     lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
 
