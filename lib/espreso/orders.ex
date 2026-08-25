@@ -125,6 +125,7 @@ defmodule Espreso.Orders do
 
   Uses aggregate queries only (no order/item preloads).
   `todays_count` is based on UTC calendar day of `inserted_at`.
+  Cancelled orders are excluded from operational counts.
   """
   def dashboard_overview do
     active_statuses = ["received", "preparing"]
@@ -135,7 +136,7 @@ defmodule Espreso.Orders do
       received_count: count_orders(status: ["received"]),
       preparing_count: count_orders(status: ["preparing"]),
       unpaid_active_count: count_orders(status: active_statuses, payment_status: "unpaid"),
-      todays_count: count_orders(inserted_at_gte: today_start)
+      todays_count: count_orders(inserted_at_gte: today_start, exclude_cancelled: true)
     }
   end
 
@@ -143,12 +144,13 @@ defmodule Espreso.Orders do
   Recent orders placed today (UTC calendar day of `inserted_at`).
 
   Newest first. Does not preload items. Default limit is 5.
+  Excludes cancelled orders.
   """
   def list_todays_orders(limit \\ 5) when is_integer(limit) and limit > 0 do
     today_start = DateTime.new!(Date.utc_today(), ~T[00:00:00], "Etc/UTC")
 
     Order
-    |> where([o], o.inserted_at >= ^today_start)
+    |> where([o], o.inserted_at >= ^today_start and o.status != "cancelled")
     |> order_by([o], desc: o.inserted_at)
     |> limit(^limit)
     |> Repo.all()
@@ -238,6 +240,13 @@ defmodule Espreso.Orders do
         _ -> query
       end
     end)
+    |> then(fn query ->
+      if Keyword.get(opts, :exclude_cancelled, false) do
+        where(query, [o], o.status != "cancelled")
+      else
+        query
+      end
+    end)
     |> Repo.aggregate(:count, :id)
   end
 
@@ -245,6 +254,32 @@ defmodule Espreso.Orders do
     order
     |> Order.status_changeset(status)
     |> Repo.update()
+  end
+
+  @doc """
+  Cancels an unpaid order that is still `received` or `preparing`.
+
+  Reloads the order from the database before applying rules.
+  """
+  def cancel_order(%Order{id: id}) when is_integer(id) do
+    case Repo.get(Order, id) do
+      nil ->
+        {:error, :not_found}
+
+      %Order{} = current ->
+        cond do
+          current.payment_status == "paid" ->
+            {:error, :paid}
+
+          current.status not in ["received", "preparing"] ->
+            {:error, :invalid_status}
+
+          true ->
+            current
+            |> Order.cancel_changeset()
+            |> Repo.update()
+        end
+    end
   end
 
   def mark_paid(%Order{} = order) do
@@ -262,6 +297,7 @@ defmodule Espreso.Orders do
   def status_label("received"), do: "Received"
   def status_label("preparing"), do: "Preparing"
   def status_label("ready"), do: "Ready"
+  def status_label("cancelled"), do: "Cancelled"
   def status_label(other), do: other
 
   def payment_label(%Order{payment_method: "counter", payment_status: "unpaid"}),

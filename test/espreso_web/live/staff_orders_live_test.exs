@@ -44,4 +44,68 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     assert has_element?(view, ".staff-badge--preparing", "Preparing")
   end
+
+  test "cancel action voids unpaid active order and removes it from active list", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Cancel Me",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    assert has_element?(view, "#cancel-order-#{order.id}", "Cancel")
+
+    view |> element("#cancel-order-#{order.id}") |> render_click()
+
+    assert has_element?(view, "#orders-flash", "#{order.number} cancelled.")
+    refute has_element?(view, ".staff-order-number", order.number)
+    assert Orders.list_active_orders() == []
+  end
+
+  test "cancel is unavailable for paid orders; mark paid still works", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Paid Keep",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    assert has_element?(view, "#cancel-order-#{order.id}")
+
+    view
+    |> element("button", "Mark paid")
+    |> render_click()
+
+    refute has_element?(view, "#cancel-order-#{order.id}")
+    assert has_element?(view, ".staff-badge--pay-paid")
+  end
+
+  test "cancel is unavailable after order is ready", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Ready Keep",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    view
+    |> element("button", "Ready")
+    |> render_click()
+
+    refute has_element?(view, "#cancel-order-#{order.id}")
+    assert has_element?(view, ".staff-order-number", order.number)
+  end
 end

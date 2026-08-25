@@ -83,6 +83,105 @@ defmodule Espreso.OrdersTest do
     assert number == order.number
   end
 
+  test "cancel_order voids unpaid received and preparing orders" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, received} =
+      Orders.create_order(lines, %{
+        customer_name: "Void Rec",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, preparing} =
+      Orders.create_order(lines, %{
+        customer_name: "Void Prep",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, preparing} = Orders.update_status(preparing, "preparing")
+
+    assert {:ok, cancelled_received} = Orders.cancel_order(received)
+    assert cancelled_received.status == "cancelled"
+    assert Orders.status_label(cancelled_received.status) == "Cancelled"
+
+    assert {:ok, cancelled_preparing} = Orders.cancel_order(preparing)
+    assert cancelled_preparing.status == "cancelled"
+
+    active_numbers = Enum.map(Orders.list_active_orders(), & &1.number)
+    refute received.number in active_numbers
+    refute preparing.number in active_numbers
+
+    overview = Orders.dashboard_overview()
+    assert overview.active_count == 0
+    assert overview.todays_count == 0
+    assert Orders.list_todays_orders() == []
+  end
+
+  test "cancel_order rejects paid, ready, and already cancelled orders" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, paid} =
+      Orders.create_order(lines, %{
+        customer_name: "Paid",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, paid} = Orders.mark_paid(paid)
+    assert {:error, :paid} = Orders.cancel_order(paid)
+
+    {:ok, ready} =
+      Orders.create_order(lines, %{
+        customer_name: "Ready",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, ready} = Orders.update_status(ready, "ready")
+    assert {:error, :invalid_status} = Orders.cancel_order(ready)
+    assert Enum.any?(Orders.list_recent_ready(), &(&1.id == ready.id))
+
+    {:ok, to_cancel} =
+      Orders.create_order(lines, %{
+        customer_name: "Twice",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    assert {:ok, cancelled} = Orders.cancel_order(to_cancel)
+    assert {:error, :invalid_status} = Orders.cancel_order(cancelled)
+    refute Enum.any?(Orders.list_recent_ready(), &(&1.id == cancelled.id))
+  end
+
+  test "cancelling unpaid order does not change paid sales metrics" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, paid} =
+      Orders.create_order(lines, %{
+        customer_name: "Paid Keep",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, _} = Orders.mark_paid(paid)
+
+    {:ok, unpaid} =
+      Orders.create_order(lines, %{
+        customer_name: "Unpaid Void",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    before = Orders.sales_overview()
+    assert {:ok, _} = Orders.cancel_order(unpaid)
+    after_cancel = Orders.sales_overview()
+
+    assert Decimal.equal?(before.todays_paid_total, after_cancel.todays_paid_total)
+    assert before.todays_paid_count == after_cancel.todays_paid_count
+  end
+
   test "dashboard_overview returns zeros when empty" do
     assert Orders.dashboard_overview() == %{
              active_count: 0,
