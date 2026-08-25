@@ -15,7 +15,9 @@ defmodule Espreso.Orders do
   `lines` — maps with `:name`, `:size`, `:quantity`, `:price` (Decimal).
   `attrs` — `:customer_name`, `:fulfillment` (`:dine_in` | `:pickup` or strings),
   `:table_number`, `:notes`, `:payment_method` (`:counter` | `:online`),
-  `:source` (`:customer` | `:pos` or strings; default `"customer"`).
+  `:source` (`:customer` | `:pos` or strings; default `"customer"`),
+  optional `:payment_status` (`:unpaid` | `:paid`) — `:paid` only allowed with
+  `:counter` (POS pay-at-create). Online is always unpaid. Default unpaid.
   """
   def create_order(lines, attrs) when is_list(lines) and lines != [] do
     fulfillment =
@@ -28,12 +30,16 @@ defmodule Espreso.Orders do
 
     source = normalize_source(Map.get(attrs, :source) || Map.get(attrs, "source"))
 
+    payment_status =
+      normalize_payment_status(
+        payment_method,
+        Map.get(attrs, :payment_status) || Map.get(attrs, "payment_status")
+      )
+
     total =
       Enum.reduce(lines, Decimal.new(0), fn line, acc ->
         Decimal.add(acc, Decimal.mult(line.price, line.quantity))
       end)
-
-    payment_status = if payment_method == "online", do: "unpaid", else: "unpaid"
 
     order_attrs = %{
       number: "TMP-" <> Integer.to_string(System.unique_integer([:positive])),
@@ -282,11 +288,30 @@ defmodule Espreso.Orders do
     end
   end
 
-  def mark_paid(%Order{} = order) do
-    order
-    |> Order.payment_changeset(%{payment_status: "paid"})
-    |> Repo.update()
+  @doc """
+  Marks an order paid. Reloads from the database first.
+
+  Cancelled orders cannot be paid. Already-paid orders return idempotent success.
+  """
+  def mark_paid(%Order{id: id}) when is_integer(id) do
+    case Repo.get(Order, id) do
+      nil ->
+        {:error, :not_found}
+
+      %Order{status: "cancelled"} ->
+        {:error, :cancelled}
+
+      %Order{payment_status: "paid"} = current ->
+        {:ok, current}
+
+      %Order{} = current ->
+        current
+        |> Order.payment_changeset(%{payment_status: "paid"})
+        |> Repo.update()
+    end
   end
+
+  def mark_paid(%Order{} = order), do: mark_paid(%Order{id: order.id})
 
   def format_total(%Order{total: total}), do: Menu.format_price(total)
 
@@ -324,6 +349,10 @@ defmodule Espreso.Orders do
 
   defp normalize_payment_method(value) when value in [:online, "online"], do: "online"
   defp normalize_payment_method(_), do: "counter"
+
+  # Paid is only allowed for counter (POS pay-at-create). Online stays unpaid.
+  defp normalize_payment_status("counter", value) when value in [:paid, "paid"], do: "paid"
+  defp normalize_payment_status(_method, _value), do: "unpaid"
 
   defp normalize_source(value) when value in [:pos, "pos"], do: "pos"
   defp normalize_source(_), do: "customer"

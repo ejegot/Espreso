@@ -32,8 +32,17 @@ defmodule EspresoWeb.StaffOrdersLive do
     order = Espreso.Repo.get!(Espreso.Orders.Order, id)
 
     case Orders.mark_paid(order) do
-      {:ok, _} -> {:noreply, load_orders(assign(socket, :flash_note, nil))}
-      {:error, _} -> {:noreply, socket}
+      {:ok, paid} ->
+        {:noreply,
+         socket
+         |> assign(:flash_note, "#{paid.number} marked paid.")
+         |> load_orders()}
+
+      {:error, :cancelled} ->
+        {:noreply, assign(socket, :flash_note, "Cancelled orders cannot be marked paid.")}
+
+      {:error, _} ->
+        {:noreply, assign(socket, :flash_note, "Could not mark order paid.")}
     end
   end
 
@@ -176,6 +185,18 @@ defmodule EspresoWeb.StaffOrdersLive do
                 <span :if={order.table_number}>· Table {order.table_number}</span>
                 · {Orders.payment_label(order)}
               </p>
+              <div class="staff-order-actions">
+                <button
+                  :if={order.payment_status == "unpaid"}
+                  type="button"
+                  class="staff-action"
+                  id={"ready-mark-paid-#{order.id}"}
+                  phx-click="mark_paid"
+                  phx-value-id={order.id}
+                >
+                  Mark paid
+                </button>
+              </div>
             </article>
           </section>
         </div>

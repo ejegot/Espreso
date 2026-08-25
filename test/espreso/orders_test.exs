@@ -78,9 +78,74 @@ defmodule Espreso.OrdersTest do
 
     assert {:ok, paid} = Orders.mark_paid(preparing)
     assert paid.payment_status == "paid"
+    assert paid.payment_method == "counter"
 
     assert [%{number: number}] = Orders.list_active_orders()
     assert number == order.number
+  end
+
+  test "mark_paid is idempotent when already paid" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, order} =
+      Orders.create_order(lines, %{
+        customer_name: "Idempotent",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    assert {:ok, paid} = Orders.mark_paid(order)
+    assert paid.payment_status == "paid"
+    assert paid.payment_method == "counter"
+
+    assert {:ok, again} = Orders.mark_paid(paid)
+    assert again.id == paid.id
+    assert again.payment_status == "paid"
+    assert again.payment_method == "counter"
+  end
+
+  test "mark_paid rejects cancelled orders" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, order} =
+      Orders.create_order(lines, %{
+        customer_name: "Cancelled Pay",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    assert {:ok, cancelled} = Orders.cancel_order(order)
+    assert cancelled.status == "cancelled"
+    assert {:error, :cancelled} = Orders.mark_paid(cancelled)
+  end
+
+  test "create_order allows paid only for counter payment" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    assert {:ok, paid} =
+             Orders.create_order(lines, %{
+               customer_name: "Walk-in",
+               fulfillment: :pickup,
+               payment_method: :counter,
+               payment_status: :paid,
+               source: :pos
+             })
+
+    assert paid.payment_method == "counter"
+    assert paid.payment_status == "paid"
+    assert paid.source == "pos"
+    assert paid.status == "received"
+
+    assert {:ok, online} =
+             Orders.create_order(lines, %{
+               customer_name: "Online Attempt",
+               fulfillment: :pickup,
+               payment_method: :online,
+               payment_status: :paid
+             })
+
+    assert online.payment_method == "online"
+    assert online.payment_status == "unpaid"
   end
 
   test "cancel_order voids unpaid received and preparing orders" do

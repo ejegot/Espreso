@@ -2846,6 +2846,10 @@ a.staff-home-card:focus-visible {
   margin-bottom: 0.85rem;
 }
 
+.staff-pos-payment {
+  margin-bottom: 0.85rem;
+}
+
 .staff-pos-total-row {
   display: flex;
   justify-content: space-between;
