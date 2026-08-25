@@ -63,6 +63,26 @@ defmodule Espreso.OrdersPubSubTest do
     assert id == cancelled.id
   end
 
+  test "complete_order broadcasts order_changed when status changes" do
+    {:ok, order} = Orders.create_order(lines(), attrs(%{customer_name: "Complete Broadcast"}))
+    {:ok, ready} = Orders.update_status(order, "ready")
+    :ok = Orders.subscribe()
+
+    assert {:ok, completed} = Orders.complete_order(ready)
+    assert_receive {:order_changed, %{id: id, status: "completed"}}
+    assert id == completed.id
+  end
+
+  test "complete_order does not broadcast when already completed" do
+    {:ok, order} = Orders.create_order(lines(), attrs(%{customer_name: "Complete Idempotent"}))
+    {:ok, ready} = Orders.update_status(order, "ready")
+    assert {:ok, completed} = Orders.complete_order(ready)
+
+    :ok = Orders.subscribe()
+    assert {:ok, ^completed} = Orders.complete_order(completed)
+    refute_receive {:order_changed, _}, 50
+  end
+
   test "order-specific subscribe receives changes for that order only" do
     {:ok, watched} = Orders.create_order(lines(), attrs(%{customer_name: "Watched"}))
     {:ok, other} = Orders.create_order(lines(), attrs(%{customer_name: "Other"}))

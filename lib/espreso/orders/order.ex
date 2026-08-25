@@ -4,7 +4,7 @@ defmodule Espreso.Orders.Order do
 
   alias Espreso.Orders.OrderItem
 
-  @statuses ~w(received preparing ready cancelled)
+  @statuses ~w(received preparing ready completed cancelled)
   @payment_methods ~w(counter online)
   @payment_statuses ~w(unpaid paid)
   @fulfillments ~w(dine_in pickup)
@@ -79,6 +79,13 @@ defmodule Espreso.Orders.Order do
   """
   def cancel_changeset(order) do
     status_changeset(order, "cancelled")
+  end
+
+  @doc """
+  Sets status to completed. Callers must enforce business rules in the context.
+  """
+  def complete_changeset(order) do
+    status_changeset(order, "completed")
   end
 
   def payment_changeset(order, attrs) do

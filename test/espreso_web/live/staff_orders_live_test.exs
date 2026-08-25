@@ -157,6 +157,59 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     assert has_element?(view, ".staff-order-number", order.number)
     refute has_element?(view, "#ready-mark-paid-#{order.id}")
+    assert has_element?(view, "#ready-complete-#{order.id}", "Picked up")
+  end
+
+  test "ready order can be marked picked up and leaves Recently ready", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Pickup Me",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    view
+    |> element("button", "Ready")
+    |> render_click()
+
+    assert has_element?(view, "#ready-mark-paid-#{order.id}", "Mark paid")
+    assert has_element?(view, "#ready-complete-#{order.id}", "Picked up")
+    refute has_element?(view, "#cancel-order-#{order.id}")
+
+    view |> element("#ready-complete-#{order.id}") |> render_click()
+
+    assert has_element?(view, "#orders-flash", "#{order.number} picked up.")
+    refute has_element?(view, "#ready-complete-#{order.id}")
+    refute has_element?(view, ".staff-order-number", order.number)
+
+    reloaded = Orders.get_order_by_number!(order.number)
+    assert reloaded.status == "completed"
+    assert reloaded.payment_status == "unpaid"
+  end
+
+  test "board reloads when an order is completed via PubSub", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Complete Live",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, _} = Orders.update_status(order, "ready")
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    assert has_element?(view, "#ready-complete-#{order.id}")
+
+    assert {:ok, _} = Orders.complete_order(order)
+    html = render(view)
+    refute html =~ order.number
   end
 
   test "board reloads from PubSub without clicking Refresh", %{conn: conn} do

@@ -74,6 +74,27 @@ defmodule EspresoWeb.StaffOrdersLive do
     end
   end
 
+  def handle_event("complete_order", %{"id" => id}, socket) do
+    order = Espreso.Repo.get!(Espreso.Orders.Order, id)
+
+    case Orders.complete_order(order) do
+      {:ok, completed} ->
+        {:noreply,
+         socket
+         |> assign(:flash_note, "#{completed.number} picked up.")
+         |> load_orders()}
+
+      {:error, :cancelled} ->
+        {:noreply, assign(socket, :flash_note, "Cancelled orders cannot be marked picked up.")}
+
+      {:error, :invalid_status} ->
+        {:noreply, assign(socket, :flash_note, "Only ready orders can be marked picked up.")}
+
+      {:error, _} ->
+        {:noreply, assign(socket, :flash_note, "Could not mark order picked up.")}
+    end
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -202,6 +223,15 @@ defmodule EspresoWeb.StaffOrdersLive do
                   phx-value-id={order.id}
                 >
                   Mark paid
+                </button>
+                <button
+                  type="button"
+                  class="staff-action staff-action-primary"
+                  id={"ready-complete-#{order.id}"}
+                  phx-click="complete_order"
+                  phx-value-id={order.id}
+                >
+                  Picked up
                 </button>
               </div>
             </article>

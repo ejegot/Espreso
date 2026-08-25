@@ -332,6 +332,36 @@ defmodule Espreso.Orders do
 
   def mark_paid(%Order{} = order), do: mark_paid(%Order{id: order.id})
 
+  @doc """
+  Marks a ready order as picked up / completed.
+
+  Reloads from the database first. Does not change payment_status.
+  Already-completed orders return idempotent success without broadcasting.
+  """
+  def complete_order(%Order{id: id}) when is_integer(id) do
+    case Repo.get(Order, id) do
+      nil ->
+        {:error, :not_found}
+
+      %Order{status: "cancelled"} ->
+        {:error, :cancelled}
+
+      %Order{status: "completed"} = current ->
+        {:ok, current}
+
+      %Order{status: "ready"} = current ->
+        current
+        |> Order.complete_changeset()
+        |> Repo.update()
+        |> broadcast()
+
+      %Order{} ->
+        {:error, :invalid_status}
+    end
+  end
+
+  def complete_order(%Order{} = order), do: complete_order(%Order{id: order.id})
+
   def format_total(%Order{total: total}), do: Menu.format_price(total)
 
   def fulfillment_label("dine_in"), do: "Dine-in"
@@ -341,6 +371,7 @@ defmodule Espreso.Orders do
   def status_label("received"), do: "Received"
   def status_label("preparing"), do: "Preparing"
   def status_label("ready"), do: "Ready"
+  def status_label("completed"), do: "Picked up"
   def status_label("cancelled"), do: "Cancelled"
   def status_label(other), do: other
 
