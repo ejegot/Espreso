@@ -148,6 +148,76 @@ defmodule Espreso.OrdersTest do
     assert online.payment_status == "unpaid"
   end
 
+  test "complete_order marks ready orders picked up without changing payment" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, unpaid} =
+      Orders.create_order(lines, %{
+        customer_name: "Complete Unpaid",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, unpaid_ready} = Orders.update_status(unpaid, "ready")
+    assert {:ok, completed_unpaid} = Orders.complete_order(unpaid_ready)
+    assert completed_unpaid.status == "completed"
+    assert completed_unpaid.payment_status == "unpaid"
+    assert Orders.status_label(completed_unpaid.status) == "Picked up"
+    refute Enum.any?(Orders.list_recent_ready(), &(&1.id == completed_unpaid.id))
+
+    {:ok, paid} =
+      Orders.create_order(lines, %{
+        customer_name: "Complete Paid",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, _} = Orders.mark_paid(paid)
+    {:ok, paid_ready} = Orders.update_status(paid, "ready")
+    assert {:ok, completed_paid} = Orders.complete_order(paid_ready)
+    assert completed_paid.status == "completed"
+    assert completed_paid.payment_status == "paid"
+  end
+
+  test "complete_order rejects cancelled and non-ready statuses; idempotent when completed" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, received} =
+      Orders.create_order(lines, %{
+        customer_name: "Complete Received",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    assert {:error, :invalid_status} = Orders.complete_order(received)
+
+    {:ok, preparing} = Orders.update_status(received, "preparing")
+    assert {:error, :invalid_status} = Orders.complete_order(preparing)
+
+    {:ok, to_cancel} =
+      Orders.create_order(lines, %{
+        customer_name: "Complete Cancelled",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, cancelled} = Orders.cancel_order(to_cancel)
+    assert {:error, :cancelled} = Orders.complete_order(cancelled)
+
+    {:ok, ready} =
+      Orders.create_order(lines, %{
+        customer_name: "Complete Idempotent",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, ready} = Orders.update_status(ready, "ready")
+    assert {:ok, completed} = Orders.complete_order(ready)
+    assert {:ok, again} = Orders.complete_order(completed)
+    assert again.id == completed.id
+    assert again.status == "completed"
+  end
+
   test "cancel_order voids unpaid received and preparing orders" do
     lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
 

@@ -30,6 +30,25 @@ defmodule EspresoWeb.OrderLiveTest do
     assert render(view) =~ "Paid at counter"
   end
 
+  test "customer order page updates when picked up", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Customer Complete",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, ready} = Orders.update_status(order, "ready")
+    {:ok, view, html} = live(conn, ~p"/order/#{order.number}")
+    assert html =~ "Ready"
+
+    assert {:ok, _} = Orders.complete_order(ready)
+    assert render(view) =~ "Picked up"
+  end
+
   test "customer order page updates when cancelled", %{conn: conn} do
     {:ok, order} =
       Orders.create_order(
