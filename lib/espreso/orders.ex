@@ -83,7 +83,7 @@ defmodule Espreso.Orders do
     |> Repo.transaction()
     |> case do
       {:ok, %{numbered: order, items: items}} ->
-        {:ok, %{order | items: items}}
+        broadcast({:ok, %{order | items: items}})
 
       {:error, :order, changeset, _} ->
         {:error, changeset}
@@ -94,6 +94,22 @@ defmodule Espreso.Orders do
   end
 
   def create_order([], _attrs), do: {:error, :empty_cart}
+
+  @doc """
+  Subscribes the current process to all order changes (staff queue).
+  """
+  def subscribe do
+    Phoenix.PubSub.subscribe(Espreso.PubSub, topic())
+  end
+
+  @doc """
+  Subscribes the current process to changes for a single order (customer status).
+  """
+  def subscribe(%Order{id: id}) when is_integer(id), do: subscribe(id)
+
+  def subscribe(order_id) when is_integer(order_id) do
+    Phoenix.PubSub.subscribe(Espreso.PubSub, topic(order_id))
+  end
 
   def get_order_by_number!(number) when is_binary(number) do
     Order
@@ -260,6 +276,7 @@ defmodule Espreso.Orders do
     order
     |> Order.status_changeset(status)
     |> Repo.update()
+    |> broadcast()
   end
 
   @doc """
@@ -284,6 +301,7 @@ defmodule Espreso.Orders do
             current
             |> Order.cancel_changeset()
             |> Repo.update()
+            |> broadcast()
         end
     end
   end
@@ -308,6 +326,7 @@ defmodule Espreso.Orders do
         current
         |> Order.payment_changeset(%{payment_status: "paid"})
         |> Repo.update()
+        |> broadcast()
     end
   end
 
@@ -356,6 +375,18 @@ defmodule Espreso.Orders do
 
   defp normalize_source(value) when value in [:pos, "pos"], do: "pos"
   defp normalize_source(_), do: "customer"
+
+  defp topic, do: "orders"
+  defp topic(order_id) when is_integer(order_id), do: "orders:#{order_id}"
+
+  defp broadcast({:ok, %Order{} = order} = result) do
+    message = {:order_changed, order}
+    Phoenix.PubSub.broadcast(Espreso.PubSub, topic(), message)
+    Phoenix.PubSub.broadcast(Espreso.PubSub, topic(order.id), message)
+    result
+  end
+
+  defp broadcast(other), do: other
 
   defp blank_to_nil(nil), do: nil
   defp blank_to_nil(""), do: nil

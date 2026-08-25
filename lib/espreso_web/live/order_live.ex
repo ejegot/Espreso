@@ -14,10 +14,23 @@ defmodule EspresoWeb.OrderLive do
          |> assign(:order, nil), layout: false}
 
       order ->
+        if connected?(socket), do: Orders.subscribe(order)
+
         {:ok,
          socket
          |> assign(:page_title, "Order #{order.number}")
          |> assign(:order, order), layout: false}
+    end
+  end
+
+  @impl true
+  def handle_info({:order_changed, %{id: id}}, socket) do
+    case socket.assigns.order do
+      %{id: ^id, number: number} ->
+        {:noreply, assign(socket, :order, Orders.get_order_by_number!(number))}
+
+      _ ->
+        {:noreply, socket}
     end
   end
 
