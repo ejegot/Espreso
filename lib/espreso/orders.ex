@@ -160,12 +160,12 @@ defmodule Espreso.Orders do
   Read-only order counts for the staff dashboard.
 
   Uses aggregate queries only (no order/item preloads).
-  `todays_count` is based on UTC calendar day of `inserted_at`.
+  `todays_count` uses the current Asia/Manila shop day of `inserted_at`.
   Cancelled orders are excluded from operational counts.
   """
   def dashboard_overview do
     active_statuses = ["received", "preparing"]
-    today_start = DateTime.new!(Date.utc_today(), ~T[00:00:00], "Etc/UTC")
+    today_start = shop_day_start_utc()
 
     %{
       active_count: count_orders(status: active_statuses),
@@ -177,13 +177,13 @@ defmodule Espreso.Orders do
   end
 
   @doc """
-  Recent orders placed today (UTC calendar day of `inserted_at`).
+  Recent orders placed on the current Asia/Manila shop day.
 
   Newest first. Does not preload items. Default limit is 5.
   Excludes cancelled orders.
   """
   def list_todays_orders(limit \\ 5) when is_integer(limit) and limit > 0 do
-    today_start = DateTime.new!(Date.utc_today(), ~T[00:00:00], "Etc/UTC")
+    today_start = shop_day_start_utc()
 
     Order
     |> where([o], o.inserted_at >= ^today_start and o.status != "cancelled")
@@ -193,13 +193,13 @@ defmodule Espreso.Orders do
   end
 
   @doc """
-  Today's paid sales for the dashboard (UTC calendar day of `inserted_at`).
+  Today's paid sales for the dashboard (current Asia/Manila shop day).
 
   Only `payment_status == "paid"` orders are included. Uses `Order.total`
   aggregates — does not load items.
   """
   def sales_overview do
-    today_start = DateTime.new!(Date.utc_today(), ~T[00:00:00], "Etc/UTC")
+    today_start = shop_day_start_utc()
 
     paid_today =
       Order
@@ -215,12 +215,12 @@ defmodule Espreso.Orders do
   end
 
   @doc """
-  Paid sales over the last 7 UTC calendar days (including today).
+  Paid sales over the last 7 Asia/Manila shop days (including today).
 
   Uses `Order.total` aggregates — does not load items.
   """
   def reports_overview do
-    today_start = DateTime.new!(Date.utc_today(), ~T[00:00:00], "Etc/UTC")
+    today_start = shop_day_start_utc()
     period_start = DateTime.add(today_start, -6, :day)
 
     paid_period =
@@ -238,12 +238,12 @@ defmodule Espreso.Orders do
   end
 
   @doc """
-  Today's most ordered products from paid orders (UTC calendar day of `inserted_at`).
+  Today's most ordered products from paid orders (current Asia/Manila shop day).
 
   Groups by item name and ranks by total quantity. Default limit is 5.
   """
   def popular_products(limit \\ 5) when is_integer(limit) and limit > 0 do
-    today_start = DateTime.new!(Date.utc_today(), ~T[00:00:00], "Etc/UTC")
+    today_start = shop_day_start_utc()
 
     from(i in OrderItem,
       join: o in assoc(i, :order),
@@ -254,6 +254,22 @@ defmodule Espreso.Orders do
       select: %{name: i.name, quantity: sum(i.quantity)}
     )
     |> Repo.all()
+  end
+
+  # CoffeeSpot shop calendar is Asia/Manila. Philippines Standard Time is UTC+8
+  # year-round (no DST). Timestamps stay UTC in the DB; we only shift the day window.
+  @shop_utc_offset_seconds 8 * 60 * 60
+
+  @doc false
+  def shop_day_start_utc do
+    manila_date =
+      DateTime.utc_now()
+      |> DateTime.add(@shop_utc_offset_seconds, :second)
+      |> DateTime.to_date()
+
+    manila_date
+    |> DateTime.new!(~T[00:00:00], "Etc/UTC")
+    |> DateTime.add(-@shop_utc_offset_seconds, :second)
   end
 
   defp count_orders(opts) do

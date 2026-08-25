@@ -659,7 +659,7 @@ defmodule Espreso.OrdersTest do
     assert Decimal.equal?(reports.period_paid_total, Decimal.new("0"))
   end
 
-  test "reports_overview includes paid orders across last 7 UTC days only" do
+  test "reports_overview includes paid orders across last 7 Manila shop days only" do
     lines_75 = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
     lines_120 = [%{name: "Americano", size: "12oz", quantity: 1, price: Decimal.new("120")}]
     lines_200 = [%{name: "Latte", size: "12oz", quantity: 1, price: Decimal.new("200")}]
@@ -704,7 +704,7 @@ defmodule Espreso.OrdersTest do
     {:ok, paid_edge} = Orders.mark_paid(paid_edge)
     {:ok, paid_old} = Orders.mark_paid(paid_old)
 
-    today_start = DateTime.new!(Date.utc_today(), ~T[00:00:00], "Etc/UTC")
+    today_start = Orders.shop_day_start_utc()
     mid_window = DateTime.add(today_start, -3, :day)
     edge_window = DateTime.add(today_start, -6, :day)
     too_old = DateTime.add(today_start, -7, :day)
@@ -733,5 +733,92 @@ defmodule Espreso.OrdersTest do
     assert reports.period_paid_count == 3
     assert Decimal.equal?(reports.period_paid_total, Decimal.new("395"))
     assert unpaid_today.payment_status == "unpaid"
+  end
+
+  test "Manila shop day counts orders after UTC midnight but before Manila midnight as previous day" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+    today_start = Orders.shop_day_start_utc()
+
+    # Just after Manila midnight (still previous UTC calendar date when offset is +8).
+    after_manila_midnight = DateTime.add(today_start, 30 * 60, :second)
+    before_manila_midnight = DateTime.add(today_start, -60, :second)
+
+    {:ok, today_order} =
+      Orders.create_order(lines, %{
+        customer_name: "Manila Today",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, previous_order} =
+      Orders.create_order(lines, %{
+        customer_name: "Manila Yesterday",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, today_paid} =
+      Orders.create_order(lines, %{
+        customer_name: "Manila Paid Today",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, previous_paid} =
+      Orders.create_order(
+        [%{name: "Mocha", size: nil, quantity: 2, price: Decimal.new("80")}],
+        %{
+          customer_name: "Manila Paid Yesterday",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, _} = Orders.mark_paid(today_paid)
+    {:ok, _} = Orders.mark_paid(previous_paid)
+
+    {1, _} =
+      Espreso.Repo.update_all(
+        from(o in Espreso.Orders.Order, where: o.id == ^today_order.id),
+        set: [inserted_at: after_manila_midnight, updated_at: after_manila_midnight]
+      )
+
+    {1, _} =
+      Espreso.Repo.update_all(
+        from(o in Espreso.Orders.Order, where: o.id == ^previous_order.id),
+        set: [inserted_at: before_manila_midnight, updated_at: before_manila_midnight]
+      )
+
+    {1, _} =
+      Espreso.Repo.update_all(
+        from(o in Espreso.Orders.Order, where: o.id == ^today_paid.id),
+        set: [inserted_at: after_manila_midnight, updated_at: after_manila_midnight]
+      )
+
+    {1, _} =
+      Espreso.Repo.update_all(
+        from(o in Espreso.Orders.Order, where: o.id == ^previous_paid.id),
+        set: [inserted_at: before_manila_midnight, updated_at: before_manila_midnight]
+      )
+
+    todays = Orders.list_todays_orders()
+    assert Enum.any?(todays, &(&1.id == today_order.id))
+    refute Enum.any?(todays, &(&1.id == previous_order.id))
+
+    overview = Orders.dashboard_overview()
+    assert overview.todays_count == 2
+
+    sales = Orders.sales_overview()
+    assert sales.todays_paid_count == 1
+    assert Decimal.equal?(sales.todays_paid_total, Decimal.new("75"))
+
+    popular = Orders.popular_products()
+    assert %{name: "Espresso", quantity: 1} in popular
+    refute Enum.any?(popular, &(&1.name == "Mocha"))
+
+    # Previous-day paid order still falls inside the 7-shop-day window.
+    reports = Orders.reports_overview()
+    assert reports.period_paid_count == 2
+    assert Decimal.equal?(reports.period_paid_total, Decimal.new("235"))
   end
 end
