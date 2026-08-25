@@ -18,6 +18,7 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:cart, [])
      |> assign(:customer_name, "Walk-in")
      |> assign(:payment_choice, :unpaid)
+     |> assign(:placing_order?, false)
      |> assign(:size_picker, nil)
      |> assign(:last_order, nil)
      |> assign(:error, nil), layout: false}
@@ -98,6 +99,7 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:last_order, nil)
      |> assign(:error, nil)
      |> assign(:payment_choice, :unpaid)
+     |> assign(:placing_order?, false)
      |> assign(:customer_name, "Walk-in")}
   end
 
@@ -112,46 +114,58 @@ defmodule EspresoWeb.StaffPosLive do
   end
 
   def handle_event("place_order", _params, socket) do
-    cart = socket.assigns.cart
+    cond do
+      socket.assigns.placing_order? ->
+        {:noreply, socket}
 
-    if cart == [] do
-      {:noreply, assign(socket, :error, "Add at least one item before placing an order.")}
-    else
-      lines =
-        Enum.map(cart, fn line ->
-          %{
-            name: line.name,
-            size: line.size,
-            quantity: line.quantity,
-            price: line.price
-          }
-        end)
+      socket.assigns.cart == [] ->
+        {:noreply, assign(socket, :error, "Add at least one item before placing an order.")}
 
-      attrs = %{
-        customer_name: socket.assigns.customer_name,
-        fulfillment: :pickup,
-        payment_method: :counter,
-        payment_status: socket.assigns.payment_choice,
-        source: :pos
-      }
+      true ->
+        lines =
+          Enum.map(socket.assigns.cart, fn line ->
+            %{
+              name: line.name,
+              size: line.size,
+              quantity: line.quantity,
+              price: line.price
+            }
+          end)
 
-      case Orders.create_order(lines, attrs) do
-        {:ok, order} ->
-          {:noreply,
-           socket
-           |> assign(:cart, [])
-           |> assign(:size_picker, nil)
-           |> assign(:error, nil)
-           |> assign(:last_order, order)
-           |> assign(:payment_choice, :unpaid)
-           |> assign(:categories, Menu.list_menu())}
+        attrs = %{
+          customer_name: socket.assigns.customer_name,
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_status: socket.assigns.payment_choice,
+          source: :pos
+        }
 
-        {:error, :empty_cart} ->
-          {:noreply, assign(socket, :error, "Add at least one item before placing an order.")}
+        socket = assign(socket, :placing_order?, true)
 
-        {:error, _changeset} ->
-          {:noreply, assign(socket, :error, "Could not place order. Check items and try again.")}
-      end
+        case Orders.create_order(lines, attrs) do
+          {:ok, order} ->
+            {:noreply,
+             socket
+             |> assign(:cart, [])
+             |> assign(:size_picker, nil)
+             |> assign(:error, nil)
+             |> assign(:last_order, order)
+             |> assign(:payment_choice, :unpaid)
+             |> assign(:placing_order?, false)
+             |> assign(:categories, Menu.list_menu())}
+
+          {:error, :empty_cart} ->
+            {:noreply,
+             socket
+             |> assign(:placing_order?, false)
+             |> assign(:error, "Add at least one item before placing an order.")}
+
+          {:error, _changeset} ->
+            {:noreply,
+             socket
+             |> assign(:placing_order?, false)
+             |> assign(:error, "Could not place order. Check items and try again.")}
+        end
     end
   end
 
@@ -338,11 +352,11 @@ defmodule EspresoWeb.StaffPosLive do
                   type="button"
                   class={[
                     "menu-basket-checkout staff-pos-place",
-                    @cart == [] && "is-disabled"
+                    (@cart == [] or @placing_order?) && "is-disabled"
                   ]}
                   id="pos-place-order"
                   phx-click="place_order"
-                  disabled={@cart == []}
+                  disabled={@cart == [] or @placing_order?}
                 >
                   Place Order
                 </button>
