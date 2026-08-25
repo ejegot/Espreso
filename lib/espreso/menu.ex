@@ -310,6 +310,71 @@ defmodule Espreso.Menu do
     Application.fetch_env!(:espreso, :public_menu_url)
   end
 
+  @doc """
+  Returns display names for order lines whose products are missing or unavailable.
+
+  Prefers `:product_id` on each line (Menu/POS carts). Lines without an id are
+  resolved by exact product name when such products exist. Application-level
+  check only — not a DB lock.
+  """
+  def unavailable_for_order_lines(lines) when is_list(lines) do
+    ids =
+      lines
+      |> Enum.map(&line_product_id/1)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    products_by_id =
+      if ids == [] do
+        %{}
+      else
+        Product
+        |> where([p], p.id in ^ids)
+        |> Repo.all()
+        |> Map.new(&{&1.id, &1})
+      end
+
+    lines
+    |> Enum.flat_map(fn line ->
+      name = line_name(line)
+
+      case line_product_id(line) do
+        nil ->
+          flags =
+            Product
+            |> where([p], p.name == ^name)
+            |> select([p], p.available)
+            |> Repo.all()
+
+          cond do
+            flags == [] -> []
+            Enum.any?(flags, & &1) -> []
+            true -> [name]
+          end
+
+        id ->
+          case Map.fetch(products_by_id, id) do
+            {:ok, %{available: true}} -> []
+            {:ok, %{available: false}} -> [name]
+            :error -> [name]
+          end
+      end
+    end)
+    |> Enum.uniq()
+  end
+
+  defp line_product_id(line) do
+    case Map.get(line, :product_id) || Map.get(line, "product_id") do
+      id when is_integer(id) -> id
+      id when is_binary(id) -> String.to_integer(id)
+      _ -> nil
+    end
+  end
+
+  defp line_name(line) do
+    Map.get(line, :name) || Map.get(line, "name") || "Item"
+  end
+
   defp filter_available_products(category) do
     products =
       category.products

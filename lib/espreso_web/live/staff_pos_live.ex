@@ -125,6 +125,7 @@ defmodule EspresoWeb.StaffPosLive do
         lines =
           Enum.map(socket.assigns.cart, fn line ->
             %{
+              product_id: line.product_id,
               name: line.name,
               size: line.size,
               quantity: line.quantity,
@@ -159,6 +160,12 @@ defmodule EspresoWeb.StaffPosLive do
              socket
              |> assign(:placing_order?, false)
              |> assign(:error, "Add at least one item before placing an order.")}
+
+          {:error, {:unavailable, names}} ->
+            {:noreply,
+             socket
+             |> assign(:placing_order?, false)
+             |> assign(:error, unavailable_error(names))}
 
           {:error, _changeset} ->
             {:noreply,
@@ -469,5 +476,11 @@ defmodule EspresoWeb.StaffPosLive do
     Enum.reduce(cart, Decimal.new(0), fn line, acc ->
       Decimal.add(acc, Decimal.mult(line.price, line.quantity))
     end)
+  end
+
+  defp unavailable_error([name]), do: "#{name} is no longer available. Remove it or choose something else."
+
+  defp unavailable_error(names) when is_list(names) do
+    "#{Enum.join(names, ", ")} are no longer available. Remove them or choose something else."
   end
 end

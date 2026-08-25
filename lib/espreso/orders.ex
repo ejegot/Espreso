@@ -12,14 +12,30 @@ defmodule Espreso.Orders do
   @doc """
   Creates an order from cart lines and checkout attrs.
 
-  `lines` — maps with `:name`, `:size`, `:quantity`, `:price` (Decimal).
+  `lines` — maps with `:name`, `:size`, `:quantity`, `:price` (Decimal),
+  and preferably `:product_id` (for availability checks).
   `attrs` — `:customer_name`, `:fulfillment` (`:dine_in` | `:pickup` or strings),
   `:table_number`, `:notes`, `:payment_method` (`:counter` | `:online`),
   `:source` (`:customer` | `:pos` or strings; default `"customer"`),
   optional `:payment_status` (`:unpaid` | `:paid`) — `:paid` only allowed with
   `:counter` (POS pay-at-create). Online is always unpaid. Default unpaid.
+
+  Rejects the whole order with `{:error, {:unavailable, names}}` when any
+  referenced product is unavailable (application-level check).
   """
   def create_order(lines, attrs) when is_list(lines) and lines != [] do
+    case Menu.unavailable_for_order_lines(lines) do
+      [] ->
+        do_create_order(lines, attrs)
+
+      names ->
+        {:error, {:unavailable, names}}
+    end
+  end
+
+  def create_order([], _attrs), do: {:error, :empty_cart}
+
+  defp do_create_order(lines, attrs) do
     fulfillment =
       normalize_fulfillment(Map.get(attrs, :fulfillment) || Map.get(attrs, "fulfillment"))
 
@@ -92,8 +108,6 @@ defmodule Espreso.Orders do
         {:error, reason}
     end
   end
-
-  def create_order([], _attrs), do: {:error, :empty_cart}
 
   @doc """
   Subscribes the current process to all order changes (staff queue).
