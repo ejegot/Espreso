@@ -89,6 +89,16 @@ defmodule EspresoWeb.StaffPosLive do
     {:noreply, assign(socket, :cart, Enum.reject(socket.assigns.cart, &(&1.key == key)))}
   end
 
+  def handle_event("new_order", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:cart, [])
+     |> assign(:size_picker, nil)
+     |> assign(:last_order, nil)
+     |> assign(:error, nil)
+     |> assign(:customer_name, "Walk-in")}
+  end
+
   def handle_event("place_order", _params, socket) do
     cart = socket.assigns.cart
 
@@ -135,7 +145,7 @@ defmodule EspresoWeb.StaffPosLive do
   def render(assigns) do
     ~H"""
     <div class="menu-page-brune site-page staff-pos-page">
-      <header class="staff-orders-top">
+      <header class="staff-orders-top staff-pos-top">
         <div>
           <p class="staff-orders-brand">CoffeeSpot POS</p>
           <h1 class="staff-orders-title">POS</h1>
@@ -152,15 +162,6 @@ defmodule EspresoWeb.StaffPosLive do
 
       <main class="staff-pos-main">
         <p :if={@error} class="staff-admin-note" id="pos-error">{@error}</p>
-
-        <div :if={@last_order} class="staff-auth-card staff-pos-confirm" id="pos-confirmation">
-          <p class="staff-home-card-eyebrow">Order placed</p>
-          <p class="staff-order-number">{@last_order.number}</p>
-          <p class="staff-order-meta">
-            Status: {Orders.status_label(@last_order.status)} · {@last_order.customer_name}
-          </p>
-          <.link navigate={~p"/orders"} class="staff-refresh">Open order queue</.link>
-        </div>
 
         <div class="staff-pos-layout">
           <section class="staff-pos-catalog" id="pos-catalog">
@@ -179,27 +180,6 @@ defmodule EspresoWeb.StaffPosLive do
                 {category.name}
               </button>
             </nav>
-
-            <div :if={@size_picker} class="staff-pos-size-picker" id="pos-size-picker">
-              <div class="staff-pos-size-picker-head">
-                <p>Select size — {@size_picker.name}</p>
-                <button type="button" class="staff-action" phx-click="cancel_size">Cancel</button>
-              </div>
-              <div class="staff-pos-size-options">
-                <button
-                  :for={price <- @size_picker.product_prices}
-                  type="button"
-                  class="staff-pos-product"
-                  id={"pos-size-#{price.id}"}
-                  phx-click="select_size"
-                  phx-value-product-id={@size_picker.id}
-                  phx-value-price-id={price.id}
-                >
-                  <span>{price.size || "Regular"}</span>
-                  <span>{Menu.format_price(price.price)}</span>
-                </button>
-              </div>
-            </div>
 
             <div class="staff-pos-products" id="pos-products">
               <button
@@ -222,77 +202,147 @@ defmodule EspresoWeb.StaffPosLive do
           </section>
 
           <aside class="staff-pos-ticket" id="pos-ticket">
-            <h2>Current Order</h2>
-            <p class="staff-pos-customer">Customer: {@customer_name}</p>
-
-            <p :if={@cart == []} class="staff-empty" id="pos-cart-empty">No items yet.</p>
-
-            <ul class="staff-pos-cart" id="pos-cart-lines">
-              <li :for={line <- @cart} class="staff-pos-cart-line" id={"pos-line-#{line.key}"}>
-                <div class="staff-pos-cart-info">
-                  <p class="staff-pos-cart-name">
-                    {line.name}
-                    <span :if={line.size} class="staff-pos-cart-size">· {line.size}</span>
-                  </p>
-                  <p class="staff-pos-cart-amount">
-                    {Menu.format_price(Decimal.mult(line.price, line.quantity))}
-                  </p>
+            <%= if @last_order do %>
+              <div class="staff-pos-success" id="pos-confirmation">
+                <p class="staff-home-card-eyebrow">Order placed</p>
+                <p class="staff-order-number">{@last_order.number}</p>
+                <p class="staff-order-meta">
+                  Status: {Orders.status_label(@last_order.status)} · {@last_order.customer_name}
+                </p>
+                <div class="staff-pos-success-actions">
+                  <button
+                    type="button"
+                    class="menu-basket-checkout staff-pos-place"
+                    id="pos-new-order"
+                    phx-click="new_order"
+                  >
+                    New Order
+                  </button>
+                  <.link navigate={~p"/orders"} class="staff-refresh staff-pos-view-orders">
+                    View Orders
+                  </.link>
                 </div>
-                <div class="staff-pos-cart-actions">
-                  <button
-                    type="button"
-                    class="staff-action"
-                    phx-click="dec"
-                    phx-value-key={line.key}
-                    aria-label={"Decrease #{line.name}"}
-                  >
-                    −
-                  </button>
-                  <span class="staff-pos-qty">{line.quantity}</span>
-                  <button
-                    type="button"
-                    class="staff-action"
-                    phx-click="inc"
-                    phx-value-key={line.key}
-                    aria-label={"Increase #{line.name}"}
-                  >
-                    +
-                  </button>
-                  <button
-                    type="button"
-                    class="staff-action"
-                    phx-click="remove"
-                    phx-value-key={line.key}
-                    aria-label={"Remove #{line.name}"}
-                  >
-                    Remove
-                  </button>
+              </div>
+            <% else %>
+              <div class="staff-pos-ticket-head">
+                <h2>Current Order</h2>
+                <p class="staff-pos-customer">Customer: {@customer_name}</p>
+              </div>
+
+              <div class="staff-pos-ticket-body">
+                <p :if={@cart == []} class="staff-empty" id="pos-cart-empty">No items yet.</p>
+
+                <ul class="staff-pos-cart" id="pos-cart-lines">
+                  <li :for={line <- @cart} class="staff-pos-cart-line" id={"pos-line-#{line.key}"}>
+                    <div class="staff-pos-cart-info">
+                      <p class="staff-pos-cart-name">
+                        {line.name}
+                        <span :if={line.size} class="staff-pos-cart-size">· {line.size}</span>
+                      </p>
+                      <p class="staff-pos-cart-amount">
+                        {Menu.format_price(Decimal.mult(line.price, line.quantity))}
+                      </p>
+                    </div>
+                    <div class="staff-pos-cart-actions">
+                      <div class="staff-pos-qty-controls">
+                        <button
+                          type="button"
+                          class="staff-pos-qty-btn"
+                          phx-click="dec"
+                          phx-value-key={line.key}
+                          aria-label={"Decrease #{line.name}"}
+                        >
+                          −
+                        </button>
+                        <span class="staff-pos-qty">{line.quantity}</span>
+                        <button
+                          type="button"
+                          class="staff-pos-qty-btn"
+                          phx-click="inc"
+                          phx-value-key={line.key}
+                          aria-label={"Increase #{line.name}"}
+                        >
+                          +
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        class="staff-pos-remove"
+                        phx-click="remove"
+                        phx-value-key={line.key}
+                        aria-label={"Remove #{line.name}"}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+
+              <div class="staff-pos-ticket-footer">
+                <div class="staff-pos-totals">
+                  <div class="staff-pos-total-row">
+                    <span>Subtotal</span>
+                    <span id="pos-subtotal">{Menu.format_price(cart_total(@cart))}</span>
+                  </div>
+                  <div class="staff-pos-total-row staff-pos-total-row--grand">
+                    <span>Total</span>
+                    <span id="pos-total">{Menu.format_price(cart_total(@cart))}</span>
+                  </div>
                 </div>
-              </li>
-            </ul>
 
-            <div class="staff-pos-totals">
-              <div class="staff-pos-total-row">
-                <span>Subtotal</span>
-                <span id="pos-subtotal">{Menu.format_price(cart_total(@cart))}</span>
+                <button
+                  type="button"
+                  class={[
+                    "menu-basket-checkout staff-pos-place",
+                    @cart == [] && "is-disabled"
+                  ]}
+                  id="pos-place-order"
+                  phx-click="place_order"
+                  disabled={@cart == []}
+                >
+                  Place Order
+                </button>
               </div>
-              <div class="staff-pos-total-row staff-pos-total-row--grand">
-                <span>Total</span>
-                <span id="pos-total">{Menu.format_price(cart_total(@cart))}</span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              class="menu-basket-checkout staff-pos-place"
-              id="pos-place-order"
-              phx-click="place_order"
-            >
-              Place Order
-            </button>
+            <% end %>
           </aside>
         </div>
       </main>
+
+      <div
+        :if={@size_picker}
+        class="staff-pos-modal"
+        id="pos-size-picker"
+        phx-window-keydown="cancel_size"
+        phx-key="Escape"
+      >
+        <div class="staff-pos-modal-backdrop" phx-click="cancel_size" aria-hidden="true"></div>
+        <div
+          class="staff-pos-modal-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pos-size-title"
+        >
+          <div class="staff-pos-size-picker-head">
+            <p id="pos-size-title">Select size — {@size_picker.name}</p>
+            <button type="button" class="staff-action" phx-click="cancel_size">Cancel</button>
+          </div>
+          <div class="staff-pos-size-options">
+            <button
+              :for={price <- @size_picker.product_prices}
+              type="button"
+              class="staff-pos-size-option"
+              id={"pos-size-#{price.id}"}
+              phx-click="select_size"
+              phx-value-product-id={@size_picker.id}
+              phx-value-price-id={price.id}
+            >
+              <span class="staff-pos-product-name">{price.size || "Regular"}</span>
+              <span class="staff-pos-product-price">{Menu.format_price(price.price)}</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
     """
   end
