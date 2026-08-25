@@ -7,6 +7,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
   alias Espreso.Menu.{Category, Product, ProductPrice}
   alias Espreso.Orders
   alias Espreso.Repo
+  alias EspresoWeb.StaffPosLive
 
   setup do
     {:ok, owner} =
@@ -229,6 +230,101 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert order.status == "received"
   end
 
+  test "Place Order creates exactly one order; repeated place_order while placing is ignored", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+
+    view |> element("#pos-place-order") |> render_click()
+    # Second click after success: confirmation is showing (no place button / cart cleared).
+    view |> render_click("place_order", %{})
+
+    assert length(Orders.list_active_orders()) == 1
+    assert has_element?(view, "#pos-confirmation")
+  end
+
+  test "repeated place_order is ignored while placing_order? is already true", %{
+    espresso: espresso
+  } do
+    price = hd(espresso.product_prices)
+
+    cart = [
+      %{
+        key: "#{espresso.id}-#{price.id}",
+        name: espresso.name,
+        size: price.size,
+        quantity: 1,
+        price: price.price
+      }
+    ]
+
+    socket =
+      place_order_socket(%{
+        placing_order?: true,
+        cart: cart,
+        customer_name: "Walk-in",
+        payment_choice: :unpaid
+      })
+
+    assert {:noreply, next} = StaffPosLive.handle_event("place_order", %{}, socket)
+    assert next.assigns.placing_order? == true
+    assert next.assigns.cart == cart
+    assert Orders.list_active_orders() == []
+  end
+
+  test "placing_order? resets after successful creation", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-place-order") |> render_click()
+
+    assert has_element?(view, "#pos-confirmation")
+
+    view |> element("#pos-new-order") |> render_click()
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+
+    refute has_element?(view, "#pos-place-order[disabled]")
+    view |> element("#pos-place-order") |> render_click()
+
+    assert length(Orders.list_active_orders()) == 2
+    assert has_element?(view, "#pos-confirmation")
+  end
+
+  test "placing_order? resets after create_order error", %{espresso: espresso} do
+    price = hd(espresso.product_prices)
+
+    cart = [
+      %{
+        key: "#{espresso.id}-#{price.id}",
+        name: espresso.name,
+        size: price.size,
+        quantity: 1,
+        price: price.price
+      }
+    ]
+
+    socket =
+      place_order_socket(%{
+        placing_order?: false,
+        cart: cart,
+        # Too short for Order.changeset customer_name validation
+        customer_name: "A",
+        payment_choice: :unpaid
+      })
+
+    assert {:noreply, next} = StaffPosLive.handle_event("place_order", %{}, socket)
+    assert next.assigns.placing_order? == false
+    assert next.assigns.error == "Could not place order. Check items and try again."
+    assert next.assigns.cart == cart
+    assert Orders.list_active_orders() == []
+  end
+
   test "staff home POS card is ready (not Soon)", %{conn: conn, barista: barista} do
     {:ok, view, html} = live(log_in(conn, barista), ~p"/staff")
     assert has_element?(view, "a[href='/pos']", "POS")
@@ -240,6 +336,22 @@ defmodule EspresoWeb.StaffPosLiveTest do
     conn
     |> Phoenix.ConnTest.init_test_session(%{})
     |> Plug.Conn.put_session(:user_id, user.id)
+  end
+
+  defp place_order_socket(assigns) do
+    %Phoenix.LiveView.Socket{}
+    |> Phoenix.Component.assign(
+      Map.merge(
+        %{
+          categories: [],
+          selected_category: nil,
+          size_picker: nil,
+          last_order: nil,
+          error: nil
+        },
+        assigns
+      )
+    )
   end
 
   defp insert_category!(name) do
