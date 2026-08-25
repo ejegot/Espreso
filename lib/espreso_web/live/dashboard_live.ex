@@ -1,7 +1,6 @@
 defmodule EspresoWeb.DashboardLive do
   use EspresoWeb, :live_view
 
-  alias Espreso.Accounts.User
   alias Espreso.Menu
   alias Espreso.Orders
 
@@ -20,21 +19,7 @@ defmodule EspresoWeb.DashboardLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="menu-page-brune site-page staff-home-page dashboard-page">
-      <header class="staff-orders-top">
-        <div>
-          <p class="staff-orders-brand">
-            CoffeeSpot · {User.role_label(@current_user.role)}
-          </p>
-          <h1 class="staff-orders-title">Dashboard</h1>
-          <p class="staff-orders-user">{@current_user.name}</p>
-        </div>
-        <div class="staff-top-actions">
-          <.link navigate={~p"/staff"} class="staff-refresh">Staff workspace</.link>
-          <.link href={~p"/logout"} method="delete" class="staff-refresh">Log out</.link>
-        </div>
-      </header>
-
+    <.staff_shell current={:dashboard} current_user={@current_user} page_title="Dashboard">
       <main class="staff-home-main">
         <p class="staff-home-lede">
           {dashboard_lede(@current_user.role)}
@@ -106,7 +91,7 @@ defmodule EspresoWeb.DashboardLive do
         >
           <div class="dashboard-todays-preview-head">
             <h2>Today’s Orders</h2>
-            <.link navigate={~p"/orders"} class="staff-refresh">Open order queue</.link>
+            <.link navigate={~p"/orders"} class="staff-shell-tool">Open order queue</.link>
           </div>
 
           <p :if={@todays_orders == []} class="staff-empty">No orders yet today.</p>
@@ -138,7 +123,7 @@ defmodule EspresoWeb.DashboardLive do
           </article>
         </section>
       </main>
-    </div>
+    </.staff_shell>
     """
   end
 

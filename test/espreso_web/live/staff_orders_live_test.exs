@@ -219,7 +219,8 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
   test "board reloads from PubSub without clicking Refresh", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/orders")
-    assert has_element?(view, ".staff-empty", "No active orders.")
+    assert has_element?(view, "#orders-new .staff-empty", "No new orders.")
+    assert has_element?(view, "#orders-preparing .staff-empty", "Nothing preparing.")
 
     {:ok, order} =
       Orders.create_order(
@@ -237,7 +238,8 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     assert {:ok, _} = Orders.update_status(order, "ready")
     html = render(view)
-    assert html =~ "No active orders."
+    assert html =~ "No new orders."
+    assert html =~ "Nothing preparing."
     assert has_element?(view, ".staff-order-card-muted .staff-order-number", order.number)
   end
 

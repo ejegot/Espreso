@@ -89,6 +89,7 @@ defmodule EspresoWeb do
       import Phoenix.HTML
       # Core UI components
       import EspresoWeb.CoreComponents
+      import EspresoWeb.StaffComponents
 
       # Shortcut for generating JS commands
       alias Phoenix.LiveView.JS

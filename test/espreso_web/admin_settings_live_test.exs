@@ -38,7 +38,7 @@ defmodule EspresoWeb.AdminSettingsLiveTest do
     settings = BusinessSettings.get()
     {:ok, view, _html} = live(log_in(conn, owner), ~p"/admin/settings")
 
-    assert has_element?(view, ".staff-orders-title", "Business settings")
+    assert has_element?(view, ".staff-shell-title", "Settings")
     assert has_element?(view, "#admin-settings-form")
     assert has_element?(view, "#admin-settings-form input[name='settings[business_name]']")
 
@@ -52,10 +52,10 @@ defmodule EspresoWeb.AdminSettingsLiveTest do
   end
 
   test "manager and staff are denied", %{conn: conn, manager: manager, barista: barista} do
-    assert {:error, {:redirect, %{to: "/staff"}}} =
+    assert {:error, {:redirect, %{to: "/dashboard"}}} =
              live(log_in(conn, manager), ~p"/admin/settings")
 
-    assert {:error, {:redirect, %{to: "/staff"}}} =
+    assert {:error, {:redirect, %{to: "/orders"}}} =
              live(log_in(conn, barista), ~p"/admin/settings")
   end
 

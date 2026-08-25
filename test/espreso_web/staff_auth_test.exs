@@ -38,17 +38,32 @@ defmodule EspresoWeb.StaffAuthTest do
     assert {:error, {:redirect, %{to: "/login"}}} = live(conn, ~p"/orders")
   end
 
-  test "login lands on dashboard", %{conn: conn, barista: barista} do
-    {:ok, _view, html} = live(conn, ~p"/login")
-    assert html =~ "Hello, welcome back"
-
+  test "login lands barista on orders and managers on dashboard", %{
+    conn: conn,
+    barista: barista,
+    manager: manager,
+    owner: owner
+  } do
     conn =
       post(conn, ~p"/session", %{
         "user" => %{"email" => barista.email, "password" => "password123"}
       })
 
+    assert redirected_to(conn) == ~p"/orders"
+
+    conn =
+      post(recycle(conn), ~p"/session", %{
+        "user" => %{"email" => manager.email, "password" => "password123"}
+      })
+
     assert redirected_to(conn) == ~p"/dashboard"
-    assert get_session(conn, :user_id) == barista.id
+
+    conn =
+      post(recycle(conn), ~p"/session", %{
+        "user" => %{"email" => owner.email, "password" => "password123"}
+      })
+
+    assert redirected_to(conn) == ~p"/dashboard"
   end
 
   test "anyone can open register and sign-in link is present", %{conn: conn} do
@@ -84,7 +99,7 @@ defmodule EspresoWeb.StaffAuthTest do
         "user" => %{"email" => "newstaff@test.local", "password" => "password123"}
       })
 
-    assert redirected_to(conn) == ~p"/dashboard"
+    assert redirected_to(conn) == ~p"/orders"
   end
 
   test "dashboard requires login", %{conn: conn} do
@@ -98,7 +113,14 @@ defmodule EspresoWeb.StaffAuthTest do
     barista: barista
   } do
     {:ok, owner_view, _html} = live(log_in(conn, owner), ~p"/dashboard")
-    assert has_element?(owner_view, ".staff-orders-title", "Dashboard")
+    assert has_element?(owner_view, ".staff-shell-title", "Dashboard")
+    assert has_element?(owner_view, "#staff-nav-orders", "Orders")
+    assert has_element?(owner_view, "#staff-nav-pos", "POS")
+    assert has_element?(owner_view, "#staff-nav-dashboard.is-active", "Dashboard")
+    assert has_element?(owner_view, "#staff-nav-availability", "Availability")
+    assert has_element?(owner_view, "#staff-nav-reports", "Reports")
+    assert has_element?(owner_view, "#staff-nav-staff", "Staff")
+    assert has_element?(owner_view, "#staff-nav-settings", "Settings")
     assert has_element?(owner_view, "#dashboard-panel-sales", "Sales")
     assert has_element?(owner_view, "#dashboard-panel-orders", "Orders")
     assert has_element?(owner_view, "#dashboard-panel-popular-products", "Popular Products")
@@ -131,6 +153,13 @@ defmodule EspresoWeb.StaffAuthTest do
     refute has_element?(manager_view, "#dashboard-panel-settings")
 
     {:ok, staff_view, _html} = live(log_in(conn, barista), ~p"/dashboard")
+    refute has_element?(staff_view, "#staff-nav-dashboard")
+    refute has_element?(staff_view, "#staff-nav-availability")
+    refute has_element?(staff_view, "#staff-nav-reports")
+    refute has_element?(staff_view, "#staff-nav-staff")
+    refute has_element?(staff_view, "#staff-nav-settings")
+    assert has_element?(staff_view, "#staff-nav-orders", "Orders")
+    assert has_element?(staff_view, "#staff-nav-pos", "POS")
     refute has_element?(staff_view, "#dashboard-panel-todays-orders")
     assert has_element?(staff_view, "#dashboard-todays-orders-preview", "Today’s Orders")
     refute has_element?(staff_view, "#dashboard-panel-sales")
@@ -424,26 +453,28 @@ defmodule EspresoWeb.StaffAuthTest do
     end
   end
 
-  test "staff workspace remains available after dashboard login destination", %{
+  test "/staff redirects barista to orders and managers to dashboard", %{
+    conn: conn,
+    barista: barista,
+    manager: manager,
+    owner: owner
+  } do
+    assert {:error, {:redirect, %{to: "/orders"}}} = live(log_in(conn, barista), ~p"/staff")
+    assert {:error, {:redirect, %{to: "/dashboard"}}} = live(log_in(conn, manager), ~p"/staff")
+    assert {:error, {:redirect, %{to: "/dashboard"}}} = live(log_in(conn, owner), ~p"/staff")
+  end
+
+  test "orders shell is active for barista with Orders and POS only", %{
     conn: conn,
     barista: barista
   } do
-    conn = log_in(conn, barista)
-    {:ok, view, _html} = live(conn, ~p"/staff")
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/orders")
 
-    assert has_element?(view, ".staff-orders-title", "Home")
-    assert has_element?(view, "a[href='/orders']", "Orders")
-    assert has_element?(view, "a[href='/pos']", "POS")
-  end
-
-  test "staff home shows Orders and POS, not Staff accounts", %{conn: conn, barista: barista} do
-    conn = log_in(conn, barista)
-    {:ok, view, _html} = live(conn, ~p"/staff")
-
-    assert has_element?(view, ".staff-orders-title", "Home")
-    assert has_element?(view, "a[href='/orders']", "Orders")
-    assert has_element?(view, "a[href='/pos']", "POS")
-    refute has_element?(view, "a[href='/admin/users']", "Staff accounts")
+    assert has_element?(view, ".staff-shell-title", "Orders")
+    assert has_element?(view, "#staff-nav-orders.is-active", "Orders")
+    assert has_element?(view, "#staff-nav-pos", "POS")
+    refute has_element?(view, "#staff-nav-dashboard")
+    refute has_element?(view, "#staff-nav-staff")
   end
 
   test "manager can access staff routes but not user management", %{
@@ -452,28 +483,26 @@ defmodule EspresoWeb.StaffAuthTest do
   } do
     conn = log_in(conn, manager)
 
-    {:ok, home, _html} = live(conn, ~p"/staff")
-    assert has_element?(home, "a[href='/orders']", "Orders")
-    refute has_element?(home, "a[href='/admin/users']", "Staff accounts")
-
     {:ok, orders, _html} = live(conn, ~p"/orders")
-    assert has_element?(orders, ".staff-orders-title")
+    assert has_element?(orders, ".staff-shell-title", "Orders")
+    assert has_element?(orders, "#staff-nav-dashboard", "Dashboard")
+    assert has_element?(orders, "#staff-nav-availability", "Availability")
+    assert has_element?(orders, "#staff-nav-reports", "Reports")
+    refute has_element?(orders, "#staff-nav-staff")
 
-    assert {:error, {:redirect, %{to: "/staff"}}} = live(conn, ~p"/admin/users")
+    assert {:error, {:redirect, %{to: "/dashboard"}}} = live(conn, ~p"/admin/users")
   end
 
-  test "owner staff home shows Staff accounts", %{conn: conn, owner: owner} do
+  test "owner can open staff admin from shell", %{conn: conn, owner: owner} do
     conn = log_in(conn, owner)
-    {:ok, view, _html} = live(conn, ~p"/staff")
-    assert has_element?(view, "a[href='/admin/users']", "Staff accounts")
-
     {:ok, admin, _html} = live(conn, ~p"/admin/users")
-    assert has_element?(admin, ".staff-orders-title", "Staff users")
+    assert has_element?(admin, ".staff-shell-title", "Staff")
+    assert has_element?(admin, "#staff-nav-staff.is-active", "Staff")
   end
 
   test "staff cannot open admin users", %{conn: conn, barista: barista} do
     conn = log_in(conn, barista)
-    assert {:error, {:redirect, %{to: "/staff"}}} = live(conn, ~p"/admin/users")
+    assert {:error, {:redirect, %{to: "/orders"}}} = live(conn, ~p"/admin/users")
   end
 
   test "owner cannot edit own role in admin UI", %{conn: conn, owner: owner} do
@@ -491,7 +520,8 @@ defmodule EspresoWeb.StaffAuthTest do
   test "pos is reachable for staff", %{conn: conn, barista: barista} do
     conn = log_in(conn, barista)
     {:ok, view, _html} = live(conn, ~p"/pos")
-    assert has_element?(view, ".staff-orders-title", "POS")
+    assert has_element?(view, ".staff-shell-title", "POS")
+    assert has_element?(view, "#staff-nav-pos.is-active", "POS")
     assert has_element?(view, "#pos-catalog")
     refute render(view) =~ "Coming soon"
   end

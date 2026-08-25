@@ -71,7 +71,7 @@ defmodule EspresoWeb.StaffAuth do
     else
       conn
       |> put_flash(:error, "You don’t have permission to do that.")
-      |> redirect(to: ~p"/staff")
+      |> redirect(to: home_path(user))
       |> halt()
     end
   end
@@ -109,7 +109,7 @@ defmodule EspresoWeb.StaffAuth do
       socket =
         socket
         |> Phoenix.LiveView.put_flash(:error, "You don’t have permission to do that.")
-        |> Phoenix.LiveView.redirect(to: ~p"/staff")
+        |> Phoenix.LiveView.redirect(to: home_path(socket.assigns.current_user))
 
       {:halt, socket}
     end
@@ -123,7 +123,7 @@ defmodule EspresoWeb.StaffAuth do
     socket = mount_current_user(socket, session)
 
     if User.can_access_orders?(socket.assigns.current_user) do
-      {:halt, Phoenix.LiveView.redirect(socket, to: signed_in_path(socket.assigns.current_user))}
+      {:halt, Phoenix.LiveView.redirect(socket, to: home_path(socket.assigns.current_user))}
     else
       {:cont, socket}
     end
@@ -153,5 +153,14 @@ defmodule EspresoWeb.StaffAuth do
 
   defp maybe_store_return_to(conn), do: conn
 
-  defp signed_in_path(_user), do: ~p"/dashboard"
+  @doc """
+  Role-aware staff home after login / `/staff`.
+
+  Barista → `/orders`. Manager and owner → `/dashboard`.
+  """
+  def home_path(%User{role: "barista"}), do: ~p"/orders"
+  def home_path(%User{}), do: ~p"/dashboard"
+  def home_path(_), do: ~p"/login"
+
+  defp signed_in_path(user), do: home_path(user)
 end

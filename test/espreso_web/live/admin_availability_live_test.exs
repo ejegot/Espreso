@@ -47,7 +47,7 @@ defmodule EspresoWeb.AdminAvailabilityLiveTest do
     secret: secret
   } do
     {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/admin/availability")
-    assert has_element?(manager_view, ".staff-orders-title", "Availability")
+    assert has_element?(manager_view, ".staff-shell-title", "Availability")
     assert has_element?(manager_view, "#availability-product-#{secret.id}", "Secret Blend")
     assert has_element?(manager_view, "#availability-product-#{secret.id}", "Unavailable")
 
@@ -56,7 +56,7 @@ defmodule EspresoWeb.AdminAvailabilityLiveTest do
   end
 
   test "barista is redirected", %{conn: conn, barista: barista} do
-    assert {:error, {:redirect, %{to: "/staff"}}} =
+    assert {:error, {:redirect, %{to: "/orders"}}} =
              live(log_in(conn, barista), ~p"/admin/availability")
   end
 

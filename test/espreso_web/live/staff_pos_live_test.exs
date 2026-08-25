@@ -56,7 +56,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert {:error, {:redirect, %{to: "/login"}}} = live(conn, ~p"/pos")
 
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
-    assert has_element?(view, ".staff-orders-title", "POS")
+    assert has_element?(view, ".staff-shell-title", "POS")
     assert has_element?(view, "#pos-catalog")
     assert has_element?(view, "#pos-ticket")
     refute render(view) =~ "Coming soon"
@@ -355,10 +355,14 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert length(Orders.list_active_orders()) == 1
   end
 
-  test "staff home POS card is ready (not Soon)", %{conn: conn, barista: barista} do
-    {:ok, view, html} = live(log_in(conn, barista), ~p"/staff")
-    assert has_element?(view, "a[href='/pos']", "POS")
-    refute html =~ "Soon"
+  test "staff home redirects barista to orders (POS reachable from shell)", %{
+    conn: conn,
+    barista: barista
+  } do
+    assert {:error, {:redirect, %{to: "/orders"}}} = live(log_in(conn, barista), ~p"/staff")
+
+    {:ok, view, html} = live(log_in(conn, barista), ~p"/orders")
+    assert has_element?(view, "#staff-nav-pos", "POS")
     refute html =~ "Coming next"
   end
 

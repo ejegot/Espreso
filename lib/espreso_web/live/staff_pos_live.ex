@@ -1,7 +1,6 @@
 defmodule EspresoWeb.StaffPosLive do
   use EspresoWeb, :live_view
 
-  alias Espreso.Accounts.User
   alias Espreso.Menu
   alias Espreso.Orders
 
@@ -179,22 +178,7 @@ defmodule EspresoWeb.StaffPosLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="menu-page-brune site-page staff-pos-page">
-      <header class="staff-orders-top staff-pos-top">
-        <div>
-          <p class="staff-orders-brand">CoffeeSpot POS</p>
-          <h1 class="staff-orders-title">POS</h1>
-          <p class="staff-orders-user">
-            {@current_user.name} · {User.role_label(@current_user.role)}
-          </p>
-        </div>
-        <div class="staff-top-actions">
-          <.link navigate={~p"/staff"} class="staff-refresh">Home</.link>
-          <.link navigate={~p"/orders"} class="staff-refresh">Orders</.link>
-          <.link href={~p"/logout"} method="delete" class="staff-refresh">Log out</.link>
-        </div>
-      </header>
-
+    <.staff_shell current={:pos} current_user={@current_user} page_title="POS">
       <main class="staff-pos-main">
         <p :if={@error} class="staff-admin-note" id="pos-error">{@error}</p>
 
@@ -407,7 +391,7 @@ defmodule EspresoWeb.StaffPosLive do
           </div>
         </div>
       </div>
-    </div>
+    </.staff_shell>
     """
   end
 
