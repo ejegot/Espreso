@@ -1398,7 +1398,7 @@ body:has(.menu-page-locked) {
   outline: none;
 }
 
-/* Basket sheet — C4b mobile bottom sheet; desktop remains centered */
+/* Basket sheet — fullscreen mobile-first bag; desktop remains a large panel */
 .menu-basket-panel {
   position: relative;
   z-index: 1;
@@ -1414,6 +1414,51 @@ body:has(.menu-page-locked) {
   box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.16);
   animation: menu-modal-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
   will-change: transform;
+}
+
+.menu-basket-layer--fullscreen {
+  place-items: stretch;
+  padding: 0;
+}
+
+.menu-basket-panel--fullscreen {
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  max-height: 100dvh;
+  border-radius: 0;
+  box-shadow: none;
+  animation-name: menu-fade-in;
+}
+
+.menu-basket-layer--fullscreen .menu-basket-backdrop {
+  background: #faf7f4;
+  backdrop-filter: none;
+}
+
+.menu-basket-panel--fullscreen .menu-basket-handle {
+  display: none;
+}
+
+.menu-basket-panel--fullscreen .menu-basket-close {
+  width: auto;
+  min-width: auto;
+  height: auto;
+  padding: 0.35rem 0.55rem;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  color: color-mix(in srgb, #382010 62%, #b0a098);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.menu-basket-panel--fullscreen .menu-basket-close:hover,
+.menu-basket-panel--fullscreen .menu-basket-close:focus-visible {
+  color: #f85020;
+  background: transparent;
+  outline: none;
 }
 
 .menu-basket-panel.is-dragging {
@@ -4277,6 +4322,11 @@ a.staff-home-card:focus-visible {
     padding: 1.5rem;
   }
 
+  .menu-basket-layer--fullscreen {
+    place-items: center;
+    padding: 1.5rem;
+  }
+
   .menu-basket-panel {
     width: min(100%, 26rem);
     height: min(88vh, 42rem);
@@ -4284,6 +4334,24 @@ a.staff-home-card:focus-visible {
     border-radius: 1.25rem;
     box-shadow: 0 18px 56px rgba(0, 0, 0, 0.16);
     animation-name: menu-modal-center;
+  }
+
+  .menu-basket-panel--fullscreen {
+    width: min(100%, 28rem);
+    height: min(92vh, 46rem);
+    max-height: min(92vh, 46rem);
+    border-radius: 1.25rem;
+    box-shadow: 0 18px 56px rgba(0, 0, 0, 0.16);
+    animation-name: menu-modal-center;
+  }
+
+  .menu-basket-layer--fullscreen .menu-basket-backdrop {
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(4px);
+  }
+
+  .menu-basket-panel--fullscreen .menu-basket-handle {
+    display: block;
   }
 
   .menu-basket-list {
@@ -6037,18 +6105,26 @@ body:has(.home-page-landing) {
 }
 
 /* P3 — QR ordering chrome (no public website navbar) */
-.menu-qr-chrome {
+.menu-qr-sticky {
   position: sticky;
   top: 0;
   z-index: 40;
+  background: color-mix(in srgb, #faf7f4 94%, #fff);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(56, 32, 16, 0.08);
+}
+
+.menu-qr-chrome {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.65rem;
   min-height: 3.15rem;
-  padding: 0.55rem 1rem;
-  border-bottom: 1px solid rgba(56, 32, 16, 0.1);
-  background: color-mix(in srgb, #faf7f4 92%, #fff);
+  padding: 0.55rem 1rem 0.35rem;
+  border-bottom: 0;
+  background: transparent;
   color: #382010;
 }
 
@@ -6119,8 +6195,74 @@ body:has(.home-page-landing) {
   outline: none;
 }
 
+.menu-qr-chrome-bag.is-bag-confirm {
+  animation: menu-qr-bag-confirm 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  color: #f85020;
+}
+
+.menu-qr-bag-plus {
+  position: absolute;
+  top: -0.15rem;
+  right: -0.2rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.22rem;
+  border-radius: 999px;
+  background: #f85020;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+  animation: menu-qr-bag-plus 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes menu-qr-bag-confirm {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.14);
+  }
+  65% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes menu-qr-bag-plus {
+  0% {
+    opacity: 0;
+    transform: translateY(0.25rem) scale(0.7);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-0.15rem) scale(1.05);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-0.55rem) scale(0.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-qr-chrome-bag.is-bag-confirm,
+  .menu-qr-bag-plus {
+    animation: none;
+  }
+}
+
 .menu-page--qr {
-  overflow-x: hidden;
+  --menu-qr-chrome-height: 3.15rem;
+  --menu-qr-sticky-height: 6.35rem;
+  --menu-sticky-top: var(--menu-qr-sticky-height);
+  overflow-x: clip;
 }
 
 /* C6a — compact CoffeeSpot wordmark in sticky mobile header (menu + order only) */
@@ -6163,35 +6305,38 @@ body:has(.home-page-landing) {
   }
 }
 
-/* C7a — compact craving rail (non-sticky discovery, before category pills) */
+/* C7a / M1 — single sticky QR category rail (7 craving choices) */
 .menu-live-root .menu-craving {
   width: 100%;
   max-width: 58rem;
   margin: 0 auto;
-  padding: 0.15rem 1.15rem 0.45rem;
+  padding: 0.35rem 1.15rem 0.45rem;
 }
 
-.menu-live-root .menu-craving-title {
-  margin: 0 0 0.35rem;
-  color: color-mix(in srgb, #382010 58%, #b0a098);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  line-height: 1.2;
-  text-transform: uppercase;
+.menu-live-root .menu-craving--sticky {
+  position: relative;
+  top: auto;
+  z-index: 1;
+  max-width: none;
+  margin: 0;
+  padding: 0.2rem 0 0.55rem;
+  border-bottom: 0;
+  background: transparent;
+  backdrop-filter: none;
 }
 
 .menu-live-root .menu-craving-rail {
   display: flex;
   flex-wrap: nowrap;
   gap: 0.4rem;
-  margin: 0 -1.15rem;
+  margin: 0;
   padding: 0 1.15rem 0.1rem;
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  scroll-snap-type: x proximity;
 }
 
 .menu-live-root .menu-craving-rail::-webkit-scrollbar {
@@ -6214,6 +6359,7 @@ body:has(.home-page-landing) {
   font: inherit;
   cursor: pointer;
   white-space: nowrap;
+  scroll-snap-align: start;
 }
 
 .menu-live-root .menu-craving-chip:hover,
@@ -6774,7 +6920,7 @@ body:has(.home-page-landing) {
   }
 }
 
-/* P4 — Come say hi visit panel (P2c sibling) */
+/* P4 — Visit CoffeeSpot panel (P2c sibling) */
 .menu-qr-visit {
   display: flex;
   flex-direction: column;
@@ -6926,6 +7072,52 @@ body:has(.home-page-landing) {
   display: block;
 }
 
+.menu-qr-visit-socials {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.35rem;
+  padding-top: 0.15rem;
+}
+
+.menu-qr-visit-social {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.55rem;
+  height: 2.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 32, 16, 0.12);
+  background: color-mix(in srgb, #faf7f4 70%, #fff);
+  color: #382010;
+  text-decoration: none;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.menu-qr-visit-social svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.menu-qr-visit-social:hover,
+.menu-qr-visit-social:focus-visible {
+  border-color: rgba(248, 80, 32, 0.4);
+  color: #f85020;
+  background: #fff;
+  outline: none;
+}
+
+.menu-qr-visit-social--instagram:hover,
+.menu-qr-visit-social--instagram:focus-visible {
+  color: #dd2a7b;
+}
+
+.menu-qr-visit-social--facebook:hover,
+.menu-qr-visit-social--facebook:focus-visible {
+  color: #1877f2;
+}
+
 .menu-qr-visit-menu-link {
   justify-self: start;
   margin: 0.85rem 0 0;
@@ -7016,16 +7208,9 @@ body:has(.home-page-landing) {
 }
 
 @media (min-width: 640px) {
-  .menu-live-root .menu-craving {
+  .menu-live-root .menu-craving--sticky .menu-craving-rail {
     padding-left: 1.5rem;
     padding-right: 1.5rem;
-  }
-
-  .menu-live-root .menu-craving-rail {
-    margin-left: 0;
-    margin-right: 0;
-    padding-left: 0;
-    padding-right: 0;
   }
 
   .menu-live-root .menu-craving-chip {

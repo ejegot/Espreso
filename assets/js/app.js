@@ -167,12 +167,22 @@ Hooks.MenuBrowse = {
   mounted() {
     this.handleEvent("scroll_to_items", () => this.scrollToItems())
     this.handleEvent("scroll_to_category", ({name}) => this.scrollToCategory(name))
+    this.handleEvent("scroll_active_chip", ({id}) => this.scrollActiveChip(id))
   },
 
   scrollOffset() {
-    const header = this.el.querySelector(".brune-top") || this.el.querySelector(".site-top")
-    const nav = this.el.querySelector(".brune-menu-tabs-line") || this.el.querySelector(".brune-menu-nav")
-    return (header?.offsetHeight || 0) + (nav?.offsetHeight || 0) + 12
+    const sticky = this.el.querySelector("#menu-qr-sticky")
+    if (sticky) return sticky.offsetHeight + 12
+
+    const chrome =
+      this.el.querySelector("#menu-qr-chrome") ||
+      this.el.querySelector(".brune-top") ||
+      this.el.querySelector(".site-top")
+    const rail =
+      this.el.querySelector("#menu-craving.menu-craving--sticky") ||
+      this.el.querySelector(".brune-menu-tabs-line") ||
+      this.el.querySelector(".brune-menu-nav")
+    return (chrome?.offsetHeight || 0) + (rail?.offsetHeight || 0) + 12
   },
 
   scrollTo(top) {
@@ -202,6 +212,21 @@ Hooks.MenuBrowse = {
       this.scrollTo(top)
     }
 
+    requestAnimationFrame(() => requestAnimationFrame(go))
+  },
+
+  scrollActiveChip(id) {
+    if (!id) return
+    const go = () => {
+      const chip = this.el.querySelector(`#${CSS.escape(id)}`)
+      if (!chip) return
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      chip.scrollIntoView({
+        inline: "nearest",
+        block: "nearest",
+        behavior: reduce ? "auto" : "smooth"
+      })
+    }
     requestAnimationFrame(() => requestAnimationFrame(go))
   }
 }
