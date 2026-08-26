@@ -2,7 +2,6 @@ defmodule EspresoWeb.StaffOrdersLive do
   use EspresoWeb, :live_view
 
   alias Espreso.Orders
-  alias Espreso.Menu
 
   @impl true
   def mount(_params, _session, socket) do
@@ -115,65 +114,49 @@ defmodule EspresoWeb.StaffOrdersLive do
           <p :if={@flash_note} class="staff-admin-note" id="orders-flash">{@flash_note}</p>
 
           <div class="staff-orders-board">
-            <section class="staff-orders-section staff-orders-section--new" id="orders-new">
-              <header class="staff-orders-section-head">
-                <h2>New</h2>
-                <span class="staff-orders-count">{length(@received_orders)}</span>
-              </header>
-              <p :if={@received_orders == []} class="staff-empty">No new orders.</p>
-              <.active_order_card :for={order <- @received_orders} order={order} />
-            </section>
+            <div
+              class="staff-orders-kitchen"
+              id="orders-kitchen"
+              role="region"
+              aria-label="Kitchen"
+            >
+              <section class="staff-orders-section staff-orders-section--new" id="orders-new">
+                <header class="staff-orders-section-head">
+                  <h2>New</h2>
+                  <span class="staff-orders-count">{length(@received_orders)}</span>
+                </header>
+                <p :if={@received_orders == []} class="staff-empty">No new orders.</p>
+                <.kitchen_order_card :for={order <- @received_orders} order={order} />
+              </section>
+
+              <section
+                class="staff-orders-section staff-orders-section--preparing"
+                id="orders-preparing"
+              >
+                <header class="staff-orders-section-head">
+                  <h2>Preparing</h2>
+                  <span class="staff-orders-count">{length(@preparing_orders)}</span>
+                </header>
+                <p :if={@preparing_orders == []} class="staff-empty">Nothing preparing.</p>
+                <.kitchen_order_card :for={order <- @preparing_orders} order={order} />
+              </section>
+
+              <section class="staff-orders-section staff-orders-section--ready" id="orders-ready">
+                <header class="staff-orders-section-head">
+                  <h2>Ready</h2>
+                  <span class="staff-orders-count">{length(@ready_orders)}</span>
+                </header>
+                <p :if={@ready_orders == []} class="staff-empty">None yet.</p>
+                <.kitchen_order_card :for={order <- @ready_orders} order={order} />
+              </section>
+            </div>
 
             <section
-              class="staff-orders-section staff-orders-section--preparing"
-              id="orders-preparing"
+              class="staff-orders-section staff-orders-section--unpaid staff-orders-collections"
+              id="unpaid-orders"
+              role="region"
+              aria-label="Unpaid orders"
             >
-              <header class="staff-orders-section-head">
-                <h2>Preparing</h2>
-                <span class="staff-orders-count">{length(@preparing_orders)}</span>
-              </header>
-              <p :if={@preparing_orders == []} class="staff-empty">Nothing preparing.</p>
-              <.active_order_card :for={order <- @preparing_orders} order={order} />
-            </section>
-
-            <section class="staff-orders-section staff-orders-section--ready" id="orders-ready">
-              <header class="staff-orders-section-head">
-                <h2>Ready</h2>
-                <span class="staff-orders-count">{length(@ready_orders)}</span>
-              </header>
-              <p :if={@ready_orders == []} class="staff-empty">None yet.</p>
-              <article :for={order <- @ready_orders} class="staff-order-card staff-order-card-muted">
-                <p class="staff-order-number">{order.number} · {order.customer_name}</p>
-                <p class="staff-order-meta">
-                  {Orders.fulfillment_label(order.fulfillment)}
-                  <span :if={order.table_number}>· Table {order.table_number}</span>
-                  · {Orders.payment_label(order)}
-                </p>
-                <div class="staff-order-actions">
-                  <button
-                    :if={order.payment_status == "unpaid"}
-                    type="button"
-                    class="staff-action"
-                    id={"ready-mark-paid-#{order.id}"}
-                    phx-click="mark_paid"
-                    phx-value-id={order.id}
-                  >
-                    Mark paid
-                  </button>
-                  <button
-                    type="button"
-                    class="staff-action staff-action-primary"
-                    id={"ready-complete-#{order.id}"}
-                    phx-click="complete_order"
-                    phx-value-id={order.id}
-                  >
-                    Picked up
-                  </button>
-                </div>
-              </article>
-            </section>
-
-            <section class="staff-orders-section staff-orders-section--unpaid" id="unpaid-orders">
               <header class="staff-orders-section-head">
                 <h2>Unpaid Orders</h2>
                 <span class="staff-orders-count">{length(@unpaid_orders)}</span>
@@ -186,23 +169,20 @@ defmodule EspresoWeb.StaffOrdersLive do
                 class="staff-order-card staff-order-card--unpaid"
                 id={"unpaid-order-#{order.id}"}
               >
-                <header class="staff-order-head">
-                  <div>
-                    <p class="staff-order-number">{order.number}</p>
-                    <p class="staff-order-name">{order.customer_name}</p>
-                  </div>
-                  <div class="staff-order-badges">
-                    <span class={"staff-badge staff-badge--#{order.status}"}>
-                      {Orders.status_label(order.status)}
-                    </span>
-                    <span class={"staff-badge staff-badge--pay-#{order.payment_status}"}>
-                      {Orders.payment_label(order)}
-                    </span>
-                  </div>
-                </header>
-
-                <p class="staff-order-total">Total {Orders.format_total(order)}</p>
-
+                <p class="staff-order-number">{order.number}</p>
+                <p class="staff-order-name">{order.customer_name}</p>
+                <p class="staff-order-pay">
+                  <span class="staff-order-pay-amount">{Orders.format_total(order)}</span>
+                  ·
+                  <span class={"staff-badge staff-badge--pay-#{order.payment_status}"}>
+                    {payment_state_label(order)}
+                  </span>
+                </p>
+                <p class="staff-order-meta">
+                  <span class={"staff-badge staff-badge--#{order.status}"}>
+                    {Orders.status_label(order.status)}
+                  </span>
+                </p>
                 <div class="staff-order-actions">
                   <button
                     type="button"
@@ -223,68 +203,77 @@ defmodule EspresoWeb.StaffOrdersLive do
     """
   end
 
-  defp active_order_card(assigns) do
+  defp kitchen_order_card(assigns) do
     ~H"""
-    <article class={"staff-order-card staff-order-card--#{@order.status}"}>
-      <header class="staff-order-head">
-        <div>
-          <p class="staff-order-number">{@order.number}</p>
-          <p class="staff-order-name">{@order.customer_name}</p>
-        </div>
-        <div class="staff-order-badges">
-          <span class={"staff-badge staff-badge--#{@order.status}"}>
-            {Orders.status_label(@order.status)}
-          </span>
-          <span class={"staff-badge staff-badge--pay-#{@order.payment_status}"}>
-            {Orders.payment_label(@order)}
-          </span>
-        </div>
-      </header>
-
-      <p class="staff-order-meta">
-        {Orders.fulfillment_label(@order.fulfillment)}
-        <span :if={@order.table_number}>· Table {@order.table_number}</span>
-      </p>
-      <p :if={@order.notes} class="staff-order-notes">Notes: {@order.notes}</p>
+    <article
+      class={["staff-order-card", "staff-order-card--#{@order.status}"]}
+      id={"order-card-#{@order.id}"}
+    >
+      <p class="staff-order-number">{@order.number}</p>
+      <p class="staff-order-name">{@order.customer_name}</p>
 
       <ul class="staff-order-items">
         <li :for={item <- @order.items}>
-          {item.quantity}× {item.name}
-          <span :if={item.size}>({item.size})</span> — {Menu.format_price(item.line_total)}
+          <span class="staff-order-item-qty">{item.quantity} ×</span>
+          {item.name}
+          <span :if={item.size} class="staff-order-item-size">({item.size})</span>
         </li>
       </ul>
 
-      <p class="staff-order-total">Total {Orders.format_total(@order)}</p>
+      <p class="staff-order-pay">
+        <span class="staff-order-pay-amount">{Orders.format_total(@order)}</span>
+        ·
+        <span class={"staff-order-pay-state staff-badge--pay-#{@order.payment_status}"}>
+          {payment_state_label(@order)}
+        </span>
+      </p>
+
+      <p class="staff-order-meta">{fulfillment_short(@order)}</p>
+      <p :if={@order.notes} class="staff-order-notes">{@order.notes}</p>
 
       <div class="staff-order-actions">
-        <button
-          :if={@order.payment_status == "unpaid"}
-          type="button"
-          class="staff-action"
-          phx-click="mark_paid"
-          phx-value-id={@order.id}
-        >
-          Mark paid
-        </button>
         <button
           :if={@order.status == "received"}
           type="button"
           class="staff-action staff-action-primary"
+          id={"order-prepare-#{@order.id}"}
           phx-click="set_status"
           phx-value-id={@order.id}
           phx-value-status="preparing"
         >
-          Preparing
+          Prepare
         </button>
         <button
-          :if={@order.status in ["received", "preparing"]}
+          :if={@order.status == "preparing"}
           type="button"
           class="staff-action staff-action-primary"
+          id={"order-ready-#{@order.id}"}
           phx-click="set_status"
           phx-value-id={@order.id}
           phx-value-status="ready"
         >
           Ready
+        </button>
+        <button
+          :if={@order.status == "ready"}
+          type="button"
+          class="staff-action staff-action-primary"
+          id={"ready-complete-#{@order.id}"}
+          phx-click="complete_order"
+          phx-value-id={@order.id}
+        >
+          Picked up
+        </button>
+
+        <button
+          :if={@order.payment_status == "unpaid"}
+          type="button"
+          class="staff-action staff-action-secondary"
+          id={if(@order.status == "ready", do: "ready-mark-paid-#{@order.id}")}
+          phx-click="mark_paid"
+          phx-value-id={@order.id}
+        >
+          Mark paid
         </button>
         <button
           :if={@order.payment_status == "unpaid" and @order.status in ["received", "preparing"]}
@@ -300,6 +289,17 @@ defmodule EspresoWeb.StaffOrdersLive do
     </article>
     """
   end
+
+  defp payment_state_label(%{payment_status: "paid"}), do: "Paid"
+  defp payment_state_label(_), do: "Unpaid"
+
+  defp fulfillment_short(%{fulfillment: "dine_in", table_number: table})
+       when is_binary(table) and table != "",
+       do: "Table #{table}"
+
+  defp fulfillment_short(%{fulfillment: "dine_in"}), do: "Dine-in"
+  defp fulfillment_short(%{fulfillment: "pickup"}), do: "Pickup"
+  defp fulfillment_short(_), do: "Order"
 
   defp load_orders(socket) do
     socket

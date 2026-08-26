@@ -3355,7 +3355,7 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-orders-page .staff-orders-main {
-  width: min(calc(100% - 2rem), 72rem);
+  width: min(calc(100% - 2rem), 90rem);
   margin: 0 auto;
   padding: 1.25rem 0 3rem;
 }
@@ -3368,19 +3368,30 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-orders-page .staff-orders-board {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 1.25rem;
+}
+
+.staff-orders-page .staff-orders-kitchen {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+}
+
+.staff-orders-page .staff-orders-collections {
+  margin: 0;
 }
 
 @media (min-width: 900px) {
   .staff-orders-page .staff-orders-board {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-    gap: 1.35rem;
+    gap: 1.75rem;
   }
 
-  .staff-orders-page .staff-orders-section--unpaid {
-    grid-column: 1 / -1;
+  .staff-orders-page .staff-orders-kitchen {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.15rem;
+    align-items: stretch;
   }
 }
 
@@ -3432,7 +3443,7 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-orders-page .staff-orders-section--ready {
-  border-top: 3px solid color-mix(in srgb, var(--cs-brown) 55%, var(--cs-beige));
+  border-top: 3px solid var(--cs-brown);
 }
 
 .staff-orders-page .staff-orders-section--unpaid {
@@ -3478,29 +3489,85 @@ a.staff-home-card:focus-visible {
   background: #fff;
 }
 
-.staff-orders-page .staff-order-card-muted {
-  opacity: 1;
-  background: color-mix(in srgb, var(--cs-cream) 70%, #fff);
+.staff-orders-page .staff-order-card--ready {
+  border-left: 3px solid var(--cs-brown);
+  background: #fff;
 }
 
 .staff-orders-page .staff-order-number {
+  margin: 0;
   color: var(--cs-brown);
   font-family: "DM Sans", system-ui, sans-serif;
-  font-size: 1.2rem;
+  font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 .staff-orders-page .staff-order-name {
+  margin: 0.2rem 0 0;
   color: var(--cs-brown);
-  font-size: 0.98rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.staff-orders-page .staff-order-items {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  color: var(--cs-brown);
+  font-size: 1.02rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.staff-orders-page .staff-order-items li + li {
+  margin-top: 0.25rem;
+}
+
+.staff-orders-page .staff-order-item-qty {
+  font-variant-numeric: tabular-nums;
+}
+
+.staff-orders-page .staff-order-item-size {
+  color: color-mix(in srgb, var(--cs-brown) 62%, var(--cs-beige));
+  font-weight: 500;
+}
+
+.staff-orders-page .staff-order-pay {
+  margin: 0.75rem 0 0;
+  color: var(--cs-brown);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.staff-orders-page .staff-order-pay-amount {
+  font-variant-numeric: tabular-nums;
+}
+
+.staff-orders-page .staff-order-pay-state.staff-badge--pay-unpaid {
+  color: var(--cs-orange);
+  font-weight: 700;
+}
+
+.staff-orders-page .staff-order-pay-state.staff-badge--pay-paid {
+  color: color-mix(in srgb, var(--cs-brown) 70%, var(--cs-beige));
   font-weight: 600;
 }
 
 .staff-orders-page .staff-order-meta,
-.staff-orders-page .staff-order-notes,
-.staff-orders-page .staff-order-items {
+.staff-orders-page .staff-order-notes {
+  margin: 0.35rem 0 0;
   color: color-mix(in srgb, var(--cs-brown) 62%, var(--cs-beige));
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.staff-orders-page .staff-order-notes {
+  color: var(--cs-brown);
 }
 
 .staff-orders-page .staff-order-total {
@@ -3542,6 +3609,9 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-orders-page .staff-order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem;
   margin-top: 0.95rem;
 }
@@ -3553,11 +3623,14 @@ a.staff-home-card:focus-visible {
   border-radius: 0.75rem;
   background: #fff;
   color: var(--cs-brown);
+  font: inherit;
   font-size: 0.9rem;
   font-weight: 600;
+  cursor: pointer;
 }
 
 .staff-orders-page .staff-action-primary {
+  flex: 1 1 100%;
   border-color: var(--cs-orange);
   background: var(--cs-orange);
   color: #fff;
@@ -3566,6 +3639,19 @@ a.staff-home-card:focus-visible {
 .staff-orders-page .staff-action-primary:hover,
 .staff-orders-page .staff-action-primary:focus-visible {
   filter: brightness(0.96);
+  outline: none;
+}
+
+.staff-orders-page .staff-action-secondary {
+  border-color: var(--cs-line);
+  background: var(--cs-surface);
+  color: var(--cs-brown);
+  font-weight: 600;
+}
+
+.staff-orders-page .staff-action-secondary:hover,
+.staff-orders-page .staff-action-secondary:focus-visible {
+  border-color: var(--cs-beige);
   outline: none;
 }
 
