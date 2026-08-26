@@ -8472,6 +8472,44 @@ html:not(.page-is-loading) .brune-top {
   scroll-margin-top: calc(var(--menu-sticky-top, 4.15rem) + 2.75rem);
 }
 
+/* C7b — subtle category color worlds (surface only; cards stay CoffeeSpot white) */
+.menu-live-root .brune-menu-section--hot,
+.menu-live-root .brune-menu-section--cold,
+.menu-live-root .brune-menu-section--frappe,
+.menu-live-root .brune-menu-section--soda,
+.menu-live-root .brune-menu-section--food {
+  padding: 0.7rem 0.65rem 0.8rem;
+  border-radius: 0.9rem;
+}
+
+.menu-live-root .brune-menu-section--hot {
+  background: color-mix(in srgb, #faf7f4 90%, #e2b57a);
+}
+
+.menu-live-root .brune-menu-section--cold {
+  background: color-mix(in srgb, #faf7f4 91%, #9eb8c9);
+}
+
+.menu-live-root .brune-menu-section--frappe {
+  background: color-mix(in srgb, #faf7f4 91%, #b5a4c7);
+}
+
+.menu-live-root .brune-menu-section--soda {
+  background: color-mix(in srgb, #faf7f4 90%, #e4a992);
+}
+
+.menu-live-root .brune-menu-section--food {
+  background: color-mix(in srgb, #faf7f4 88%, #c4b09a);
+}
+
+.menu-live-root .brune-menu-section--hot .brune-menu-category-title,
+.menu-live-root .brune-menu-section--cold .brune-menu-category-title,
+.menu-live-root .brune-menu-section--frappe .brune-menu-category-title,
+.menu-live-root .brune-menu-section--soda .brune-menu-category-title,
+.menu-live-root .brune-menu-section--food .brune-menu-category-title {
+  color: #382010;
+}
+
 .menu-page-brune .brune-menu-group + .brune-menu-group {
   margin-top: 1.75rem;
 }
