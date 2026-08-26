@@ -6063,6 +6063,239 @@ body:has(.home-page-landing) {
   color: #382010;
 }
 
+/* C5a — status-first hierarchy on customer order page */
+.order-page .order-card {
+  border-color: rgba(56, 32, 16, 0.1);
+  background: color-mix(in srgb, #faf7f4 55%, #fff);
+  box-shadow: 0 10px 28px rgba(56, 32, 16, 0.06);
+}
+
+.order-page .order-status-block {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0 0 1.15rem;
+  padding-bottom: 1.1rem;
+  border-bottom: 1px solid rgba(56, 32, 16, 0.1);
+}
+
+.order-page .order-status-message {
+  margin: 0;
+  color: #382010;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(1.7rem, 6.5vw, 2.35rem);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  text-transform: none;
+}
+
+.order-page .order-number {
+  margin: 0;
+  color: color-mix(in srgb, #382010 62%, #b0a098);
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.order-page .order-hint {
+  margin: 0.15rem 0 0;
+  color: color-mix(in srgb, #382010 68%, #b0a098);
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.92rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+/* C5b — linear progress tracker + cancelled exception */
+.order-page .order-progress {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0.75rem 0.35rem 0.55rem;
+  border: 1px solid rgba(56, 32, 16, 0.1);
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, #faf7f4 88%, #fff);
+}
+
+.order-page .order-progress-step {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  text-align: center;
+}
+
+.order-page .order-progress-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 999px;
+  border: 1.5px solid rgba(56, 32, 16, 0.18);
+  background: #fff;
+  color: color-mix(in srgb, #382010 45%, #b0a098);
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
+.order-page .order-progress-marker-inner {
+  display: block;
+  transform: translateY(0.02rem);
+}
+
+.order-page .order-progress-label {
+  display: block;
+  max-width: 100%;
+  color: color-mix(in srgb, #382010 48%, #b0a098);
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.order-page .order-progress-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.order-page .order-progress-step.is-completed .order-progress-marker {
+  border-color: color-mix(in srgb, #382010 35%, #b0a098);
+  background: color-mix(in srgb, #b0a098 22%, #fff);
+  color: #382010;
+  font-weight: 700;
+}
+
+.order-page .order-progress-step.is-completed .order-progress-label {
+  color: #382010;
+  font-weight: 600;
+}
+
+.order-page .order-progress-step.is-current .order-progress-marker {
+  border-color: #f85020;
+  border-width: 2px;
+  background: color-mix(in srgb, #f85020 14%, #fff);
+  color: #f85020;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px #f85020;
+}
+
+.order-page .order-progress-step.is-current .order-progress-label {
+  color: #382010;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1.5px;
+}
+
+.order-page .order-progress-step.is-upcoming .order-progress-marker {
+  border-style: dashed;
+  opacity: 0.85;
+}
+
+.order-page .order-progress-step.is-upcoming .order-progress-label {
+  font-weight: 500;
+}
+
+.order-page .order-cancelled-state {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.85rem 0 0;
+  padding: 0.85rem 0.9rem;
+  border: 1.5px solid color-mix(in srgb, #8e241c 28%, transparent);
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, #8e241c 7%, #fff);
+}
+
+.order-page .order-cancelled-badge {
+  margin: 0;
+  color: #8e241c;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.order-page .order-cancelled-lede {
+  margin: 0;
+  color: color-mix(in srgb, #382010 72%, #8e241c);
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+@media (max-width: 374px) {
+  .order-page .order-progress {
+    gap: 0.2rem;
+    padding-left: 0.2rem;
+    padding-right: 0.2rem;
+  }
+
+  .order-page .order-progress-label {
+    font-size: 0.58rem;
+  }
+
+  .order-page .order-progress-marker {
+    width: 1.65rem;
+    height: 1.65rem;
+  }
+}
+
+.order-page .order-payment {
+  margin: 0;
+  color: #f85020;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.order-page .order-meta {
+  margin-top: 1.15rem;
+}
+
+.order-page .order-meta dt {
+  color: #b0a098;
+}
+
+.order-page .order-meta dd,
+.order-page .order-item-name,
+.order-page .order-total {
+  color: #382010;
+}
+
+.order-page .order-item-size {
+  color: color-mix(in srgb, #382010 55%, #b0a098);
+}
+
+.order-page .order-items {
+  border-top-color: rgba(56, 32, 16, 0.1);
+}
+
+.order-page .order-item {
+  border-bottom-color: rgba(56, 32, 16, 0.1);
+}
+
+.order-page .order-total strong {
+  color: #382010;
+}
+
 .order-page .brune-primary-btn {
   border-color: #f85020;
   background: #f85020;
