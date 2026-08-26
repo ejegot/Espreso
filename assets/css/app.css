@@ -1783,6 +1783,17 @@ body:has(.menu-page-locked) {
   color: #246628;
 }
 
+.menu-checkout-payment .menu-checkout-options {
+  grid-template-columns: 1fr;
+}
+
+.menu-checkout-payment .menu-checkout-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+
 .menu-checkout-field {
   display: grid;
   gap: 0.35rem;
@@ -1936,6 +1947,7 @@ body:has(.menu-page-locked) {
 }
 
 .order-eyebrow,
+.order-status-message,
 .staff-orders-brand {
   margin: 0 0 0.35rem;
   color: var(--brune-muted, #6b6b6b);
@@ -1943,6 +1955,15 @@ body:has(.menu-page-locked) {
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+.order-status-message {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--brune-ink, #111112);
+  line-height: 1.35;
 }
 
 .order-title,

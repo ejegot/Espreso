@@ -834,29 +834,9 @@ defmodule EspresoWeb.MenuLive do
 
             <fieldset class="menu-checkout-fulfillment menu-checkout-payment">
               <legend class="menu-checkout-label">Payment</legend>
-              <div class="menu-checkout-options" role="radiogroup" aria-label="Payment">
-                <button
-                  type="button"
-                  class={["menu-checkout-option", @payment_method == :counter && "is-active"]}
-                  phx-click="set_payment_method"
-                  phx-value-method="counter"
-                  aria-pressed={to_string(@payment_method == :counter)}
-                >
-                  Pay at counter
-                </button>
-                <button
-                  type="button"
-                  class={["menu-checkout-option", @payment_method == :online && "is-active"]}
-                  phx-click="set_payment_method"
-                  phx-value-method="online"
-                  aria-pressed={to_string(@payment_method == :online)}
-                >
-                  Pay online
-                </button>
+              <div class="menu-checkout-options" role="group" aria-label="Payment">
+                <span class="menu-checkout-option is-active">Pay at counter</span>
               </div>
-              <p class="menu-basket-note menu-checkout-payment-note">
-                Online payment (GCash / cards) comes next — Pay at counter works now.
-              </p>
             </fieldset>
 
             <%= if checkout_valid?(@fulfillment, @customer_name, @table_number) do %>
@@ -866,7 +846,7 @@ defmodule EspresoWeb.MenuLive do
                 phx-click="place_order"
                 disabled={@placing_order?}
               >
-                {if @placing_order?, do: "Placing order…", else: place_order_label(@payment_method)}
+                {if @placing_order?, do: "Placing order…", else: "Place order · Pay at counter"}
               </button>
               <a
                 href={CoffeeSpot.order_whatsapp_url(@cart, checkout_payload(assigns))}
@@ -1093,9 +1073,6 @@ defmodule EspresoWeb.MenuLive do
       Map.put(acc, field, List.first(messages))
     end)
   end
-
-  defp place_order_label(:online), do: "Pay online"
-  defp place_order_label(_), do: "Place order · Pay at counter"
 
   defp unavailable_toast([name]), do: "#{name} is no longer available. Update your basket and try again."
 

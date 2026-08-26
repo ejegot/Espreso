@@ -287,6 +287,9 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, ".menu-basket-line-size", "12oz")
 
     assert has_element?(view, "button.menu-basket-checkout", "Place order")
+    assert has_element?(view, ".menu-checkout-payment .menu-checkout-option.is-active", "Pay at counter")
+    refute render(view) =~ "Pay online"
+    refute render(view) =~ "Online payment"
 
     view
     |> form("#menu-checkout-form", %{
@@ -297,6 +300,7 @@ defmodule EspresoWeb.MenuLiveTest do
     |> render_change()
 
     assert has_element?(view, "button.menu-basket-checkout", "Place order · Pay at counter")
+    refute render(view) =~ "Pay online"
     assert has_element?(view, "a.menu-basket-whatsapp", "Or send on WhatsApp")
 
     href =
@@ -321,6 +325,7 @@ defmodule EspresoWeb.MenuLiveTest do
       |> follow_redirect(conn)
 
     assert has_element?(order_view, ".order-number")
+    assert has_element?(order_view, "#order-status-message", "Order received")
     assert has_element?(order_view, ".order-card", "Juan")
     assert render(order_view) =~ "Table 7"
     assert render(order_view) =~ "Pay at counter"

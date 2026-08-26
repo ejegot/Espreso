@@ -51,11 +51,10 @@ defmodule EspresoWeb.OrderLive do
         </div>
 
         <div :if={@order} class="order-card">
-          <p class="order-eyebrow">Order received</p>
-          <h1 class="order-number">{@order.number}</h1>
-          <p class="order-status">
-            Status: <strong>{Orders.status_label(@order.status)}</strong>
+          <p class="order-status-message" id="order-status-message">
+            {customer_status_message(@order.status)}
           </p>
+          <h1 class="order-number">{@order.number}</h1>
           <p class="order-payment">{Orders.payment_label(@order)}</p>
 
           <dl class="order-meta">
@@ -109,4 +108,11 @@ defmodule EspresoWeb.OrderLive do
     </div>
     """
   end
+
+  defp customer_status_message("received"), do: "Order received"
+  defp customer_status_message("preparing"), do: "We're preparing your order"
+  defp customer_status_message("ready"), do: "Your order is ready"
+  defp customer_status_message("completed"), do: "Order picked up"
+  defp customer_status_message("cancelled"), do: "Order cancelled"
+  defp customer_status_message(_), do: "Order"
 end
