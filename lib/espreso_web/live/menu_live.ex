@@ -494,15 +494,94 @@ defmodule EspresoWeb.MenuLive do
         </div>
       </div>
 
-      <div :if={@menu_stage == :visit} id="menu-visit-stub" class="menu-qr-stub">
-        <button type="button" class="menu-qr-stub-back" phx-click="back_to_landing">
-          Back
-        </button>
-        <p class="menu-qr-stub-brand">CoffeeSpot</p>
-        <h1 class="menu-qr-stub-title">Come say hi</h1>
-        <p class="menu-qr-stub-lede">
-          Visit details for Lilac Marikina will live here. About and Contact pages stay unchanged.
-        </p>
+      <div :if={@menu_stage == :visit} id="menu-visit" class="menu-qr-visit">
+        <div class="menu-qr-visit-bridge" aria-hidden="true">
+          <img
+            src="/images/coffeespot/cold-signature-01.jpg"
+            alt=""
+            class="menu-qr-visit-bridge-photo"
+            width="800"
+            height="1000"
+          />
+          <div class="menu-qr-visit-bridge-scrim"></div>
+        </div>
+
+        <div class="menu-qr-visit-sheet">
+          <button type="button" class="menu-qr-visit-back" phx-click="back_to_landing">
+            Back
+          </button>
+
+          <p class="menu-qr-visit-brand">{CoffeeSpot.business_name()}</p>
+          <h1 class="menu-qr-visit-title">Come say hi</h1>
+          <p class="menu-qr-visit-place">{CoffeeSpot.location()}</p>
+
+          <section class="menu-qr-visit-block" aria-labelledby="menu-visit-address-label">
+            <h2 id="menu-visit-address-label" class="menu-qr-visit-label">Address</h2>
+            <p class="menu-qr-visit-text">{CoffeeSpot.address_short()}</p>
+            <a
+              href={CoffeeSpot.map_link_url()}
+              id="menu-visit-maps"
+              class="menu-qr-visit-link"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open in Maps
+            </a>
+          </section>
+
+          <section class="menu-qr-visit-block" aria-labelledby="menu-visit-hours-label">
+            <h2 id="menu-visit-hours-label" class="menu-qr-visit-label">Hours</h2>
+            <p
+              :for={line <- visit_hours_lines()}
+              class={[
+                "menu-qr-visit-text",
+                visit_hours_note?(line) && "menu-qr-visit-text--note"
+              ]}
+            >
+              {line}
+            </p>
+          </section>
+
+          <section class="menu-qr-visit-block" aria-labelledby="menu-visit-contact-label">
+            <h2 id="menu-visit-contact-label" class="menu-qr-visit-label">Contact</h2>
+            <a
+              href={"tel:#{CoffeeSpot.phone_tel()}"}
+              id="menu-visit-phone"
+              class="menu-qr-visit-link menu-qr-visit-link--stack"
+            >
+              {CoffeeSpot.phone_display()}
+            </a>
+            <a
+              href={CoffeeSpot.email_url()}
+              id="menu-visit-email"
+              class="menu-qr-visit-link menu-qr-visit-link--stack"
+            >
+              {CoffeeSpot.email()}
+            </a>
+          </section>
+
+          <section class="menu-qr-visit-block" aria-labelledby="menu-visit-social-label">
+            <h2 id="menu-visit-social-label" class="menu-qr-visit-label">Instagram</h2>
+            <a
+              href={CoffeeSpot.instagram_url()}
+              id="menu-visit-instagram"
+              class="menu-qr-visit-link"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              @{CoffeeSpot.instagram_handle()}
+            </a>
+          </section>
+
+          <button
+            type="button"
+            id="menu-visit-view-menu"
+            class="menu-qr-visit-menu-link"
+            phx-click="enter_craving"
+          >
+            View the menu
+          </button>
+        </div>
       </div>
 
       <div :if={@menu_stage == :menu} class="menu-page menu-page-brune site-page menu-page--qr">
@@ -1240,6 +1319,17 @@ defmodule EspresoWeb.MenuLive do
 
   defp sweets_product?(%{name: name}), do: Menu.sweets_product_name?(name)
   defp sweets_product?(_), do: false
+
+  defp visit_hours_lines do
+    CoffeeSpot.hours_lines()
+    |> Enum.reject(&String.contains?(&1, "Student"))
+  end
+
+  defp visit_hours_note?(line) when is_binary(line) do
+    String.contains?(String.downcase(line), "holiday")
+  end
+
+  defp visit_hours_note?(_), do: false
 
   defp craving_options do
     [
