@@ -290,15 +290,64 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#checkout-table[value='12']")
   end
 
-  test "/menu Come say hi opens visit stub without About/Contact pages", %{conn: conn} do
+  test "/menu Come say hi opens visit panel without About/Contact pages", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
 
     view |> element("#menu-cta-come-say-hi") |> render_click()
-    assert has_element?(view, "#menu-visit-stub")
-    assert has_element?(view, ".menu-qr-stub-title", "Come say hi")
+    assert has_element?(view, "#menu-visit")
+    assert has_element?(view, ".menu-qr-visit-title", "Come say hi")
+    assert has_element?(view, ".menu-qr-visit-brand", "CoffeeSpot")
+    assert has_element?(view, ".menu-qr-visit-place", "Lilac, Marikina")
+    assert has_element?(
+             view,
+             ".menu-qr-visit-text",
+             "84 Lilac St., Concepcion Dos, Marikina City, Philippines"
+           )
+    assert has_element?(view, "#menu-visit-maps", "Open in Maps")
+    assert has_element?(view, ".menu-qr-visit-text", "Mon–Thu · 8:00 AM – 12:00 AM")
+    assert has_element?(view, ".menu-qr-visit-text", "Fri–Sun · 8:00 AM – 10:00 PM")
+    assert has_element?(view, ".menu-qr-visit-text", "Holiday hours on Instagram")
+    refute render(view) =~ "Student Hour"
+    assert has_element?(view, "#menu-visit-phone", "+639566728906")
+    assert has_element?(view, "#menu-visit-email", "elilaicorp.ph@gmail.com")
+    assert has_element?(view, "#menu-visit-instagram")
+
+    maps_href =
+      view
+      |> element("#menu-visit-maps")
+      |> render()
+      |> Floki.parse_fragment!()
+      |> Floki.attribute("href")
+      |> List.first()
+
+    assert maps_href =~ "google.com/maps"
+
     refute has_element?(view, ".about-page")
     refute has_element?(view, ".contact-page")
+    refute has_element?(view, ".brune-top")
     refute has_element?(view, ".brune-top-nav")
+    refute has_element?(view, ".brune-drawer")
+
+    view |> element("#menu-visit .menu-qr-visit-back") |> render_click()
+    assert has_element?(view, "#menu-landing")
+    refute has_element?(view, "#menu-visit")
+  end
+
+  test "/menu?table=12 survives Come say hi visit path", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu?table=12")
+
+    view |> element("#menu-cta-come-say-hi") |> render_click()
+    assert has_element?(view, "#menu-visit")
+
+    view |> element("#menu-visit .menu-qr-visit-back") |> render_click()
+    view |> element("#menu-cta-view-menu") |> render_click()
+    view |> element("#menu-craving-option-coffee") |> render_click()
+
+    view |> element("button[aria-label='Add Espresso']") |> render_click()
+    view |> element("button.menu-buy-now", "Add to bag") |> render_click()
+    view |> element("button.brune-icon-bag") |> render_click()
+
+    assert has_element?(view, "#checkout-table[value='12']")
   end
 
   test "GET /menu loads browse menu after landing flow", %{conn: conn} do
