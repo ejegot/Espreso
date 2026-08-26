@@ -5,7 +5,7 @@ defmodule EspresoWeb.OrderLiveTest do
 
   alias Espreso.Orders
 
-  test "customer order page updates status and payment without refresh", %{conn: conn} do
+  test "customer order page shows status-driven messaging and live updates", %{conn: conn} do
     {:ok, order} =
       Orders.create_order(
         [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
@@ -17,14 +17,17 @@ defmodule EspresoWeb.OrderLiveTest do
       )
 
     {:ok, view, html} = live(conn, ~p"/order/#{order.number}")
-    assert html =~ "Received"
+    assert has_element?(view, "#order-status-message", "Order received")
     assert html =~ "Pay at counter"
+    refute html =~ "Status: "
 
     assert {:ok, preparing} = Orders.update_status(order, "preparing")
-    assert render(view) =~ "Preparing"
+    assert has_element?(view, "#order-status-message", "We're preparing your order")
+    refute render(view) =~ ~r/Order received/
 
     assert {:ok, _} = Orders.update_status(preparing, "ready")
-    assert render(view) =~ "Ready"
+    assert has_element?(view, "#order-status-message", "Your order is ready")
+    refute render(view) =~ ~r/Order received/
 
     assert {:ok, _} = Orders.mark_paid(preparing)
     assert render(view) =~ "Paid at counter"
@@ -43,10 +46,12 @@ defmodule EspresoWeb.OrderLiveTest do
 
     {:ok, ready} = Orders.update_status(order, "ready")
     {:ok, view, html} = live(conn, ~p"/order/#{order.number}")
-    assert html =~ "Ready"
+    assert has_element?(view, "#order-status-message", "Your order is ready")
+    refute html =~ ~r/>Order received</
 
     assert {:ok, _} = Orders.complete_order(ready)
-    assert render(view) =~ "Picked up"
+    assert has_element?(view, "#order-status-message", "Order picked up")
+    refute render(view) =~ ~r/Order received/
   end
 
   test "customer order page updates when cancelled", %{conn: conn} do
@@ -60,10 +65,35 @@ defmodule EspresoWeb.OrderLiveTest do
         }
       )
 
-    {:ok, view, html} = live(conn, ~p"/order/#{order.number}")
-    assert html =~ "Received"
+    {:ok, view, _html} = live(conn, ~p"/order/#{order.number}")
+    assert has_element?(view, "#order-status-message", "Order received")
 
     assert {:ok, _} = Orders.cancel_order(order)
-    assert render(view) =~ "Cancelled"
+    assert has_element?(view, "#order-status-message", "Order cancelled")
+    refute render(view) =~ ~r/Order received/
+  end
+
+  test "each order status shows the matching customer message", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Status Copy",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/order/#{order.number}")
+    assert has_element?(view, "#order-status-message", "Order received")
+
+    assert {:ok, preparing} = Orders.update_status(order, "preparing")
+    assert has_element?(view, "#order-status-message", "We're preparing your order")
+
+    assert {:ok, ready} = Orders.update_status(preparing, "ready")
+    assert has_element?(view, "#order-status-message", "Your order is ready")
+
+    assert {:ok, _} = Orders.complete_order(ready)
+    assert has_element?(view, "#order-status-message", "Order picked up")
   end
 end
