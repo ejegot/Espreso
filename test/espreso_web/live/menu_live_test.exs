@@ -274,7 +274,7 @@ defmodule EspresoWeb.MenuLiveTest do
     view |> element("button.menu-buy-now", "Add to bag") |> render_click()
     refute has_element?(view, "#menu-detail")
     refute has_element?(view, "#menu-basket")
-    assert has_element?(view, ".menu-toast", "Added to basket")
+    assert has_element?(view, ".menu-toast", "Added to bag")
     assert has_element?(view, ".brune-bag-count", "1")
 
     view |> element("button.menu-toast-action", "View") |> render_click()
@@ -300,7 +300,7 @@ defmodule EspresoWeb.MenuLiveTest do
     view |> element("button.menu-buy-now", "Add to bag") |> render_click()
 
     assert has_element?(view, ".brune-bag-count", "2")
-    assert has_element?(view, ".menu-toast", "Added to basket")
+    assert has_element?(view, ".menu-toast", "Added to bag")
 
     view |> element("button.brune-icon-bag") |> render_click()
     assert has_element?(view, ".menu-basket-line-name", "Americano")

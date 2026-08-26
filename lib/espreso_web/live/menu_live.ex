@@ -166,7 +166,7 @@ defmodule EspresoWeb.MenuLive do
          |> assign(:cart, cart)
          |> assign(:detail, nil)
          |> assign(:detail_closing?, false)
-         |> assign(:toast, "Added to basket")
+         |> assign(:toast, "Added to bag")
          |> assign(:basket_pulse?, true)}
       else
         _ -> {:noreply, socket}
@@ -1119,9 +1119,9 @@ defmodule EspresoWeb.MenuLive do
     end)
   end
 
-  defp unavailable_toast([name]), do: "#{name} is no longer available. Update your basket and try again."
+  defp unavailable_toast([name]), do: "#{name} is no longer available. Update your bag and try again."
 
   defp unavailable_toast(names) when is_list(names) do
-    "#{Enum.join(names, ", ")} are no longer available. Update your basket and try again."
+    "#{Enum.join(names, ", ")} are no longer available. Update your bag and try again."
   end
 end

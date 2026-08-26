@@ -6036,6 +6036,46 @@ body:has(.home-page-landing) {
   color: var(--cs-brown);
 }
 
+/* C6a — compact CoffeeSpot wordmark in sticky mobile header (menu + order only) */
+@media (max-width: 639px) {
+  .menu-live-root .brune-top-bar,
+  .order-page .brune-top-bar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .menu-live-root .brune-top-brand,
+  .order-page .brune-top-brand {
+    display: block;
+    justify-self: center;
+    max-width: 100%;
+    overflow: hidden;
+    color: #382010;
+    font-family: "Instrument Serif", Georgia, serif;
+    font-size: 1.2rem;
+    font-weight: 400;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    text-align: center;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .menu-live-root .brune-top-trailing,
+  .order-page .brune-top-trailing {
+    margin-left: 0;
+    justify-self: end;
+  }
+
+  .menu-live-root .brune-top-leading,
+  .order-page .brune-top-leading {
+    justify-self: start;
+  }
+}
+
 .menu-live-root .brune-bag-count {
   background: var(--cs-orange);
   color: #fff;
