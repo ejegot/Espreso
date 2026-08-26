@@ -3570,6 +3570,32 @@ a.staff-home-card:focus-visible {
   color: var(--cs-brown);
 }
 
+.staff-orders-page .staff-order-age {
+  margin: 0.45rem 0 0;
+  color: var(--cs-beige);
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  line-height: 1.3;
+}
+
+.staff-orders-page .staff-order-age--attention {
+  color: color-mix(in srgb, var(--cs-brown) 72%, var(--cs-beige));
+  font-weight: 700;
+}
+
+.staff-orders-page .staff-order-age--urgent {
+  color: var(--cs-orange);
+  font-weight: 700;
+}
+
+.staff-orders-page .staff-order-age--critical {
+  color: var(--cs-orange);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
 .staff-orders-page .staff-order-total {
   margin-top: 0.75rem;
   color: var(--cs-brown);
