@@ -51,10 +51,51 @@ defmodule EspresoWeb.OrderLive do
         </div>
 
         <div :if={@order} class="order-card">
-          <p class="order-status-message" id="order-status-message">
-            {customer_status_message(@order.status)}
-          </p>
-          <h1 class="order-number">{@order.number}</h1>
+          <div class="order-status-block">
+            <h1 class="order-status-message" id="order-status-message">
+              {customer_status_message(@order.status)}
+            </h1>
+            <p class="order-number">{@order.number}</p>
+
+            <ol
+              :if={show_order_tracker?(@order.status)}
+              id="order-progress"
+              class="order-progress"
+              aria-label="Order progress"
+            >
+              <li
+                :for={step <- tracker_steps(@order.status)}
+                class={[
+                  "order-progress-step",
+                  "is-#{step.state}"
+                ]}
+                data-step={step.key}
+                data-state={step.state}
+                aria-current={if(step.state == "current", do: "step")}
+              >
+                <span class="order-progress-marker" aria-hidden="true">
+                  <span class="order-progress-marker-inner">{step.marker}</span>
+                </span>
+                <span class="order-progress-label">
+                  <span class="order-progress-sr">{step.sr_prefix}</span>
+                  {step.label}
+                </span>
+              </li>
+            </ol>
+
+            <div
+              :if={@order.status == "cancelled"}
+              id="order-cancelled-state"
+              class="order-cancelled-state"
+              role="status"
+            >
+              <p class="order-cancelled-badge">Cancelled</p>
+              <p class="order-cancelled-lede">This order will not be prepared.</p>
+            </div>
+
+            <p class="order-hint" id="order-hint">{customer_status_hint(@order)}</p>
+          </div>
+
           <p class="order-payment">{Orders.payment_label(@order)}</p>
 
           <dl class="order-meta">
@@ -92,14 +133,6 @@ defmodule EspresoWeb.OrderLive do
             <strong>{Orders.format_total(@order)}</strong>
           </div>
 
-          <p class="order-hint">
-            <%= if @order.payment_method == "counter" do %>
-              Show this screen at the counter to pay and claim your order.
-            <% else %>
-              Keep this screen — we’ll update your status as we prepare your order.
-            <% end %>
-          </p>
-
           <div class="order-actions">
             <.link navigate={~p"/menu"} class="brune-primary-btn">Order more</.link>
           </div>
@@ -115,4 +148,83 @@ defmodule EspresoWeb.OrderLive do
   defp customer_status_message("completed"), do: "Order picked up"
   defp customer_status_message("cancelled"), do: "Order cancelled"
   defp customer_status_message(_), do: "Order"
+
+  defp customer_status_hint(%{status: "completed"}),
+    do: "Thanks — this order is complete. We hope you enjoyed CoffeeSpot."
+
+  defp customer_status_hint(%{status: "cancelled"}),
+    do: "This order was cancelled. You can place a new order from the menu."
+
+  defp customer_status_hint(%{status: "preparing"}),
+    do: "We're preparing it — keep this screen for updates."
+
+  defp customer_status_hint(%{status: "ready", payment_status: "paid"}),
+    do: "Your order is ready — show this screen at the counter."
+
+  defp customer_status_hint(%{status: "ready"}),
+    do: "Your order is ready — show this screen at the counter. Payment is due at the counter."
+
+  defp customer_status_hint(%{status: "received", payment_status: "paid"}),
+    do: "Keep this screen open for live updates on your order."
+
+  defp customer_status_hint(%{status: "received", payment_method: "counter"}),
+    do: "Keep this screen and show it at the counter for your order. Payment is due at the counter."
+
+  defp customer_status_hint(%{status: "received"}),
+    do: "Keep this screen open for live updates on your order."
+
+  defp customer_status_hint(_order),
+    do: "Keep this screen open for live updates on your order."
+
+  defp show_order_tracker?(status) when status in ["received", "preparing", "ready", "completed"],
+    do: true
+
+  defp show_order_tracker?(_status), do: false
+
+  defp tracker_steps(order_status) do
+    [
+      {"received", "Received"},
+      {"preparing", "Preparing"},
+      {"ready", "Ready"},
+      {"completed", "Picked up"}
+    ]
+    |> Enum.map(fn {key, label} ->
+      state = tracker_step_state(order_status, key)
+
+      %{
+        key: key,
+        label: label,
+        state: state,
+        marker: tracker_marker(state),
+        sr_prefix: tracker_sr_prefix(state)
+      }
+    end)
+  end
+
+  defp tracker_step_state(order_status, step_key) do
+    order_idx = tracker_index(order_status)
+    step_idx = tracker_index(step_key)
+
+    cond do
+      order_idx > step_idx -> "completed"
+      order_idx == step_idx -> "current"
+      true -> "upcoming"
+    end
+  end
+
+  defp tracker_index("received"), do: 0
+  defp tracker_index("preparing"), do: 1
+  defp tracker_index("ready"), do: 2
+  defp tracker_index("completed"), do: 3
+  defp tracker_index(_), do: -1
+
+  defp tracker_marker("completed"), do: "✓"
+  defp tracker_marker("current"), do: "●"
+  defp tracker_marker("upcoming"), do: "○"
+  defp tracker_marker(_), do: "○"
+
+  defp tracker_sr_prefix("completed"), do: "Completed: "
+  defp tracker_sr_prefix("current"), do: "Current: "
+  defp tracker_sr_prefix("upcoming"), do: "Upcoming: "
+  defp tracker_sr_prefix(_), do: ""
 end
