@@ -6687,7 +6687,7 @@ html:not(.page-is-loading) .brune-top {
   outline: none;
 }
 
-/* Menu hero (title + cups) */
+/* Menu hero (title + cups) — retained for non-QR surfaces; /menu uses compact heading */
 .brune-menu-hero {
   position: relative;
   width: 100%;
@@ -6747,6 +6747,152 @@ html:not(.page-is-loading) .brune-top {
 @media (max-width: 719px) {
   .brune-menu-hero-art {
     display: none;
+  }
+}
+
+/* C3a — product-first chrome on /menu */
+.menu-page-brune .brune-menu-heading {
+  width: 100%;
+  margin: 0 auto;
+  padding: 0.85rem 1.15rem 0.35rem;
+  text-align: left;
+  background: #faf6f1;
+}
+
+.menu-page-brune .brune-menu-heading-title {
+  margin: 0;
+  color: #382010;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 1.65rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.menu-page-brune .brune-menu-shell {
+  padding: 0.5rem 1.15rem 2rem;
+}
+
+.menu-page-brune .brune-menu-search--compact {
+  max-width: 58rem;
+  margin: 0 auto 0.85rem;
+  padding: 0;
+}
+
+.menu-page-brune .brune-menu-search--compact .brune-search-input {
+  min-height: 2.35rem;
+  padding: 0.4rem 0.85rem 0.4rem 2.35rem;
+  font-size: 0.88rem;
+  background: #fff;
+  border-color: rgba(56, 32, 16, 0.12);
+}
+
+.menu-page-brune .brune-menu-search--compact .brune-search-input:focus {
+  border-color: #f85020;
+  box-shadow: 0 0 0 3px rgba(248, 80, 32, 0.12);
+}
+
+.menu-page-brune .brune-menu-tabs-line {
+  top: 4.5rem;
+  z-index: 20;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  margin: 0 auto 0.75rem;
+  padding: 0.55rem 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  border-bottom: 1px solid rgba(56, 32, 16, 0.1);
+  background: #faf6f1;
+}
+
+.menu-page-brune .brune-menu-tab-link {
+  flex: 0 0 auto;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.85rem;
+  margin-bottom: 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  border-bottom: 1px solid transparent;
+  color: #382010;
+  font-size: 0.92rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.menu-page-brune .brune-menu-tab-link:hover,
+.menu-page-brune .brune-menu-tab-link:focus-visible {
+  color: #f85020;
+  transform: none;
+  outline: none;
+  background: rgba(248, 80, 32, 0.08);
+}
+
+.menu-page-brune .brune-menu-tab-link-active {
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  background: #f85020;
+  border-color: #f85020;
+}
+
+.menu-page-brune .brune-menu-category-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+}
+
+.menu-page-brune .brune-student-promo {
+  margin: 1.75rem auto 0;
+  max-width: 58rem;
+  padding: 0;
+  opacity: 0.92;
+}
+
+.menu-page-brune .brune-student-promo-text {
+  border-color: rgba(176, 160, 152, 0.45);
+  background: rgba(176, 160, 152, 0.12);
+  color: #382010;
+  font-size: 0.82rem;
+}
+
+.menu-page-brune .brune-student-promo-text::before {
+  color: #b0a098;
+}
+
+.menu-page-brune .brune-mega-footer--secondary {
+  margin-top: 0.5rem;
+  padding: 1.75rem 1.15rem 2.5rem;
+  border-top: 1px solid rgba(56, 32, 16, 0.1);
+  background: #faf6f1;
+}
+
+.menu-page-brune .brune-mega-footer--secondary .brune-mega-brand {
+  color: #b0a098;
+  font-size: 1.15rem;
+}
+
+.menu-page-brune .brune-mega-footer--secondary .brune-mega-label {
+  color: #b0a098;
+}
+
+.menu-page-brune .brune-mega-footer--secondary .brune-mega-text,
+.menu-page-brune .brune-mega-footer--secondary .brune-mega-link {
+  color: color-mix(in srgb, #382010 72%, #b0a098);
+  font-size: 0.88rem;
+}
+
+@media (min-width: 720px) {
+  .menu-page-brune .brune-menu-heading {
+    padding: 1rem 2.5rem 0.45rem;
+  }
+
+  .menu-page-brune .brune-menu-shell {
+    padding: 0.65rem 2.5rem 2.5rem;
+  }
+
+  .menu-page-brune .brune-menu-tabs-line {
+    gap: 0.45rem;
   }
 }
 
