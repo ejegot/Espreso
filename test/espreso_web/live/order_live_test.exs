@@ -20,7 +20,10 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, "#order-status-message", "Order received")
     assert has_element?(view, "#order-hint", "Payment is due at the counter")
     assert html =~ "Pay at counter"
-    assert has_element?(view, "a.brune-primary-btn", "Order more")
+    assert has_element?(view, "a.order-more-link", "Order more")
+    assert has_element?(view, "#order-receipt", "Your order")
+    assert has_element?(view, "#order-receipt .order-total", "₱75")
+    assert has_element?(view, "#order-receipt .order-payment", "Pay at counter")
     assert has_element?(view, "#order-progress")
     assert has_element?(view, ~s(#order-progress [data-step="received"][data-state="current"][aria-current="step"]))
     refute html =~ "Status: "
@@ -81,7 +84,7 @@ defmodule EspresoWeb.OrderLiveTest do
     refute hint =~ ~r/pay/i
     refute hint =~ ~r/claim/i
     refute render(view) =~ ~r/Order received/
-    assert has_element?(view, "a.brune-primary-btn", "Order more")
+    assert has_element?(view, "a.order-more-link", "Order more")
   end
 
   test "customer order page updates when cancelled", %{conn: conn} do
@@ -114,7 +117,8 @@ defmodule EspresoWeb.OrderLiveTest do
     refute hint =~ ~r/pay/i
     refute hint =~ ~r/claim/i
     refute render(view) =~ ~r/Order received/
-    assert has_element?(view, "a.brune-primary-btn", "Order more")
+    assert has_element?(view, "a.order-more-link", "Order more")
+    assert has_element?(view, "#order-receipt")
   end
 
   test "each order status shows the matching customer message", %{conn: conn} do

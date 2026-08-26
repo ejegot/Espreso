@@ -96,45 +96,51 @@ defmodule EspresoWeb.OrderLive do
             <p class="order-hint" id="order-hint">{customer_status_hint(@order)}</p>
           </div>
 
-          <p class="order-payment">{Orders.payment_label(@order)}</p>
+          <section id="order-receipt" class="order-receipt" aria-labelledby="order-receipt-title">
+            <h2 id="order-receipt-title" class="order-receipt-title">Your order</h2>
 
-          <dl class="order-meta">
-            <div>
-              <dt>Name</dt>
-              <dd>{@order.customer_name}</dd>
-            </div>
-            <div>
-              <dt>Type</dt>
-              <dd>
-                {Orders.fulfillment_label(@order.fulfillment)}
-                <span :if={@order.table_number}>· Table {@order.table_number}</span>
-              </dd>
-            </div>
-            <div :if={@order.notes}>
-              <dt>Notes</dt>
-              <dd>{@order.notes}</dd>
-            </div>
-          </dl>
-
-          <ul class="order-items">
-            <li :for={item <- @order.items} class="order-item">
+            <dl class="order-meta">
               <div>
-                <p class="order-item-name">
-                  {item.quantity}× {item.name}
-                  <span :if={item.size} class="order-item-size">({item.size})</span>
-                </p>
+                <dt>Name</dt>
+                <dd>{@order.customer_name}</dd>
               </div>
-              <p class="order-item-price">{Menu.format_price(item.line_total)}</p>
-            </li>
-          </ul>
+              <div>
+                <dt>Type</dt>
+                <dd>
+                  {Orders.fulfillment_label(@order.fulfillment)}
+                  <span :if={@order.table_number}>· Table {@order.table_number}</span>
+                </dd>
+              </div>
+              <div :if={@order.notes} class="order-meta-notes">
+                <dt>Notes</dt>
+                <dd>{@order.notes}</dd>
+              </div>
+            </dl>
 
-          <div class="order-total">
-            <span>Total</span>
-            <strong>{Orders.format_total(@order)}</strong>
-          </div>
+            <ul class="order-items">
+              <li :for={item <- @order.items} class="order-item">
+                <div class="order-item-copy">
+                  <p class="order-item-name">
+                    <span class="order-item-qty">{item.quantity}×</span>
+                    {item.name}
+                  </p>
+                  <p :if={item.size} class="order-item-size">{item.size}</p>
+                </div>
+                <p class="order-item-price">{Menu.format_price(item.line_total)}</p>
+              </li>
+            </ul>
+
+            <div class="order-receipt-footer">
+              <div class="order-total">
+                <span>Total</span>
+                <strong>{Orders.format_total(@order)}</strong>
+              </div>
+              <p class="order-payment">{Orders.payment_label(@order)}</p>
+            </div>
+          </section>
 
           <div class="order-actions">
-            <.link navigate={~p"/menu"} class="brune-primary-btn">Order more</.link>
+            <.link navigate={~p"/menu"} class="order-more-link">Order more</.link>
           </div>
         </div>
       </main>

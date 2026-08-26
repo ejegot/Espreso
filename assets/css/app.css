@@ -6259,41 +6259,215 @@ body:has(.home-page-landing) {
 
 .order-page .order-payment {
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid color-mix(in srgb, #f85020 28%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, #f85020 8%, #fff);
   color: #f85020;
   font-family: "DM Sans", sans-serif;
-  font-size: 0.84rem;
+  font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
 
+/* C5c — secondary receipt + CoffeeSpot polish */
+.order-page .order-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0.35rem 0 1.5rem;
+}
+
+.order-page .order-status-block {
+  margin-bottom: 1.35rem;
+  padding: 0 0 1.15rem;
+  border-bottom: 1px solid rgba(176, 160, 152, 0.35);
+}
+
+.order-page .order-receipt {
+  display: grid;
+  gap: 0.95rem;
+  margin: 0;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(56, 32, 16, 0.1);
+  border-radius: 1rem;
+  background: color-mix(in srgb, #faf7f4 70%, #fff);
+}
+
+.order-page .order-receipt-title {
+  margin: 0;
+  color: #b0a098;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
 .order-page .order-meta {
-  margin-top: 1.15rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem 0.85rem;
+  margin: 0;
+}
+
+.order-page .order-meta-notes {
+  grid-column: 1 / -1;
 }
 
 .order-page .order-meta dt {
+  margin: 0;
   color: #b0a098;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
-.order-page .order-meta dd,
-.order-page .order-item-name,
-.order-page .order-total {
+.order-page .order-meta dd {
+  margin: 0.2rem 0 0;
   color: #382010;
-}
-
-.order-page .order-item-size {
-  color: color-mix(in srgb, #382010 55%, #b0a098);
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .order-page .order-items {
-  border-top-color: rgba(56, 32, 16, 0.1);
+  list-style: none;
+  margin: 0;
+  padding: 0.15rem 0 0;
+  border-top: 1px solid rgba(176, 160, 152, 0.35);
 }
 
 .order-page .order-item {
-  border-bottom-color: rgba(56, 32, 16, 0.1);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(176, 160, 152, 0.28);
+}
+
+.order-page .order-item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0.35rem;
+}
+
+.order-page .order-item-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.order-page .order-item-name {
+  margin: 0;
+  color: #382010;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.order-page .order-item-qty {
+  color: color-mix(in srgb, #382010 62%, #b0a098);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.order-page .order-item-size {
+  margin: 0.2rem 0 0;
+  color: color-mix(in srgb, #382010 55%, #b0a098);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.order-page .order-item-price {
+  margin: 0.1rem 0 0;
+  flex: 0 0 auto;
+  color: #382010;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.order-page .order-receipt-footer {
+  display: grid;
+  gap: 0.65rem;
+  justify-items: start;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(176, 160, 152, 0.35);
+}
+
+.order-page .order-total {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0;
+  color: color-mix(in srgb, #382010 58%, #b0a098);
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .order-page .order-total strong {
   color: #382010;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 1.55rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.order-page .order-actions {
+  margin-top: 1.35rem;
+  text-align: center;
+}
+
+.order-page .order-more-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0.45rem 1.15rem;
+  border: 1.5px solid rgba(56, 32, 16, 0.18);
+  border-radius: 0.75rem;
+  background: transparent;
+  color: #382010;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.order-page .order-more-link:hover,
+.order-page .order-more-link:focus-visible {
+  border-color: #f85020;
+  color: #f85020;
+  background: color-mix(in srgb, #f85020 6%, #fff);
+  outline: none;
+}
+
+.order-page .order-eyebrow,
+.order-page .order-title,
+.order-page .order-lede {
+  color: #382010;
+}
+
+.order-page .order-lede {
+  color: color-mix(in srgb, #382010 65%, #b0a098);
 }
 
 .order-page .brune-primary-btn {
