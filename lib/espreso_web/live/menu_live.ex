@@ -75,6 +75,19 @@ defmodule EspresoWeb.MenuLive do
      socket
      |> assign(:menu_stage, :landing)
      |> assign(:menu_filter, nil)
+     |> assign(:search, "")
+     |> assign(:detail, nil)
+     |> assign(:detail_closing?, false)
+     |> assign(:basket_open?, false)
+     |> assign(:basket_closing?, false)}
+  end
+
+  def handle_event("back_to_craving", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:menu_stage, :craving)
+     |> assign(:menu_filter, nil)
+     |> assign(:search, "")
      |> assign(:detail, nil)
      |> assign(:detail_closing?, false)
      |> assign(:basket_open?, false)
@@ -107,16 +120,8 @@ defmodule EspresoWeb.MenuLive do
   end
 
   def handle_event("search", %{"search" => query}, socket) do
-    socket = assign(socket, :search, query)
-
-    socket =
-      if String.trim(query) != "" do
-        assign(socket, :menu_filter, nil)
-      else
-        socket
-      end
-
-    {:noreply, socket}
+    # Keep Matcha/Sweets filter context; search narrows within the active view.
+    {:noreply, assign(socket, :search, query)}
   end
 
   def handle_event("open_detail", %{"id" => id}, socket) do
@@ -496,16 +501,72 @@ defmodule EspresoWeb.MenuLive do
         </p>
       </div>
 
-      <div :if={@menu_stage == :menu} class="menu-page menu-page-brune site-page">
-        <.brune_header
-          current="menu"
-          show_basket?={true}
-          basket_count={cart_count(@cart)}
-          basket_pulse?={@basket_pulse?}
-        />
+      <div :if={@menu_stage == :menu} class="menu-page menu-page-brune site-page menu-page--qr">
+        <header id="menu-qr-chrome" class="menu-qr-chrome">
+          <button
+            type="button"
+            id="menu-qr-back"
+            class="menu-qr-chrome-back"
+            phx-click="back_to_craving"
+          >
+            Back
+          </button>
+          <p class="menu-qr-chrome-brand">CoffeeSpot</p>
+          <div class="menu-qr-chrome-trailing">
+            <button
+              type="button"
+              class="menu-qr-chrome-search"
+              aria-label="Search menu"
+              phx-click={JS.focus(to: "#menu-search-input")}
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.6" />
+                <path
+                  d="M16.2 16.2 20 20"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class={[
+                "menu-qr-chrome-bag",
+                "brune-icon-bag",
+                @basket_pulse? && "brune-basket-btn-pulse"
+              ]}
+              phx-click="open_basket"
+              aria-label={"Checkout, #{cart_count(@cart)} items"}
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M7.5 8.5V7.2a4.5 4.5 0 0 1 9 0v1.3"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                />
+                <path
+                  d="M6.2 8.5h11.6l-.7 11.2a1.6 1.6 0 0 1-1.6 1.5H8.5a1.6 1.6 0 0 1-1.6-1.5L6.2 8.5Z"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              <span
+                :if={cart_count(@cart) > 0}
+                class={["brune-bag-count", @basket_pulse? && "is-pulse"]}
+              >
+                {cart_count(@cart)}
+              </span>
+            </button>
+          </div>
+        </header>
 
         <section class="brune-menu-heading" aria-labelledby="brune-menu-title">
-          <h1 id="brune-menu-title" class="brune-menu-heading-title">Menu</h1>
+          <h1 id="brune-menu-title" class="brune-menu-heading-title">
+            {menu_page_title(@menu_filter)}
+          </h1>
         </section>
 
         <nav
@@ -516,29 +577,40 @@ defmodule EspresoWeb.MenuLive do
           <p id="menu-craving-title" class="menu-craving-title">What are you craving?</p>
           <div class="menu-craving-rail">
             <button
-              :for={category <- @categories}
+              :for={chip <- menu_craving_chips(@categories)}
               type="button"
-              phx-click="select_category"
-              phx-value-name={category.name}
+              id={"menu-craving-chip-#{chip.key}"}
+              phx-click={chip.event}
+              phx-value-name={chip[:name]}
+              phx-value-id={chip[:id]}
               class={[
                 "menu-craving-chip",
-                @selected_category == category.name && "is-active"
+                chip_active?(chip, @selected_category, @menu_filter) && "is-active"
               ]}
-              aria-pressed={to_string(@selected_category == category.name)}
-              aria-current={if(@selected_category == category.name, do: "true")}
-              aria-label={craving_aria_label(category.name, @selected_category == category.name)}
+              aria-pressed={
+                to_string(chip_active?(chip, @selected_category, @menu_filter))
+              }
+              aria-current={
+                if(chip_active?(chip, @selected_category, @menu_filter), do: "true")
+              }
+              aria-label={
+                craving_chip_aria_label(
+                  chip,
+                  chip_active?(chip, @selected_category, @menu_filter)
+                )
+              }
             >
               <img
-                src={craving_thumb(category)}
+                src={chip.thumb}
                 alt=""
                 class="menu-craving-thumb"
                 loading="lazy"
                 width="32"
                 height="32"
               />
-              <span class="menu-craving-label">{craving_label(category.name)}</span>
+              <span class="menu-craving-label">{chip.label}</span>
               <span
-                :if={@selected_category == category.name}
+                :if={chip_active?(chip, @selected_category, @menu_filter)}
                 class="menu-craving-check"
                 aria-hidden="true"
               >
@@ -557,9 +629,12 @@ defmodule EspresoWeb.MenuLive do
               phx-value-name={category.name}
               class={[
                 "brune-menu-tab-link",
-                @selected_category == category.name && "brune-menu-tab-link-active"
+                is_nil(@menu_filter) && @selected_category == category.name &&
+                  "brune-menu-tab-link-active"
               ]}
-              aria-pressed={to_string(@selected_category == category.name)}
+              aria-pressed={
+                to_string(is_nil(@menu_filter) && @selected_category == category.name)
+              }
             >
               {category_nav_label(category.name)}
             </button>
@@ -619,7 +694,9 @@ defmodule EspresoWeb.MenuLive do
               id={"category-#{category.name}"}
               data-category={category.name}
             >
-              <h2 class="brune-menu-category-title">{category_nav_label(category.name)}</h2>
+              <h2 class="brune-menu-category-title">
+                {menu_section_title(@menu_filter, category.name)}
+              </h2>
               <div :for={group <- category.groups} class="brune-menu-group">
                 <p :if={group.name} class="brune-menu-subgroup">{group.name}</p>
 
@@ -1079,18 +1156,25 @@ defmodule EspresoWeb.MenuLive do
   defp visible_categories(categories, selected_category, search, filter) do
     query = String.trim(search) |> String.downcase()
 
-    cond do
-      query != "" ->
-        filter_categories_by_query(categories, query)
+    categories =
+      cond do
+        filter == :matcha ->
+          filter_matcha_categories(categories)
 
-      filter == :matcha ->
-        filter_matcha_categories(categories)
+        filter == :sweets ->
+          filter_sweets_categories(categories)
 
-      filter == :sweets ->
-        filter_sweets_categories(categories)
+        query != "" ->
+          categories
 
-      true ->
-        Enum.filter(categories, &(&1.name == selected_category))
+        true ->
+          Enum.filter(categories, &(&1.name == selected_category))
+      end
+
+    if query == "" do
+      categories
+    else
+      filter_categories_by_query(categories, query)
     end
   end
 
@@ -1373,6 +1457,14 @@ defmodule EspresoWeb.MenuLive do
   defp category_nav_label("FOOD"), do: "Food"
   defp category_nav_label(name), do: name
 
+  defp menu_page_title(:matcha), do: "Matcha"
+  defp menu_page_title(:sweets), do: "Sweets"
+  defp menu_page_title(_), do: "Menu"
+
+  defp menu_section_title(:matcha, category_name), do: craving_label(category_name)
+  defp menu_section_title(:sweets, _category_name), do: "Sweets"
+  defp menu_section_title(_, category_name), do: category_nav_label(category_name)
+
   defp craving_label("HOT"), do: "Coffee"
   defp craving_label("COLD"), do: "Iced"
   defp craving_label("FRAPPE"), do: "Frappe"
@@ -1380,8 +1472,49 @@ defmodule EspresoWeb.MenuLive do
   defp craving_label("FOOD"), do: "Food"
   defp craving_label(name), do: category_nav_label(name)
 
-  defp craving_aria_label(name, true), do: "#{craving_label(name)}, selected"
-  defp craving_aria_label(name, false), do: "Show #{craving_label(name)} menu"
+  defp menu_craving_chips(categories) do
+    category_chips =
+      Enum.map(categories, fn category ->
+        %{
+          key: category.name,
+          label: craving_label(category.name),
+          event: "select_category",
+          name: category.name,
+          id: nil,
+          thumb: craving_thumb(category),
+          kind: :category
+        }
+      end)
+
+    filter_chips =
+      [
+        Enum.find(craving_options(), &(&1.id == "matcha")),
+        Enum.find(craving_options(), &(&1.id == "sweets"))
+      ]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(fn option ->
+        %{
+          key: option.id,
+          label: option.label,
+          event: "select_craving",
+          name: nil,
+          id: option.id,
+          thumb: option.image,
+          kind: :filter
+        }
+      end)
+
+    category_chips ++ filter_chips
+  end
+
+  defp chip_active?(%{kind: :filter, id: "matcha"}, _selected, :matcha), do: true
+  defp chip_active?(%{kind: :filter, id: "sweets"}, _selected, :sweets), do: true
+
+  defp chip_active?(%{kind: :category, name: name}, selected, nil), do: selected == name
+  defp chip_active?(_chip, _selected, _filter), do: false
+
+  defp craving_chip_aria_label(%{label: label}, true), do: "#{label}, selected"
+  defp craving_chip_aria_label(%{label: label}, false), do: "Show #{label} menu"
 
   defp craving_thumb(category) do
     case craving_sample_product(category) do

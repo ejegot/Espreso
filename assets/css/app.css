@@ -6036,6 +6036,93 @@ body:has(.home-page-landing) {
   color: var(--cs-brown);
 }
 
+/* P3 — QR ordering chrome (no public website navbar) */
+.menu-qr-chrome {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 3.15rem;
+  padding: 0.55rem 1rem;
+  border-bottom: 1px solid rgba(56, 32, 16, 0.1);
+  background: color-mix(in srgb, #faf7f4 92%, #fff);
+  color: #382010;
+}
+
+.menu-qr-chrome-back {
+  margin: 0;
+  padding: 0.35rem 0.15rem;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, #382010 62%, #b0a098);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.menu-qr-chrome-back:hover,
+.menu-qr-chrome-back:focus-visible {
+  color: #f85020;
+  outline: none;
+}
+
+.menu-qr-chrome-brand {
+  margin: 0;
+  justify-self: center;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  text-align: center;
+}
+
+.menu-qr-chrome-trailing {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  justify-self: end;
+}
+
+.menu-qr-chrome-search,
+.menu-qr-chrome-bag {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #382010;
+  cursor: pointer;
+}
+
+.menu-qr-chrome-search svg,
+.menu-qr-chrome-bag svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.menu-qr-chrome-search:hover,
+.menu-qr-chrome-search:focus-visible,
+.menu-qr-chrome-bag:hover,
+.menu-qr-chrome-bag:focus-visible {
+  color: #f85020;
+  outline: none;
+}
+
+.menu-page--qr {
+  overflow-x: hidden;
+}
+
 /* C6a — compact CoffeeSpot wordmark in sticky mobile header (menu + order only) */
 @media (max-width: 639px) {
   .menu-live-root .brune-top-bar,
