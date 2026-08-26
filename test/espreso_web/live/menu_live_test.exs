@@ -307,6 +307,9 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, ".menu-basket-line-size", "12oz")
 
     assert has_element?(view, "button.menu-basket-checkout", "Place order")
+    assert has_element?(view, "#menu-basket-submit")
+    assert has_element?(view, "#menu-basket-submit .menu-basket-total", "₱195")
+    assert has_element?(view, "#menu-basket-submit .menu-basket-submit-payment", "Pay at counter")
     assert has_element?(view, ".menu-checkout-payment .menu-checkout-option.is-active", "Pay at counter")
     refute render(view) =~ "Pay online"
     refute render(view) =~ "Online payment"
@@ -319,7 +322,7 @@ defmodule EspresoWeb.MenuLiveTest do
     })
     |> render_change()
 
-    assert has_element?(view, "button.menu-basket-checkout", "Place order · Pay at counter")
+    assert has_element?(view, "button.menu-basket-checkout", "Place order · ₱195")
     refute render(view) =~ "Pay online"
     assert has_element?(view, "a.menu-basket-whatsapp", "Or send on WhatsApp")
 
@@ -340,7 +343,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
     {:ok, order_view, _html} =
       view
-      |> element("button.menu-basket-checkout", "Place order · Pay at counter")
+      |> element("button.menu-basket-checkout", "Place order · ₱195")
       |> render_click()
       |> follow_redirect(conn)
 
@@ -374,12 +377,31 @@ defmodule EspresoWeb.MenuLiveTest do
     |> Repo.update!()
 
     view
-    |> element("button.menu-basket-checkout", "Place order · Pay at counter")
+    |> element("button.menu-basket-checkout", "Place order · ₱75")
     |> render_click()
 
     assert has_element?(view, ".menu-toast", "Espresso is no longer available")
     assert has_element?(view, ".menu-basket-line-name", "Espresso")
     assert Orders.list_active_orders() == []
+  end
+
+  test "/menu basket keeps sticky submit outside checkout scroll", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+
+    view |> element("button[aria-label='Add Espresso']") |> render_click()
+    view |> element("button.menu-buy-now", "Add to bag") |> render_click()
+    view |> element("button.brune-icon-bag") |> render_click()
+
+    assert has_element?(view, "#menu-basket-panel .menu-basket-body")
+    assert has_element?(view, "#menu-basket-panel .menu-basket-checkout-fields #menu-checkout-form")
+    assert has_element?(view, "#menu-basket-submit")
+    assert has_element?(view, "#menu-basket-submit button.menu-basket-checkout")
+    refute has_element?(view, ".menu-basket-body button.menu-basket-checkout")
+    refute has_element?(view, ".menu-basket-footer")
+
+    view |> element("button.menu-checkout-option", "Pickup at counter") |> render_click()
+    refute has_element?(view, "#checkout-table")
+    assert has_element?(view, "button.menu-checkout-option.is-active", "Pickup at counter")
   end
 
   test "/menu keeps product-first chrome and CoffeeSpot footer", %{conn: conn} do

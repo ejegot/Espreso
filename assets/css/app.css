@@ -1158,9 +1158,9 @@ body:has(.menu-page-locked) {
 
 .menu-basket-layer {
   display: grid;
-  place-items: center;
+  place-items: end center;
   z-index: 95;
-  padding: 1rem;
+  padding: 0;
 }
 
 .menu-detail-backdrop,
@@ -1398,20 +1398,21 @@ body:has(.menu-page-locked) {
   outline: none;
 }
 
-/* Basket sheet */
+/* Basket sheet — C4b mobile bottom sheet; desktop remains centered */
 .menu-basket-panel {
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
-  width: min(100%, 26rem);
-  height: min(88vh, 40rem);
-  max-height: min(88vh, 40rem);
+  width: 100%;
+  max-width: 100%;
+  height: min(92dvh, 100%);
+  max-height: min(92dvh, 100%);
   overflow: hidden;
   background: #fff;
-  border-radius: 1.25rem;
-  box-shadow: 0 18px 56px rgba(0, 0, 0, 0.16);
-  animation: menu-modal-center 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  border-radius: 1.25rem 1.25rem 0 0;
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.16);
+  animation: menu-modal-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
   will-change: transform;
 }
 
@@ -1424,7 +1425,7 @@ body:has(.menu-page-locked) {
 }
 
 .menu-basket-layer.is-closing .menu-basket-panel {
-  animation: menu-modal-center-out 0.28s ease both;
+  animation: menu-modal-down 0.28s ease both;
 }
 
 .menu-basket-handle {
@@ -1588,15 +1589,12 @@ body:has(.menu-page-locked) {
 }
 
 .menu-basket-list {
-  flex: 1 1 auto;
-  min-height: 8rem;
-  overflow-x: hidden;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: visible;
   list-style: none;
   margin: 0;
-  padding: 0.15rem 1.4rem;
+  padding: 0.15rem 1.15rem 0.35rem;
   display: grid;
 }
 
@@ -1714,10 +1712,25 @@ body:has(.menu-page-locked) {
   outline: none;
 }
 
+.menu-basket-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scroll-padding-bottom: 1.25rem;
+}
+
+.menu-basket-checkout-fields {
+  padding: 0.35rem 1.15rem 1rem;
+  border-top: 1px solid var(--menu-line);
+}
+
 .menu-basket-footer {
+  /* Legacy alias kept for any external references; C4b uses body + submit */
   flex: 0 1 auto;
   min-height: 0;
-  max-height: 55%;
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -1725,6 +1738,29 @@ body:has(.menu-page-locked) {
   padding: 0.85rem 1.4rem calc(1rem + env(safe-area-inset-bottom));
   border-top: 1px solid var(--menu-line);
   background: #fff;
+}
+
+.menu-basket-submit {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.75rem 1.15rem calc(0.85rem + env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(56, 32, 16, 0.1);
+  background: #faf7f4;
+  box-shadow: 0 -6px 18px rgba(56, 32, 16, 0.06);
+}
+
+.menu-basket-submit .menu-basket-total {
+  margin-bottom: 0;
+}
+
+.menu-basket-submit-payment {
+  margin: 0;
+  color: color-mix(in srgb, #382010 62%, #b0a098);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: center;
 }
 
 .menu-checkout {
@@ -1842,18 +1878,18 @@ body:has(.menu-page-locked) {
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1rem;
-  color: var(--menu-muted);
+  color: color-mix(in srgb, #382010 55%, #b0a098);
   font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .menu-basket-total strong {
-  color: var(--menu-espresso);
-  font-family: "Fraunces", serif;
+  color: #382010;
+  font-family: "Instrument Serif", Georgia, serif;
   font-size: 1.45rem;
-  font-weight: 600;
+  font-weight: 400;
   letter-spacing: -0.03em;
   text-transform: none;
   font-variant-numeric: tabular-nums;
@@ -4251,7 +4287,17 @@ a.staff-home-card:focus-visible {
   }
 
   .menu-basket-list {
-    min-height: 10rem;
+    min-height: 0;
+  }
+
+  .menu-basket-checkout-fields {
+    padding-left: 1.4rem;
+    padding-right: 1.4rem;
+  }
+
+  .menu-basket-submit {
+    padding-left: 1.4rem;
+    padding-right: 1.4rem;
   }
 
   .menu-basket-layer.is-closing .menu-basket-panel {
@@ -7559,7 +7605,17 @@ html:not(.page-is-loading) .brune-top {
   text-transform: none;
 }
 
-.menu-live-root .menu-basket-checkout,
+.menu-live-root .menu-basket-checkout {
+  border: 1.5px solid #f85020;
+  background: #f85020;
+  color: #fff;
+  font-family: "DM Sans", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  min-height: 3.15rem;
+}
+
 .menu-live-root .menu-basket-empty-cta {
   border: 1.5px solid #f85020;
   background: #f85020;
@@ -7580,7 +7636,14 @@ html:not(.page-is-loading) .brune-top {
 }
 
 .menu-live-root .menu-basket-checkout:hover,
-.menu-live-root .menu-basket-checkout:focus-visible,
+.menu-live-root .menu-basket-checkout:focus-visible {
+  background: color-mix(in srgb, #f85020 88%, #382010);
+  border-color: #f85020;
+  color: #fff;
+  outline: 2px solid color-mix(in srgb, #f85020 45%, #382010);
+  outline-offset: 2px;
+}
+
 .menu-live-root .menu-basket-empty-cta:hover,
 .menu-live-root .menu-basket-empty-cta:focus-visible {
   background: color-mix(in srgb, #f85020 88%, #382010);
@@ -7638,6 +7701,38 @@ html:not(.page-is-loading) .brune-top {
 .menu-live-root .menu-basket-whatsapp:hover,
 .menu-live-root .menu-basket-whatsapp:focus-visible {
   color: #f85020;
+}
+
+/* C4b — basket geometry polish scoped to customer menu */
+.menu-live-root .menu-basket-header h2 {
+  color: #382010;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-weight: 400;
+}
+
+.menu-live-root .menu-basket-submit .menu-basket-checkout {
+  width: 100%;
+}
+
+.menu-live-root .menu-checkout-input:focus {
+  border-color: #f85020;
+  box-shadow: 0 0 0 3px rgba(248, 80, 32, 0.12);
+}
+
+.menu-live-root .menu-basket-body {
+  background: #fff;
+}
+
+@media (max-width: 639px) {
+  .menu-live-root .menu-basket-header {
+    padding-left: 1.15rem;
+    padding-right: 1.15rem;
+  }
+
+  .menu-live-root .menu-basket-line {
+    padding-top: 0.85rem;
+    padding-bottom: 0.85rem;
+  }
 }
 
 .menu-live-root .menu-detail-add {

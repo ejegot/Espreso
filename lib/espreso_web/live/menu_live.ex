@@ -680,152 +680,158 @@ defmodule EspresoWeb.MenuLive do
             </button>
           </div>
 
-          <ul :if={@cart != []} class="menu-basket-list">
-            <li :for={line <- @cart} class="menu-basket-line">
-              <div class="menu-basket-line-visual">
-                <img src={line.image} alt="" class="menu-basket-line-photo" />
-              </div>
-              <div class="menu-basket-line-main">
-                <div class="menu-basket-line-top">
-                  <div class="menu-basket-line-copy">
-                    <p class="menu-basket-line-name">{line.name}</p>
-                    <p :if={line.size} class="menu-basket-line-size">{line.size}</p>
+          <div :if={@cart != []} class="menu-basket-body">
+            <ul class="menu-basket-list">
+              <li :for={line <- @cart} class="menu-basket-line">
+                <div class="menu-basket-line-visual">
+                  <img src={line.image} alt="" class="menu-basket-line-photo" />
+                </div>
+                <div class="menu-basket-line-main">
+                  <div class="menu-basket-line-top">
+                    <div class="menu-basket-line-copy">
+                      <p class="menu-basket-line-name">{line.name}</p>
+                      <p :if={line.size} class="menu-basket-line-size">{line.size}</p>
+                    </div>
+                    <p class="menu-basket-line-price">
+                      {Menu.format_price(Decimal.mult(line.price, line.quantity))}
+                    </p>
                   </div>
-                  <p class="menu-basket-line-price">
-                    {Menu.format_price(Decimal.mult(line.price, line.quantity))}
+                  <div class="menu-basket-line-actions">
+                    <div class="menu-qty menu-qty-compact">
+                      <button
+                        type="button"
+                        phx-click="cart_qty"
+                        phx-value-key={line.key}
+                        phx-value-delta="-1"
+                        aria-label="Decrease"
+                        disabled={line.quantity <= 1}
+                      >
+                        −
+                      </button>
+                      <span>{line.quantity}</span>
+                      <button
+                        type="button"
+                        phx-click="cart_qty"
+                        phx-value-key={line.key}
+                        phx-value-delta="1"
+                        aria-label="Increase"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      class="menu-basket-remove"
+                      phx-click="cart_remove"
+                      phx-value-key={line.key}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              </li>
+            </ul>
+
+            <div class="menu-basket-checkout-fields">
+              <form
+                id="menu-checkout-form"
+                class="menu-checkout"
+                phx-change="update_checkout"
+                phx-submit="validate_checkout"
+              >
+                <fieldset class="menu-checkout-fulfillment">
+                  <legend class="menu-checkout-label">How will you get it?</legend>
+                  <div class="menu-checkout-options" role="radiogroup" aria-label="Fulfillment">
+                    <button
+                      type="button"
+                      class={["menu-checkout-option", @fulfillment == :dine_in && "is-active"]}
+                      phx-click="set_fulfillment"
+                      phx-value-type="dine_in"
+                      aria-pressed={to_string(@fulfillment == :dine_in)}
+                    >
+                      Dine-in
+                    </button>
+                    <button
+                      type="button"
+                      class={["menu-checkout-option", @fulfillment == :pickup && "is-active"]}
+                      phx-click="set_fulfillment"
+                      phx-value-type="pickup"
+                      aria-pressed={to_string(@fulfillment == :pickup)}
+                    >
+                      Pickup at counter
+                    </button>
+                  </div>
+                </fieldset>
+
+                <div :if={@fulfillment == :dine_in} class="menu-checkout-field">
+                  <label class="menu-checkout-label" for="checkout-table">Table number</label>
+                  <input
+                    id="checkout-table"
+                    type="number"
+                    name="table_number"
+                    inputmode="numeric"
+                    min="1"
+                    max="99"
+                    value={@table_number}
+                    placeholder="e.g. 7"
+                    class={["menu-checkout-input", @checkout_errors[:table_number] && "is-error"]}
+                    phx-debounce="200"
+                  />
+                  <p :if={@checkout_errors[:table_number]} class="menu-checkout-error">
+                    {@checkout_errors[:table_number]}
                   </p>
                 </div>
-                <div class="menu-basket-line-actions">
-                  <div class="menu-qty menu-qty-compact">
-                    <button
-                      type="button"
-                      phx-click="cart_qty"
-                      phx-value-key={line.key}
-                      phx-value-delta="-1"
-                      aria-label="Decrease"
-                      disabled={line.quantity <= 1}
-                    >
-                      −
-                    </button>
-                    <span>{line.quantity}</span>
-                    <button
-                      type="button"
-                      phx-click="cart_qty"
-                      phx-value-key={line.key}
-                      phx-value-delta="1"
-                      aria-label="Increase"
-                    >
-                      +
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    class="menu-basket-remove"
-                    phx-click="cart_remove"
-                    phx-value-key={line.key}
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-            </li>
-          </ul>
 
-          <footer :if={@cart != []} class="menu-basket-footer">
-            <form
-              id="menu-checkout-form"
-              class="menu-checkout"
-              phx-change="update_checkout"
-              phx-submit="validate_checkout"
-            >
-              <fieldset class="menu-checkout-fulfillment">
-                <legend class="menu-checkout-label">How will you get it?</legend>
-                <div class="menu-checkout-options" role="radiogroup" aria-label="Fulfillment">
-                  <button
-                    type="button"
-                    class={["menu-checkout-option", @fulfillment == :dine_in && "is-active"]}
-                    phx-click="set_fulfillment"
-                    phx-value-type="dine_in"
-                    aria-pressed={to_string(@fulfillment == :dine_in)}
-                  >
-                    Dine-in
-                  </button>
-                  <button
-                    type="button"
-                    class={["menu-checkout-option", @fulfillment == :pickup && "is-active"]}
-                    phx-click="set_fulfillment"
-                    phx-value-type="pickup"
-                    aria-pressed={to_string(@fulfillment == :pickup)}
-                  >
-                    Pickup at counter
-                  </button>
+                <div class="menu-checkout-field">
+                  <label class="menu-checkout-label" for="checkout-name">Your name</label>
+                  <input
+                    id="checkout-name"
+                    type="text"
+                    name="customer_name"
+                    value={@customer_name}
+                    placeholder="Name for your order"
+                    autocomplete="name"
+                    maxlength="60"
+                    class={["menu-checkout-input", @checkout_errors[:customer_name] && "is-error"]}
+                    phx-debounce="200"
+                  />
+                  <p :if={@checkout_errors[:customer_name]} class="menu-checkout-error">
+                    {@checkout_errors[:customer_name]}
+                  </p>
+                </div>
+
+                <div class="menu-checkout-field">
+                  <label class="menu-checkout-label" for="checkout-notes">
+                    Notes <span class="menu-checkout-optional">(optional)</span>
+                  </label>
+                  <textarea
+                    id="checkout-notes"
+                    name="notes"
+                    rows="2"
+                    maxlength="200"
+                    placeholder="less ice, oat milk, no sugar…"
+                    class="menu-checkout-input menu-checkout-textarea"
+                    phx-debounce="200"
+                  >{Phoenix.HTML.Form.normalize_value("textarea", @notes)}</textarea>
+                </div>
+              </form>
+
+              <fieldset class="menu-checkout-fulfillment menu-checkout-payment">
+                <legend class="menu-checkout-label">Payment</legend>
+                <div class="menu-checkout-options" role="group" aria-label="Payment">
+                  <span class="menu-checkout-option is-active">Pay at counter</span>
                 </div>
               </fieldset>
+            </div>
+          </div>
 
-              <div :if={@fulfillment == :dine_in} class="menu-checkout-field">
-                <label class="menu-checkout-label" for="checkout-table">Table number</label>
-                <input
-                  id="checkout-table"
-                  type="number"
-                  name="table_number"
-                  inputmode="numeric"
-                  min="1"
-                  max="99"
-                  value={@table_number}
-                  placeholder="e.g. 7"
-                  class={["menu-checkout-input", @checkout_errors[:table_number] && "is-error"]}
-                  phx-debounce="200"
-                />
-                <p :if={@checkout_errors[:table_number]} class="menu-checkout-error">
-                  {@checkout_errors[:table_number]}
-                </p>
-              </div>
-
-              <div class="menu-checkout-field">
-                <label class="menu-checkout-label" for="checkout-name">Your name</label>
-                <input
-                  id="checkout-name"
-                  type="text"
-                  name="customer_name"
-                  value={@customer_name}
-                  placeholder="Name for your order"
-                  autocomplete="name"
-                  maxlength="60"
-                  class={["menu-checkout-input", @checkout_errors[:customer_name] && "is-error"]}
-                  phx-debounce="200"
-                />
-                <p :if={@checkout_errors[:customer_name]} class="menu-checkout-error">
-                  {@checkout_errors[:customer_name]}
-                </p>
-              </div>
-
-              <div class="menu-checkout-field">
-                <label class="menu-checkout-label" for="checkout-notes">
-                  Notes <span class="menu-checkout-optional">(optional)</span>
-                </label>
-                <textarea
-                  id="checkout-notes"
-                  name="notes"
-                  rows="2"
-                  maxlength="200"
-                  placeholder="less ice, oat milk, no sugar…"
-                  class="menu-checkout-input menu-checkout-textarea"
-                  phx-debounce="200"
-                >{Phoenix.HTML.Form.normalize_value("textarea", @notes)}</textarea>
-              </div>
-            </form>
-
+          <div :if={@cart != []} id="menu-basket-submit" class="menu-basket-submit">
             <div class="menu-basket-total">
               <span>Total</span>
               <strong>{Menu.format_price(cart_total(@cart))}</strong>
             </div>
 
-            <fieldset class="menu-checkout-fulfillment menu-checkout-payment">
-              <legend class="menu-checkout-label">Payment</legend>
-              <div class="menu-checkout-options" role="group" aria-label="Payment">
-                <span class="menu-checkout-option is-active">Pay at counter</span>
-              </div>
-            </fieldset>
+            <p class="menu-basket-submit-payment">Pay at counter</p>
 
             <%= if checkout_valid?(@fulfillment, @customer_name, @table_number) do %>
               <button
@@ -834,7 +840,9 @@ defmodule EspresoWeb.MenuLive do
                 phx-click="place_order"
                 disabled={@placing_order?}
               >
-                {if @placing_order?, do: "Placing order…", else: "Place order · Pay at counter"}
+                {if @placing_order?,
+                  do: "Placing order…",
+                  else: "Place order · #{Menu.format_price(cart_total(@cart))}"}
               </button>
               <a
                 href={CoffeeSpot.order_whatsapp_url(@cart, checkout_payload(assigns))}
@@ -851,7 +859,7 @@ defmodule EspresoWeb.MenuLive do
             <% end %>
 
             <p class="menu-basket-note">You’ll get an order number to show at the counter.</p>
-          </footer>
+          </div>
         </aside>
       </div>
     </div>
