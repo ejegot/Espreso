@@ -6527,22 +6527,55 @@ body:has(.home-page-landing) {
   line-height: 1.45;
 }
 
-/* P2 — What are you craving? (visually continues P1 landing) */
+/* P2b+ — Craving: soft atmosphere bridge + cream editorial rows */
 .menu-qr-craving {
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
+  background: #faf7f4;
   color: #382010;
   overflow-x: hidden;
 }
 
+.menu-qr-craving-bridge {
+  position: relative;
+  flex: 0 0 auto;
+  height: clamp(7.5rem, 28vh, 11.5rem);
+  overflow: hidden;
+  background: #382010;
+  animation: menu-qr-craving-bridge-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.menu-qr-craving-bridge-photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 42%;
+}
+
+.menu-qr-craving-bridge-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(56, 32, 16, 0.22) 0%,
+      rgba(56, 32, 16, 0.08) 42%,
+      rgba(250, 247, 244, 0.55) 78%,
+      #faf7f4 100%
+    );
+}
+
 .menu-qr-craving-hero {
   display: grid;
-  gap: 0.55rem;
-  padding: 1.15rem 1.25rem 1.1rem;
-  background: #382010;
-  color: #faf7f4;
-  animation: menu-qr-craving-enter 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+  gap: 0.4rem;
+  margin-top: -1.35rem;
+  padding: 0 1.25rem 0.85rem;
+  background: transparent;
+  color: #382010;
+  animation: menu-qr-craving-enter 0.36s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both;
 }
 
 .menu-qr-craving-back {
@@ -6551,7 +6584,7 @@ body:has(.home-page-landing) {
   padding: 0.25rem 0;
   border: 0;
   background: transparent;
-  color: color-mix(in srgb, #faf7f4 72%, #b0a098);
+  color: color-mix(in srgb, #382010 58%, #b0a098);
   font: inherit;
   font-size: 0.88rem;
   font-weight: 600;
@@ -6567,94 +6600,108 @@ body:has(.home-page-landing) {
 .menu-qr-craving-brand {
   margin: 0.15rem 0 0;
   font-family: "Instrument Serif", Georgia, serif;
-  font-size: clamp(1.85rem, 7vw, 2.35rem);
+  font-size: clamp(1.7rem, 6.5vw, 2.05rem);
   font-weight: 400;
   letter-spacing: -0.03em;
   line-height: 1;
+  color: #382010;
 }
 
 .menu-qr-craving-title {
   margin: 0;
-  max-width: 14ch;
+  max-width: 16ch;
   font-family: "Instrument Serif", Georgia, serif;
-  font-size: clamp(1.4rem, 5.8vw, 1.85rem);
+  font-size: clamp(1.2rem, 4.8vw, 1.45rem);
   font-weight: 400;
   letter-spacing: -0.02em;
-  line-height: 1.15;
+  line-height: 1.2;
+  color: color-mix(in srgb, #382010 88%, #b0a098);
 }
 
 .menu-qr-craving-lede {
   margin: 0;
   max-width: 28ch;
-  color: color-mix(in srgb, #faf7f4 78%, #b0a098);
-  font-size: 0.92rem;
+  color: color-mix(in srgb, #382010 58%, #b0a098);
+  font-size: 0.9rem;
   line-height: 1.45;
 }
 
 .menu-qr-craving-body {
   display: grid;
-  gap: 0.55rem;
   flex: 1 1 auto;
-  padding: 1rem 1.25rem calc(1.15rem + env(safe-area-inset-bottom));
-  background: #faf7f4;
-  animation: menu-qr-craving-enter 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.04s both;
+  padding: 0.8rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+  background: transparent;
+  animation: menu-qr-craving-enter 0.38s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
 }
 
 .menu-qr-craving-grid {
   display: grid;
-  gap: 0.5rem;
+  gap: 0;
+  border-top: 1px solid rgba(56, 32, 16, 0.07);
 }
 
 .menu-qr-craving-option {
   display: grid;
-  grid-template-columns: 3.5rem minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 2.5rem;
   align-items: center;
-  gap: 0.85rem;
+  gap: 1rem;
   min-height: 3.35rem;
-  padding: 0.4rem 0.95rem 0.4rem 0.4rem;
-  border: 1px solid rgba(56, 32, 16, 0.14);
-  border-radius: 1rem;
-  background: #fff;
+  padding: 0.85rem 0.1rem;
+  border: 0;
+  border-bottom: 1px solid rgba(56, 32, 16, 0.07);
+  border-radius: 0;
+  background: transparent;
   color: #382010;
   box-shadow: none;
   font: inherit;
   text-align: left;
   cursor: pointer;
   transition:
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    transform 0.14s ease,
-    opacity 0.14s ease;
-  animation: menu-qr-craving-tile 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+    color 0.16s ease,
+    opacity 0.14s ease,
+    transform 0.14s ease;
+  animation: menu-qr-craving-tile 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.menu-qr-craving-option:nth-child(1) { animation-delay: 0.06s; }
-.menu-qr-craving-option:nth-child(2) { animation-delay: 0.09s; }
-.menu-qr-craving-option:nth-child(3) { animation-delay: 0.12s; }
-.menu-qr-craving-option:nth-child(4) { animation-delay: 0.15s; }
-.menu-qr-craving-option:nth-child(5) { animation-delay: 0.18s; }
-.menu-qr-craving-option:nth-child(6) { animation-delay: 0.21s; }
-.menu-qr-craving-option:nth-child(7) { animation-delay: 0.24s; }
+.menu-qr-craving-option:nth-child(1) { animation-delay: 0.05s; }
+.menu-qr-craving-option:nth-child(2) { animation-delay: 0.08s; }
+.menu-qr-craving-option:nth-child(3) { animation-delay: 0.11s; }
+.menu-qr-craving-option:nth-child(4) { animation-delay: 0.14s; }
+.menu-qr-craving-option:nth-child(5) { animation-delay: 0.17s; }
+.menu-qr-craving-option:nth-child(6) { animation-delay: 0.2s; }
+.menu-qr-craving-option:nth-child(7) { animation-delay: 0.23s; }
 
 .menu-qr-craving-option:hover,
 .menu-qr-craving-option:focus-visible {
-  border-color: rgba(248, 80, 32, 0.45);
+  color: #f85020;
   outline: none;
-  box-shadow: 0 0 0 3px rgba(248, 80, 32, 0.16);
+}
+
+.menu-qr-craving-option:hover .menu-qr-craving-thumb-wrap,
+.menu-qr-craving-option:focus-visible .menu-qr-craving-thumb-wrap {
+  box-shadow: 0 0 0 2px rgba(248, 80, 32, 0.28);
 }
 
 .menu-qr-craving-option:active {
-  transform: scale(0.985);
-  opacity: 0.92;
+  transform: scale(0.992);
+  opacity: 0.88;
+}
+
+.menu-qr-craving-label {
+  min-width: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
 }
 
 .menu-qr-craving-thumb-wrap {
   display: block;
-  width: 3.5rem;
-  height: 3.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
   overflow: hidden;
-  border-radius: 0.85rem;
-  background: color-mix(in srgb, #faf7f4 70%, #e8dfd6);
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, #faf7f4 55%, #e8dfd6);
 }
 
 .menu-qr-craving-thumb {
@@ -6665,22 +6712,20 @@ body:has(.home-page-landing) {
   object-position: center;
 }
 
-.menu-qr-craving-copy {
-  min-width: 0;
-}
+@keyframes menu-qr-craving-bridge-in {
+  from {
+    opacity: 0;
+  }
 
-.menu-qr-craving-label {
-  display: block;
-  font-size: 1.02rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes menu-qr-craving-enter {
   from {
     opacity: 0;
-    transform: translateY(0.55rem);
+    transform: translateY(0.45rem);
   }
 
   to {
@@ -6692,7 +6737,7 @@ body:has(.home-page-landing) {
 @keyframes menu-qr-craving-tile {
   from {
     opacity: 0;
-    transform: translateY(0.4rem);
+    transform: translateY(0.35rem);
   }
 
   to {
@@ -6702,6 +6747,7 @@ body:has(.home-page-landing) {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .menu-qr-craving-bridge,
   .menu-qr-craving-hero,
   .menu-qr-craving-body,
   .menu-qr-craving-option {
@@ -6715,6 +6761,16 @@ body:has(.home-page-landing) {
   .menu-qr-craving-option:active {
     transform: none;
     opacity: 1;
+  }
+}
+
+@media (min-width: 640px) {
+  .menu-qr-craving-bridge {
+    height: clamp(8rem, 26vh, 12rem);
+  }
+
+  .menu-qr-craving-bridge-photo {
+    object-position: 50% 42%;
   }
 }
 
