@@ -25,6 +25,7 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:detail_closing?, false)
      |> assign(:toast, nil)
      |> assign(:basket_pulse?, false)
+     |> assign(:bag_add_delta, nil)
      |> assign(:fulfillment, :dine_in)
      |> assign(:table_number, "")
      |> assign(:customer_name, "")
@@ -58,7 +59,8 @@ defmodule EspresoWeb.MenuLive do
     {:noreply,
      socket
      |> assign(:toast, nil)
-     |> assign(:basket_pulse?, false)}
+     |> assign(:basket_pulse?, false)
+     |> assign(:bag_add_delta, nil)}
   end
 
   @impl true
@@ -100,7 +102,10 @@ defmodule EspresoWeb.MenuLive do
         {:noreply, socket}
 
       option ->
-        {:noreply, apply_craving_option(socket, option)}
+        {:noreply,
+         socket
+         |> apply_craving_option(option)
+         |> push_qr_nav_visibility(option)}
     end
   end
 
@@ -113,6 +118,7 @@ defmodule EspresoWeb.MenuLive do
        |> assign(:search, "")
        |> assign(:detail, nil)
        |> assign(:detail_closing?, false)
+       |> push_event("scroll_active_chip", %{id: "menu-craving-chip-#{name}"})
        |> push_event("scroll_to_category", %{name: name})}
     else
       {:noreply, socket}
@@ -205,15 +211,16 @@ defmodule EspresoWeb.MenuLive do
             Menu.product_image(category_name, product.name)
           )
 
-        Process.send_after(self(), :clear_toast, 2000)
+        Process.send_after(self(), :clear_toast, 900)
 
         {:noreply,
          socket
          |> assign(:cart, cart)
          |> assign(:detail, nil)
          |> assign(:detail_closing?, false)
-         |> assign(:toast, "Added to bag")
-         |> assign(:basket_pulse?, true)}
+         |> assign(:toast, nil)
+         |> assign(:basket_pulse?, true)
+         |> assign(:bag_add_delta, qty)}
       else
         _ -> {:noreply, socket}
       end
@@ -433,11 +440,11 @@ defmodule EspresoWeb.MenuLive do
               </button>
               <button
                 type="button"
-                id="menu-cta-come-say-hi"
+                id="menu-cta-visit-coffeespot"
                 class="menu-qr-landing-cta menu-qr-landing-cta--quiet"
                 phx-click="enter_visit"
               >
-                Come say hi
+                Visit CoffeeSpot
               </button>
             </div>
           </div>
@@ -512,7 +519,7 @@ defmodule EspresoWeb.MenuLive do
           </button>
 
           <p class="menu-qr-visit-brand">{CoffeeSpot.business_name()}</p>
-          <h1 class="menu-qr-visit-title">Come say hi</h1>
+          <h1 class="menu-qr-visit-title">Visit CoffeeSpot</h1>
           <p class="menu-qr-visit-place">{CoffeeSpot.location()}</p>
 
           <section class="menu-qr-visit-block" aria-labelledby="menu-visit-address-label">
@@ -560,16 +567,20 @@ defmodule EspresoWeb.MenuLive do
             </a>
           </section>
 
-          <section class="menu-qr-visit-block" aria-labelledby="menu-visit-social-label">
-            <h2 id="menu-visit-social-label" class="menu-qr-visit-label">Instagram</h2>
+          <section
+            class="menu-qr-visit-block menu-qr-visit-socials"
+            aria-label="Social"
+          >
             <a
-              href={CoffeeSpot.instagram_url()}
-              id="menu-visit-instagram"
-              class="menu-qr-visit-link"
+              :for={link <- CoffeeSpot.social_links()}
+              href={link.href}
+              id={"menu-visit-#{link.id}"}
+              class={"menu-qr-visit-social menu-qr-visit-social--#{link.id}"}
               target="_blank"
               rel="noopener noreferrer"
+              aria-label={"CoffeeSpot on #{link.label}"}
             >
-              @{CoffeeSpot.instagram_handle()}
+              <.social_icon name={link.id} />
             </a>
           </section>
 
@@ -585,79 +596,81 @@ defmodule EspresoWeb.MenuLive do
       </div>
 
       <div :if={@menu_stage == :menu} class="menu-page menu-page-brune site-page menu-page--qr">
-        <header id="menu-qr-chrome" class="menu-qr-chrome">
-          <button
-            type="button"
-            id="menu-qr-back"
-            class="menu-qr-chrome-back"
-            phx-click="back_to_craving"
-          >
-            Back
-          </button>
-          <p class="menu-qr-chrome-brand">CoffeeSpot</p>
-          <div class="menu-qr-chrome-trailing">
+        <div id="menu-qr-sticky" class="menu-qr-sticky">
+          <header id="menu-qr-chrome" class="menu-qr-chrome">
             <button
               type="button"
-              class="menu-qr-chrome-search"
-              aria-label="Search menu"
-              phx-click={JS.focus(to: "#menu-search-input")}
+              id="menu-qr-back"
+              class="menu-qr-chrome-back"
+              phx-click="back_to_craving"
             >
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.6" />
-                <path
-                  d="M16.2 16.2 20 20"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linecap="round"
-                />
-              </svg>
+              Back
             </button>
-            <button
-              type="button"
-              class={[
-                "menu-qr-chrome-bag",
-                "brune-icon-bag",
-                @basket_pulse? && "brune-basket-btn-pulse"
-              ]}
-              phx-click="open_basket"
-              aria-label={"Checkout, #{cart_count(@cart)} items"}
-            >
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path
-                  d="M7.5 8.5V7.2a4.5 4.5 0 0 1 9 0v1.3"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linecap="round"
-                />
-                <path
-                  d="M6.2 8.5h11.6l-.7 11.2a1.6 1.6 0 0 1-1.6 1.5H8.5a1.6 1.6 0 0 1-1.6-1.5L6.2 8.5Z"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linejoin="round"
-                />
-              </svg>
-              <span
-                :if={cart_count(@cart) > 0}
-                class={["brune-bag-count", @basket_pulse? && "is-pulse"]}
+            <p class="menu-qr-chrome-brand">CoffeeSpot</p>
+            <div class="menu-qr-chrome-trailing">
+              <button
+                type="button"
+                class="menu-qr-chrome-search"
+                aria-label="Search menu"
+                phx-click={JS.focus(to: "#menu-search-input")}
               >
-                {cart_count(@cart)}
-              </span>
-            </button>
-          </div>
-        </header>
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.6" />
+                  <path
+                    d="M16.2 16.2 20 20"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                  />
+                </svg>
+              </button>
+              <button
+                type="button"
+                id="menu-qr-bag"
+                class={[
+                  "menu-qr-chrome-bag",
+                  "brune-icon-bag",
+                  @basket_pulse? && "is-bag-confirm"
+                ]}
+                phx-click="open_basket"
+                aria-label={"Checkout, #{cart_count(@cart)} items"}
+              >
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M7.5 8.5V7.2a4.5 4.5 0 0 1 9 0v1.3"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                  />
+                  <path
+                    d="M6.2 8.5h11.6l-.7 11.2a1.6 1.6 0 0 1-1.6 1.5H8.5a1.6 1.6 0 0 1-1.6-1.5L6.2 8.5Z"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                <span
+                  :if={cart_count(@cart) > 0}
+                  class={["brune-bag-count", @basket_pulse? && "is-pulse"]}
+                >
+                  {cart_count(@cart)}
+                </span>
+                <span
+                  :if={@bag_add_delta}
+                  class="menu-qr-bag-plus"
+                  aria-hidden="true"
+                >
+                  +{@bag_add_delta}
+                </span>
+              </button>
+            </div>
+          </header>
 
-        <section class="brune-menu-heading" aria-labelledby="brune-menu-title">
-          <h1 id="brune-menu-title" class="brune-menu-heading-title">
-            {menu_page_title(@menu_filter)}
-          </h1>
-        </section>
-
-        <nav
-          id="menu-craving"
-          class="menu-craving"
-          aria-labelledby="menu-craving-title"
-        >
-          <p id="menu-craving-title" class="menu-craving-title">What are you craving?</p>
+          <nav
+            id="menu-craving"
+            class="menu-craving menu-craving--sticky"
+            aria-label="Menu categories"
+          >
           <div class="menu-craving-rail">
             <button
               :for={chip <- menu_craving_chips(@categories)}
@@ -702,27 +715,15 @@ defmodule EspresoWeb.MenuLive do
             </button>
           </div>
         </nav>
+        </div>
+
+        <section class="brune-menu-heading" aria-labelledby="brune-menu-title">
+          <h1 id="brune-menu-title" class="brune-menu-heading-title">
+            {menu_page_title(@menu_filter)}
+          </h1>
+        </section>
 
         <section class="brune-menu-shell" id="menu">
-          <nav class="brune-menu-tabs-line" aria-label="Menu categories">
-            <button
-              :for={category <- @categories}
-              type="button"
-              phx-click="select_category"
-              phx-value-name={category.name}
-              class={[
-                "brune-menu-tab-link",
-                is_nil(@menu_filter) && @selected_category == category.name &&
-                  "brune-menu-tab-link-active"
-              ]}
-              aria-pressed={
-                to_string(is_nil(@menu_filter) && @selected_category == category.name)
-              }
-            >
-              {category_nav_label(category.name)}
-            </button>
-          </nav>
-
           <div id="menu-search" class="brune-menu-search brune-menu-search--compact">
             <form phx-change="search" phx-submit="search">
               <div class="brune-search-wrap">
@@ -764,7 +765,7 @@ defmodule EspresoWeb.MenuLive do
             >
               <p class="menu-filter-empty-title">Nothing here right now</p>
               <p class="menu-filter-empty-lede">
-                Try another craving pick, or browse a category from the tabs above.
+                Try another craving pick, or browse a category above.
               </p>
             </div>
 
@@ -962,11 +963,13 @@ defmodule EspresoWeb.MenuLive do
         </div>
       </div>
 
-      <div :if={@menu_stage == :menu && @toast} class="menu-toast" role="status" aria-live="polite">
+      <div
+        :if={@menu_stage == :menu && @toast}
+        class="menu-toast"
+        role="status"
+        aria-live="polite"
+      >
         {@toast}
-        <button type="button" class="menu-toast-action" phx-click="open_basket">
-          View
-        </button>
       </div>
 
       <div
@@ -988,7 +991,7 @@ defmodule EspresoWeb.MenuLive do
 
       <div
         :if={@menu_stage == :menu && @basket_open?}
-        class={["menu-basket-layer", @basket_closing? && "is-closing"]}
+        class={["menu-basket-layer", "menu-basket-layer--fullscreen", @basket_closing? && "is-closing"]}
         id="menu-basket"
         phx-window-keydown="close_basket"
         phx-key="Escape"
@@ -1002,7 +1005,7 @@ defmodule EspresoWeb.MenuLive do
         </button>
         <aside
           id="menu-basket-panel"
-          class="menu-basket-panel"
+          class="menu-basket-panel menu-basket-panel--fullscreen"
           role="dialog"
           aria-modal="true"
           aria-labelledby="menu-basket-title"
@@ -1016,7 +1019,7 @@ defmodule EspresoWeb.MenuLive do
           <header class="menu-basket-header">
             <div class="menu-basket-heading">
               <p class="menu-basket-eyebrow">CoffeeSpot</p>
-              <h2 id="menu-basket-title">Your order</h2>
+              <h2 id="menu-basket-title">Your bag</h2>
               <p class="menu-basket-count-label">
                 {cart_count(@cart)} {if cart_count(@cart) == 1, do: "item", else: "items"}
               </p>
@@ -1025,9 +1028,9 @@ defmodule EspresoWeb.MenuLive do
               type="button"
               class="menu-basket-close"
               phx-click="close_basket"
-              aria-label="Close"
+              aria-label="Back to menu"
             >
-              ✕
+              Back
             </button>
           </header>
 
@@ -1438,6 +1441,23 @@ defmodule EspresoWeb.MenuLive do
 
   defp apply_craving_option(socket, _option), do: socket
 
+  defp push_qr_nav_visibility(socket, %{filter: :matcha}) do
+    push_event(socket, "scroll_active_chip", %{id: "menu-craving-chip-matcha"})
+  end
+
+  defp push_qr_nav_visibility(socket, %{filter: :sweets}) do
+    push_event(socket, "scroll_active_chip", %{id: "menu-craving-chip-sweets"})
+  end
+
+  defp push_qr_nav_visibility(socket, %{filter: nil, category: category})
+       when is_binary(category) do
+    socket
+    |> push_event("scroll_active_chip", %{id: "menu-craving-chip-#{category}"})
+    |> push_event("scroll_to_category", %{name: category})
+  end
+
+  defp push_qr_nav_visibility(socket, _option), do: socket
+
   defp find_product_with_category(categories, id) when is_binary(id) do
     find_product_with_category(categories, String.to_integer(id))
   end
@@ -1567,38 +1587,39 @@ defmodule EspresoWeb.MenuLive do
   defp craving_label(name), do: category_nav_label(name)
 
   defp menu_craving_chips(categories) do
-    category_chips =
-      Enum.map(categories, fn category ->
-        %{
-          key: category.name,
-          label: craving_label(category.name),
-          event: "select_category",
-          name: category.name,
-          id: nil,
-          thumb: craving_thumb(category),
-          kind: :category
-        }
-      end)
+    Enum.map(craving_options(), fn option ->
+      case option do
+        %{filter: nil, category: category, label: label, image: image} ->
+          %{
+            key: category,
+            label: label,
+            event: "select_category",
+            name: category,
+            id: nil,
+            thumb: qr_nav_thumb(categories, category, image),
+            kind: :category
+          }
 
-    filter_chips =
-      [
-        Enum.find(craving_options(), &(&1.id == "matcha")),
-        Enum.find(craving_options(), &(&1.id == "sweets"))
-      ]
-      |> Enum.reject(&is_nil/1)
-      |> Enum.map(fn option ->
-        %{
-          key: option.id,
-          label: option.label,
-          event: "select_craving",
-          name: nil,
-          id: option.id,
-          thumb: option.image,
-          kind: :filter
-        }
-      end)
+        %{filter: filter, id: id, label: label, image: image}
+        when filter in [:matcha, :sweets] ->
+          %{
+            key: id,
+            label: label,
+            event: "select_craving",
+            name: nil,
+            id: id,
+            thumb: image,
+            kind: :filter
+          }
+      end
+    end)
+  end
 
-    category_chips ++ filter_chips
+  defp qr_nav_thumb(categories, category_name, fallback_image) do
+    case Enum.find(categories, &(&1.name == category_name)) do
+      nil -> fallback_image
+      category -> craving_thumb(category)
+    end
   end
 
   defp chip_active?(%{kind: :filter, id: "matcha"}, _selected, :matcha), do: true
