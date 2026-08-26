@@ -242,6 +242,50 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, "#category-HOT")
   end
 
+  test "/menu craving rail selects categories in sync with pills", %{conn: conn, food: food} do
+    insert_product!(food, "Beef Tapa", true, [{nil, "180"}])
+
+    {:ok, view, _html} = live(conn, ~p"/menu")
+
+    assert has_element?(view, "#menu-craving")
+    assert has_element?(view, "#menu-craving-title", "What are you craving?")
+    assert has_element?(view, "#menu-craving button.menu-craving-chip", "Coffee")
+    assert has_element?(view, "#menu-craving button.menu-craving-chip", "Iced")
+    assert has_element?(view, "#menu-craving button.menu-craving-chip", "Frappe")
+    assert has_element?(view, "#menu-craving button.menu-craving-chip", "Soda")
+    assert has_element?(view, "#menu-craving button.menu-craving-chip", "Food")
+
+    assert has_element?(view, "#menu-craving button.menu-craving-chip.is-active", "Coffee")
+    assert has_element?(view, ".brune-menu-tab-link-active", "Hot")
+    assert has_element?(view, "#category-HOT")
+
+    view |> element("#menu-craving button.menu-craving-chip", "Iced") |> render_click()
+
+    assert has_element?(view, "#menu-craving button.menu-craving-chip.is-active", "Iced")
+    assert has_element?(view, ".brune-menu-tab-link-active", "Cold")
+    assert has_element?(view, "#category-COLD")
+    refute has_element?(view, "#category-HOT")
+    assert has_element?(view, "#menu-items", "Hazelnut")
+
+    view |> element("button.brune-menu-tab-link", "Soda") |> render_click()
+
+    assert has_element?(view, "#menu-craving button.menu-craving-chip.is-active", "Soda")
+    assert has_element?(view, ".brune-menu-tab-link-active", "Soda")
+    assert has_element?(view, "#category-SODA")
+
+    view |> element("#menu-craving button.menu-craving-chip", "Food") |> render_click()
+
+    assert has_element?(view, "#menu-craving button.menu-craving-chip.is-active", "Food")
+    assert has_element?(view, ".brune-menu-tab-link-active", "Food")
+    assert has_element?(view, "#category-FOOD")
+    assert has_element?(view, "#menu-items", "Beef Tapa")
+
+    assert has_element?(view, "#menu-search")
+    view |> form("#menu-search form", %{search: "Espresso"}) |> render_change()
+    assert has_element?(view, "#menu-items", "Espresso")
+    assert has_element?(view, "#menu-craving")
+  end
+
   test "/menu shows product description in detail when present", %{conn: conn, hot: hot} do
     insert_product!(hot, "Spanish Latte", true, [{"8oz", "160"}], "Rich and creamy")
 
@@ -424,6 +468,7 @@ defmodule EspresoWeb.MenuLiveTest do
     {:ok, view, _html} = live(conn, ~p"/menu")
 
     assert has_element?(view, ".brune-menu-heading-title", "Menu")
+    assert has_element?(view, "#menu-craving")
     assert has_element?(view, ".brune-top-brand", "CoffeeSpot")
     assert has_element?(view, ".brune-menu-tabs-line")
     assert has_element?(view, "#menu-search.brune-menu-search--compact")
