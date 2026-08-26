@@ -59,20 +59,190 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, ".brune-menu-shell")
   end
 
-  test "/menu View the menu and Order online enter craving stub", %{conn: conn} do
+  test "/menu View the menu and Order online enter craving chooser", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
 
     view |> element("#menu-cta-view-menu") |> render_click()
-    assert has_element?(view, "#menu-craving-stub")
-    assert has_element?(view, ".menu-qr-stub-title", "What are you craving?")
+    assert has_element?(view, "#menu-craving-chooser")
+    assert has_element?(view, "#menu-craving-chooser-title", "What are you craving?")
+    assert has_element?(view, ".menu-qr-craving-brand", "CoffeeSpot")
+    assert has_element?(view, ".menu-qr-craving-hero")
+    assert has_element?(view, ".menu-qr-craving-body")
     refute has_element?(view, ".brune-top")
     refute has_element?(view, "#menu-items")
 
-    view |> element(".menu-qr-stub-back") |> render_click()
+    view |> element("#menu-craving-chooser .menu-qr-craving-back") |> render_click()
     assert has_element?(view, "#menu-landing")
 
     view |> element("#menu-cta-order-online") |> render_click()
-    assert has_element?(view, "#menu-craving-stub")
+    assert has_element?(view, "#menu-craving-chooser")
+  end
+
+  test "/menu craving chooser shows exactly seven options without Brunch", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view |> element("#menu-cta-view-menu") |> render_click()
+
+    assert has_element?(view, "#menu-craving-option-coffee", "Coffee")
+    assert has_element?(view, "#menu-craving-option-iced", "Iced")
+    assert has_element?(view, "#menu-craving-option-frappe", "Frappe")
+    assert has_element?(view, "#menu-craving-option-soda", "Soda")
+    assert has_element?(view, "#menu-craving-option-food", "Food")
+    assert has_element?(view, "#menu-craving-option-matcha", "Matcha")
+    assert has_element?(view, "#menu-craving-option-sweets", "Sweets")
+
+    html = render(view)
+    assert html |> Floki.parse_document!() |> Floki.find(".menu-qr-craving-option") |> length() == 7
+    refute html =~ "Brunch"
+    refute has_element?(view, "#menu-craving-option-brunch")
+    refute has_element?(view, ".brune-top")
+    refute has_element?(view, ".brune-drawer")
+    refute has_element?(view, ".brune-top-nav")
+  end
+
+  test "/menu craving Coffee selects HOT", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view |> element("#menu-cta-view-menu") |> render_click()
+    view |> element("#menu-craving-option-coffee") |> render_click()
+
+    assert has_element?(view, "#menu-items")
+    assert has_element?(view, "#category-HOT")
+    assert has_element?(view, "button.menu-craving-chip.is-active", "Coffee")
+    refute has_element?(view, "#menu-craving-chooser")
+  end
+
+  test "/menu craving Iced selects COLD", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view |> element("#menu-cta-view-menu") |> render_click()
+    view |> element("#menu-craving-option-iced") |> render_click()
+
+    assert has_element?(view, "#category-COLD")
+    assert has_element?(view, "button.menu-craving-chip.is-active", "Iced")
+    assert has_element?(view, ".brune-menu-item-name", "Hazelnut")
+  end
+
+  test "/menu craving Frappe selects FRAPPE", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view |> element("#menu-cta-view-menu") |> render_click()
+    view |> element("#menu-craving-option-frappe") |> render_click()
+
+    assert has_element?(view, "#category-FRAPPE")
+    assert has_element?(view, "button.menu-craving-chip.is-active", "Frappe")
+    assert has_element?(view, ".brune-menu-item-name", "Biscoff")
+  end
+
+  test "/menu craving Soda selects SODA", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view |> element("#menu-cta-view-menu") |> render_click()
+    view |> element("#menu-craving-option-soda") |> render_click()
+
+    assert has_element?(view, "#category-SODA")
+    assert has_element?(view, "button.menu-craving-chip.is-active", "Soda")
+    assert has_element?(view, ".brune-menu-item-name", "Hummingbird")
+  end
+
+  test "/menu craving Food selects FOOD", %{conn: conn, food: food} do
+    insert_product!(food, "Beef Tapa", true, [{nil, "150"}])
+
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view |> element("#menu-cta-view-menu") |> render_click()
+    view |> element("#menu-craving-option-food") |> render_click()
+
+    assert has_element?(view, "#category-FOOD")
+    assert has_element?(view, "button.menu-craving-chip.is-active", "Food")
+    assert has_element?(view, ".brune-menu-item-name", "Beef Tapa")
+  end
+
+  test "/menu craving Matcha filters existing matcha products", %{
+    conn: conn,
+    hot: hot,
+    cold: cold
+  } do
+    frappe = Repo.get_by!(Category, name: "FRAPPE")
+    insert_product!(hot, "Matcha Latte", true, [{"12oz", "160"}])
+    insert_product!(cold, "Matcha Caramel", true, [{"16oz", "180"}])
+    insert_product!(cold, "Strawberry Matcha", true, [{"16oz", "180"}])
+    insert_product!(frappe, "Matcha", true, [{"16oz", "190"}])
+    insert_product!(hot, "Café Latte", true, [{"12oz", "140"}])
+
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view |> element("#menu-cta-view-menu") |> render_click()
+    view |> element("#menu-craving-option-matcha") |> render_click()
+
+    assert has_element?(view, "#menu-items")
+    assert has_element?(view, ".brune-menu-item-name", "Matcha Latte")
+    assert has_element?(view, ".brune-menu-item-name", "Matcha Caramel")
+    assert has_element?(view, ".brune-menu-item-name", "Strawberry Matcha")
+    assert has_element?(view, ".brune-menu-item-name", "Matcha")
+    refute has_element?(view, ".brune-menu-item-name", "Café Latte")
+    refute has_element?(view, ".brune-menu-item-name", "Americano")
+    refute has_element?(view, ".brune-menu-item-name", "Biscoff")
+    refute has_element?(view, ".brune-menu-item-name", "Hazelnut")
+  end
+
+  test "/menu craving Sweets filters existing FOOD sweets", %{conn: conn, food: food} do
+    insert_product!(food, "Beef Tapa", true, [{nil, "150"}])
+    insert_product!(food, "Solo Fries", true, [{nil, "90"}])
+    insert_product!(food, "BNN Cream Cheese", true, [{nil, "95"}])
+    insert_product!(food, "BNN Choco Overload", true, [{nil, "95"}])
+    insert_product!(food, "Choco Chip Cookies", true, [{nil, "85"}])
+    insert_product!(food, "Dark Choco Dream Cake", true, [{nil, "120"}])
+    insert_product!(food, "Carrot Moist Slice", true, [{nil, "110"}])
+
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view |> element("#menu-cta-view-menu") |> render_click()
+    view |> element("#menu-craving-option-sweets") |> render_click()
+
+    assert has_element?(view, "#category-FOOD")
+    assert has_element?(view, ".brune-menu-item-name", "BNN Cream Cheese")
+    assert has_element?(view, ".brune-menu-item-name", "BNN Choco Overload")
+    assert has_element?(view, ".brune-menu-item-name", "Choco Chip Cookies")
+    assert has_element?(view, ".brune-menu-item-name", "Dark Choco Dream Cake")
+    assert has_element?(view, ".brune-menu-item-name", "Carrot Moist Slice")
+    refute has_element?(view, ".brune-menu-item-name", "Beef Tapa")
+    refute has_element?(view, ".brune-menu-item-name", "Solo Fries")
+    refute has_element?(view, ".brune-menu-subgroup", "Rice Meal")
+    refute has_element?(view, ".brune-menu-subgroup", "Appetizers")
+  end
+
+  test "/menu craving Food still returns full FOOD browsing", %{conn: conn, food: food} do
+    insert_product!(food, "Beef Tapa", true, [{nil, "150"}])
+    insert_product!(food, "BNN Cream Cheese", true, [{nil, "95"}])
+
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view |> element("#menu-cta-view-menu") |> render_click()
+    view |> element("#menu-craving-option-food") |> render_click()
+
+    assert has_element?(view, "#category-FOOD")
+    assert has_element?(view, ".brune-menu-item-name", "Beef Tapa")
+    assert has_element?(view, ".brune-menu-item-name", "BNN Cream Cheese")
+    assert has_element?(view, ".brune-menu-subgroup", "Rice Meal")
+    assert has_element?(view, ".brune-menu-subgroup", "Muffins")
+  end
+
+  test "/menu craving Matcha empty state when no matcha products", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view |> element("#menu-cta-view-menu") |> render_click()
+    view |> element("#menu-craving-option-matcha") |> render_click()
+
+    assert has_element?(view, "#menu-filter-empty")
+    assert has_element?(view, ".menu-filter-empty-title", "Nothing here right now")
+    refute has_element?(view, ".brune-menu-item-name")
+  end
+
+  test "/menu?table=12 survives Landing → Craving → selection", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu?table=12")
+
+    view |> element("#menu-cta-view-menu") |> render_click()
+    assert has_element?(view, "#menu-craving-chooser")
+
+    view |> element("#menu-craving-option-coffee") |> render_click()
+    assert has_element?(view, "#menu-items")
+
+    view |> element("button[aria-label='Add Espresso']") |> render_click()
+    view |> element("button.menu-buy-now", "Add to bag") |> render_click()
+    view |> element("button.brune-icon-bag") |> render_click()
+
+    assert has_element?(view, "#checkout-table[value='12']")
   end
 
   test "/menu Come say hi opens visit stub without About/Contact pages", %{conn: conn} do
@@ -603,7 +773,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
   defp enter_menu_browse(view) do
     view |> element("#menu-cta-view-menu") |> render_click()
-    view |> element("#menu-craving-stub-continue") |> render_click()
+    view |> element("#menu-craving-option-coffee") |> render_click()
     view
   end
 

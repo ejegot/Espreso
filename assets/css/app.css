@@ -6368,6 +6368,218 @@ body:has(.home-page-landing) {
   line-height: 1.45;
 }
 
+/* P2 — What are you craving? (visually continues P1 landing) */
+.menu-qr-craving {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  color: #382010;
+  overflow-x: hidden;
+}
+
+.menu-qr-craving-hero {
+  display: grid;
+  gap: 0.55rem;
+  padding: 1.15rem 1.25rem 1.1rem;
+  background: #382010;
+  color: #faf7f4;
+  animation: menu-qr-craving-enter 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.menu-qr-craving-back {
+  justify-self: start;
+  margin: 0;
+  padding: 0.25rem 0;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, #faf7f4 72%, #b0a098);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.menu-qr-craving-back:hover,
+.menu-qr-craving-back:focus-visible {
+  color: #f85020;
+  outline: none;
+}
+
+.menu-qr-craving-brand {
+  margin: 0.15rem 0 0;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(1.85rem, 7vw, 2.35rem);
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.menu-qr-craving-title {
+  margin: 0;
+  max-width: 14ch;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(1.4rem, 5.8vw, 1.85rem);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.menu-qr-craving-lede {
+  margin: 0;
+  max-width: 28ch;
+  color: color-mix(in srgb, #faf7f4 78%, #b0a098);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.menu-qr-craving-body {
+  display: grid;
+  gap: 0.55rem;
+  flex: 1 1 auto;
+  padding: 1rem 1.25rem calc(1.15rem + env(safe-area-inset-bottom));
+  background: #faf7f4;
+  animation: menu-qr-craving-enter 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.04s both;
+}
+
+.menu-qr-craving-grid {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.menu-qr-craving-option {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.85rem;
+  min-height: 3.35rem;
+  padding: 0.4rem 0.95rem 0.4rem 0.4rem;
+  border: 1px solid rgba(56, 32, 16, 0.14);
+  border-radius: 1rem;
+  background: #fff;
+  color: #382010;
+  box-shadow: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.14s ease,
+    opacity 0.14s ease;
+  animation: menu-qr-craving-tile 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.menu-qr-craving-option:nth-child(1) { animation-delay: 0.06s; }
+.menu-qr-craving-option:nth-child(2) { animation-delay: 0.09s; }
+.menu-qr-craving-option:nth-child(3) { animation-delay: 0.12s; }
+.menu-qr-craving-option:nth-child(4) { animation-delay: 0.15s; }
+.menu-qr-craving-option:nth-child(5) { animation-delay: 0.18s; }
+.menu-qr-craving-option:nth-child(6) { animation-delay: 0.21s; }
+.menu-qr-craving-option:nth-child(7) { animation-delay: 0.24s; }
+
+.menu-qr-craving-option:hover,
+.menu-qr-craving-option:focus-visible {
+  border-color: rgba(248, 80, 32, 0.45);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(248, 80, 32, 0.16);
+}
+
+.menu-qr-craving-option:active {
+  transform: scale(0.985);
+  opacity: 0.92;
+}
+
+.menu-qr-craving-thumb-wrap {
+  display: block;
+  width: 3.5rem;
+  height: 3.5rem;
+  overflow: hidden;
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, #faf7f4 70%, #e8dfd6);
+}
+
+.menu-qr-craving-thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.menu-qr-craving-copy {
+  min-width: 0;
+}
+
+.menu-qr-craving-label {
+  display: block;
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+@keyframes menu-qr-craving-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.55rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes menu-qr-craving-tile {
+  from {
+    opacity: 0;
+    transform: translateY(0.4rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-qr-craving-hero,
+  .menu-qr-craving-body,
+  .menu-qr-craving-option {
+    animation: none;
+  }
+
+  .menu-qr-craving-option {
+    transition: none;
+  }
+
+  .menu-qr-craving-option:active {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.menu-live-root .menu-filter-empty {
+  padding: 1.5rem 0.35rem 1rem;
+  text-align: left;
+}
+
+.menu-live-root .menu-filter-empty-title {
+  margin: 0 0 0.35rem;
+  color: #382010;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 400;
+}
+
+.menu-live-root .menu-filter-empty-lede {
+  margin: 0;
+  max-width: 28ch;
+  color: color-mix(in srgb, #382010 58%, #b0a098);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
 @media (min-width: 640px) {
   .menu-qr-landing {
     max-width: 28rem;
@@ -6378,7 +6590,8 @@ body:has(.home-page-landing) {
     margin-inline: 0;
   }
 
-  .menu-qr-stub {
+  .menu-qr-stub,
+  .menu-qr-craving {
     max-width: 28rem;
     margin: 0 auto;
   }

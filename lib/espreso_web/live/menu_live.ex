@@ -14,6 +14,7 @@ defmodule EspresoWeb.MenuLive do
      socket
      |> assign(:page_title, "Menu")
      |> assign(:menu_stage, :landing)
+     |> assign(:menu_filter, nil)
      |> assign(:categories, categories)
      |> assign(:selected_category, selected)
      |> assign(:search, "")
@@ -73,15 +74,21 @@ defmodule EspresoWeb.MenuLive do
     {:noreply,
      socket
      |> assign(:menu_stage, :landing)
+     |> assign(:menu_filter, nil)
      |> assign(:detail, nil)
      |> assign(:detail_closing?, false)
      |> assign(:basket_open?, false)
      |> assign(:basket_closing?, false)}
   end
 
-  def handle_event("enter_menu", _params, socket) do
-    # P1 stub bridge: full craving chooser arrives in P2.
-    {:noreply, assign(socket, :menu_stage, :menu)}
+  def handle_event("select_craving", %{"id" => id}, socket) do
+    case Enum.find(craving_options(), &(&1.id == id)) do
+      nil ->
+        {:noreply, socket}
+
+      option ->
+        {:noreply, apply_craving_option(socket, option)}
+    end
   end
 
   def handle_event("select_category", %{"name" => name}, socket) do
@@ -89,6 +96,7 @@ defmodule EspresoWeb.MenuLive do
       {:noreply,
        socket
        |> assign(:selected_category, name)
+       |> assign(:menu_filter, nil)
        |> assign(:search, "")
        |> assign(:detail, nil)
        |> assign(:detail_closing?, false)
@@ -99,7 +107,16 @@ defmodule EspresoWeb.MenuLive do
   end
 
   def handle_event("search", %{"search" => query}, socket) do
-    {:noreply, assign(socket, :search, query)}
+    socket = assign(socket, :search, query)
+
+    socket =
+      if String.trim(query) != "" do
+        assign(socket, :menu_filter, nil)
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   def handle_event("open_detail", %{"id" => id}, socket) do
@@ -427,23 +444,45 @@ defmodule EspresoWeb.MenuLive do
         </div>
       </div>
 
-      <div :if={@menu_stage == :craving} id="menu-craving-stub" class="menu-qr-stub">
-        <button type="button" class="menu-qr-stub-back" phx-click="back_to_landing">
-          Back
-        </button>
-        <p class="menu-qr-stub-brand">CoffeeSpot</p>
-        <h1 class="menu-qr-stub-title">What are you craving?</h1>
-        <p class="menu-qr-stub-lede">
-          Category chooser comes next. Continue to browse today’s menu.
-        </p>
-        <button
-          type="button"
-          id="menu-craving-stub-continue"
-          class="menu-qr-landing-cta menu-qr-landing-cta--primary"
-          phx-click="enter_menu"
-        >
-          Continue to menu
-        </button>
+      <div :if={@menu_stage == :craving} id="menu-craving-chooser" class="menu-qr-craving">
+        <div class="menu-qr-craving-hero">
+          <button type="button" class="menu-qr-craving-back" phx-click="back_to_landing">
+            Back
+          </button>
+          <p class="menu-qr-craving-brand">CoffeeSpot</p>
+          <h1 id="menu-craving-chooser-title" class="menu-qr-craving-title">
+            What are you craving?
+          </h1>
+          <p class="menu-qr-craving-lede">Choose something for your CoffeeSpot moment.</p>
+        </div>
+
+        <div class="menu-qr-craving-body">
+          <div class="menu-qr-craving-grid" role="list">
+            <button
+              :for={option <- craving_options()}
+              type="button"
+              id={"menu-craving-option-#{option.id}"}
+              class={"menu-qr-craving-option menu-qr-craving-option--#{option.id}"}
+              role="listitem"
+              phx-click="select_craving"
+              phx-value-id={option.id}
+            >
+              <span class="menu-qr-craving-thumb-wrap">
+                <img
+                  src={option.image}
+                  alt=""
+                  class="menu-qr-craving-thumb"
+                  loading="lazy"
+                  width="56"
+                  height="56"
+                />
+              </span>
+              <span class="menu-qr-craving-copy">
+                <span class="menu-qr-craving-label">{option.label}</span>
+              </span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <div :if={@menu_stage == :visit} id="menu-visit-stub" class="menu-qr-stub">
@@ -558,8 +597,24 @@ defmodule EspresoWeb.MenuLive do
           </div>
 
           <div class="brune-menu-body" id="menu-items">
+            <div
+              :if={
+                visible_categories(@categories, @selected_category, @search, @menu_filter) == []
+              }
+              id="menu-filter-empty"
+              class="menu-filter-empty"
+            >
+              <p class="menu-filter-empty-title">Nothing here right now</p>
+              <p class="menu-filter-empty-lede">
+                Try another craving pick, or browse a category from the tabs above.
+              </p>
+            </div>
+
             <section
-              :for={category <- visible_categories(@categories, @selected_category, @search)}
+              :for={
+                category <-
+                  visible_categories(@categories, @selected_category, @search, @menu_filter)
+              }
               class={"brune-menu-section brune-menu-section--#{section_tone(category.name)}"}
               id={"category-#{category.name}"}
               data-category={category.name}
@@ -1021,30 +1076,189 @@ defmodule EspresoWeb.MenuLive do
     """
   end
 
-  defp visible_categories(categories, selected_category, search) do
+  defp visible_categories(categories, selected_category, search, filter) do
     query = String.trim(search) |> String.downcase()
 
-    if query == "" do
-      Enum.filter(categories, &(&1.name == selected_category))
-    else
-      categories
-      |> Enum.map(fn category ->
-        filtered_groups =
-          Enum.map(category.groups, fn group ->
-            filtered =
-              Enum.filter(group.products, fn product ->
-                String.downcase(product.name) |> String.contains?(query)
-              end)
+    cond do
+      query != "" ->
+        filter_categories_by_query(categories, query)
 
-            %{group | products: filtered}
-          end)
-          |> Enum.reject(fn group -> group.products == [] end)
+      filter == :matcha ->
+        filter_matcha_categories(categories)
 
-        %{category | groups: filtered_groups}
-      end)
-      |> Enum.reject(fn category -> category.groups == [] end)
+      filter == :sweets ->
+        filter_sweets_categories(categories)
+
+      true ->
+        Enum.filter(categories, &(&1.name == selected_category))
     end
   end
+
+  defp filter_categories_by_query(categories, query) do
+    categories
+    |> Enum.map(fn category ->
+      filtered_groups =
+        Enum.map(category.groups, fn group ->
+          filtered =
+            Enum.filter(group.products, fn product ->
+              String.downcase(product.name) |> String.contains?(query)
+            end)
+
+          %{group | products: filtered}
+        end)
+        |> Enum.reject(fn group -> group.products == [] end)
+
+      %{category | groups: filtered_groups}
+    end)
+    |> Enum.reject(fn category -> category.groups == [] end)
+  end
+
+  defp filter_matcha_categories(categories) do
+    categories
+    |> Enum.map(fn category ->
+      filtered_groups =
+        Enum.map(category.groups, fn group ->
+          filtered = Enum.filter(group.products, &matcha_product?/1)
+          %{group | products: filtered}
+        end)
+        |> Enum.reject(fn group -> group.products == [] end)
+
+      %{category | groups: filtered_groups}
+    end)
+    |> Enum.reject(fn category -> category.groups == [] end)
+  end
+
+  defp filter_sweets_categories(categories) do
+    categories
+    |> Enum.filter(&(&1.name == "FOOD"))
+    |> Enum.map(fn category ->
+      filtered_groups =
+        Enum.map(category.groups, fn group ->
+          filtered = Enum.filter(group.products, &sweets_product?/1)
+          %{group | products: filtered}
+        end)
+        |> Enum.reject(fn group -> group.products == [] end)
+
+      %{category | groups: filtered_groups}
+    end)
+    |> Enum.reject(fn category -> category.groups == [] end)
+  end
+
+  defp matcha_product?(%{name: name}) when is_binary(name) do
+    String.contains?(String.downcase(name), "matcha")
+  end
+
+  defp matcha_product?(_), do: false
+
+  defp sweets_product?(%{name: name}), do: Menu.sweets_product_name?(name)
+  defp sweets_product?(_), do: false
+
+  defp craving_options do
+    [
+      %{
+        id: "coffee",
+        label: "Coffee",
+        category: "HOT",
+        filter: nil,
+        image: "/images/coffeespot/coffee-espresso-01.jpg"
+      },
+      %{
+        id: "iced",
+        label: "Iced",
+        category: "COLD",
+        filter: nil,
+        image: "/images/coffeespot/cold-signature-01.jpg"
+      },
+      %{
+        id: "frappe",
+        label: "Frappe",
+        category: "FRAPPE",
+        filter: nil,
+        image: "/images/coffeespot/IMG_3458.JPG"
+      },
+      %{
+        id: "soda",
+        label: "Soda",
+        category: "SODA",
+        filter: nil,
+        image: "/images/coffeespot/soda-signature-01.jpg"
+      },
+      %{
+        id: "food",
+        label: "Food",
+        category: "FOOD",
+        filter: nil,
+        image: "/images/coffeespot/food-savory-01.jpg"
+      },
+      %{
+        id: "matcha",
+        label: "Matcha",
+        category: nil,
+        filter: :matcha,
+        image: "/images/coffeespot/IMG_3471.JPG"
+      },
+      %{
+        id: "sweets",
+        label: "Sweets",
+        category: "FOOD",
+        filter: :sweets,
+        image: "/images/coffeespot/pastry-signature-01.jpg"
+      }
+    ]
+  end
+
+  defp apply_craving_option(socket, %{filter: :matcha}) do
+    selected =
+      socket.assigns.categories
+      |> filter_matcha_categories()
+      |> List.first()
+      |> case do
+        %{name: name} -> name
+        _ -> socket.assigns.selected_category
+      end
+
+    socket
+    |> assign(:menu_stage, :menu)
+    |> assign(:menu_filter, :matcha)
+    |> assign(:selected_category, selected)
+    |> assign(:search, "")
+    |> assign(:detail, nil)
+    |> assign(:detail_closing?, false)
+  end
+
+  defp apply_craving_option(socket, %{filter: :sweets, category: "FOOD"}) do
+    socket
+    |> assign(:menu_stage, :menu)
+    |> assign(:menu_filter, :sweets)
+    |> assign(:selected_category, "FOOD")
+    |> assign(:search, "")
+    |> assign(:detail, nil)
+    |> assign(:detail_closing?, false)
+  end
+
+  defp apply_craving_option(socket, %{filter: nil, category: category})
+       when is_binary(category) do
+    if Enum.any?(socket.assigns.categories, &(&1.name == category)) do
+      socket
+      |> assign(:menu_stage, :menu)
+      |> assign(:menu_filter, nil)
+      |> assign(:selected_category, category)
+      |> assign(:search, "")
+      |> assign(:detail, nil)
+      |> assign(:detail_closing?, false)
+    else
+      # Category currently empty — still enter menu with empty state.
+      socket
+      |> assign(:menu_stage, :menu)
+      |> assign(:menu_filter, nil)
+      |> assign(:selected_category, category)
+      |> assign(:search, "")
+      |> assign(:detail, nil)
+      |> assign(:detail_closing?, false)
+    end
+  end
+
+  defp apply_craving_option(socket, _option), do: socket
 
   defp find_product_with_category(categories, id) when is_binary(id) do
     find_product_with_category(categories, String.to_integer(id))
