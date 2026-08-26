@@ -6076,6 +6076,137 @@ body:has(.home-page-landing) {
   }
 }
 
+/* C7a — compact craving rail (non-sticky discovery, before category pills) */
+.menu-live-root .menu-craving {
+  width: 100%;
+  max-width: 58rem;
+  margin: 0 auto;
+  padding: 0.15rem 1.15rem 0.45rem;
+}
+
+.menu-live-root .menu-craving-title {
+  margin: 0 0 0.35rem;
+  color: color-mix(in srgb, #382010 58%, #b0a098);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.menu-live-root .menu-craving-rail {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.4rem;
+  margin: 0 -1.15rem;
+  padding: 0 1.15rem 0.1rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.menu-live-root .menu-craving-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.menu-live-root .menu-craving-chip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.35rem;
+  max-width: 9.5rem;
+  padding: 0.28rem 0.65rem 0.28rem 0.28rem;
+  border: 1px solid rgba(56, 32, 16, 0.12);
+  border-radius: 999px;
+  background: color-mix(in srgb, #faf7f4 88%, #fff);
+  color: #382010;
+  box-shadow: none;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.menu-live-root .menu-craving-chip:hover,
+.menu-live-root .menu-craving-chip:focus-visible {
+  border-color: rgba(248, 80, 32, 0.35);
+  background: #fff;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(248, 80, 32, 0.22);
+}
+
+.menu-live-root .menu-craving-chip.is-active {
+  border-color: #f85020;
+  background: #f85020;
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+.menu-live-root .menu-craving-chip.is-active:hover,
+.menu-live-root .menu-craving-chip.is-active:focus-visible {
+  background: #f85020;
+  color: #fff;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+    0 0 0 2px rgba(248, 80, 32, 0.28);
+}
+
+.menu-live-root .menu-craving-thumb {
+  flex: 0 0 auto;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  object-fit: cover;
+  background: #fff;
+}
+
+.menu-live-root .menu-craving-chip.is-active .menu-craving-thumb {
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.85);
+}
+
+.menu-live-root .menu-craving-label {
+  overflow: hidden;
+  color: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+}
+
+.menu-live-root .menu-craving-chip.is-active .menu-craving-label {
+  font-weight: 700;
+}
+
+.menu-live-root .menu-craving-check {
+  flex: 0 0 auto;
+  margin-left: 0.05rem;
+  color: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+@media (min-width: 640px) {
+  .menu-live-root .menu-craving {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  .menu-live-root .menu-craving-rail {
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .menu-live-root .menu-craving-chip {
+    min-height: 2.45rem;
+  }
+}
+
 .menu-live-root .brune-bag-count {
   background: var(--cs-orange);
   color: #fff;

@@ -365,6 +365,46 @@ defmodule EspresoWeb.MenuLive do
           <h1 id="brune-menu-title" class="brune-menu-heading-title">Menu</h1>
         </section>
 
+        <nav
+          id="menu-craving"
+          class="menu-craving"
+          aria-labelledby="menu-craving-title"
+        >
+          <p id="menu-craving-title" class="menu-craving-title">What are you craving?</p>
+          <div class="menu-craving-rail">
+            <button
+              :for={category <- @categories}
+              type="button"
+              phx-click="select_category"
+              phx-value-name={category.name}
+              class={[
+                "menu-craving-chip",
+                @selected_category == category.name && "is-active"
+              ]}
+              aria-pressed={to_string(@selected_category == category.name)}
+              aria-current={if(@selected_category == category.name, do: "true")}
+              aria-label={craving_aria_label(category.name, @selected_category == category.name)}
+            >
+              <img
+                src={craving_thumb(category)}
+                alt=""
+                class="menu-craving-thumb"
+                loading="lazy"
+                width="32"
+                height="32"
+              />
+              <span class="menu-craving-label">{craving_label(category.name)}</span>
+              <span
+                :if={@selected_category == category.name}
+                class="menu-craving-check"
+                aria-hidden="true"
+              >
+                ✓
+              </span>
+            </button>
+          </div>
+        </nav>
+
         <section class="brune-menu-shell" id="menu">
           <nav class="brune-menu-tabs-line" aria-label="Menu categories">
             <button
@@ -1014,6 +1054,27 @@ defmodule EspresoWeb.MenuLive do
   defp category_nav_label("SODA"), do: "Soda"
   defp category_nav_label("FOOD"), do: "Food"
   defp category_nav_label(name), do: name
+
+  defp craving_label("HOT"), do: "Coffee"
+  defp craving_label("COLD"), do: "Iced"
+  defp craving_label("FRAPPE"), do: "Frappe"
+  defp craving_label("SODA"), do: "Soda"
+  defp craving_label("FOOD"), do: "Food"
+  defp craving_label(name), do: category_nav_label(name)
+
+  defp craving_aria_label(name, true), do: "#{craving_label(name)}, selected"
+  defp craving_aria_label(name, false), do: "Show #{craving_label(name)} menu"
+
+  defp craving_thumb(category) do
+    case craving_sample_product(category) do
+      %{name: product_name} -> Menu.product_image(category.name, product_name)
+      _ -> Menu.product_image(category.name, category.name)
+    end
+  end
+
+  defp craving_sample_product(%{groups: groups}) do
+    Enum.find_value(groups, fn group -> List.first(group.products) end)
+  end
 
   defp category_blurb("HOT"), do: "Freshly pulled and served warm."
   defp category_blurb("COLD"), do: "Iced and ready for a slow Lilac afternoon."
