@@ -43,14 +43,16 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#menu-landing")
     assert has_element?(view, ".menu-qr-landing-brand", "CoffeeSpot")
     assert has_element?(view, ".menu-qr-landing-headline", "Order from your table.")
+    assert has_element?(view, ".menu-qr-landing-lede", "Browse, pay at the counter, we prepare it.")
     assert has_element?(view, "#menu-cta-view-menu", "View the menu")
-    assert has_element?(view, "#menu-cta-order-online", "Order online")
     assert has_element?(view, "#menu-cta-come-say-hi", "Come say hi")
     assert has_element?(
              view,
              ~s(.menu-qr-landing-photo[src="/images/coffeespot/cold-signature-01.jpg"])
            )
 
+    refute has_element?(view, "#menu-cta-order-online")
+    refute html =~ "Order online"
     refute has_element?(view, ".brune-top")
     refute has_element?(view, ".brune-drawer")
     refute has_element?(view, ".brune-top-nav")
@@ -59,7 +61,7 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, ".brune-menu-shell")
   end
 
-  test "/menu View the menu and Order online enter craving chooser", %{conn: conn} do
+  test "/menu View the menu enters craving chooser", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
 
     view |> element("#menu-cta-view-menu") |> render_click()
@@ -73,9 +75,6 @@ defmodule EspresoWeb.MenuLiveTest do
 
     view |> element("#menu-craving-chooser .menu-qr-craving-back") |> render_click()
     assert has_element?(view, "#menu-landing")
-
-    view |> element("#menu-cta-order-online") |> render_click()
-    assert has_element?(view, "#menu-craving-chooser")
   end
 
   test "/menu craving chooser shows exactly seven options without Brunch", %{conn: conn} do

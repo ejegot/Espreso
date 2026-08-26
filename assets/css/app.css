@@ -6276,128 +6276,200 @@ body:has(.home-page-landing) {
   line-height: 1;
 }
 
-/* P1 — QR landing (no site chrome; CoffeeSpot-only) */
+/* P1b — QR landing: one full-bleed CoffeeSpot scene */
 .menu-live-root--qr-entry {
   min-height: 100dvh;
   background: #faf7f4;
 }
 
 .menu-qr-landing {
+  min-height: 100dvh;
+  color: #faf7f4;
+  overflow-x: hidden;
+}
+
+.menu-qr-landing-scene {
+  position: relative;
   display: flex;
   flex-direction: column;
+  justify-content: flex-end;
   min-height: 100dvh;
-  color: #382010;
+  isolation: isolate;
 }
 
-.menu-qr-landing-hero {
-  position: relative;
-  display: grid;
-  gap: 0.65rem;
-  flex: 1 1 auto;
-  padding: 1.35rem 1.25rem 1rem;
-  background: #382010;
-  color: #faf7f4;
-}
-
-.menu-qr-landing-brand {
-  margin: 0;
-  font-family: "Instrument Serif", Georgia, serif;
-  font-size: clamp(2rem, 8vw, 2.55rem);
-  font-weight: 400;
-  letter-spacing: -0.03em;
-  line-height: 1;
-}
-
-.menu-qr-landing-headline {
-  margin: 0;
-  max-width: 14ch;
-  font-family: "Instrument Serif", Georgia, serif;
-  font-size: clamp(1.55rem, 6.5vw, 2rem);
-  font-weight: 400;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
-}
-
-.menu-qr-landing-lede {
-  margin: 0;
-  max-width: 28ch;
-  color: color-mix(in srgb, #faf7f4 78%, #b0a098);
-  font-size: 0.92rem;
-  line-height: 1.45;
-}
-
-.menu-qr-landing-visual {
-  margin-top: 0.35rem;
-  margin-inline: -0.15rem;
+.menu-qr-landing-media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   overflow: hidden;
-  border-radius: 1rem 1rem 0 0;
-  min-height: 11.5rem;
+  background: #382010;
 }
 
 .menu-qr-landing-photo {
   display: block;
   width: 100%;
-  height: min(42vh, 22rem);
+  height: 100%;
   object-fit: cover;
-  object-position: center;
+  object-position: 50% 42%;
+  animation: menu-qr-landing-photo-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.menu-qr-landing-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(56, 32, 16, 0.28) 0%,
+      rgba(56, 32, 16, 0.18) 34%,
+      rgba(56, 32, 16, 0.55) 62%,
+      rgba(56, 32, 16, 0.88) 100%
+    );
+}
+
+.menu-qr-landing-content {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 0.55rem;
+  padding: 1.35rem 1.25rem calc(1.35rem + env(safe-area-inset-bottom));
+  max-width: 28rem;
+  animation: menu-qr-landing-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
+}
+
+.menu-qr-landing-brand {
+  margin: 0;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(2.55rem, 11vw, 3.35rem);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: 0.95;
+  color: #faf7f4;
+  text-shadow: 0 1px 18px rgba(56, 32, 16, 0.35);
+}
+
+.menu-qr-landing-headline {
+  margin: 0.15rem 0 0;
+  max-width: 14ch;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(1.35rem, 5.4vw, 1.7rem);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: color-mix(in srgb, #faf7f4 92%, #b0a098);
+}
+
+.menu-qr-landing-lede {
+  margin: 0;
+  max-width: 26ch;
+  color: color-mix(in srgb, #faf7f4 76%, #b0a098);
+  font-size: 0.92rem;
+  line-height: 1.45;
 }
 
 .menu-qr-landing-actions {
   display: grid;
-  gap: 0.55rem;
-  padding: 1rem 1.25rem calc(1.15rem + env(safe-area-inset-bottom));
-  background: #faf7f4;
+  gap: 0.7rem;
+  justify-items: start;
+  margin-top: 0.55rem;
+  animation: menu-qr-landing-rise 0.38s cubic-bezier(0.22, 1, 0.36, 1) 0.14s both;
 }
 
 .menu-qr-landing-cta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 2.85rem;
-  padding: 0.7rem 1rem;
-  border-radius: 999px;
   font: inherit;
-  font-size: 0.92rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
   cursor: pointer;
 }
 
 .menu-qr-landing-cta--primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.85rem;
+  min-width: min(100%, 16.5rem);
+  padding: 0.7rem 1.25rem;
   border: 1px solid #f85020;
+  border-radius: 999px;
   background: #f85020;
   color: #fff;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .menu-qr-landing-cta--primary:hover,
 .menu-qr-landing-cta--primary:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(248, 80, 32, 0.28);
+  box-shadow: 0 0 0 3px rgba(248, 80, 32, 0.34);
 }
 
-.menu-qr-landing-cta--secondary {
-  border: 1px solid rgba(56, 32, 16, 0.22);
-  background: #fff;
-  color: #382010;
+.menu-qr-landing-cta--quiet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  margin: 0;
+  padding: 0.2rem 0.1rem;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, #faf7f4 78%, #b0a098);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-decoration: underline;
+  text-decoration-color: rgba(250, 247, 244, 0.35);
+  text-underline-offset: 0.22em;
 }
 
-.menu-qr-landing-cta--secondary:hover,
-.menu-qr-landing-cta--secondary:focus-visible {
-  border-color: #f85020;
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(248, 80, 32, 0.16);
-}
-
-.menu-qr-landing-cta--tertiary {
-  border: 1px solid #382010;
-  background: #382010;
+.menu-qr-landing-cta--quiet:hover,
+.menu-qr-landing-cta--quiet:focus-visible {
   color: #faf7f4;
+  text-decoration-color: #f85020;
+  outline: none;
 }
 
-.menu-qr-landing-cta--tertiary:hover,
-.menu-qr-landing-cta--tertiary:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(56, 32, 16, 0.22);
+@keyframes menu-qr-landing-photo-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes menu-qr-landing-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-qr-landing-photo,
+  .menu-qr-landing-content,
+  .menu-qr-landing-actions {
+    animation: none;
+  }
+}
+
+@media (min-width: 640px) {
+  .menu-qr-landing-photo {
+    object-position: 50% 40%;
+  }
+
+  .menu-qr-landing-content {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+    margin-inline: auto;
+    width: 100%;
+  }
 }
 
 .menu-qr-stub {
@@ -6668,15 +6740,6 @@ body:has(.home-page-landing) {
 }
 
 @media (min-width: 640px) {
-  .menu-qr-landing {
-    max-width: 28rem;
-    margin: 0 auto;
-  }
-
-  .menu-qr-landing-visual {
-    margin-inline: 0;
-  }
-
   .menu-qr-stub,
   .menu-qr-craving {
     max-width: 28rem;
