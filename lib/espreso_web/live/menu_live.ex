@@ -13,6 +13,7 @@ defmodule EspresoWeb.MenuLive do
     {:ok,
      socket
      |> assign(:page_title, "Menu")
+     |> assign(:menu_stage, :landing)
      |> assign(:categories, categories)
      |> assign(:selected_category, selected)
      |> assign(:search, "")
@@ -60,6 +61,29 @@ defmodule EspresoWeb.MenuLive do
   end
 
   @impl true
+  def handle_event("enter_craving", _params, socket) do
+    {:noreply, assign(socket, :menu_stage, :craving)}
+  end
+
+  def handle_event("enter_visit", _params, socket) do
+    {:noreply, assign(socket, :menu_stage, :visit)}
+  end
+
+  def handle_event("back_to_landing", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:menu_stage, :landing)
+     |> assign(:detail, nil)
+     |> assign(:detail_closing?, false)
+     |> assign(:basket_open?, false)
+     |> assign(:basket_closing?, false)}
+  end
+
+  def handle_event("enter_menu", _params, socket) do
+    # P1 stub bridge: full craving chooser arrives in P2.
+    {:noreply, assign(socket, :menu_stage, :menu)}
+  end
+
   def handle_event("select_category", %{"name" => name}, socket) do
     if Enum.any?(socket.assigns.categories, &(&1.name == name)) do
       {:noreply,
@@ -351,9 +375,89 @@ defmodule EspresoWeb.MenuLive do
     <div
       id="menu-page"
       phx-hook="MenuBrowse"
-      class={["menu-live-root", (@detail || @basket_open?) && "menu-page-locked"]}
+      class={[
+        "menu-live-root",
+        @menu_stage != :menu && "menu-live-root--qr-entry",
+        (@detail || @basket_open?) && "menu-page-locked"
+      ]}
     >
-      <div class="menu-page menu-page-brune site-page">
+      <div :if={@menu_stage == :landing} id="menu-landing" class="menu-qr-landing">
+        <div class="menu-qr-landing-hero">
+          <p class="menu-qr-landing-brand">CoffeeSpot</p>
+          <h1 class="menu-qr-landing-headline">Order from your table.</h1>
+          <p class="menu-qr-landing-lede">
+            Browse the menu, pay at the counter, and we’ll prepare your order.
+          </p>
+          <div class="menu-qr-landing-visual">
+            <img
+              src="/images/coffeespot/cold-signature-01.jpg"
+              alt="Iced coffee at CoffeeSpot"
+              class="menu-qr-landing-photo"
+              width="800"
+              height="1000"
+            />
+          </div>
+        </div>
+
+        <div class="menu-qr-landing-actions">
+          <button
+            type="button"
+            id="menu-cta-view-menu"
+            class="menu-qr-landing-cta menu-qr-landing-cta--primary"
+            phx-click="enter_craving"
+          >
+            View the menu
+          </button>
+          <button
+            type="button"
+            id="menu-cta-order-online"
+            class="menu-qr-landing-cta menu-qr-landing-cta--secondary"
+            phx-click="enter_craving"
+          >
+            Order online
+          </button>
+          <button
+            type="button"
+            id="menu-cta-come-say-hi"
+            class="menu-qr-landing-cta menu-qr-landing-cta--tertiary"
+            phx-click="enter_visit"
+          >
+            Come say hi
+          </button>
+        </div>
+      </div>
+
+      <div :if={@menu_stage == :craving} id="menu-craving-stub" class="menu-qr-stub">
+        <button type="button" class="menu-qr-stub-back" phx-click="back_to_landing">
+          Back
+        </button>
+        <p class="menu-qr-stub-brand">CoffeeSpot</p>
+        <h1 class="menu-qr-stub-title">What are you craving?</h1>
+        <p class="menu-qr-stub-lede">
+          Category chooser comes next. Continue to browse today’s menu.
+        </p>
+        <button
+          type="button"
+          id="menu-craving-stub-continue"
+          class="menu-qr-landing-cta menu-qr-landing-cta--primary"
+          phx-click="enter_menu"
+        >
+          Continue to menu
+        </button>
+      </div>
+
+      <div :if={@menu_stage == :visit} id="menu-visit-stub" class="menu-qr-stub">
+        <button type="button" class="menu-qr-stub-back" phx-click="back_to_landing">
+          Back
+        </button>
+        <p class="menu-qr-stub-brand">CoffeeSpot</p>
+        <h1 class="menu-qr-stub-title">Come say hi</h1>
+        <p class="menu-qr-stub-lede">
+          Visit details for Lilac Marikina will live here. About and Contact pages stay unchanged.
+        </p>
+      </div>
+
+      <div :if={@menu_stage == :menu} class="menu-page menu-page-brune site-page">
         <.brune_header
           current="menu"
           show_basket?={true}
@@ -534,7 +638,7 @@ defmodule EspresoWeb.MenuLive do
       </div>
 
       <div
-        :if={@detail}
+        :if={@menu_stage == :menu && @detail}
         class={["menu-buy-layer", @detail_closing? && "is-closing"]}
         id="menu-detail"
         phx-window-keydown="close_detail"
@@ -643,7 +747,7 @@ defmodule EspresoWeb.MenuLive do
         </div>
       </div>
 
-      <div :if={@toast} class="menu-toast" role="status" aria-live="polite">
+      <div :if={@menu_stage == :menu && @toast} class="menu-toast" role="status" aria-live="polite">
         {@toast}
         <button type="button" class="menu-toast-action" phx-click="open_basket">
           View
@@ -651,7 +755,7 @@ defmodule EspresoWeb.MenuLive do
       </div>
 
       <div
-        :if={show_floating_bag?(@cart, @basket_open?, @detail)}
+        :if={@menu_stage == :menu && show_floating_bag?(@cart, @basket_open?, @detail)}
         id="menu-floating-bag"
         class="menu-floating-bag"
         role="region"
@@ -668,7 +772,7 @@ defmodule EspresoWeb.MenuLive do
       </div>
 
       <div
-        :if={@basket_open?}
+        :if={@menu_stage == :menu && @basket_open?}
         class={["menu-basket-layer", @basket_closing? && "is-closing"]}
         id="menu-basket"
         phx-window-keydown="close_basket"
