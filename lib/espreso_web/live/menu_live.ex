@@ -436,20 +436,20 @@ defmodule EspresoWeb.MenuLive do
                         />
                       </div>
                       <div class="brune-menu-item-body">
-                        <div class="brune-menu-item-top">
-                          <h3 class="brune-menu-item-name">{product.name}</h3>
-                          <p class="brune-menu-item-price">{card_price_label(product)}</p>
-                        </div>
+                        <h3 class="brune-menu-item-name">{product.name}</h3>
                         <p class="brune-menu-item-blurb">{product_blurb(product, category.name)}</p>
-                        <button
-                          type="button"
-                          class="brune-order-link"
-                          phx-click="open_detail"
-                          phx-value-id={product.id}
-                          aria-label={"Order #{product.name}"}
-                        >
-                          Order <span aria-hidden="true">›</span>
-                        </button>
+                        <div class="brune-menu-item-actions">
+                          <p class="brune-menu-item-price">{card_price_label(product)}</p>
+                          <button
+                            type="button"
+                            class="brune-menu-add"
+                            phx-click="open_detail"
+                            phx-value-id={product.id}
+                            aria-label={"Add #{product.name}"}
+                          >
+                            Add
+                          </button>
+                        </div>
                       </div>
                     </article>
                   </li>
