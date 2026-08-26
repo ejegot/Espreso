@@ -611,6 +611,23 @@ defmodule EspresoWeb.MenuLive do
       </div>
 
       <div
+        :if={show_floating_bag?(@cart, @basket_open?, @detail)}
+        id="menu-floating-bag"
+        class="menu-floating-bag"
+        role="region"
+        aria-label={floating_bag_label(@cart)}
+      >
+        <p class="menu-floating-bag-summary">
+          Your order · {cart_count(@cart)} {floating_bag_items_label(@cart)} · {Menu.format_price(
+            cart_total(@cart)
+          )}
+        </p>
+        <button type="button" class="menu-floating-bag-cta" phx-click="open_basket">
+          View bag
+        </button>
+      </div>
+
+      <div
         :if={@basket_open?}
         class={["menu-basket-layer", @basket_closing? && "is-closing"]}
         id="menu-basket"
@@ -909,6 +926,18 @@ defmodule EspresoWeb.MenuLive do
   defp line_key(product_id, %{id: price_id}), do: "#{product_id}:#{price_id}"
 
   defp cart_count(cart), do: Enum.reduce(cart, 0, fn line, acc -> acc + line.quantity end)
+
+  defp show_floating_bag?(cart, basket_open?, detail) do
+    cart != [] && not basket_open? && is_nil(detail)
+  end
+
+  defp floating_bag_items_label(cart) do
+    if cart_count(cart) == 1, do: "item", else: "items"
+  end
+
+  defp floating_bag_label(cart) do
+    "Your order, #{cart_count(cart)} #{floating_bag_items_label(cart)}, #{Menu.format_price(cart_total(cart))}"
+  end
 
   defp cart_total(cart) do
     Enum.reduce(cart, Decimal.new(0), fn line, acc ->
