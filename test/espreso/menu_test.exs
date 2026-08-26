@@ -161,6 +161,18 @@ defmodule Espreso.MenuTest do
       assert Menu.product_image("HOT", "Espresso") ==
                "/images/coffeespot/coffee-espresso-01.jpg"
 
+      assert Menu.product_image("HOT", "Double Espresso") ==
+               "/images/coffeespot/coffee-detail-01.jpg"
+
+      assert Menu.product_image("HOT", "Americano") ==
+               "/images/coffeespot/coffee-table-01.jpg"
+
+      assert Menu.product_image("SODA", "Tropical Passion Fruit") ==
+               "/images/coffeespot/soda-signature-01.jpg"
+
+      assert Menu.product_image("FOOD", "Nugget") ==
+               "/images/coffeespot/IMG_3474.JPG"
+
       assert Menu.product_image("FOOD", "Beef Tapa") ==
                "/images/coffeespot/IMG_3464.JPG"
 
@@ -172,8 +184,9 @@ defmodule Espreso.MenuTest do
       src = Menu.product_image("SODA", "Mystery Fizz")
 
       assert src in [
-               "/images/coffeespot/menu-drink-01.jpg",
-               "/images/coffeespot/IMG_3481.JPG"
+               "/images/coffeespot/soda-signature-01.jpg",
+               "/images/coffeespot/IMG_3477.JPG",
+               "/images/coffeespot/IMG_3457.JPG"
              ]
     end
   end

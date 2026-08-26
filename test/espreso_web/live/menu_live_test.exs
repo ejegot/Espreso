@@ -86,7 +86,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
     assert has_element?(
              view,
-             ~s(.brune-menu-item-photo[src="/images/coffeespot/coffee-espresso-01.jpg"][alt="Americano"])
+             ~s(.brune-menu-item-photo[src="/images/coffeespot/coffee-table-01.jpg"][alt="Americano"])
            )
 
     assert has_element?(
