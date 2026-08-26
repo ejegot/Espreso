@@ -5960,9 +5960,83 @@ body:has(.home-page-landing) {
   font-family: "DM Sans", sans-serif;
 }
 
+/* C3c — CoffeeSpot tokens scoped to /menu (and overlays), not Home/About/Contact */
+.menu-live-root {
+  --cs-orange: #f85020;
+  --cs-brown: #382010;
+  --cs-beige: #b0a098;
+  --cs-cream: #faf7f4;
+}
+
+.menu-live-root .menu-page-brune {
+  --brune-bg: var(--cs-cream);
+  --brune-ink: var(--cs-brown);
+  --brune-muted: color-mix(in srgb, var(--cs-brown) 55%, var(--cs-beige));
+  --brune-line: rgba(56, 32, 16, 0.12);
+  --brune-sage: var(--cs-orange);
+  --brune-dew: var(--cs-orange);
+  --brune-tab-bg: color-mix(in srgb, var(--cs-beige) 22%, #fff);
+  background: var(--cs-cream);
+  color: var(--cs-brown);
+}
+
+.menu-live-root .brune-top {
+  background: color-mix(in srgb, var(--cs-cream) 94%, #fff);
+  border-bottom-color: rgba(56, 32, 16, 0.08);
+}
+
+.menu-live-root .brune-top-brand {
+  color: var(--cs-brown);
+}
+
+.menu-live-root .brune-bag-count {
+  background: var(--cs-orange);
+  color: #fff;
+}
+
+.menu-live-root .brune-icon-btn:focus-visible,
+.menu-live-root .brune-search-btn:focus-visible {
+  outline-color: var(--cs-orange);
+}
+
+.menu-live-root .brune-menu-shell,
+.menu-live-root .brune-menu-heading,
+.menu-live-root .brune-menu-tabs-line {
+  background: var(--cs-cream);
+}
+
+.order-page.menu-page-brune {
+  --brune-bg: #faf7f4;
+  --brune-ink: #382010;
+  --brune-muted: color-mix(in srgb, #382010 55%, #b0a098);
+  --brune-line: rgba(56, 32, 16, 0.12);
+  --brune-sage: #f85020;
+  --brune-dew: #f85020;
+  background: #faf7f4;
+  color: #382010;
+}
+
+.order-page .brune-primary-btn {
+  border-color: #f85020;
+  background: #f85020;
+  color: #fff;
+}
+
+.order-page .brune-primary-btn:hover,
+.order-page .brune-primary-btn:focus-visible {
+  background: #fff;
+  color: #f85020;
+  border-color: #f85020;
+}
+
 .site-body:has(.home-page-brune),
 .site-body:has(.menu-page-brune) {
   background: #fff;
+}
+
+.site-body:has(.menu-live-root),
+.site-body:has(.order-page) {
+  background: #faf7f4;
 }
 
 .brune-top {
@@ -6756,7 +6830,7 @@ html:not(.page-is-loading) .brune-top {
   margin: 0 auto;
   padding: 0.85rem 1.15rem 0.35rem;
   text-align: left;
-  background: #faf6f1;
+  background: #faf7f4;
 }
 
 .menu-page-brune .brune-menu-heading-title {
@@ -6803,7 +6877,7 @@ html:not(.page-is-loading) .brune-top {
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   border-bottom: 1px solid rgba(56, 32, 16, 0.1);
-  background: #faf6f1;
+  background: #faf7f4;
 }
 
 .menu-page-brune .brune-menu-tab-link {
@@ -6864,7 +6938,7 @@ html:not(.page-is-loading) .brune-top {
   margin-top: 0.5rem;
   padding: 1.75rem 1.15rem 2.5rem;
   border-top: 1px solid rgba(56, 32, 16, 0.1);
-  background: #faf6f1;
+  background: #faf7f4;
 }
 
 .menu-page-brune .brune-mega-footer--secondary .brune-mega-brand {
@@ -7458,68 +7532,107 @@ html:not(.page-is-loading) .brune-top {
   color: rgba(255, 255, 255, 0.88);
 }
 
-.menu-page-brune .menu-buy-now,
 .menu-live-root .menu-buy-now {
-  border: 1.5px solid #b7e0b9;
-  background: #d8efd9;
-  color: #2f7a33;
+  border: 1.5px solid #f85020;
+  background: #f85020;
+  color: #fff;
   font-family: "DM Sans", sans-serif;
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: none;
 }
 
-.menu-page-brune .menu-basket-checkout,
-.menu-page-brune .menu-basket-empty-cta,
 .menu-live-root .menu-basket-checkout,
 .menu-live-root .menu-basket-empty-cta {
-  border: 1.5px solid #b7e0b9;
-  background: #d8efd9;
-  color: #2f7a33;
+  border: 1.5px solid #f85020;
+  background: #f85020;
+  color: #fff;
   font-family: "DM Sans", sans-serif;
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: none;
 }
 
-.menu-page-brune .menu-buy-now:hover,
-.menu-page-brune .menu-buy-now:focus-visible,
 .menu-live-root .menu-buy-now:hover,
 .menu-live-root .menu-buy-now:focus-visible {
-  background: #c7e8c9;
-  border-color: #3a8a3e;
-  color: #246628;
+  background: color-mix(in srgb, #f85020 88%, #382010);
+  border-color: #f85020;
+  color: #fff;
+  outline: 2px solid color-mix(in srgb, #f85020 45%, #382010);
+  outline-offset: 2px;
 }
 
-.menu-page-brune .menu-basket-checkout:hover,
-.menu-page-brune .menu-basket-checkout:focus-visible,
-.menu-page-brune .menu-basket-empty-cta:hover,
-.menu-page-brune .menu-basket-empty-cta:focus-visible,
 .menu-live-root .menu-basket-checkout:hover,
 .menu-live-root .menu-basket-checkout:focus-visible,
 .menu-live-root .menu-basket-empty-cta:hover,
 .menu-live-root .menu-basket-empty-cta:focus-visible {
-  background: #c7e8c9;
-  border-color: #3a8a3e;
-  color: #246628;
+  background: color-mix(in srgb, #f85020 88%, #382010);
+  border-color: #f85020;
+  color: #fff;
+  outline: 2px solid color-mix(in srgb, #f85020 45%, #382010);
+  outline-offset: 2px;
 }
 
-.menu-page-brune .menu-toast,
 .menu-live-root .menu-toast {
-  background: #d8efd9;
-  color: #246628;
-  border: 1.5px solid #b7e0b9;
+  background: color-mix(in srgb, #f85020 12%, #fff);
+  color: #382010;
+  border: 1.5px solid color-mix(in srgb, #f85020 35%, transparent);
 }
 
-.menu-page-brune .menu-toast-action,
 .menu-live-root .menu-toast-action {
   color: #fff;
-  background: #3a8a3e;
+  background: #f85020;
 }
 
-.menu-page-brune .menu-toast-action:hover,
 .menu-live-root .menu-toast-action:hover {
-  background: #246628;
+  background: color-mix(in srgb, #f85020 88%, #382010);
+}
+
+/* C3c — detail / basket accents scoped to menu overlays */
+.menu-live-root .menu-size-pill-active {
+  border-color: #f85020;
+  background: color-mix(in srgb, #f85020 14%, #fff);
+  color: #382010;
+}
+
+.menu-live-root .menu-qty button:hover,
+.menu-live-root .menu-qty button:focus-visible {
+  border-color: #f85020;
+  color: #f85020;
+  outline: none;
+}
+
+.menu-live-root .menu-checkout-option.is-active {
+  border-color: #f85020;
+  background: color-mix(in srgb, #f85020 14%, #fff);
+  color: #382010;
+}
+
+.menu-live-root .menu-checkout-payment .menu-checkout-option.is-active {
+  border-color: #f85020;
+  background: color-mix(in srgb, #f85020 14%, #fff);
+  color: #382010;
+}
+
+.menu-live-root .menu-basket-whatsapp {
+  color: #382010;
+}
+
+.menu-live-root .menu-basket-whatsapp:hover,
+.menu-live-root .menu-basket-whatsapp:focus-visible {
+  color: #f85020;
+}
+
+.menu-live-root .menu-detail-add {
+  border-color: #f85020;
+  background: #f85020;
+  color: #fff;
+}
+
+.menu-live-root .menu-detail-add:hover,
+.menu-live-root .menu-detail-add:focus-visible {
+  background: #fff;
+  color: #f85020;
 }
 
 @media (min-width: 720px) {
