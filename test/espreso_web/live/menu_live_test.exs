@@ -42,8 +42,11 @@ defmodule EspresoWeb.MenuLiveTest do
     assert html =~ "CoffeeSpot"
     assert has_element?(view, ".menu-page-brune")
     assert has_element?(view, ".brune-menu-shell")
-    assert has_element?(view, ".brune-menu-hero")
-    assert has_element?(view, ".site-instagram-menu")
+    assert has_element?(view, ".brune-menu-heading-title", "Menu")
+    assert has_element?(view, "#menu-search")
+    assert has_element?(view, "#menu-items")
+    refute has_element?(view, ".brune-menu-hero")
+    refute has_element?(view, ".site-instagram-menu")
     refute has_element?(view, ".menu-marquee")
     refute has_element?(view, ".contact-hero")
   end
@@ -373,17 +376,22 @@ defmodule EspresoWeb.MenuLiveTest do
     assert Orders.list_active_orders() == []
   end
 
-  test "/menu keeps Brune header and menu shell copy", %{conn: conn} do
+  test "/menu keeps product-first chrome and CoffeeSpot footer", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
 
-    assert has_element?(view, ".brune-menu-hero-title", "Our Menu")
+    assert has_element?(view, ".brune-menu-heading-title", "Menu")
     assert has_element?(view, ".brune-top-brand", "CoffeeSpot")
-    assert has_element?(view, ".brune-top-link[href='/menu']", "Menu")
-    assert has_element?(view, ".brune-mega-footer")
-    assert has_element?(view, ".brune-mega-brand", "Elilai")
+    assert has_element?(view, ".brune-menu-tabs-line")
+    assert has_element?(view, "#menu-search.brune-menu-search--compact")
+    assert has_element?(view, ".brune-student-promo")
+    assert has_element?(view, ".brune-mega-footer--secondary")
+    assert has_element?(view, ".brune-mega-brand", "CoffeeSpot")
     assert has_element?(view, ".brune-mega-label", "Hours")
     assert has_element?(view, ".brune-mega-label", "Contact")
     assert has_element?(view, ".brune-mega-label", "Location")
+    refute has_element?(view, ".brune-menu-hero")
+    refute has_element?(view, ".site-instagram-menu")
+    refute has_element?(view, ".brune-mega-brand", "Elilai")
     refute has_element?(view, ~s([data-image-slot="menu-hero"]))
   end
 

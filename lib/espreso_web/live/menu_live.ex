@@ -361,22 +361,28 @@ defmodule EspresoWeb.MenuLive do
           basket_pulse?={@basket_pulse?}
         />
 
-        <%!-- Menu header with cups illustration --%>
-        <section class="brune-menu-hero" aria-labelledby="brune-menu-title">
-          <div class="brune-menu-hero-copy">
-            <h1 id="brune-menu-title" class="brune-menu-hero-title">Our Menu</h1>
-            <p class="brune-menu-hero-lede">
-              We have drink for every taste and a place for every occasion.
-            </p>
-          </div>
-          <div class="brune-menu-hero-art" aria-hidden="true">
-            <.brune_cups />
-          </div>
+        <section class="brune-menu-heading" aria-labelledby="brune-menu-title">
+          <h1 id="brune-menu-title" class="brune-menu-heading-title">Menu</h1>
         </section>
 
         <section class="brune-menu-shell" id="menu">
-          <%!-- Search --%>
-          <div id="menu-search" class="brune-menu-search">
+          <nav class="brune-menu-tabs-line" aria-label="Menu categories">
+            <button
+              :for={category <- @categories}
+              type="button"
+              phx-click="select_category"
+              phx-value-name={category.name}
+              class={[
+                "brune-menu-tab-link",
+                @selected_category == category.name && "brune-menu-tab-link-active"
+              ]}
+              aria-pressed={to_string(@selected_category == category.name)}
+            >
+              {category_nav_label(category.name)}
+            </button>
+          </nav>
+
+          <div id="menu-search" class="brune-menu-search brune-menu-search--compact">
             <form phx-change="search" phx-submit="search">
               <div class="brune-search-wrap">
                 <span class="brune-search-icon" aria-hidden="true">
@@ -406,24 +412,6 @@ defmodule EspresoWeb.MenuLive do
               </div>
             </form>
           </div>
-
-          <nav class="brune-menu-tabs-line" aria-label="Menu categories">
-            <button
-              :for={category <- @categories}
-              type="button"
-              phx-click="select_category"
-              phx-value-name={category.name}
-              class={[
-                "brune-menu-tab-link",
-                @selected_category == category.name && "brune-menu-tab-link-active"
-              ]}
-              aria-pressed={to_string(@selected_category == category.name)}
-            >
-              {category_nav_label(category.name)}
-            </button>
-          </nav>
-
-          <.brune_student_promo />
 
           <div class="brune-menu-body" id="menu-items">
             <section
@@ -469,34 +457,12 @@ defmodule EspresoWeb.MenuLive do
               </div>
             </section>
           </div>
+
+          <.brune_student_promo />
         </section>
 
-        <%!-- Instagram --%>
-        <section class="site-instagram site-instagram-menu" aria-labelledby="menu-instagram-title">
-          <header class="site-instagram-head">
-            <h2 id="menu-instagram-title" class="site-instagram-title">
-              <a href={CoffeeSpot.instagram_url()} target="_blank" rel="noopener noreferrer">
-                Check us out on Instagram
-              </a>
-            </h2>
-          </header>
-          <ul class="site-instagram-grid">
-            <li :for={src <- instagram_images()} class="site-instagram-cell">
-              <a
-                href={CoffeeSpot.instagram_url()}
-                target="_blank"
-                rel="noopener noreferrer"
-                tabindex="-1"
-                aria-hidden="true"
-              >
-                <img src={src} alt="" loading="lazy" />
-              </a>
-            </li>
-          </ul>
-        </section>
-
-        <footer class="brune-mega-footer" aria-label="CoffeeSpot footer">
-          <p class="brune-mega-brand">Elilai</p>
+        <footer class="brune-mega-footer brune-mega-footer--secondary" aria-label="CoffeeSpot footer">
+          <p class="brune-mega-brand">CoffeeSpot</p>
 
           <div class="brune-mega-grid">
             <div class="brune-mega-block">
@@ -1078,15 +1044,5 @@ defmodule EspresoWeb.MenuLive do
 
   defp unavailable_toast(names) when is_list(names) do
     "#{Enum.join(names, ", ")} are no longer available. Update your basket and try again."
-  end
-
-  defp instagram_images do
-    [
-      "/images/coffeespot/IMG_3478.JPG",
-      "/images/coffeespot/IMG_3482.JPG",
-      "/images/coffeespot/IMG_3468.JPG",
-      "/images/coffeespot/IMG_3475.JPG",
-      "/images/coffeespot/IMG_3488.JPG"
-    ]
   end
 end
