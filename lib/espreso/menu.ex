@@ -14,32 +14,32 @@ defmodule Espreso.Menu do
 
   @product_images %{
     {"HOT", "Espresso"} => "/images/coffeespot/coffee-espresso-01.jpg",
-    {"HOT", "Double Espresso"} => "/images/coffeespot/coffee-espresso-01.jpg",
-    {"HOT", "Americano"} => "/images/coffeespot/coffee-espresso-01.jpg",
+    {"HOT", "Double Espresso"} => "/images/coffeespot/coffee-detail-01.jpg",
+    {"HOT", "Americano"} => "/images/coffeespot/coffee-table-01.jpg",
     {"HOT", "Café Latte"} => "/images/coffeespot/IMG_3468.JPG",
     {"HOT", "Cappuccino"} => "/images/coffeespot/IMG_3468.JPG",
     {"HOT", "Spanish Latte"} => "/images/coffeespot/IMG_3478.JPG",
-    {"HOT", "Mocha Latte"} => "/images/coffeespot/coffee-table-01.jpg",
+    {"HOT", "Mocha Latte"} => "/images/coffeespot/IMG_3468.JPG",
     {"HOT", "Caramel Macchiato"} => "/images/coffeespot/IMG_3458.JPG",
-    {"HOT", "Butter Scotch"} => "/images/coffeespot/IMG_3458.JPG",
+    {"HOT", "Butter Scotch"} => "/images/coffeespot/IMG_3469.JPG",
     {"HOT", "Matcha Latte"} => "/images/coffeespot/IMG_3471.JPG",
-    {"HOT", "Hot Belagio Chocolate"} => "/images/coffeespot/coffee-table-01.jpg",
+    {"HOT", "Hot Belagio Chocolate"} => "/images/coffeespot/IMG_3477.JPG",
     {"COLD", "Americano"} => "/images/coffeespot/menu-drink-01.jpg",
     {"COLD", "Café Latte"} => "/images/coffeespot/cold-signature-01.jpg",
     {"COLD", "Mocha Latte"} => "/images/coffeespot/cold-detail-01.jpg",
     {"COLD", "Hazelnut"} => "/images/coffeespot/cold-table-01.jpg",
     {"COLD", "Macadamia"} => "/images/coffeespot/menu-drink-01.jpg",
     {"COLD", "Roasted Almond"} => "/images/coffeespot/cold-signature-01.jpg",
-    {"COLD", "English Toffee"} => "/images/coffeespot/IMG_3458.JPG",
-    {"COLD", "Caramel Macchiato"} => "/images/coffeespot/IMG_3458.JPG",
+    {"COLD", "English Toffee"} => "/images/coffeespot/cold-detail-01.jpg",
+    {"COLD", "Caramel Macchiato"} => "/images/coffeespot/cold-signature-01.jpg",
     {"COLD", "Spanish Latte"} => "/images/coffeespot/IMG_3478.JPG",
-    {"COLD", "Butter Scotch"} => "/images/coffeespot/IMG_3458.JPG",
+    {"COLD", "Butter Scotch"} => "/images/coffeespot/cold-table-01.jpg",
     {"COLD", "Matcha Caramel"} => "/images/coffeespot/IMG_3471.JPG",
     {"COLD", "Strawberry Matcha"} => "/images/coffeespot/IMG_3467.JPG",
     {"COLD", "Choco Berry"} => "/images/coffeespot/IMG_3481.JPG",
     {"FRAPPE", "Salted Caramel"} => "/images/coffeespot/IMG_3458.JPG",
     {"FRAPPE", "Mocha"} => "/images/coffeespot/cold-detail-01.jpg",
-    {"FRAPPE", "Butter Scotch"} => "/images/coffeespot/IMG_3458.JPG",
+    {"FRAPPE", "Butter Scotch"} => "/images/coffeespot/IMG_3469.JPG",
     {"FRAPPE", "Mocha Crumble"} => "/images/coffeespot/cold-detail-01.jpg",
     {"FRAPPE", "Biscoff"} => "/images/coffeespot/IMG_3483.JPG",
     {"FRAPPE", "Cookies & Cream"} => "/images/coffeespot/IMG_3479.JPG",
@@ -47,22 +47,22 @@ defmodule Espreso.Menu do
     {"FRAPPE", "Double Chocolate"} => "/images/coffeespot/IMG_3481.JPG",
     {"FRAPPE", "Vanilla Bean Hazelnut"} => "/images/coffeespot/cold-signature-01.jpg",
     {"FRAPPE", "Strawberry"} => "/images/coffeespot/IMG_3467.JPG",
-    {"SODA", "Tropical Passion Fruit"} => "/images/coffeespot/menu-drink-01.jpg",
-    {"SODA", "Green Apple Campaign"} => "/images/coffeespot/IMG_3481.JPG",
-    {"SODA", "Minty Peach"} => "/images/coffeespot/menu-drink-01.jpg",
-    {"SODA", "Scarlet Berry"} => "/images/coffeespot/IMG_3481.JPG",
-    {"SODA", "Majestic Mango"} => "/images/coffeespot/menu-drink-01.jpg",
-    {"SODA", "Peach Berry"} => "/images/coffeespot/IMG_3481.JPG",
-    {"SODA", "Hummingbird"} => "/images/coffeespot/menu-drink-01.jpg",
+    {"SODA", "Tropical Passion Fruit"} => "/images/coffeespot/soda-signature-01.jpg",
+    {"SODA", "Green Apple Campaign"} => "/images/coffeespot/IMG_3457.JPG",
+    {"SODA", "Minty Peach"} => "/images/coffeespot/IMG_3457.JPG",
+    {"SODA", "Scarlet Berry"} => "/images/coffeespot/IMG_3477.JPG",
+    {"SODA", "Majestic Mango"} => "/images/coffeespot/soda-signature-01.jpg",
+    {"SODA", "Peach Berry"} => "/images/coffeespot/IMG_3477.JPG",
+    {"SODA", "Hummingbird"} => "/images/coffeespot/IMG_3477.JPG",
     {"FOOD", "Chicken Flakes"} => "/images/coffeespot/IMG_3459.JPG",
     {"FOOD", "Beef Tapa"} => "/images/coffeespot/IMG_3464.JPG",
     {"FOOD", "Corned Beef"} => "/images/coffeespot/IMG_3480.JPG",
     {"FOOD", "Spam"} => "/images/coffeespot/IMG_3487.JPG",
     {"FOOD", "Pork Liempo"} => "/images/coffeespot/food-savory-01.jpg",
     {"FOOD", "Spam Musubi"} => "/images/coffeespot/IMG_3487.JPG",
-    {"FOOD", "Nugget"} => "/images/coffeespot/food-savory-01.jpg",
+    {"FOOD", "Nugget"} => "/images/coffeespot/IMG_3474.JPG",
     {"FOOD", "Solo Fries"} => "/images/coffeespot/food-savory-01.jpg",
-    {"FOOD", "Fries w/ Nuggets"} => "/images/coffeespot/food-savory-01.jpg",
+    {"FOOD", "Fries w/ Nuggets"} => "/images/coffeespot/IMG_3474.JPG",
     {"FOOD", "Beef Nachos"} => "/images/coffeespot/IMG_3465.JPG",
     {"FOOD", "Quesadillas"} => "/images/coffeespot/IMG_3472.JPG",
     {"FOOD", "Chicken & Chips"} => "/images/coffeespot/IMG_3473.JPG",
@@ -83,7 +83,8 @@ defmodule Espreso.Menu do
     "HOT" => [
       "/images/coffeespot/coffee-espresso-01.jpg",
       "/images/coffeespot/IMG_3468.JPG",
-      "/images/coffeespot/coffee-table-01.jpg"
+      "/images/coffeespot/coffee-table-01.jpg",
+      "/images/coffeespot/coffee-detail-01.jpg"
     ],
     "COLD" => [
       "/images/coffeespot/cold-signature-01.jpg",
@@ -94,17 +95,20 @@ defmodule Espreso.Menu do
     "FRAPPE" => [
       "/images/coffeespot/IMG_3458.JPG",
       "/images/coffeespot/cold-signature-01.jpg",
-      "/images/coffeespot/IMG_3481.JPG"
+      "/images/coffeespot/IMG_3481.JPG",
+      "/images/coffeespot/IMG_3469.JPG"
     ],
     "SODA" => [
-      "/images/coffeespot/menu-drink-01.jpg",
-      "/images/coffeespot/IMG_3481.JPG"
+      "/images/coffeespot/soda-signature-01.jpg",
+      "/images/coffeespot/IMG_3477.JPG",
+      "/images/coffeespot/IMG_3457.JPG"
     ],
     "FOOD" => [
       "/images/coffeespot/food-savory-01.jpg",
       "/images/coffeespot/pastry-signature-01.jpg",
       "/images/coffeespot/food-signature-01.jpg",
-      "/images/coffeespot/IMG_3472.JPG"
+      "/images/coffeespot/IMG_3472.JPG",
+      "/images/coffeespot/IMG_3474.JPG"
     ]
   }
 
