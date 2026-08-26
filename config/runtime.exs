@@ -63,9 +63,9 @@ if config_env() == :prod do
 
   config :espreso, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
-  # QR destination defaults to https://PHX_HOST/ when PUBLIC_MENU_URL is unset.
+  # QR destination defaults to https://PHX_HOST/menu when PUBLIC_MENU_URL is unset.
   if System.get_env("PUBLIC_MENU_URL") in [nil, ""] do
-    config :espreso, public_menu_url: "https://#{host}/"
+    config :espreso, public_menu_url: "https://#{host}/menu"
   end
 
   config :espreso, EspresoWeb.Endpoint,
