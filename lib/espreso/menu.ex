@@ -249,6 +249,25 @@ defmodule Espreso.Menu do
      ]}
   ]
 
+  @sweets_subcategory_names ["Muffins", "Cakes / Breads"]
+
+  @doc """
+  Customer-facing Sweets filter names derived from FOOD muffin/cake/cookie items.
+
+  Not a database category — used by the QR craving discovery layer.
+  """
+  def sweets_product_names do
+    @food_subcategories
+    |> Enum.filter(fn {group, _} -> group in @sweets_subcategory_names end)
+    |> Enum.flat_map(fn {_, products} -> products end)
+  end
+
+  def sweets_product_name?(name) when is_binary(name) do
+    name in sweets_product_names()
+  end
+
+  def sweets_product_name?(_), do: false
+
   @doc """
   Returns categories in menu order, each with available products, prices,
   and display groups (FOOD is split into subcategories).
