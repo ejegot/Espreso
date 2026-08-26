@@ -48,6 +48,17 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, ".contact-hero")
   end
 
+  test "GET /menu?table=12 prefills dine-in table for checkout", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu?table=12")
+
+    view |> element("button[aria-label='Order Espresso']") |> render_click()
+    view |> element("button.menu-buy-now", "Add to basket") |> render_click()
+    view |> element("button.brune-icon-bag") |> render_click()
+
+    assert has_element?(view, "#checkout-table[value='12']")
+    assert has_element?(view, "button.menu-checkout-option.is-active", "Dine-in")
+  end
+
   test "/menu displays categories in order", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
 

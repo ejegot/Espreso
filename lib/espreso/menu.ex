@@ -301,10 +301,10 @@ defmodule Espreso.Menu do
   end
 
   @doc """
-  Absolute public URL for the CoffeeSpot QR landing page (`/`).
+  Absolute public URL for the CoffeeSpot QR menu landing page (`/menu`).
 
   Configured as `:public_menu_url` (env `PUBLIC_MENU_URL`).
-  Development falls back to `http://localhost:4000/`.
+  Development falls back to `http://localhost:4000/menu`.
   """
   def public_url do
     Application.fetch_env!(:espreso, :public_menu_url)
