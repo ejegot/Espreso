@@ -404,48 +404,43 @@ defmodule EspresoWeb.MenuLive do
       ]}
     >
       <div :if={@menu_stage == :landing} id="menu-landing" class="menu-qr-landing">
-        <div class="menu-qr-landing-hero">
-          <p class="menu-qr-landing-brand">CoffeeSpot</p>
-          <h1 class="menu-qr-landing-headline">Order from your table.</h1>
-          <p class="menu-qr-landing-lede">
-            Browse the menu, pay at the counter, and we’ll prepare your order.
-          </p>
-          <div class="menu-qr-landing-visual">
+        <div class="menu-qr-landing-scene">
+          <div class="menu-qr-landing-media" aria-hidden="true">
             <img
               src="/images/coffeespot/cold-signature-01.jpg"
-              alt="Iced coffee at CoffeeSpot"
+              alt=""
               class="menu-qr-landing-photo"
               width="800"
               height="1000"
             />
           </div>
-        </div>
 
-        <div class="menu-qr-landing-actions">
-          <button
-            type="button"
-            id="menu-cta-view-menu"
-            class="menu-qr-landing-cta menu-qr-landing-cta--primary"
-            phx-click="enter_craving"
-          >
-            View the menu
-          </button>
-          <button
-            type="button"
-            id="menu-cta-order-online"
-            class="menu-qr-landing-cta menu-qr-landing-cta--secondary"
-            phx-click="enter_craving"
-          >
-            Order online
-          </button>
-          <button
-            type="button"
-            id="menu-cta-come-say-hi"
-            class="menu-qr-landing-cta menu-qr-landing-cta--tertiary"
-            phx-click="enter_visit"
-          >
-            Come say hi
-          </button>
+          <div class="menu-qr-landing-scrim" aria-hidden="true"></div>
+
+          <div class="menu-qr-landing-content">
+            <p class="menu-qr-landing-brand">CoffeeSpot</p>
+            <h1 class="menu-qr-landing-headline">Order from your table.</h1>
+            <p class="menu-qr-landing-lede">Browse, pay at the counter, we prepare it.</p>
+
+            <div class="menu-qr-landing-actions">
+              <button
+                type="button"
+                id="menu-cta-view-menu"
+                class="menu-qr-landing-cta menu-qr-landing-cta--primary"
+                phx-click="enter_craving"
+              >
+                View the menu
+              </button>
+              <button
+                type="button"
+                id="menu-cta-come-say-hi"
+                class="menu-qr-landing-cta menu-qr-landing-cta--quiet"
+                phx-click="enter_visit"
+              >
+                Come say hi
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
