@@ -445,6 +445,17 @@ defmodule EspresoWeb.MenuLive do
       </div>
 
       <div :if={@menu_stage == :craving} id="menu-craving-chooser" class="menu-qr-craving">
+        <div class="menu-qr-craving-bridge" aria-hidden="true">
+          <img
+            src="/images/coffeespot/cold-signature-01.jpg"
+            alt=""
+            class="menu-qr-craving-bridge-photo"
+            width="800"
+            height="1000"
+          />
+          <div class="menu-qr-craving-bridge-scrim"></div>
+        </div>
+
         <div class="menu-qr-craving-hero">
           <button type="button" class="menu-qr-craving-back" phx-click="back_to_landing">
             Back
@@ -467,18 +478,16 @@ defmodule EspresoWeb.MenuLive do
               phx-click="select_craving"
               phx-value-id={option.id}
             >
+              <span class="menu-qr-craving-label">{option.label}</span>
               <span class="menu-qr-craving-thumb-wrap">
                 <img
                   src={option.image}
                   alt=""
                   class="menu-qr-craving-thumb"
                   loading="lazy"
-                  width="56"
-                  height="56"
+                  width="40"
+                  height="40"
                 />
-              </span>
-              <span class="menu-qr-craving-copy">
-                <span class="menu-qr-craving-label">{option.label}</span>
               </span>
             </button>
           </div>
