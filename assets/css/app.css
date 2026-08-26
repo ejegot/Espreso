@@ -6189,6 +6189,201 @@ body:has(.home-page-landing) {
   line-height: 1;
 }
 
+/* P1 — QR landing (no site chrome; CoffeeSpot-only) */
+.menu-live-root--qr-entry {
+  min-height: 100dvh;
+  background: #faf7f4;
+}
+
+.menu-qr-landing {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  color: #382010;
+}
+
+.menu-qr-landing-hero {
+  position: relative;
+  display: grid;
+  gap: 0.65rem;
+  flex: 1 1 auto;
+  padding: 1.35rem 1.25rem 1rem;
+  background: #382010;
+  color: #faf7f4;
+}
+
+.menu-qr-landing-brand {
+  margin: 0;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(2rem, 8vw, 2.55rem);
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.menu-qr-landing-headline {
+  margin: 0;
+  max-width: 14ch;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(1.55rem, 6.5vw, 2rem);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.menu-qr-landing-lede {
+  margin: 0;
+  max-width: 28ch;
+  color: color-mix(in srgb, #faf7f4 78%, #b0a098);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.menu-qr-landing-visual {
+  margin-top: 0.35rem;
+  margin-inline: -0.15rem;
+  overflow: hidden;
+  border-radius: 1rem 1rem 0 0;
+  min-height: 11.5rem;
+}
+
+.menu-qr-landing-photo {
+  display: block;
+  width: 100%;
+  height: min(42vh, 22rem);
+  object-fit: cover;
+  object-position: center;
+}
+
+.menu-qr-landing-actions {
+  display: grid;
+  gap: 0.55rem;
+  padding: 1rem 1.25rem calc(1.15rem + env(safe-area-inset-bottom));
+  background: #faf7f4;
+}
+
+.menu-qr-landing-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.85rem;
+  padding: 0.7rem 1rem;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.menu-qr-landing-cta--primary {
+  border: 1px solid #f85020;
+  background: #f85020;
+  color: #fff;
+}
+
+.menu-qr-landing-cta--primary:hover,
+.menu-qr-landing-cta--primary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(248, 80, 32, 0.28);
+}
+
+.menu-qr-landing-cta--secondary {
+  border: 1px solid rgba(56, 32, 16, 0.22);
+  background: #fff;
+  color: #382010;
+}
+
+.menu-qr-landing-cta--secondary:hover,
+.menu-qr-landing-cta--secondary:focus-visible {
+  border-color: #f85020;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(248, 80, 32, 0.16);
+}
+
+.menu-qr-landing-cta--tertiary {
+  border: 1px solid #382010;
+  background: #382010;
+  color: #faf7f4;
+}
+
+.menu-qr-landing-cta--tertiary:hover,
+.menu-qr-landing-cta--tertiary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(56, 32, 16, 0.22);
+}
+
+.menu-qr-stub {
+  display: grid;
+  gap: 0.65rem;
+  align-content: start;
+  min-height: 100dvh;
+  padding: 1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+  background: #faf7f4;
+  color: #382010;
+}
+
+.menu-qr-stub-back {
+  justify-self: start;
+  margin: 0;
+  padding: 0.35rem 0;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, #382010 62%, #b0a098);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.menu-qr-stub-back:hover,
+.menu-qr-stub-back:focus-visible {
+  color: #f85020;
+  outline: none;
+}
+
+.menu-qr-stub-brand {
+  margin: 0.35rem 0 0;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 1.75rem;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.menu-qr-stub-title {
+  margin: 0;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 1.55rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.menu-qr-stub-lede {
+  margin: 0 0 0.5rem;
+  max-width: 32ch;
+  color: color-mix(in srgb, #382010 62%, #b0a098);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+@media (min-width: 640px) {
+  .menu-qr-landing {
+    max-width: 28rem;
+    margin: 0 auto;
+  }
+
+  .menu-qr-landing-visual {
+    margin-inline: 0;
+  }
+
+  .menu-qr-stub {
+    max-width: 28rem;
+    margin: 0 auto;
+  }
+}
+
 @media (min-width: 640px) {
   .menu-live-root .menu-craving {
     padding-left: 1.5rem;
