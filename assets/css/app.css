@@ -6896,6 +6896,132 @@ html:not(.page-is-loading) .brune-top {
   }
 }
 
+/* C3b — image-led cards & Add CTA on /menu */
+.menu-page-brune .brune-menu-items {
+  gap: 1.15rem;
+}
+
+.menu-page-brune .brune-menu-item-card {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(56, 32, 16, 0.1);
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: none;
+}
+
+.menu-page-brune .brune-menu-item-thumb {
+  height: 8.5rem;
+  border-radius: 0;
+  background: #f3ede6;
+}
+
+.menu-page-brune .brune-menu-item-photo {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  object-fit: cover;
+  object-position: center;
+}
+
+.menu-page-brune .brune-menu-item-body {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem 1rem 1rem;
+  min-width: 0;
+}
+
+.menu-page-brune .brune-menu-item-name {
+  margin: 0;
+  color: #382010;
+  font-size: 1.08rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.menu-page-brune .brune-menu-item-blurb {
+  margin: 0;
+  color: color-mix(in srgb, #382010 55%, #b0a098);
+  font-size: 0.84rem;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.menu-page-brune .brune-menu-item-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.45rem;
+}
+
+.menu-page-brune .brune-menu-item-price {
+  margin: 0;
+  color: #382010;
+  font-size: 1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.menu-page-brune .brune-menu-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.6rem;
+  min-width: 4.5rem;
+  padding: 0.45rem 1.1rem;
+  border: 1.5px solid #f85020;
+  border-radius: 0.75rem;
+  background: #f85020;
+  color: #fff;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: filter 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.menu-page-brune .brune-menu-add:hover,
+.menu-page-brune .brune-menu-add:focus-visible {
+  filter: brightness(0.96);
+  outline: 2px solid color-mix(in srgb, #f85020 55%, #382010);
+  outline-offset: 2px;
+}
+
+.menu-page-brune .brune-menu-add:active {
+  filter: brightness(0.92);
+}
+
+@media (min-width: 640px) {
+  .menu-page-brune .brune-menu-items {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.15rem;
+  }
+
+  .menu-page-brune .brune-menu-item-thumb {
+    height: 9rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .menu-page-brune .brune-menu-items {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 58rem;
+  }
+
+  .menu-page-brune .brune-menu-item-thumb {
+    height: 9.5rem;
+  }
+}
+
 .brune-menu-shell {
   width: 100%;
   margin: 0 auto 0;
