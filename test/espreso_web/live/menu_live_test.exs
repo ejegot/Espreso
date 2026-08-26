@@ -310,9 +310,13 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#menu-basket-submit")
     assert has_element?(view, "#menu-basket-submit .menu-basket-total", "₱195")
     assert has_element?(view, "#menu-basket-submit .menu-basket-submit-payment", "Pay at counter")
-    assert has_element?(view, ".menu-checkout-payment .menu-checkout-option.is-active", "Pay at counter")
+    assert has_element?(view, ".menu-checkout-payment-info-value", "Pay at counter")
+    refute has_element?(view, ".menu-checkout-payment .menu-checkout-option")
     refute render(view) =~ "Pay online"
     refute render(view) =~ "Online payment"
+
+    view |> element("button.menu-basket-checkout", "Place order") |> render_click()
+    assert has_element?(view, "#menu-checkout-summary", "Enter your name and table number.")
 
     view
     |> form("#menu-checkout-form", %{
@@ -322,9 +326,17 @@ defmodule EspresoWeb.MenuLiveTest do
     })
     |> render_change()
 
-    assert has_element?(view, "button.menu-basket-checkout", "Place order · ₱195")
+    refute has_element?(view, "#menu-checkout-summary")
+    assert has_element?(view, "button.menu-basket-checkout", "Place order · Pay at counter")
     refute render(view) =~ "Pay online"
-    assert has_element?(view, "a.menu-basket-whatsapp", "Or send on WhatsApp")
+    assert has_element?(view, ".menu-basket-alt-label", "Other ways to order")
+    assert has_element?(view, "a.menu-basket-whatsapp", "Message us on WhatsApp instead")
+    assert has_element?(
+             view,
+             ".menu-basket-whatsapp-note",
+             "WhatsApp orders don’t create a tracked order number."
+           )
+    assert has_element?(view, "label[for='checkout-notes']", "Add a note")
 
     href =
       view
@@ -343,7 +355,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
     {:ok, order_view, _html} =
       view
-      |> element("button.menu-basket-checkout", "Place order · ₱195")
+      |> element("button.menu-basket-checkout", "Place order · Pay at counter")
       |> render_click()
       |> follow_redirect(conn)
 
@@ -377,7 +389,7 @@ defmodule EspresoWeb.MenuLiveTest do
     |> Repo.update!()
 
     view
-    |> element("button.menu-basket-checkout", "Place order · ₱75")
+    |> element("button.menu-basket-checkout", "Place order · Pay at counter")
     |> render_click()
 
     assert has_element?(view, ".menu-toast", "Espresso is no longer available")
@@ -396,12 +408,16 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#menu-basket-panel .menu-basket-checkout-fields #menu-checkout-form")
     assert has_element?(view, "#menu-basket-submit")
     assert has_element?(view, "#menu-basket-submit button.menu-basket-checkout")
+    assert has_element?(view, ".menu-checkout-payment-info")
     refute has_element?(view, ".menu-basket-body button.menu-basket-checkout")
     refute has_element?(view, ".menu-basket-footer")
 
     view |> element("button.menu-checkout-option", "Pickup at counter") |> render_click()
     refute has_element?(view, "#checkout-table")
     assert has_element?(view, "button.menu-checkout-option.is-active", "Pickup at counter")
+
+    view |> element("button.menu-basket-checkout", "Place order") |> render_click()
+    assert has_element?(view, "#menu-checkout-summary", "Please enter your name.")
   end
 
   test "/menu keeps product-first chrome and CoffeeSpot footer", %{conn: conn} do
