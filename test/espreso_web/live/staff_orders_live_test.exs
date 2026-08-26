@@ -2,6 +2,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
   use EspresoWeb.ConnCase
 
   import Phoenix.LiveViewTest
+  import Ecto.Query
 
   alias Espreso.Accounts
   alias Espreso.Orders
@@ -48,6 +49,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert has_element?(view, "#order-card-#{order.id} .staff-order-items", "Muffin")
     assert has_element?(view, "#order-card-#{order.id} .staff-order-pay", "₱325")
     assert has_element?(view, "#order-card-#{order.id} .staff-order-pay", "Unpaid")
+    assert has_element?(view, "#order-card-#{order.id} .staff-order-age", "Just now")
     assert has_element?(view, "#order-prepare-#{order.id}.staff-action-primary", "Prepare")
     refute has_element?(view, "#order-ready-#{order.id}")
     refute has_element?(view, "#order-card-#{order.id} .staff-badge--received")
@@ -375,5 +377,101 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert has_element?(view, "#orders-flash", "#{order.number} marked paid.")
     refute has_element?(view, "#unpaid-order-#{order.id}")
     assert has_element?(view, "#unpaid-orders-empty", "No unpaid orders today.")
+  end
+
+  test "kitchen tickets show order age from inserted_at across lanes", %{conn: conn} do
+    {:ok, fresh} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Fresh Age",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, preparing} =
+      Orders.create_order(
+        [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("120")}],
+        %{
+          customer_name: "Prep Age",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, ready} =
+      Orders.create_order(
+        [%{name: "Mocha", size: nil, quantity: 1, price: Decimal.new("140")}],
+        %{
+          customer_name: "Ready Age",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    backdate_order!(preparing, minutes_ago: 5)
+    backdate_order!(ready, minutes_ago: 10)
+    {:ok, _} = Orders.update_status(preparing, "preparing")
+    {:ok, _} = Orders.update_status(ready, "ready")
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    assert has_element?(view, "#orders-new #order-card-#{fresh.id} .staff-order-age", "Just now")
+    refute has_element?(view, "#orders-new #order-card-#{fresh.id} .staff-order-age--attention")
+
+    assert has_element?(
+             view,
+             "#orders-preparing #order-card-#{preparing.id} .staff-order-age--attention",
+             "5 min ago"
+           )
+
+    assert has_element?(
+             view,
+             "#orders-ready #order-card-#{ready.id} .staff-order-age--urgent",
+             "10 min ago"
+           )
+
+    assert has_element?(view, "#order-prepare-#{fresh.id}.staff-action-primary", "Prepare")
+    assert has_element?(view, "#order-ready-#{preparing.id}.staff-action-primary", "Ready")
+    assert has_element?(view, "#ready-complete-#{ready.id}.staff-action-primary", "Picked up")
+
+    reloaded = Orders.get_order_by_number!(fresh.number)
+    assert reloaded.status == "received"
+  end
+
+  test "15+ minute order age uses critical emphasis without changing status", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Stale Age",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    backdate_order!(order, minutes_ago: 16)
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    assert has_element?(
+             view,
+             "#order-card-#{order.id} .staff-order-age--critical",
+             "16 min ago"
+           )
+
+    assert has_element?(view, "#order-prepare-#{order.id}", "Prepare")
+    assert Orders.get_order_by_number!(order.number).status == "received"
+  end
+
+  defp backdate_order!(order, minutes_ago: minutes) when is_integer(minutes) and minutes >= 0 do
+    at =
+      DateTime.utc_now(:second)
+      |> DateTime.add(-minutes * 60, :second)
+
+    Espreso.Repo.update_all(
+      from(o in Espreso.Orders.Order, where: o.id == ^order.id),
+      set: [inserted_at: at, updated_at: at]
+    )
   end
 end

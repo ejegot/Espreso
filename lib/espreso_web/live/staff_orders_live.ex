@@ -230,6 +230,7 @@ defmodule EspresoWeb.StaffOrdersLive do
 
       <p class="staff-order-meta">{fulfillment_short(@order)}</p>
       <p :if={@order.notes} class="staff-order-notes">{@order.notes}</p>
+      <p class={order_age_class(@order.inserted_at)}>{format_order_age(@order.inserted_at)}</p>
 
       <div class="staff-order-actions">
         <button
@@ -300,6 +301,46 @@ defmodule EspresoWeb.StaffOrdersLive do
   defp fulfillment_short(%{fulfillment: "dine_in"}), do: "Dine-in"
   defp fulfillment_short(%{fulfillment: "pickup"}), do: "Pickup"
   defp fulfillment_short(_), do: "Order"
+
+  # Display-only age from inserted_at. Does not affect status, sorting, or domain rules.
+  defp format_order_age(%DateTime{} = inserted_at) do
+    seconds =
+      DateTime.utc_now(:second)
+      |> DateTime.diff(DateTime.truncate(inserted_at, :second), :second)
+      |> max(0)
+
+    cond do
+      seconds < 60 ->
+        "Just now"
+
+      seconds < 3600 ->
+        minutes = div(seconds, 60)
+        if minutes == 1, do: "1 min ago", else: "#{minutes} min ago"
+
+      true ->
+        hours = div(seconds, 3600)
+        if hours == 1, do: "1 hr ago", else: "#{hours} hr ago"
+    end
+  end
+
+  defp format_order_age(_), do: ""
+
+  defp order_age_class(%DateTime{} = inserted_at) do
+    minutes =
+      DateTime.utc_now(:second)
+      |> DateTime.diff(DateTime.truncate(inserted_at, :second), :second)
+      |> max(0)
+      |> div(60)
+
+    cond do
+      minutes < 3 -> ["staff-order-age"]
+      minutes < 8 -> ["staff-order-age", "staff-order-age--attention"]
+      minutes < 15 -> ["staff-order-age", "staff-order-age--urgent"]
+      true -> ["staff-order-age", "staff-order-age--critical"]
+    end
+  end
+
+  defp order_age_class(_), do: ["staff-order-age"]
 
   defp load_orders(socket) do
     socket
