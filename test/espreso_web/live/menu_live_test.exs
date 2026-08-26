@@ -401,6 +401,35 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, ~s([data-image-slot="menu-hero"]))
   end
 
+  test "/menu floating bag discoverability", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+
+    refute has_element?(view, "#menu-floating-bag")
+
+    view |> element("button[aria-label='Add Espresso']") |> render_click()
+    refute has_element?(view, "#menu-floating-bag")
+
+    view |> element("button.menu-buy-now", "Add to bag") |> render_click()
+    assert has_element?(view, "#menu-floating-bag")
+    assert has_element?(view, ".menu-floating-bag-summary", "Your order · 1 item · ₱75")
+    assert has_element?(view, "button.menu-floating-bag-cta", "View bag")
+
+    view |> element("button.menu-floating-bag-cta", "View bag") |> render_click()
+    assert has_element?(view, "#menu-basket")
+    refute has_element?(view, "#menu-floating-bag")
+
+    view |> element("button.menu-basket-close") |> render_click()
+    Process.sleep(300)
+    assert has_element?(view, "#menu-floating-bag")
+
+    view |> element("button[aria-label='Add Americano']") |> render_click()
+    refute has_element?(view, "#menu-floating-bag")
+
+    view |> element("button.menu-buy-now", "Add to bag") |> render_click()
+    assert has_element?(view, "#menu-floating-bag")
+    assert has_element?(view, ".menu-floating-bag-summary", "Your order · 2 items · ₱195")
+  end
+
   defp insert_category!(name) do
     %Category{}
     |> Category.changeset(%{name: name})
