@@ -7695,7 +7695,11 @@ html:not(.page-is-loading) .brune-top {
 }
 
 .menu-live-root .menu-basket-whatsapp {
-  color: #382010;
+  color: color-mix(in srgb, #382010 58%, #b0a098);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
 }
 
 .menu-live-root .menu-basket-whatsapp:hover,
@@ -7733,6 +7737,130 @@ html:not(.page-is-loading) .brune-top {
     padding-top: 0.85rem;
     padding-bottom: 0.85rem;
   }
+}
+
+/* C4c — clarity & trust polish */
+.menu-live-root .menu-basket-eyebrow {
+  color: #b0a098;
+}
+
+.menu-live-root .menu-basket-count-label {
+  color: color-mix(in srgb, #382010 55%, #b0a098);
+}
+
+.menu-live-root .menu-basket-line-name {
+  color: #382010;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-weight: 400;
+}
+
+.menu-live-root .menu-basket-line-size,
+.menu-live-root .menu-basket-remove {
+  color: color-mix(in srgb, #382010 52%, #b0a098);
+}
+
+.menu-live-root .menu-basket-line-price {
+  color: #382010;
+}
+
+.menu-live-root .menu-checkout-label {
+  color: #382010;
+}
+
+.menu-live-root .menu-checkout-field--optional {
+  margin-top: 0.15rem;
+  opacity: 0.92;
+}
+
+.menu-live-root .menu-checkout-label--optional {
+  color: color-mix(in srgb, #382010 58%, #b0a098);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-size: 0.82rem;
+}
+
+.menu-live-root .menu-checkout-textarea--optional {
+  min-height: 3.25rem;
+  border-color: rgba(56, 32, 16, 0.1);
+  background: color-mix(in srgb, #faf7f4 70%, #fff);
+  color: color-mix(in srgb, #382010 78%, #b0a098);
+  font-size: 0.9rem;
+}
+
+.menu-live-root .menu-checkout-payment-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.35rem 0 0;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid rgba(56, 32, 16, 0.1);
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, #faf7f4 88%, #fff);
+}
+
+.menu-live-root .menu-checkout-payment-info-label {
+  color: color-mix(in srgb, #382010 55%, #b0a098);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.menu-live-root .menu-checkout-payment-info-value {
+  color: #382010;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.menu-live-root .menu-checkout-summary {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid color-mix(in srgb, #c0392b 35%, transparent);
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, #c0392b 8%, #fff);
+  color: #8e241c;
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.menu-live-root .menu-basket-alt {
+  display: grid;
+  gap: 0.3rem;
+  justify-items: center;
+  margin-top: 0.15rem;
+  padding-top: 0.35rem;
+}
+
+.menu-live-root .menu-basket-alt-label {
+  margin: 0;
+  color: #b0a098;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.menu-live-root .menu-basket-whatsapp-note {
+  margin: 0;
+  max-width: 18rem;
+  color: color-mix(in srgb, #382010 48%, #b0a098);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.menu-live-root .menu-basket-note {
+  color: color-mix(in srgb, #382010 52%, #b0a098);
+}
+
+.menu-live-root .menu-basket-submit-payment {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.68rem;
 }
 
 .menu-live-root .menu-detail-add {

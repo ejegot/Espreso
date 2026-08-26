@@ -800,9 +800,9 @@ defmodule EspresoWeb.MenuLive do
                   </p>
                 </div>
 
-                <div class="menu-checkout-field">
-                  <label class="menu-checkout-label" for="checkout-notes">
-                    Notes <span class="menu-checkout-optional">(optional)</span>
+                <div class="menu-checkout-field menu-checkout-field--optional">
+                  <label class="menu-checkout-label menu-checkout-label--optional" for="checkout-notes">
+                    Add a note <span class="menu-checkout-optional">(optional)</span>
                   </label>
                   <textarea
                     id="checkout-notes"
@@ -810,18 +810,16 @@ defmodule EspresoWeb.MenuLive do
                     rows="2"
                     maxlength="200"
                     placeholder="less ice, oat milk, no sugar…"
-                    class="menu-checkout-input menu-checkout-textarea"
+                    class="menu-checkout-input menu-checkout-textarea menu-checkout-textarea--optional"
                     phx-debounce="200"
                   >{Phoenix.HTML.Form.normalize_value("textarea", @notes)}</textarea>
                 </div>
               </form>
 
-              <fieldset class="menu-checkout-fulfillment menu-checkout-payment">
-                <legend class="menu-checkout-label">Payment</legend>
-                <div class="menu-checkout-options" role="group" aria-label="Payment">
-                  <span class="menu-checkout-option is-active">Pay at counter</span>
-                </div>
-              </fieldset>
+              <p class="menu-checkout-payment-info" aria-label="Payment">
+                <span class="menu-checkout-payment-info-label">Payment</span>
+                <span class="menu-checkout-payment-info-value">Pay at counter</span>
+              </p>
             </div>
           </div>
 
@@ -833,6 +831,15 @@ defmodule EspresoWeb.MenuLive do
 
             <p class="menu-basket-submit-payment">Pay at counter</p>
 
+            <p
+              :if={checkout_summary_error(@checkout_errors)}
+              id="menu-checkout-summary"
+              class="menu-checkout-summary"
+              role="alert"
+            >
+              {checkout_summary_error(@checkout_errors)}
+            </p>
+
             <%= if checkout_valid?(@fulfillment, @customer_name, @table_number) do %>
               <button
                 type="button"
@@ -840,18 +847,22 @@ defmodule EspresoWeb.MenuLive do
                 phx-click="place_order"
                 disabled={@placing_order?}
               >
-                {if @placing_order?,
-                  do: "Placing order…",
-                  else: "Place order · #{Menu.format_price(cart_total(@cart))}"}
+                {if @placing_order?, do: "Placing order…", else: "Place order · Pay at counter"}
               </button>
-              <a
-                href={CoffeeSpot.order_whatsapp_url(@cart, checkout_payload(assigns))}
-                class="menu-basket-whatsapp"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Or send on WhatsApp
-              </a>
+              <div class="menu-basket-alt">
+                <p class="menu-basket-alt-label">Other ways to order</p>
+                <a
+                  href={CoffeeSpot.order_whatsapp_url(@cart, checkout_payload(assigns))}
+                  class="menu-basket-whatsapp"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Message us on WhatsApp instead
+                </a>
+                <p class="menu-basket-whatsapp-note">
+                  WhatsApp orders don’t create a tracked order number.
+                </p>
+              </div>
             <% else %>
               <button type="button" class="menu-basket-checkout" phx-click="validate_checkout">
                 Place order
@@ -1054,6 +1065,20 @@ defmodule EspresoWeb.MenuLive do
       customer_name: customer_name,
       table_number: table_number
     }) == %{}
+  end
+
+  defp checkout_summary_error(errors) when errors == %{}, do: nil
+
+  defp checkout_summary_error(errors) when is_map(errors) do
+    has_name? = Map.has_key?(errors, :customer_name)
+    has_table? = Map.has_key?(errors, :table_number)
+
+    cond do
+      has_name? and has_table? -> "Enter your name and table number."
+      has_name? -> "Please enter your name."
+      has_table? -> "Enter your table number."
+      true -> errors |> Map.values() |> List.first()
+    end
   end
 
   defp checkout_errors(assigns) do
