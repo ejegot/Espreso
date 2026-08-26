@@ -526,14 +526,16 @@ defmodule EspresoWeb.MenuLive do
           </div>
 
           <div class="menu-buy-body">
-            <div class="menu-buy-title-row">
-              <h2 id="menu-detail-title" class="menu-detail-name">{@detail.product.name}</h2>
-              <p class="menu-detail-price">
-                {Menu.format_price(selected_price(@detail).price)}
-              </p>
-            </div>
+            <h2 id="menu-detail-title" class="menu-detail-name">{@detail.product.name}</h2>
 
-            <div class="menu-detail-sizes">
+            <p :if={description?(@detail.product.description)} class="menu-detail-description">
+              {@detail.product.description}
+            </p>
+            <p :if={!description?(@detail.product.description)} class="menu-detail-description">
+              Prepared fresh at CoffeeSpot Lilac Marikina.
+            </p>
+
+            <div :if={detail_multi_size?(@detail)} class="menu-detail-sizes">
               <p class="menu-detail-label">Size</p>
               <div class="menu-size-pills" role="group" aria-label="Size">
                 <button
@@ -545,21 +547,16 @@ defmodule EspresoWeb.MenuLive do
                   ]}
                   phx-click="select_size"
                   phx-value-price-id={price.id}
+                  aria-pressed={to_string(@detail.selected_price_id == price.id)}
                 >
                   {size_label(price) || "Regular"}
                 </button>
               </div>
             </div>
 
-            <div class="menu-buy-about">
-              <p class="menu-detail-label">About</p>
-              <p :if={description?(@detail.product.description)} class="menu-detail-description">
-                {@detail.product.description}
-              </p>
-              <p :if={!description?(@detail.product.description)} class="menu-detail-description">
-                Prepared fresh at CoffeeSpot Lilac Marikina.
-              </p>
-            </div>
+            <p :if={detail_single_size_label(@detail)} class="menu-detail-size-note">
+              {detail_single_size_label(@detail)}
+            </p>
 
             <div class="menu-detail-qty-row">
               <p class="menu-detail-label">Quantity</p>
@@ -568,31 +565,39 @@ defmodule EspresoWeb.MenuLive do
                   type="button"
                   phx-click="detail_qty"
                   phx-value-delta="-1"
-                  aria-label="Decrease"
+                  aria-label="Decrease quantity"
                   disabled={@detail.quantity <= 1}
                 >
                   −
                 </button>
-                <span>{@detail.quantity}</span>
-                <button type="button" phx-click="detail_qty" phx-value-delta="1" aria-label="Increase">
+                <span aria-live="polite">{@detail.quantity}</span>
+                <button
+                  type="button"
+                  phx-click="detail_qty"
+                  phx-value-delta="1"
+                  aria-label="Increase quantity"
+                >
                   +
                 </button>
               </div>
             </div>
+
+            <p class="menu-detail-price menu-detail-price--sheet">
+              {Menu.format_price(selected_price(@detail).price)}
+            </p>
           </div>
 
-          <footer class="menu-buy-bar">
+          <footer class="menu-buy-bar menu-buy-bar--detail">
+            <button type="button" class="menu-buy-now" phx-click="buy_now">
+              Add to bag
+            </button>
             <button
               type="button"
-              class="menu-buy-basket"
+              class="menu-buy-basket-link"
               phx-click="open_basket"
               aria-label={"Checkout, #{cart_count(@cart)} items"}
             >
-              <span aria-hidden="true">▣</span>
-              <span class="menu-buy-basket-count">{cart_count(@cart)}</span>
-            </button>
-            <button type="button" class="menu-buy-now" phx-click="buy_now">
-              Add to basket
+              Bag · {cart_count(@cart)}
             </button>
           </footer>
         </div>
@@ -935,6 +940,18 @@ defmodule EspresoWeb.MenuLive do
 
   defp size_label(%{size: size}) when is_binary(size) and size != "", do: size
   defp size_label(_price), do: nil
+
+  defp detail_multi_size?(%{product: %{product_prices: prices}}) when length(prices) > 1, do: true
+  defp detail_multi_size?(_detail), do: false
+
+  defp detail_single_size_label(%{product: %{product_prices: [price | _]}}) do
+    case size_label(price) do
+      nil -> nil
+      label -> label
+    end
+  end
+
+  defp detail_single_size_label(_detail), do: nil
 
   defp section_tone("HOT"), do: "hot"
   defp section_tone("COLD"), do: "cold"
