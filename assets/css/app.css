@@ -917,32 +917,6 @@ body:has(.menu-page-locked) {
 }
 
 /* Buy now modal */
-.menu-buy-layer--fullscreen {
-  position: fixed;
-  inset: 0;
-  z-index: 70;
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  background: #fff;
-}
-
-.menu-buy-layer--fullscreen.is-closing {
-  animation: menu-fade-out 0.28s ease both;
-}
-
-.menu-buy-panel--fullscreen {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100dvh;
-  max-height: 100dvh;
-  overflow: hidden;
-  background: #fff;
-  border-radius: 0;
-  box-shadow: none;
-}
-
 .menu-buy-header {
   display: flex;
   align-items: center;
@@ -971,37 +945,6 @@ body:has(.menu-page-locked) {
   outline: none;
 }
 
-.menu-buy-layer--fullscreen .menu-buy-visual {
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  aspect-ratio: auto;
-  width: 100%;
-  min-height: clamp(10rem, 28vh, 14rem);
-  max-height: min(34vh, 15.5rem);
-  padding: 0.35rem 0;
-  background: #fff;
-}
-
-.menu-buy-layer--fullscreen .menu-buy-photo {
-  width: 100%;
-  height: 100%;
-  max-width: min(100%, 26rem);
-  max-height: min(34vh, 15.5rem);
-  object-fit: contain;
-  object-position: center;
-  border-radius: 0;
-  box-shadow: none;
-  animation: none;
-}
-
-.menu-buy-layer--fullscreen .menu-buy-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
 .menu-buy-layer {
   position: fixed;
   inset: 0;
@@ -1009,6 +952,96 @@ body:has(.menu-page-locked) {
   display: grid;
   place-items: center;
   padding: 1rem;
+}
+
+/* Fullscreen product detail — must follow .menu-buy-layer so modal-era
+   grid/padding/centering cannot win the cascade. */
+.menu-buy-layer.menu-buy-layer--fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  place-items: stretch;
+  justify-content: flex-start;
+  align-items: stretch;
+  padding: 0;
+  margin: 0;
+  background: #fff;
+  overflow: hidden;
+}
+
+.menu-buy-layer.menu-buy-layer--fullscreen.is-closing {
+  animation: menu-fade-out 0.28s ease both;
+}
+
+.menu-buy-panel--fullscreen {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: 100dvh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: #fff;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.menu-buy-layer.menu-buy-layer--fullscreen .menu-buy-header {
+  flex: 0 0 auto;
+  padding: 0.45rem 0.85rem 0.2rem;
+  border-bottom: 0;
+  background: #fff;
+}
+
+.menu-buy-layer.menu-buy-layer--fullscreen .menu-buy-visual {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  height: auto;
+  min-height: 0;
+  max-height: clamp(10.5rem, 34vh, 13.75rem);
+  padding: 0.15rem 0.65rem 0.1rem;
+  background: #fff;
+  overflow: hidden;
+}
+
+.menu-buy-layer.menu-buy-layer--fullscreen .menu-buy-photo {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
+  border-radius: 0;
+  box-shadow: none;
+  animation: none;
+}
+
+.menu-buy-layer.menu-buy-layer--fullscreen .menu-buy-body {
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: visible;
+  padding: 0.55rem 1.05rem 0.2rem;
+}
+
+.menu-buy-layer.menu-buy-layer--fullscreen .menu-buy-bar--detail {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+  padding: 0.55rem 1.05rem calc(0.85rem + env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(56, 32, 16, 0.1);
+  background: #fff;
 }
 
 .menu-buy-backdrop {
@@ -6257,29 +6290,33 @@ body:has(.home-page-landing) {
   justify-self: end;
 }
 
-.menu-qr-my-order {
+.menu-qr-my-orders {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  width: 100%;
   margin: 0;
   padding: 0.4rem 1rem 0.45rem;
+  border: 0;
   border-top: 1px solid rgba(56, 32, 16, 0.06);
   border-bottom: 1px solid rgba(56, 32, 16, 0.06);
   background: color-mix(in srgb, #f85020 5%, #faf7f4);
   color: #382010;
+  font: inherit;
   font-family: "DM Sans", sans-serif;
-  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
 }
 
-.menu-qr-my-order:hover,
-.menu-qr-my-order:focus-visible {
+.menu-qr-my-orders:hover,
+.menu-qr-my-orders:focus-visible {
   color: #f85020;
   background: color-mix(in srgb, #f85020 9%, #faf7f4);
   outline: none;
 }
 
-.menu-qr-my-order-label {
+.menu-qr-my-orders-label {
   min-width: 0;
   font-size: 0.78rem;
   font-weight: 700;
@@ -6287,12 +6324,197 @@ body:has(.home-page-landing) {
   line-height: 1.2;
 }
 
-.menu-qr-my-order-chevron {
+.menu-qr-my-orders-chevron {
   flex: 0 0 auto;
   color: #f85020;
   font-size: 0.85rem;
   font-weight: 600;
   line-height: 1;
+}
+
+.menu-my-orders-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  display: grid;
+  align-items: end;
+}
+
+.menu-my-orders-backdrop {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: rgba(56, 32, 16, 0.28);
+  cursor: pointer;
+}
+
+.menu-my-orders-panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: min(78dvh, 36rem);
+  overflow: hidden;
+  border-radius: 1.15rem 1.15rem 0 0;
+  background: #fff;
+  box-shadow: 0 -12px 36px rgba(56, 32, 16, 0.16);
+}
+
+.menu-my-orders-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.15rem 0.85rem;
+  border-bottom: 1px solid rgba(56, 32, 16, 0.1);
+}
+
+.menu-my-orders-eyebrow {
+  margin: 0 0 0.2rem;
+  color: #b0a098;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.menu-my-orders-header h2 {
+  margin: 0;
+  color: #382010;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 1.55rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.menu-my-orders-close {
+  margin: 0.1rem 0 0;
+  padding: 0.35rem 0.55rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: color-mix(in srgb, #382010 62%, #b0a098);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.menu-my-orders-close:hover,
+.menu-my-orders-close:focus-visible {
+  color: #f85020;
+  outline: none;
+}
+
+.menu-my-orders-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.85rem 1.15rem calc(1rem + env(safe-area-inset-bottom));
+}
+
+.menu-my-orders-section + .menu-my-orders-section {
+  margin-top: 1.15rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(56, 32, 16, 0.08);
+}
+
+.menu-my-orders-section-title {
+  margin: 0 0 0.65rem;
+  color: color-mix(in srgb, #382010 55%, #b0a098);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.menu-my-orders-list {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.menu-my-orders-card {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid rgba(56, 32, 16, 0.1);
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, #faf7f4 70%, #fff);
+}
+
+.menu-my-orders-card--history {
+  background: #fff;
+}
+
+.menu-my-orders-card-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.menu-my-orders-number {
+  margin: 0;
+  color: #382010;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.menu-my-orders-status {
+  margin: 0;
+  color: #f85020;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.menu-my-orders-card--history .menu-my-orders-status {
+  color: #2f7a33;
+}
+
+.menu-my-orders-meta {
+  margin: 0;
+  color: color-mix(in srgb, #382010 58%, #b0a098);
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+
+.menu-my-orders-view {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 2.2rem;
+  margin-top: 0.15rem;
+  padding: 0.35rem 0.8rem;
+  border: 1.5px solid rgba(56, 32, 16, 0.14);
+  border-radius: 0.7rem;
+  color: #382010;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.menu-my-orders-view:hover,
+.menu-my-orders-view:focus-visible {
+  border-color: #f85020;
+  color: #f85020;
+  outline: none;
+}
+
+.menu-my-orders-empty {
+  margin: 0.5rem 0 0;
+  color: color-mix(in srgb, #382010 55%, #b0a098);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  text-align: center;
 }
 
 .menu-qr-chrome-search,
@@ -7560,6 +7782,41 @@ body:has(.home-page-landing) {
   line-height: 1.4;
 }
 
+.order-page .order-status-block--complete {
+  text-align: center;
+}
+
+.order-page .order-complete-state {
+  display: grid;
+  gap: 0.45rem;
+  justify-items: center;
+}
+
+.order-page .order-complete-badge {
+  margin: 0;
+  color: #2f7a33;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.order-page .order-status-block--complete .order-status-message {
+  color: #382010;
+}
+
+.order-page .order-status-block--complete .order-number {
+  color: color-mix(in srgb, #382010 62%, #b0a098);
+}
+
+.order-page .order-status-block--complete .order-hint {
+  max-width: 22rem;
+  margin-top: 0.15rem;
+  color: color-mix(in srgb, #382010 68%, #b0a098);
+  text-align: center;
+}
+
 @media (max-width: 374px) {
   .order-page .order-progress {
     gap: 0.2rem;
@@ -8794,24 +9051,71 @@ html:not(.page-is-loading) .brune-top {
 
 .menu-page-brune .brune-mega-footer--secondary {
   margin-top: 0.5rem;
-  padding: 1.75rem 1.15rem 2.5rem;
+  padding: 1.75rem 1.15rem 2.25rem;
   border-top: 1px solid rgba(56, 32, 16, 0.1);
   background: #faf7f4;
+  text-align: center;
 }
 
 .menu-page-brune .brune-mega-footer--secondary .brune-mega-brand {
-  color: #b0a098;
-  font-size: 1.15rem;
+  margin: 0;
+  color: #382010;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
 }
 
-.menu-page-brune .brune-mega-footer--secondary .brune-mega-label {
+.menu-page-brune .brune-mega-footer--secondary .menu-footer-owned-label {
+  margin: 0.85rem 0 0;
   color: #b0a098;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
-.menu-page-brune .brune-mega-footer--secondary .brune-mega-text,
-.menu-page-brune .brune-mega-footer--secondary .brune-mega-link {
-  color: color-mix(in srgb, #382010 72%, #b0a098);
-  font-size: 0.88rem;
+.menu-page-brune .brune-mega-footer--secondary .menu-footer-owned-name {
+  margin: 0.35rem 0 0;
+  color: color-mix(in srgb, #382010 78%, #b0a098);
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.menu-page-brune .brune-mega-footer--secondary .menu-footer-socials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  margin: 1.15rem 0 0;
+}
+
+.menu-page-brune .brune-mega-footer--secondary .menu-footer-social {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border: 1px solid rgba(56, 32, 16, 0.12);
+  border-radius: 999px;
+  color: color-mix(in srgb, #382010 68%, #b0a098);
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.menu-page-brune .brune-mega-footer--secondary .menu-footer-social svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.menu-page-brune .brune-mega-footer--secondary .menu-footer-social:hover,
+.menu-page-brune .brune-mega-footer--secondary .menu-footer-social:focus-visible {
+  color: #f85020;
+  border-color: rgba(248, 80, 32, 0.35);
+  background: color-mix(in srgb, #f85020 6%, #fff);
+  outline: none;
 }
 
 @media (min-width: 720px) {
@@ -9761,44 +10065,63 @@ html:not(.page-is-loading) .brune-top {
 }
 
 .menu-live-root .menu-buy-panel--fullscreen {
+  justify-content: flex-start;
   max-height: 100dvh;
-}
-
-.menu-live-root .menu-buy-layer--fullscreen .menu-buy-visual {
-  aspect-ratio: auto;
-  width: 100%;
-  min-height: clamp(10rem, 28vh, 14rem);
-  max-height: min(34vh, 15.5rem);
-  padding: 0.35rem 0;
+  min-height: 100dvh;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-radius: 0;
+  box-shadow: none;
   background: #fff;
 }
 
-.menu-live-root .menu-buy-layer--fullscreen .menu-buy-photo {
-  max-width: min(100%, 26rem);
-  max-height: min(34vh, 15.5rem);
+.menu-live-root .menu-buy-layer.menu-buy-layer--fullscreen .menu-buy-header {
+  border-bottom: 0;
+  background: #fff;
+}
+
+.menu-live-root .menu-buy-layer.menu-buy-layer--fullscreen .menu-buy-visual {
+  aspect-ratio: 4 / 3;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  max-height: clamp(10.5rem, 34vh, 13.75rem);
+  padding: 0.15rem 0.65rem 0.1rem;
+  background: #fff;
+}
+
+.menu-live-root .menu-buy-layer.menu-buy-layer--fullscreen .menu-buy-photo {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
   border-radius: 0;
   box-shadow: none;
 }
 
-.menu-live-root .menu-buy-body {
-  padding: 0.95rem 1.15rem 0.85rem;
+.menu-live-root .menu-buy-layer.menu-buy-layer--fullscreen .menu-buy-body {
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: visible;
+  padding: 0.55rem 1.05rem 0.2rem;
 }
 
 .menu-live-root .menu-detail-name {
   color: #382010;
   font-family: "Instrument Serif", Georgia, serif;
-  font-size: clamp(1.45rem, 5.5vw, 1.85rem);
+  font-size: clamp(1.4rem, 5.2vw, 1.8rem);
   font-weight: 400;
   letter-spacing: -0.02em;
-  line-height: 1.15;
+  line-height: 1.12;
 }
 
 .menu-live-root .menu-detail-description {
-  margin: 0.45rem 0 0;
+  margin: 0.4rem 0 0;
   color: color-mix(in srgb, #382010 58%, #b0a098);
-  font-size: 0.86rem;
-  line-height: 1.4;
+  font-size: 0.84rem;
+  line-height: 1.35;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
@@ -9806,11 +10129,11 @@ html:not(.page-is-loading) .brune-top {
 }
 
 .menu-live-root .menu-detail-sizes {
-  margin-top: 0.85rem;
+  margin-top: 0.7rem;
 }
 
 .menu-live-root .menu-detail-size-note {
-  margin: 0.7rem 0 0;
+  margin: 0.55rem 0 0;
   color: color-mix(in srgb, #382010 52%, #b0a098);
   font-size: 0.82rem;
   font-weight: 600;
@@ -9824,9 +10147,9 @@ html:not(.page-is-loading) .brune-top {
 }
 
 .menu-live-root .menu-size-pill {
-  min-height: 2.75rem;
-  min-width: 3.5rem;
-  padding: 0.45rem 1rem;
+  min-height: 2.65rem;
+  min-width: 3.35rem;
+  padding: 0.4rem 0.9rem;
   border-radius: 0.7rem;
   border-color: rgba(56, 32, 16, 0.14);
   font-size: 0.9rem;
@@ -9841,19 +10164,19 @@ html:not(.page-is-loading) .brune-top {
 }
 
 .menu-live-root .menu-detail-qty-row {
-  margin-top: 1.05rem;
+  margin-top: 0.75rem;
 }
 
 .menu-live-root .menu-qty {
   border: 1px solid rgba(56, 32, 16, 0.12);
   border-radius: 0.75rem;
-  padding: 0.2rem;
+  padding: 0.15rem;
   background: #fff;
 }
 
 .menu-live-root .menu-qty button {
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.65rem;
+  height: 2.65rem;
   border-radius: 0.55rem;
   color: #382010;
 }
@@ -9864,10 +10187,10 @@ html:not(.page-is-loading) .brune-top {
 }
 
 .menu-live-root .menu-detail-price--sheet {
-  margin: 0.35rem 0 0;
+  margin: 0.28rem 0 0;
   color: #382010;
   font-family: "DM Sans", "Segoe UI", system-ui, sans-serif;
-  font-size: 1.18rem;
+  font-size: 1.12rem;
   font-weight: 700;
   letter-spacing: 0;
   text-decoration: none;
@@ -9878,15 +10201,17 @@ html:not(.page-is-loading) .brune-top {
 .menu-live-root .menu-buy-bar--detail {
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
-  padding: 0.75rem 1.15rem calc(0.85rem + env(safe-area-inset-bottom));
+  flex: 0 0 auto;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+  padding: 0.55rem 1.05rem calc(0.85rem + env(safe-area-inset-bottom));
   border-top: 1px solid rgba(56, 32, 16, 0.1);
   background: #fff;
 }
 
 .menu-live-root .menu-buy-bar--detail .menu-buy-now {
   width: 100%;
-  min-height: 3.15rem;
+  min-height: 3.05rem;
   border-radius: 0.85rem;
   font-size: 0.95rem;
   font-weight: 700;
@@ -9896,9 +10221,9 @@ html:not(.page-is-loading) .brune-top {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.35rem;
+  min-height: 2.25rem;
   margin: 0;
-  padding: 0.35rem 0.75rem;
+  padding: 0.3rem 0.75rem;
   border: 0;
   background: transparent;
   color: color-mix(in srgb, #382010 58%, #b0a098);
@@ -9917,11 +10242,11 @@ html:not(.page-is-loading) .brune-top {
 }
 
 @media (min-width: 640px) {
-  .menu-live-root .menu-buy-visual {
-    max-height: 15rem;
+  .menu-live-root .menu-buy-layer.menu-buy-layer--fullscreen .menu-buy-visual {
+    max-height: 14.5rem;
   }
 
-  .menu-live-root .menu-buy-body {
+  .menu-live-root .menu-buy-layer.menu-buy-layer--fullscreen .menu-buy-body {
     padding-left: 1.25rem;
     padding-right: 1.25rem;
   }

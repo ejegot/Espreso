@@ -3,6 +3,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Espreso.CoffeeSpot
   alias Espreso.Menu.{Category, Product, ProductPrice}
   alias Espreso.Orders
   alias Espreso.Repo
@@ -921,25 +922,17 @@ defmodule EspresoWeb.MenuLiveTest do
     assert html =~ ~s(data-cart="[]")
     assert Orders.list_active_orders() != []
 
-    # Client hook restores the persisted current order after reconnect/navigation.
-    render_hook(menu_view, "restore_current_order", %{"number" => order_number})
+    render_hook(menu_view, "restore_my_orders", %{"numbers" => [order_number]})
 
-    assert has_element?(menu_view, "#menu-qr-my-order", "My Order")
-    refute has_element?(menu_view, "#menu-qr-my-order", "Preparing")
-
-    my_order_href =
-      menu_view
-      |> element("#menu-qr-my-order")
-      |> render()
-      |> Floki.parse_fragment!()
-      |> Floki.attribute("href")
-      |> List.first()
-
-    assert my_order_href == "/order/#{order_number}"
+    assert has_element?(menu_view, "#menu-qr-my-orders", "My Orders")
+    menu_view |> element("#menu-qr-my-orders") |> render_click()
+    assert has_element?(menu_view, "#menu-my-orders-panel")
+    assert has_element?(menu_view, "#menu-my-orders-active-heading", "Active")
+    assert has_element?(menu_view, "#menu-my-order-#{order_number}", order_number)
 
     {:ok, detail_view, _html} =
       menu_view
-      |> element("#menu-qr-my-order")
+      |> element("#menu-my-order-#{order_number} a.menu-my-orders-view", "View Order")
       |> render_click()
       |> follow_redirect(conn)
 
@@ -947,45 +940,11 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(detail_view, "#order-status-message", "Order received")
   end
 
-  test "/menu My Order appears only when a current order is restored", %{conn: conn} do
+  test "/menu My Orders restores multiple orders and appends instead of replacing", %{
+    conn: conn
+  } do
     {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
-
-    refute has_element?(view, "#menu-qr-my-order")
-
-    {:ok, order} =
-      Orders.create_order(
-        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
-        %{
-          customer_name: "Persistent",
-          fulfillment: :pickup,
-          payment_method: :counter
-        }
-      )
-
-    render_hook(view, "restore_current_order", %{"number" => order.number})
-
-    assert has_element?(view, "#menu-qr-my-order", "My Order")
-    assert has_element?(view, ~s(#menu-qr-my-order[href="/order/#{order.number}"]))
-
-    assert {:ok, preparing} = Orders.update_status(order, "preparing")
-    assert has_element?(view, "#menu-qr-my-order", "My Order · Preparing")
-
-    assert {:ok, _} = Orders.update_status(preparing, "ready")
-    assert has_element?(view, "#menu-qr-my-order", "My Order · Ready")
-  end
-
-  test "/menu ignores malformed current order numbers", %{conn: conn} do
-    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
-
-    render_hook(view, "restore_current_order", %{"number" => "not-an-order"})
-    refute has_element?(view, "#menu-qr-my-order")
-
-    render_hook(view, "restore_current_order", %{"number" => "CS-222222"})
-    refute has_element?(view, "#menu-qr-my-order")
-  end
-
-  test "/menu newer current order replaces the previous reference", %{conn: conn} do
-    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    refute has_element?(view, "#menu-qr-my-orders")
 
     {:ok, first} =
       Orders.create_order(
@@ -999,7 +958,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
     {:ok, second} =
       Orders.create_order(
-        [%{name: "Americano", size: "8oz", quantity: 1, price: Decimal.new("110")}],
+        [%{name: "Americano", size: "8oz", quantity: 2, price: Decimal.new("110")}],
         %{
           customer_name: "Second",
           fulfillment: :pickup,
@@ -1007,12 +966,135 @@ defmodule EspresoWeb.MenuLiveTest do
         }
       )
 
-    render_hook(view, "restore_current_order", %{"number" => first.number})
-    assert has_element?(view, ~s(#menu-qr-my-order[href="/order/#{first.number}"]))
+    {:ok, third} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Third",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
 
-    render_hook(view, "restore_current_order", %{"number" => second.number})
-    assert has_element?(view, ~s(#menu-qr-my-order[href="/order/#{second.number}"]))
-    refute has_element?(view, ~s(#menu-qr-my-order[href="/order/#{first.number}"]))
+    render_hook(view, "restore_my_orders", %{
+      "numbers" => [first.number, second.number, third.number, first.number]
+    })
+
+    assert has_element?(view, "#menu-qr-my-orders", "My Orders")
+    view |> element("#menu-qr-my-orders") |> render_click()
+
+    assert has_element?(view, "#menu-my-order-#{first.number}")
+    assert has_element?(view, "#menu-my-order-#{second.number}")
+    assert has_element?(view, "#menu-my-order-#{third.number}")
+    assert has_element?(view, "#menu-my-order-#{second.number}", "2 items")
+    assert has_element?(view, "#menu-my-order-#{second.number}", "₱220")
+
+    html = view |> element("#menu-my-orders-panel") |> render()
+    first_matches = Regex.scan(~r/id="menu-my-order-#{Regex.escape(first.number)}"/, html)
+    assert length(first_matches) == 1
+  end
+
+  test "/menu My Orders splits active and history by status", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+
+    {:ok, received} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Rec", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, preparing} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Prep", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, ready} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Ready", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, completed} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 3, price: Decimal.new("75")}],
+        %{customer_name: "Done", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, cancelled} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Cancel", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    assert {:ok, preparing} = Orders.update_status(preparing, "preparing")
+    assert {:ok, ready} = Orders.update_status(ready, "ready")
+    assert {:ok, completed_ready} = Orders.update_status(completed, "ready")
+    assert {:ok, completed} = Orders.complete_order(completed_ready)
+    assert {:ok, _} = Orders.cancel_order(cancelled)
+
+    render_hook(view, "restore_my_orders", %{
+      "numbers" => [
+        received.number,
+        preparing.number,
+        ready.number,
+        completed.number,
+        cancelled.number
+      ]
+    })
+
+    view |> element("#menu-qr-my-orders") |> render_click()
+
+    assert has_element?(view, "#menu-my-orders-active-heading", "Active")
+    assert has_element?(view, "#menu-my-orders-history-heading", "History")
+    assert has_element?(view, "#menu-my-order-#{received.number}", "Received")
+    assert has_element?(view, "#menu-my-order-#{preparing.number}", "Preparing")
+    assert has_element?(view, "#menu-my-order-#{ready.number}", "Ready")
+    assert has_element?(view, "#menu-my-order-#{completed.number}", "Picked Up ✓")
+    assert has_element?(view, "#menu-my-order-#{completed.number}", "3 items")
+    refute has_element?(view, "#menu-my-order-#{cancelled.number}")
+
+    assert has_element?(view, "#menu-qr-my-orders", "My Orders · Ready")
+
+    assert {:ok, completed_ready_again} = Orders.complete_order(ready)
+    assert completed_ready_again.status == "completed"
+    refute has_element?(view, ~s(#menu-my-order-#{ready.number}[data-status="ready"]))
+    assert has_element?(view, ~s(#menu-my-order-#{ready.number}[data-status="completed"]))
+    assert has_element?(view, "#menu-my-order-#{ready.number}", "Picked Up ✓")
+  end
+
+  test "/menu My Orders ignores malformed and missing numbers", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Keep", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    render_hook(view, "restore_my_orders", %{
+      "numbers" => ["not-an-order", "CS-222222", order.number, "12"]
+    })
+
+    assert has_element?(view, "#menu-qr-my-orders")
+    view |> element("#menu-qr-my-orders") |> render_click()
+    assert has_element?(view, "#menu-my-order-#{order.number}")
+
+    render_hook(view, "restore_my_orders", %{"numbers" => []})
+    refute has_element?(view, "#menu-qr-my-orders")
+  end
+
+  test "/menu legacy restore_current_order still hydrates My Orders", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Legacy", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    render_hook(view, "restore_current_order", %{"number" => order.number})
+    assert has_element?(view, "#menu-qr-my-orders", "My Orders")
   end
 
   test "/menu confirmation page carries order number for client persistence", %{conn: conn} do
@@ -1121,15 +1203,27 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#menu-search.brune-menu-search--compact")
     assert has_element?(view, ".brune-student-promo")
     assert has_element?(view, ".brune-mega-footer--secondary")
-    assert has_element?(view, ".brune-mega-brand", "CoffeeSpot")
-    assert has_element?(view, ".brune-mega-label", "Hours")
-    assert has_element?(view, ".brune-mega-label", "Contact")
-    assert has_element?(view, ".brune-mega-label", "Location")
+    assert has_element?(view, ".brune-mega-brand", "CoffeeSpot Marikina")
+    assert has_element?(view, ".menu-footer-owned-label", "Owned and Operated by:")
+    assert has_element?(view, ".menu-footer-owned-name", "Elilai Kafe")
+    assert has_element?(view, "#menu-footer-instagram")
+    assert has_element?(view, "#menu-footer-facebook")
+    assert has_element?(view, "#menu-footer-tiktok")
+
+    assert view
+           |> element("#menu-footer-instagram")
+           |> render()
+           |> Floki.parse_fragment!()
+           |> Floki.attribute("href")
+           |> List.first() == CoffeeSpot.instagram_url()
+
+    refute has_element?(view, ".brune-mega-label", "Hours")
+    refute has_element?(view, ".brune-mega-label", "Contact")
+    refute has_element?(view, ".brune-mega-label", "Location")
     refute has_element?(view, ".brune-top")
     refute has_element?(view, ".brune-top-nav")
     refute has_element?(view, ".brune-menu-hero")
     refute has_element?(view, ".site-instagram-menu")
-    refute has_element?(view, ".brune-mega-brand", "Elilai")
     refute has_element?(view, ~s([data-image-slot="menu-hero"]))
   end
 
@@ -1324,13 +1418,48 @@ defmodule EspresoWeb.MenuLiveTest do
 
     view |> element("button[aria-label='Add Espresso']") |> render_click()
 
+    assert has_element?(view, "#menu-detail.menu-buy-layer--fullscreen")
+    assert has_element?(view, ".menu-buy-panel--fullscreen")
+    assert has_element?(view, ".menu-buy-header")
+    assert has_element?(view, ".menu-buy-visual .menu-buy-photo")
+    assert has_element?(view, ".menu-buy-bar--detail button.menu-buy-now", "Add to your order")
+
     html = view |> element("#menu-detail") |> render()
+    name_pos = :binary.match(html, "menu-detail-name") |> elem(0)
     price_pos = :binary.match(html, "menu-detail-price") |> elem(0)
+    desc_pos = :binary.match(html, "menu-detail-description") |> elem(0)
     qty_pos = :binary.match(html, "menu-detail-qty-row") |> elem(0)
-    assert price_pos < qty_pos
+    cta_pos = :binary.match(html, "menu-buy-bar--detail") |> elem(0)
+
+    assert name_pos < price_pos
+    assert price_pos < desc_pos
+    assert desc_pos < qty_pos
+    assert qty_pos < cta_pos
 
     refute has_element?(view, ".menu-buy-basket-link")
+    refute html =~ "View Your Order"
+    refute html =~ "Place order"
     assert has_element?(view, "button.menu-buy-close", "Back")
+  end
+
+  test "/menu product detail shows View Your Order when cart has items", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view = enter_menu_browse(view)
+
+    view |> element("button[aria-label='Add Espresso']") |> render_click()
+    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    refute has_element?(view, "#menu-detail")
+
+    view |> element("button[aria-label='Add Americano']") |> render_click()
+    assert has_element?(view, "#menu-detail.menu-buy-layer--fullscreen")
+    assert has_element?(view, ".menu-buy-basket-link", "View Your Order →")
+    refute has_element?(view, "#menu-detail button", "Place order")
+    refute has_element?(view, "#menu-detail .menu-basket-checkout")
+
+    view |> element(".menu-buy-basket-link", "View Your Order →") |> render_click()
+    assert has_element?(view, "#menu-basket")
+    assert has_element?(view, "#menu-basket-title", "Your Order")
+    assert has_element?(view, "button.menu-basket-checkout", "Place order")
   end
 
   test "/menu Your Order keeps Back on the left", %{conn: conn} do

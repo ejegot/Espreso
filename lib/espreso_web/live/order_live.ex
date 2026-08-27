@@ -103,11 +103,32 @@ defmodule EspresoWeb.OrderLive do
         </div>
 
         <div :if={@order && !@confirming?} class="order-card">
-          <div class="order-status-block">
-            <h1 class="order-status-message" id="order-status-message">
+          <div class={[
+            "order-status-block",
+            @order.status == "completed" && "order-status-block--complete"
+          ]}>
+            <div
+              :if={@order.status == "completed"}
+              id="order-complete-state"
+              class="order-complete-state"
+              role="status"
+            >
+              <p class="order-complete-badge">✓ Order complete</p>
+              <h1 class="order-status-message" id="order-status-message">Picked Up ✓</h1>
+              <p class="order-number">{@order.number}</p>
+              <p class="order-hint" id="order-hint">
+                Your order has been picked up. Thank you for visiting CoffeeSpot.
+              </p>
+            </div>
+
+            <h1
+              :if={@order.status != "completed"}
+              class="order-status-message"
+              id="order-status-message"
+            >
               {customer_status_message(@order.status)}
             </h1>
-            <p class="order-number">{@order.number}</p>
+            <p :if={@order.status != "completed"} class="order-number">{@order.number}</p>
 
             <ol
               :if={show_order_tracker?(@order.status)}
@@ -145,7 +166,13 @@ defmodule EspresoWeb.OrderLive do
               <p class="order-cancelled-lede">This order will not be prepared.</p>
             </div>
 
-            <p class="order-hint" id="order-hint">{customer_status_hint(@order)}</p>
+            <p
+              :if={@order.status not in ["completed"]}
+              class="order-hint"
+              id="order-hint"
+            >
+              {customer_status_hint(@order)}
+            </p>
           </div>
 
           <section id="order-receipt" class="order-receipt" aria-labelledby="order-receipt-title">
@@ -207,12 +234,12 @@ defmodule EspresoWeb.OrderLive do
   defp customer_status_message("received"), do: "Order received"
   defp customer_status_message("preparing"), do: "We're preparing your order"
   defp customer_status_message("ready"), do: "Your order is ready"
-  defp customer_status_message("completed"), do: "Order picked up"
+  defp customer_status_message("completed"), do: "Picked Up ✓"
   defp customer_status_message("cancelled"), do: "Order cancelled"
   defp customer_status_message(_), do: "Order"
 
   defp customer_status_hint(%{status: "completed"}),
-    do: "Thanks — this order is complete. We hope you enjoyed CoffeeSpot."
+    do: "Your order has been picked up. Thank you for visiting CoffeeSpot."
 
   defp customer_status_hint(%{status: "cancelled"}),
     do: "This order was cancelled. You can place a new order from the menu."
@@ -238,8 +265,7 @@ defmodule EspresoWeb.OrderLive do
   defp customer_status_hint(_order),
     do: "Keep this screen open for live updates on your order."
 
-  defp show_order_tracker?(status) when status in ["received", "preparing", "ready", "completed"],
-    do: true
+  defp show_order_tracker?(status) when status in ["received", "preparing", "ready"], do: true
 
   defp show_order_tracker?(_status), do: false
 

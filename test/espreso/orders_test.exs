@@ -33,6 +33,40 @@ defmodule Espreso.OrdersTest do
     assert length(order.items) == 2
   end
 
+  test "list_orders_by_numbers returns matching orders and ignores invalid input" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    assert {:ok, first} =
+             Orders.create_order(lines, %{
+               customer_name: "One",
+               fulfillment: :pickup,
+               payment_method: :counter
+             })
+
+    assert {:ok, second} =
+             Orders.create_order(lines, %{
+               customer_name: "Two",
+               fulfillment: :pickup,
+               payment_method: :counter
+             })
+
+    orders =
+      Orders.list_orders_by_numbers([
+        second.number,
+        "not-valid",
+        first.number,
+        first.number,
+        "CS-222222"
+      ])
+
+    assert MapSet.new(Enum.map(orders, & &1.number)) ==
+             MapSet.new([first.number, second.number])
+
+    assert length(orders) == 2
+    assert Orders.list_orders_by_numbers([]) == []
+    assert Orders.list_orders_by_numbers(nil) == []
+  end
+
   test "create_order assigns unique random numbers" do
     lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
 

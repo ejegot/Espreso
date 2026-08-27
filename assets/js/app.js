@@ -165,7 +165,79 @@ Hooks.SmoothScroll = {
 }
 
 const MENU_CART_STORAGE_KEY = "coffeespot.menu.cart.v1"
-const CURRENT_ORDER_STORAGE_KEY = "coffeespot.current_order.v1"
+const MY_ORDERS_STORAGE_KEY = "coffeespot.orders.v1"
+const LEGACY_CURRENT_ORDER_STORAGE_KEY = "coffeespot.current_order.v1"
+const MY_ORDERS_MAX = 20
+const ORDER_NUMBER_PATTERN = /^CS-[2-9A-HJ-NP-Z]{6}$/
+
+function isValidOrderNumber(value) {
+  return typeof value === "string" && ORDER_NUMBER_PATTERN.test(value.trim())
+}
+
+function readMyOrderNumbers() {
+  try {
+    const raw = localStorage.getItem(MY_ORDERS_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      const numbers = Array.isArray(parsed?.numbers) ? parsed.numbers : []
+      return sanitizeOrderNumbers(numbers)
+    }
+
+    // One-time migrate legacy single-order pointer.
+    const legacyRaw = localStorage.getItem(LEGACY_CURRENT_ORDER_STORAGE_KEY)
+    if (!legacyRaw) return []
+
+    const legacy = JSON.parse(legacyRaw)
+    const legacyNumber =
+      typeof legacy?.number === "string" ? legacy.number.trim() : ""
+    const migrated = sanitizeOrderNumbers([legacyNumber])
+    writeMyOrderNumbers(migrated)
+    try {
+      localStorage.removeItem(LEGACY_CURRENT_ORDER_STORAGE_KEY)
+    } catch (_error) {
+      // no-op
+    }
+    return migrated
+  } catch (_error) {
+    return []
+  }
+}
+
+function sanitizeOrderNumbers(numbers) {
+  if (!Array.isArray(numbers)) return []
+  const seen = new Set()
+  const cleaned = []
+  for (const value of numbers) {
+    if (!isValidOrderNumber(value)) continue
+    const number = String(value).trim()
+    if (seen.has(number)) continue
+    seen.add(number)
+    cleaned.push(number)
+    if (cleaned.length >= MY_ORDERS_MAX) break
+  }
+  return cleaned
+}
+
+function writeMyOrderNumbers(numbers) {
+  try {
+    const cleaned = sanitizeOrderNumbers(numbers)
+    if (!cleaned.length) {
+      localStorage.removeItem(MY_ORDERS_STORAGE_KEY)
+      return []
+    }
+    localStorage.setItem(MY_ORDERS_STORAGE_KEY, JSON.stringify({numbers: cleaned}))
+    return cleaned
+  } catch (_error) {
+    return sanitizeOrderNumbers(numbers)
+  }
+}
+
+function appendMyOrderNumber(number) {
+  if (!isValidOrderNumber(number)) return readMyOrderNumbers()
+  const value = String(number).trim()
+  const existing = readMyOrderNumbers().filter((n) => n !== value)
+  return writeMyOrderNumbers([...existing, value])
+}
 
 Hooks.OrderConfirm = {
   mounted() {
@@ -175,17 +247,12 @@ Hooks.OrderConfirm = {
       // Ignore private-mode / storage failures.
     }
 
-    this.persistCurrentOrder()
+    this.appendOrderNumber()
   },
 
-  persistCurrentOrder() {
-    try {
-      const number = (this.el.dataset.orderNumber || "").trim()
-      if (!/^CS-[2-9A-HJ-NP-Z]{6}$/.test(number)) return
-      localStorage.setItem(CURRENT_ORDER_STORAGE_KEY, JSON.stringify({number}))
-    } catch (_error) {
-      // no-op
-    }
+  appendOrderNumber() {
+    const number = (this.el.dataset.orderNumber || "").trim()
+    appendMyOrderNumber(number)
   }
 }
 
@@ -197,8 +264,11 @@ Hooks.MenuBrowse = {
     this.handleEvent("scroll_active_chip", ({id}) => this.scrollActiveChip(id))
     this.handleEvent("scroll_basket_top", () => this.scrollBasketTop())
     this.handleEvent("clear_persisted_cart", () => this.clearPersistedCart())
-    this.handleEvent("persist_current_order", ({number}) => this.persistCurrentOrder(number))
-    this.handleEvent("clear_current_order", () => this.clearCurrentOrder())
+    this.handleEvent("persist_my_order", ({number}) => this.persistMyOrder(number))
+    this.handleEvent("persist_current_order", ({number}) => this.persistMyOrder(number))
+    this.handleEvent("sync_my_orders", ({numbers}) => this.syncMyOrders(numbers))
+    this.handleEvent("clear_my_orders", () => this.clearMyOrders())
+    this.handleEvent("clear_current_order", () => this.clearMyOrders())
 
     this.onChipClick = (event) => {
       const chip = event.target.closest(".menu-craving-chip")
@@ -207,7 +277,7 @@ Hooks.MenuBrowse = {
 
     this.el.addEventListener("click", this.onChipClick)
     this.restorePersistedCart()
-    this.restoreCurrentOrder()
+    this.restoreMyOrders()
     this.persistCartFromDom()
   },
 
@@ -221,10 +291,6 @@ Hooks.MenuBrowse = {
 
   cartStorageKey() {
     return MENU_CART_STORAGE_KEY
-  },
-
-  currentOrderStorageKey() {
-    return CURRENT_ORDER_STORAGE_KEY
   },
 
   readCartPayload() {
@@ -259,48 +325,30 @@ Hooks.MenuBrowse = {
     }
   },
 
-  persistCurrentOrder(number) {
+  persistMyOrder(number) {
+    appendMyOrderNumber(number)
+  },
+
+  syncMyOrders(numbers) {
+    writeMyOrderNumbers(Array.isArray(numbers) ? numbers : [])
+  },
+
+  clearMyOrders() {
     try {
-      const value = String(number || "").trim()
-      if (!/^CS-[2-9A-HJ-NP-Z]{6}$/.test(value)) return
-      localStorage.setItem(this.currentOrderStorageKey(), JSON.stringify({number: value}))
+      localStorage.removeItem(MY_ORDERS_STORAGE_KEY)
+      localStorage.removeItem(LEGACY_CURRENT_ORDER_STORAGE_KEY)
     } catch (_error) {
       // no-op
     }
   },
 
-  clearCurrentOrder() {
-    try {
-      localStorage.removeItem(this.currentOrderStorageKey())
-    } catch (_error) {
-      // no-op
-    }
-  },
+  restoreMyOrders() {
+    if (this._myOrdersRestoreAttempted) return
+    this._myOrdersRestoreAttempted = true
 
-  readCurrentOrderNumber() {
-    try {
-      const raw = localStorage.getItem(this.currentOrderStorageKey())
-      if (!raw) return null
-      const parsed = JSON.parse(raw)
-      const number = typeof parsed?.number === "string" ? parsed.number.trim() : ""
-      if (!/^CS-[2-9A-HJ-NP-Z]{6}$/.test(number)) {
-        this.clearCurrentOrder()
-        return null
-      }
-      return number
-    } catch (_error) {
-      this.clearCurrentOrder()
-      return null
-    }
-  },
-
-  restoreCurrentOrder() {
-    if (this._currentOrderRestoreAttempted) return
-    this._currentOrderRestoreAttempted = true
-
-    const number = this.readCurrentOrderNumber()
-    if (!number) return
-    this.pushEvent("restore_current_order", {number})
+    const numbers = readMyOrderNumbers()
+    if (!numbers.length) return
+    this.pushEvent("restore_my_orders", {numbers})
   },
 
   restorePersistedCart() {
