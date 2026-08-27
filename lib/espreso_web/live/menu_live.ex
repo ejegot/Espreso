@@ -79,7 +79,25 @@ defmodule EspresoWeb.MenuLive do
   end
 
   @impl true
+  def handle_event("enter_menu", _params, socket) do
+    category = default_category(socket.assigns.categories)
+
+    {:noreply,
+     socket
+     |> push_patch(to: menu_path(socket, :menu, category: category, filter: nil))
+     |> then(fn socket ->
+       if is_binary(category) do
+         socket
+         |> push_event("scroll_active_chip", %{id: "menu-craving-chip-#{category}"})
+         |> push_event("scroll_to_menu_content", %{})
+       else
+         socket
+       end
+     end)}
+  end
+
   def handle_event("enter_craving", _params, socket) do
+    # Deprecated hop: keep for deep links / legacy handlers; normal UI uses enter_menu.
     {:noreply, push_patch(socket, to: menu_path(socket, :craving))}
   end
 
@@ -92,7 +110,8 @@ defmodule EspresoWeb.MenuLive do
   end
 
   def handle_event("back_to_craving", _params, socket) do
-    {:noreply, push_patch(socket, to: menu_path(socket, :craving))}
+    # Legacy event name — return to Landing where cravings now live.
+    {:noreply, push_patch(socket, to: menu_path(socket, :landing))}
   end
 
   def handle_event("select_craving", %{"id" => id}, socket) do
@@ -437,18 +456,18 @@ defmodule EspresoWeb.MenuLive do
         <div class="menu-qr-landing-scene">
           <div class="menu-qr-landing-media" aria-hidden="true">
             <img
-              src="/images/coffeespot/cold-signature-01.jpg"
+              src="/images/coffeespot/IMG_3498.png"
               alt=""
               class="menu-qr-landing-photo"
-              width="800"
-              height="1000"
+              width="817"
+              height="1024"
             />
           </div>
 
           <div class="menu-qr-landing-scrim" aria-hidden="true"></div>
 
           <div class="menu-qr-landing-content">
-            <p class="menu-qr-landing-brand">CoffeeSpot</p>
+            <p class="menu-qr-landing-brand">CoffeeSpot Marikina</p>
             <h1 class="menu-qr-landing-headline">Your coffee moment starts here.</h1>
             <p class="menu-qr-landing-lede">
               Browse the menu. Order from your table.
@@ -460,7 +479,7 @@ defmodule EspresoWeb.MenuLive do
                 type="button"
                 id="menu-cta-view-menu"
                 class="menu-qr-landing-cta menu-qr-landing-cta--primary"
-                phx-click="enter_craving"
+                phx-click="enter_menu"
               >
                 View the menu
               </button>
@@ -475,6 +494,25 @@ defmodule EspresoWeb.MenuLive do
             </div>
           </div>
         </div>
+
+        <footer class="menu-qr-landing-footer" aria-label="CoffeeSpot footer">
+          <div class="menu-qr-landing-socials" aria-label="Social">
+            <a
+              :for={link <- CoffeeSpot.social_links()}
+              href={link.href}
+              id={"menu-landing-#{link.id}"}
+              class={"menu-qr-landing-social menu-qr-landing-social--#{link.id}"}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={"CoffeeSpot on #{link.label}"}
+            >
+              <.social_icon name={link.id} />
+            </a>
+          </div>
+
+          <p class="menu-qr-landing-footer-brand">CoffeeSpot Marikina</p>
+          <p class="menu-qr-landing-footer-owned">Owned and Operated by Elilai Kafe</p>
+        </footer>
       </div>
 
       <div :if={@menu_stage == :craving} id="menu-craving-chooser" class="menu-qr-craving">
@@ -614,7 +652,7 @@ defmodule EspresoWeb.MenuLive do
             type="button"
             id="menu-visit-view-menu"
             class="menu-qr-visit-menu-link"
-            phx-click="enter_craving"
+            phx-click="enter_menu"
           >
             View the menu
           </button>
@@ -628,7 +666,7 @@ defmodule EspresoWeb.MenuLive do
               type="button"
               id="menu-qr-back"
               class="menu-qr-chrome-back"
-              phx-click="back_to_craving"
+              phx-click="back_to_landing"
             >
               Back
             </button>
@@ -691,22 +729,6 @@ defmodule EspresoWeb.MenuLive do
               </button>
             </div>
           </header>
-
-          <button
-            :if={@my_orders != []}
-            type="button"
-            id="menu-qr-my-orders"
-            class="menu-qr-my-orders"
-            phx-click="toggle_my_orders"
-            aria-expanded={to_string(@my_orders_open?)}
-            aria-controls="menu-my-orders-panel"
-            aria-label={my_orders_trigger_aria(@my_orders)}
-          >
-            <span class="menu-qr-my-orders-label">{my_orders_trigger_label(@my_orders)}</span>
-            <span class="menu-qr-my-orders-chevron" aria-hidden="true">
-              {if @my_orders_open?, do: "↑", else: "→"}
-            </span>
-          </button>
 
           <nav
             id="menu-craving"
@@ -1004,6 +1026,47 @@ defmodule EspresoWeb.MenuLive do
       >
         {@toast}
       </div>
+
+      <button
+        :if={
+          @menu_stage == :menu &&
+            show_floating_my_orders?(@my_orders, @my_orders_open?, @basket_open?, @detail)
+        }
+        type="button"
+        id="menu-qr-my-orders"
+        class={[
+          "menu-qr-my-orders",
+          my_orders_trigger_badge(@my_orders) && "menu-qr-my-orders--status"
+        ]}
+        phx-click="toggle_my_orders"
+        aria-expanded={to_string(@my_orders_open?)}
+        aria-controls="menu-my-orders-panel"
+        aria-label={my_orders_trigger_aria(@my_orders)}
+      >
+        <span class="menu-qr-my-orders-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path
+              d="M8 7h11M8 12h11M8 17h8"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+            />
+            <path
+              d="M5 7h.01M5 12h.01M5 17h.01"
+              stroke="currentColor"
+              stroke-width="2.4"
+              stroke-linecap="round"
+            />
+          </svg>
+        </span>
+        <span class="menu-qr-my-orders-label">My Orders</span>
+        <span
+          :if={badge = my_orders_trigger_badge(@my_orders)}
+          class="menu-qr-my-orders-badge"
+        >
+          {badge}
+        </span>
+      </button>
 
       <div
         :if={@menu_stage == :menu && show_floating_bag?(@cart, @basket_open?, @detail)}
@@ -1743,30 +1806,33 @@ defmodule EspresoWeb.MenuLive do
     |> Enum.sort_by(& &1.inserted_at, {:desc, DateTime})
   end
 
-  defp my_orders_trigger_label(orders) do
+  defp my_orders_trigger_badge(orders) do
     active = active_my_orders(orders)
 
     cond do
-      Enum.any?(active, &(&1.status == "ready")) ->
-        "My Orders · Ready"
-
-      Enum.any?(active, &(&1.status == "preparing")) ->
-        "My Orders · Preparing"
-
-      active != [] ->
-        count = length(active)
-        "My Orders · #{count} active"
-
-      true ->
-        "My Orders"
+      Enum.any?(active, &(&1.status == "ready")) -> "Ready"
+      Enum.any?(active, &(&1.status == "preparing")) -> "Preparing"
+      active != [] -> Integer.to_string(length(active))
+      true -> nil
     end
   end
 
   defp my_orders_trigger_aria(orders) do
     active_count = length(active_my_orders(orders))
     history_count = length(history_my_orders(orders))
+    status = my_orders_trigger_badge(orders)
 
-    "My orders, #{active_count} active, #{history_count} in history"
+    base = "My orders, #{active_count} active, #{history_count} in history"
+
+    if status in ["Ready", "Preparing"] do
+      "#{base}, #{status}"
+    else
+      base
+    end
+  end
+
+  defp show_floating_my_orders?(my_orders, my_orders_open?, basket_open?, detail) do
+    my_orders != [] and not my_orders_open? and not basket_open? and is_nil(detail)
   end
 
   # Customer-facing My Orders labels only — DB status remains unchanged.
