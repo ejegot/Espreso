@@ -181,9 +181,10 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute has_element?(view, "#pos-place-order")
 
     html = render(view)
-    assert html =~ ~r/CS-\d+/
 
     [order] = Orders.list_active_orders()
+    assert order.number =~ Orders.order_number_pattern()
+    assert html =~ order.number
     assert order.source == "pos"
     assert order.customer_name == "Walk-in"
     assert order.fulfillment == "pickup"

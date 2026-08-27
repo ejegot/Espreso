@@ -67,6 +67,7 @@ Hooks.SmoothScroll = {
     }
 
     this.onWheel = (event) => {
+      if (document.querySelector(".menu-live-root")) return
       if (this.isLocked() || this.inScrollable(event.target)) return
       if (event.ctrlKey) return
       event.preventDefault()
@@ -167,12 +168,98 @@ Hooks.MenuBrowse = {
   mounted() {
     this.handleEvent("scroll_to_items", () => this.scrollToItems())
     this.handleEvent("scroll_to_category", ({name}) => this.scrollToCategory(name))
+    this.handleEvent("scroll_to_menu_content", () => this.scrollToMenuContent())
     this.handleEvent("scroll_active_chip", ({id}) => this.scrollActiveChip(id))
+    this.handleEvent("scroll_basket_top", () => this.scrollBasketTop())
+    this.handleEvent("clear_persisted_cart", () => this.clearPersistedCart())
+
+    this.onChipClick = (event) => {
+      const chip = event.target.closest(".menu-craving-chip")
+      if (chip instanceof HTMLElement) chip.blur()
+    }
+
+    this.el.addEventListener("click", this.onChipClick)
+    this.restorePersistedCart()
+    this.persistCartFromDom()
+  },
+
+  updated() {
+    this.persistCartFromDom()
+  },
+
+  destroyed() {
+    if (this.onChipClick) this.el.removeEventListener("click", this.onChipClick)
+  },
+
+  cartStorageKey() {
+    return "coffeespot.menu.cart.v1"
+  },
+
+  readCartPayload() {
+    try {
+      const raw = this.el.dataset.cart
+      if (!raw) return []
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : []
+    } catch (_error) {
+      return []
+    }
+  },
+
+  persistCartFromDom() {
+    try {
+      const cart = this.readCartPayload()
+      if (!cart.length) {
+        localStorage.removeItem(this.cartStorageKey())
+        return
+      }
+      localStorage.setItem(this.cartStorageKey(), JSON.stringify(cart))
+    } catch (_error) {
+      // Ignore quota / private-mode failures; cart still works in-session.
+    }
+  },
+
+  clearPersistedCart() {
+    try {
+      localStorage.removeItem(this.cartStorageKey())
+    } catch (_error) {
+      // no-op
+    }
+  },
+
+  restorePersistedCart() {
+    if (this._cartRestoreAttempted) return
+    this._cartRestoreAttempted = true
+
+    try {
+      if (this.readCartPayload().length > 0) return
+
+      const raw = localStorage.getItem(this.cartStorageKey())
+      if (!raw) return
+
+      const parsed = JSON.parse(raw)
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        this.clearPersistedCart()
+        return
+      }
+
+      this.pushEvent("restore_cart", {cart: parsed})
+    } catch (_error) {
+      this.clearPersistedCart()
+    }
+  },
+
+  scrollBasketTop() {
+    const go = () => {
+      const body = this.el.querySelector(".menu-basket-body")
+      if (body) body.scrollTop = 0
+    }
+    requestAnimationFrame(() => requestAnimationFrame(go))
   },
 
   scrollOffset() {
     const sticky = this.el.querySelector("#menu-qr-sticky")
-    if (sticky) return sticky.offsetHeight + 12
+    if (sticky) return Math.ceil(sticky.getBoundingClientRect().height) + 8
 
     const chrome =
       this.el.querySelector("#menu-qr-chrome") ||
@@ -182,37 +269,39 @@ Hooks.MenuBrowse = {
       this.el.querySelector("#menu-craving.menu-craving--sticky") ||
       this.el.querySelector(".brune-menu-tabs-line") ||
       this.el.querySelector(".brune-menu-nav")
-    return (chrome?.offsetHeight || 0) + (rail?.offsetHeight || 0) + 12
+    return (chrome?.offsetHeight || 0) + (rail?.offsetHeight || 0) + 8
   },
 
   scrollTo(top) {
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    const event = new CustomEvent("site:scroll-to", {detail: {top, reduce}, cancelable: true})
-    window.dispatchEvent(event)
-    if (!event.defaultPrevented) {
-      window.scrollTo({top, behavior: reduce ? "auto" : "smooth"})
-    }
+    window.scrollTo({top, behavior: "auto"})
   },
 
   scrollToItems() {
-    const items = this.el.querySelector("#menu-items")
-    if (!items) return
-    const top = Math.max(0, items.getBoundingClientRect().top + window.scrollY - this.scrollOffset())
-    requestAnimationFrame(() => this.scrollTo(top))
+    this.scrollToMenuContent()
   },
 
-  scrollToCategory(name) {
+  scrollToMenuContent() {
     const go = () => {
-      const section = this.el.querySelector(`#category-${name}`)
-      const title = section?.querySelector(".brune-menu-category-title")
-      const target = title || section
-      if (!target) return this.scrollToItems()
+      const target =
+        this.el.querySelector(".brune-menu-heading") ||
+        this.el.querySelector("#menu-search") ||
+        this.el.querySelector("#menu-items")
+      if (!target) return
 
-      const top = Math.max(0, target.getBoundingClientRect().top + window.scrollY - this.scrollOffset())
+      const offset = this.scrollOffset()
+      const rectTop = target.getBoundingClientRect().top
+      // Already sitting just under the sticky stack — keep Menu title + search visible.
+      if (rectTop >= offset - 4 && rectTop <= offset + 48) return
+
+      const top = Math.max(0, rectTop + window.scrollY - offset)
       this.scrollTo(top)
     }
 
     requestAnimationFrame(() => requestAnimationFrame(go))
+  },
+
+  scrollToCategory(name) {
+    this.scrollToMenuContent()
   },
 
   scrollActiveChip(id) {
@@ -220,14 +309,25 @@ Hooks.MenuBrowse = {
     const go = () => {
       const chip = this.el.querySelector(`#${CSS.escape(id)}`)
       if (!chip) return
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      const rail = chip.closest(".menu-craving-rail")
+      if (rail) {
+        const railRect = rail.getBoundingClientRect()
+        const chipRect = chip.getBoundingClientRect()
+        const delta =
+          chipRect.left - railRect.left - (railRect.width / 2 - chipRect.width / 2)
+        rail.scrollTo({
+          left: Math.max(0, rail.scrollLeft + delta),
+          behavior: "auto"
+        })
+        return
+      }
       chip.scrollIntoView({
-        inline: "nearest",
+        inline: "center",
         block: "nearest",
-        behavior: reduce ? "auto" : "smooth"
+        behavior: "auto"
       })
     }
-    requestAnimationFrame(() => requestAnimationFrame(go))
+    requestAnimationFrame(go)
   }
 }
 

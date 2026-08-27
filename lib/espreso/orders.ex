@@ -35,7 +35,11 @@ defmodule Espreso.Orders do
 
   def create_order([], _attrs), do: {:error, :empty_cart}
 
-  defp do_create_order(lines, attrs) do
+  @order_number_chars ~c"23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+  @order_number_suffix_length 6
+  @order_number_max_attempts 8
+
+  defp do_create_order(lines, attrs, attempt \\ 1) do
     fulfillment =
       normalize_fulfillment(Map.get(attrs, :fulfillment) || Map.get(attrs, "fulfillment"))
 
@@ -58,7 +62,7 @@ defmodule Espreso.Orders do
       end)
 
     order_attrs = %{
-      number: "TMP-" <> Integer.to_string(System.unique_integer([:positive])),
+      number: generate_order_number(),
       customer_name: Map.get(attrs, :customer_name) || Map.get(attrs, "customer_name"),
       fulfillment: fulfillment,
       table_number: Map.get(attrs, :table_number) || Map.get(attrs, "table_number"),
@@ -72,10 +76,7 @@ defmodule Espreso.Orders do
 
     Ecto.Multi.new()
     |> Ecto.Multi.insert(:order, Order.changeset(%Order{}, order_attrs))
-    |> Ecto.Multi.update(:numbered, fn %{order: order} ->
-      Ecto.Changeset.change(order, %{number: format_number(order.id)})
-    end)
-    |> Ecto.Multi.run(:items, fn repo, %{numbered: order} ->
+    |> Ecto.Multi.run(:items, fn repo, %{order: order} ->
       items =
         Enum.map(lines, fn line ->
           qty = line.quantity
@@ -98,11 +99,15 @@ defmodule Espreso.Orders do
     end)
     |> Repo.transaction()
     |> case do
-      {:ok, %{numbered: order, items: items}} ->
+      {:ok, %{order: order, items: items}} ->
         broadcast({:ok, %{order | items: items}})
 
       {:error, :order, changeset, _} ->
-        {:error, changeset}
+        if unique_number_conflict?(changeset) and attempt < @order_number_max_attempts do
+          do_create_order(lines, attrs, attempt + 1)
+        else
+          {:error, changeset}
+        end
 
       {:error, _step, reason, _} ->
         {:error, reason}
@@ -438,8 +443,27 @@ defmodule Espreso.Orders do
 
   def payment_label(_), do: "Payment"
 
-  defp format_number(id) when is_integer(id) do
-    "CS-" <> String.pad_leading(Integer.to_string(id), 4, "0")
+  def order_number_pattern, do: ~r/^CS-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/
+
+  defp generate_order_number do
+    "CS-" <> random_order_suffix(@order_number_suffix_length)
+  end
+
+  defp random_order_suffix(length) do
+    alphabet = @order_number_chars
+    size = length(alphabet)
+
+    :crypto.strong_rand_bytes(length)
+    |> :binary.bin_to_list()
+    |> Enum.map(fn byte ->
+      <<Enum.at(alphabet, rem(byte, size))>>
+    end)
+    |> IO.iodata_to_binary()
+  end
+
+  defp unique_number_conflict?(%Ecto.Changeset{} = changeset) do
+    Enum.any?(changeset.constraints, &(&1.type == :unique and &1.field == :number)) and
+      Keyword.has_key?(changeset.errors, :number)
   end
 
   defp normalize_fulfillment(value) when value in [:dine_in, "dine_in"], do: "dine_in"

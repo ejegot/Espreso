@@ -20,7 +20,8 @@ defmodule Espreso.OrdersTest do
                payment_method: :counter
              })
 
-    assert order.number =~ ~r/^CS-\d{4,}$/
+    assert order.number =~ Orders.order_number_pattern()
+    refute order.number =~ ~r/^CS-0+\d+$/
     assert order.customer_name == "Juan"
     assert order.fulfillment == "dine_in"
     assert order.table_number == "7"
@@ -30,6 +31,43 @@ defmodule Espreso.OrdersTest do
     assert order.source == "customer"
     assert Decimal.equal?(order.total, Decimal.new("315"))
     assert length(order.items) == 2
+  end
+
+  test "create_order assigns unique random numbers" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    numbers =
+      for i <- 1..25 do
+        {:ok, order} =
+          Orders.create_order(lines, %{
+            customer_name: "Guest #{i}",
+            fulfillment: :pickup,
+            payment_method: :counter
+          })
+
+        order.number
+      end
+
+    assert length(numbers) == length(Enum.uniq(numbers))
+
+    Enum.each(numbers, fn number ->
+      assert number =~ Orders.order_number_pattern()
+    end)
+  end
+
+  test "get_order_by_number finds order by public number" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, order} =
+      Orders.create_order(lines, %{
+        customer_name: "Juan",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    found = Orders.get_order_by_number!(order.number)
+    assert found.id == order.id
+    assert found.number == order.number
   end
 
   test "create_order accepts source pos" do
