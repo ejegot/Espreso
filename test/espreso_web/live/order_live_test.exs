@@ -20,13 +20,24 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, "#order-status-message", "Order received")
     assert has_element?(view, "#order-hint", "Payment is due at the counter")
     assert html =~ "Pay at counter"
-    assert has_element?(view, "a.order-more-link", "Order more")
+    assert has_element?(view, "a.order-more-link", "Order More")
     assert has_element?(view, "#order-receipt", "Your order")
     assert has_element?(view, "#order-receipt .order-total", "₱75")
     assert has_element?(view, "#order-receipt .order-payment", "Pay at counter")
     assert has_element?(view, "#order-progress")
     assert has_element?(view, ~s(#order-progress [data-step="received"][data-state="current"][aria-current="step"]))
     refute html =~ "Status: "
+    refute has_element?(view, "#order-confirm")
+
+    more_href =
+      view
+      |> element("#order-order-more")
+      |> render()
+      |> Floki.parse_fragment!()
+      |> Floki.attribute("href")
+      |> List.first()
+
+    assert more_href == "/menu?stage=menu"
 
     assert {:ok, preparing} = Orders.update_status(order, "preparing")
     assert has_element?(view, "#order-status-message", "We're preparing your order")
@@ -84,7 +95,70 @@ defmodule EspresoWeb.OrderLiveTest do
     refute hint =~ ~r/pay/i
     refute hint =~ ~r/claim/i
     refute render(view) =~ ~r/Order received/
-    assert has_element?(view, "a.order-more-link", "Order more")
+    assert has_element?(view, "a.order-more-link", "Order More")
+  end
+
+  test "customer order confirmation shows View My Order and Order More", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Confirm Flow",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, view, html} = live(conn, ~p"/order/#{order.number}?confirm=1")
+
+    assert has_element?(view, "#order-confirm")
+    assert has_element?(view, "#order-confirm-title", "Order confirmed")
+    assert has_element?(view, "#order-confirm-number", order.number)
+    assert has_element?(view, ~s(#order-confirm[data-order-number="#{order.number}"]))
+    assert has_element?(view, "#order-view-my-order", "View My Order")
+    assert has_element?(view, "#order-order-more", "Order More")
+    assert html =~ ~s(phx-hook="OrderConfirm")
+    refute has_element?(view, "#order-status-message")
+    refute has_element?(view, "#order-receipt")
+
+    view_href =
+      view
+      |> element("#order-view-my-order")
+      |> render()
+      |> Floki.parse_fragment!()
+      |> Floki.attribute("href")
+      |> List.first()
+
+    more_href =
+      view
+      |> element("#order-order-more")
+      |> render()
+      |> Floki.parse_fragment!()
+      |> Floki.attribute("href")
+      |> List.first()
+
+    assert view_href == "/order/#{order.number}"
+    assert more_href == "/menu?stage=menu"
+
+    {:ok, detail_view, _html} =
+      view
+      |> element("#order-view-my-order", "View My Order")
+      |> render_click()
+      |> follow_redirect(conn)
+
+    assert has_element?(detail_view, "#order-status-message", "Order received")
+    assert has_element?(detail_view, ".order-number", order.number)
+    assert has_element?(detail_view, "#order-receipt", "Espresso")
+    refute has_element?(detail_view, "#order-confirm")
+
+    {:ok, menu_view, _html} =
+      detail_view
+      |> element("#order-order-more", "Order More")
+      |> render_click()
+      |> follow_redirect(conn)
+
+    assert has_element?(menu_view, "#menu-items")
+    refute has_element?(menu_view, "#menu-landing")
   end
 
   test "customer order page updates when cancelled", %{conn: conn} do
@@ -117,7 +191,7 @@ defmodule EspresoWeb.OrderLiveTest do
     refute hint =~ ~r/pay/i
     refute hint =~ ~r/claim/i
     refute render(view) =~ ~r/Order received/
-    assert has_element?(view, "a.order-more-link", "Order more")
+    assert has_element?(view, "a.order-more-link", "Order More")
     assert has_element?(view, "#order-receipt")
   end
 

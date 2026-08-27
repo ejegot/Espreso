@@ -815,17 +815,238 @@ defmodule EspresoWeb.MenuLiveTest do
     assert href =~ URI.encode_www_form("Table 7")
     assert href =~ URI.encode_www_form("less ice")
 
-    {:ok, order_view, _html} =
+    {:ok, order_view, html} =
       view
       |> element("button.menu-basket-checkout", "Place order · Pay at counter")
       |> render_click()
       |> follow_redirect(conn)
 
-    assert has_element?(order_view, ".order-number")
-    assert has_element?(order_view, "#order-status-message", "Order received")
-    assert has_element?(order_view, ".order-card", "Juan")
-    assert render(order_view) =~ "Table 7"
-    assert render(order_view) =~ "Pay at counter"
+    assert html =~ ~r/CS-[2-9A-HJ-NP-Z]{6}/
+    assert has_element?(order_view, "#order-confirm")
+    assert has_element?(order_view, "#order-confirm-title", "Order confirmed")
+    assert has_element?(order_view, "#order-confirm-number")
+    assert has_element?(order_view, "#order-view-my-order", "View My Order")
+    assert has_element?(order_view, "#order-order-more", "Order More")
+
+    order_number =
+      order_view
+      |> element("#order-confirm-number")
+      |> render()
+      |> Floki.parse_fragment!()
+      |> Floki.text()
+      |> String.trim()
+
+    assert order_number =~ ~r/^CS-[2-9A-HJ-NP-Z]{6}$/
+
+    view_href =
+      order_view
+      |> element("#order-view-my-order")
+      |> render()
+      |> Floki.parse_fragment!()
+      |> Floki.attribute("href")
+      |> List.first()
+
+    more_href =
+      order_view
+      |> element("#order-order-more")
+      |> render()
+      |> Floki.parse_fragment!()
+      |> Floki.attribute("href")
+      |> List.first()
+
+    assert view_href == "/order/#{order_number}"
+    assert more_href == "/menu?stage=menu"
+
+    {:ok, detail_view, _html} =
+      order_view
+      |> element("#order-view-my-order", "View My Order")
+      |> render_click()
+      |> follow_redirect(conn)
+
+    assert has_element?(detail_view, ".order-number", order_number)
+    assert has_element?(detail_view, "#order-status-message", "Order received")
+    assert has_element?(detail_view, ".order-card", "Juan")
+    assert render(detail_view) =~ "Table 7"
+    assert render(detail_view) =~ "Pay at counter"
+    assert has_element?(detail_view, "#order-receipt", "Espresso")
+    assert has_element?(detail_view, "#order-receipt", "Americano")
+    refute has_element?(detail_view, "#order-confirm")
+  end
+
+  test "/menu Order More returns to menu browse with an empty cart", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view = enter_menu_browse(view)
+
+    view |> element("button[aria-label='Add Espresso']") |> render_click()
+    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view |> element("button.brune-icon-bag") |> render_click()
+
+    view
+    |> form("#menu-checkout-form", %{
+      customer_name: "Ana",
+      table_number: "4"
+    })
+    |> render_change()
+
+    {:ok, confirm_view, _html} =
+      view
+      |> element("button.menu-basket-checkout", "Place order · Pay at counter")
+      |> render_click()
+      |> follow_redirect(conn)
+
+    assert has_element?(confirm_view, "#order-confirm")
+    assert has_element?(confirm_view, ~s(#order-confirm[phx-hook="OrderConfirm"]))
+    assert has_element?(confirm_view, ~s(#order-confirm[data-order-number]))
+
+    order_number =
+      confirm_view
+      |> element("#order-confirm-number")
+      |> render()
+      |> Floki.parse_fragment!()
+      |> Floki.text()
+      |> String.trim()
+
+    {:ok, menu_view, html} =
+      confirm_view
+      |> element("#order-order-more", "Order More")
+      |> render_click()
+      |> follow_redirect(conn)
+
+    assert has_element?(menu_view, "#menu-items")
+    refute has_element?(menu_view, "#menu-landing")
+    refute has_element?(menu_view, "#menu-craving-chooser")
+    refute has_element?(menu_view, ".brune-bag-count")
+    refute has_element?(menu_view, "#menu-basket")
+    refute has_element?(menu_view, "#menu-detail")
+    assert html =~ ~s(data-cart="[]")
+    assert Orders.list_active_orders() != []
+
+    # Client hook restores the persisted current order after reconnect/navigation.
+    render_hook(menu_view, "restore_current_order", %{"number" => order_number})
+
+    assert has_element?(menu_view, "#menu-qr-my-order", "My Order")
+    refute has_element?(menu_view, "#menu-qr-my-order", "Preparing")
+
+    my_order_href =
+      menu_view
+      |> element("#menu-qr-my-order")
+      |> render()
+      |> Floki.parse_fragment!()
+      |> Floki.attribute("href")
+      |> List.first()
+
+    assert my_order_href == "/order/#{order_number}"
+
+    {:ok, detail_view, _html} =
+      menu_view
+      |> element("#menu-qr-my-order")
+      |> render_click()
+      |> follow_redirect(conn)
+
+    assert has_element?(detail_view, ".order-number", order_number)
+    assert has_element?(detail_view, "#order-status-message", "Order received")
+  end
+
+  test "/menu My Order appears only when a current order is restored", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+
+    refute has_element?(view, "#menu-qr-my-order")
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Persistent",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    render_hook(view, "restore_current_order", %{"number" => order.number})
+
+    assert has_element?(view, "#menu-qr-my-order", "My Order")
+    assert has_element?(view, ~s(#menu-qr-my-order[href="/order/#{order.number}"]))
+
+    assert {:ok, preparing} = Orders.update_status(order, "preparing")
+    assert has_element?(view, "#menu-qr-my-order", "My Order · Preparing")
+
+    assert {:ok, _} = Orders.update_status(preparing, "ready")
+    assert has_element?(view, "#menu-qr-my-order", "My Order · Ready")
+  end
+
+  test "/menu ignores malformed current order numbers", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+
+    render_hook(view, "restore_current_order", %{"number" => "not-an-order"})
+    refute has_element?(view, "#menu-qr-my-order")
+
+    render_hook(view, "restore_current_order", %{"number" => "CS-222222"})
+    refute has_element?(view, "#menu-qr-my-order")
+  end
+
+  test "/menu newer current order replaces the previous reference", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+
+    {:ok, first} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "First",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, second} =
+      Orders.create_order(
+        [%{name: "Americano", size: "8oz", quantity: 1, price: Decimal.new("110")}],
+        %{
+          customer_name: "Second",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    render_hook(view, "restore_current_order", %{"number" => first.number})
+    assert has_element?(view, ~s(#menu-qr-my-order[href="/order/#{first.number}"]))
+
+    render_hook(view, "restore_current_order", %{"number" => second.number})
+    assert has_element?(view, ~s(#menu-qr-my-order[href="/order/#{second.number}"]))
+    refute has_element?(view, ~s(#menu-qr-my-order[href="/order/#{first.number}"]))
+  end
+
+  test "/menu confirmation page carries order number for client persistence", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view = enter_menu_browse(view)
+
+    view |> element("button[aria-label='Add Espresso']") |> render_click()
+    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view |> element("button.brune-icon-bag") |> render_click()
+
+    view
+    |> form("#menu-checkout-form", %{
+      customer_name: "Persist",
+      table_number: "9"
+    })
+    |> render_change()
+
+    {:ok, confirm_view, html} =
+      view
+      |> element("button.menu-basket-checkout", "Place order · Pay at counter")
+      |> render_click()
+      |> follow_redirect(conn)
+
+    order_number =
+      confirm_view
+      |> element("#order-confirm-number")
+      |> render()
+      |> Floki.parse_fragment!()
+      |> Floki.text()
+      |> String.trim()
+
+    assert order_number =~ ~r/^CS-[2-9A-HJ-NP-Z]{6}$/
+    assert html =~ ~s(data-order-number="#{order_number}")
+    assert has_element?(confirm_view, ~s(#order-confirm[data-order-number="#{order_number}"]))
   end
 
   test "/menu rejects place when a cart product becomes unavailable", %{
