@@ -42,8 +42,9 @@ defmodule EspresoWeb.MenuLiveTest do
     assert html =~ "CoffeeSpot"
     assert has_element?(view, "#menu-landing")
     assert has_element?(view, ".menu-qr-landing-brand", "CoffeeSpot")
-    assert has_element?(view, ".menu-qr-landing-headline", "Order from your table.")
-    assert has_element?(view, ".menu-qr-landing-lede", "Browse, pay at the counter, we prepare it.")
+    assert has_element?(view, ".menu-qr-landing-headline", "Your coffee moment starts here.")
+    assert has_element?(view, ".menu-qr-landing-lede", "Browse the menu. Order from your table.")
+    assert has_element?(view, ".menu-qr-landing-lede", "We'll take care of the rest.")
     assert has_element?(view, "#menu-cta-view-menu", "View the menu")
     assert has_element?(view, "#menu-cta-visit-coffeespot", "Visit CoffeeSpot")
     assert has_element?(

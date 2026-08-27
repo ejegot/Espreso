@@ -426,8 +426,11 @@ defmodule EspresoWeb.MenuLive do
 
           <div class="menu-qr-landing-content">
             <p class="menu-qr-landing-brand">CoffeeSpot</p>
-            <h1 class="menu-qr-landing-headline">Order from your table.</h1>
-            <p class="menu-qr-landing-lede">Browse, pay at the counter, we prepare it.</p>
+            <h1 class="menu-qr-landing-headline">Your coffee moment starts here.</h1>
+            <p class="menu-qr-landing-lede">
+              Browse the menu. Order from your table.
+              We'll take care of the rest.
+            </p>
 
             <div class="menu-qr-landing-actions">
               <button
