@@ -76,20 +76,17 @@ defmodule EspresoWeb.OrderLiveTest do
     refute html =~ ~r/>Order received</
 
     assert {:ok, _} = Orders.complete_order(ready)
-    assert has_element?(view, "#order-status-message", "Order picked up")
+    assert has_element?(view, "#order-complete-state")
+    assert has_element?(view, ".order-complete-badge", "Order complete")
+    assert has_element?(view, "#order-status-message", "Picked Up ✓")
     assert has_element?(
              view,
              "#order-hint",
-             "Thanks — this order is complete. We hope you enjoyed CoffeeSpot."
+             "Your order has been picked up. Thank you for visiting CoffeeSpot."
            )
-    assert has_element?(view, ~s(#order-progress [data-step="received"][data-state="completed"]))
-    assert has_element?(view, ~s(#order-progress [data-step="preparing"][data-state="completed"]))
-    assert has_element?(view, ~s(#order-progress [data-step="ready"][data-state="completed"]))
-    assert has_element?(
-             view,
-             ~s(#order-progress [data-step="completed"][data-state="current"][aria-current="step"]),
-             "Picked up"
-           )
+    refute has_element?(view, "#order-progress")
+    assert has_element?(view, "#order-receipt")
+    assert has_element?(view, ".order-number", order.number)
 
     hint = view |> element("#order-hint") |> render()
     refute hint =~ ~r/pay/i
@@ -225,9 +222,10 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, ~s(#order-progress [data-step="ready"][aria-current="step"]))
 
     assert {:ok, _} = Orders.complete_order(ready)
-    assert has_element?(view, "#order-status-message", "Order picked up")
-    assert has_element?(view, "#order-hint", "Thanks — this order is complete")
-    assert has_element?(view, ~s(#order-progress [data-step="completed"][aria-current="step"]))
+    assert has_element?(view, "#order-status-message", "Picked Up ✓")
+    assert has_element?(view, "#order-hint", "Your order has been picked up")
+    assert has_element?(view, "#order-complete-state")
+    refute has_element?(view, "#order-progress")
   end
 
   test "paid preparing order does not tell the customer to pay", %{conn: conn} do

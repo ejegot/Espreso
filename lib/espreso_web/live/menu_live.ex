@@ -33,7 +33,8 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:checkout_errors, %{})
      |> assign(:payment_method, :counter)
      |> assign(:placing_order?, false)
-     |> assign(:current_order, nil), layout: false}
+     |> assign(:my_orders, [])
+     |> assign(:my_orders_open?, false), layout: false}
   end
 
   @impl true
@@ -68,17 +69,12 @@ defmodule EspresoWeb.MenuLive do
   end
 
   def handle_info({:order_changed, %{id: id} = order}, socket) do
-    case socket.assigns.current_order do
-      %{id: ^id} ->
-        {:noreply,
-         assign(socket, :current_order, %{
-           id: order.id,
-           number: order.number,
-           status: order.status
-         })}
-
-      _ ->
+    case Enum.find(socket.assigns.my_orders, &(&1.id == id)) do
+      nil ->
         {:noreply, socket}
+
+      existing ->
+        {:noreply, update_my_order_summary(socket, existing, order)}
     end
   end
 
@@ -149,7 +145,8 @@ defmodule EspresoWeb.MenuLive do
          |> assign(:detail, detail)
          |> assign(:detail_closing?, false)
          |> assign(:basket_open?, false)
-         |> assign(:basket_closing?, false)}
+         |> assign(:basket_closing?, false)
+         |> assign(:my_orders_open?, false)}
     end
   end
 
@@ -234,6 +231,7 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:detail_closing?, false)
      |> assign(:basket_open?, true)
      |> assign(:basket_closing?, false)
+     |> assign(:my_orders_open?, false)
      |> assign(:checkout_errors, %{})
      |> push_event("scroll_basket_top", %{})}
   end
@@ -330,9 +328,9 @@ defmodule EspresoWeb.MenuLive do
              |> assign(:basket_closing?, false)
              |> assign(:placing_order?, false)
              |> assign(:checkout_errors, %{})
-             |> assign_current_order(order)
+             |> remember_my_order(order)
              |> push_event("clear_persisted_cart", %{})
-             |> push_event("persist_current_order", %{number: order.number})
+             |> push_event("persist_my_order", %{number: order.number})
              |> push_navigate(to: ~p"/order/#{order.number}?confirm=1")}
 
           {:error, {:unavailable, names}} ->
@@ -404,8 +402,22 @@ defmodule EspresoWeb.MenuLive do
     {:noreply, maybe_restore_cart(socket, params)}
   end
 
+  def handle_event("restore_my_orders", params, socket) do
+    {:noreply, maybe_restore_my_orders(socket, params)}
+  end
+
+  # Compatibility for older client hooks still emitting a single number.
   def handle_event("restore_current_order", params, socket) do
-    {:noreply, maybe_restore_current_order(socket, params)}
+    number = Map.get(params, "number") || Map.get(params, :number)
+    {:noreply, maybe_restore_my_orders(socket, %{"numbers" => [number]})}
+  end
+
+  def handle_event("toggle_my_orders", _params, socket) do
+    {:noreply, assign(socket, :my_orders_open?, !socket.assigns.my_orders_open?)}
+  end
+
+  def handle_event("close_my_orders", _params, socket) do
+    {:noreply, assign(socket, :my_orders_open?, false)}
   end
 
   @impl true
@@ -418,7 +430,7 @@ defmodule EspresoWeb.MenuLive do
       class={[
         "menu-live-root",
         @menu_stage != :menu && "menu-live-root--qr-entry",
-        (@detail || @basket_open?) && "menu-page-locked"
+        (@detail || @basket_open? || @my_orders_open?) && "menu-page-locked"
       ]}
     >
       <div :if={@menu_stage == :landing} id="menu-landing" class="menu-qr-landing">
@@ -680,16 +692,21 @@ defmodule EspresoWeb.MenuLive do
             </div>
           </header>
 
-          <.link
-            :if={@current_order}
-            id="menu-qr-my-order"
-            navigate={~p"/order/#{@current_order.number}"}
-            class="menu-qr-my-order"
-            aria-label={my_order_aria_label(@current_order)}
+          <button
+            :if={@my_orders != []}
+            type="button"
+            id="menu-qr-my-orders"
+            class="menu-qr-my-orders"
+            phx-click="toggle_my_orders"
+            aria-expanded={to_string(@my_orders_open?)}
+            aria-controls="menu-my-orders-panel"
+            aria-label={my_orders_trigger_aria(@my_orders)}
           >
-            <span class="menu-qr-my-order-label">{my_order_label(@current_order)}</span>
-            <span class="menu-qr-my-order-chevron" aria-hidden="true">→</span>
-          </.link>
+            <span class="menu-qr-my-orders-label">{my_orders_trigger_label(@my_orders)}</span>
+            <span class="menu-qr-my-orders-chevron" aria-hidden="true">
+              {if @my_orders_open?, do: "↑", else: "→"}
+            </span>
+          </button>
 
           <nav
             id="menu-craving"
@@ -847,33 +864,22 @@ defmodule EspresoWeb.MenuLive do
         </section>
 
         <footer class="brune-mega-footer brune-mega-footer--secondary" aria-label="CoffeeSpot footer">
-          <p class="brune-mega-brand">CoffeeSpot</p>
+          <p class="brune-mega-brand">CoffeeSpot Marikina</p>
+          <p class="menu-footer-owned-label">Owned and Operated by:</p>
+          <p class="menu-footer-owned-name">Elilai Kafe</p>
 
-          <div class="brune-mega-grid">
-            <div class="brune-mega-block">
-              <p class="brune-mega-label">Hours</p>
-              <p :for={line <- CoffeeSpot.hours_lines()} class="brune-mega-text">{line}</p>
-            </div>
-
-            <div class="brune-mega-block">
-              <p class="brune-mega-label">Contact</p>
-              <a href={CoffeeSpot.email_url()} class="brune-mega-link">{CoffeeSpot.email()}</a>
-              <a href={"tel:#{CoffeeSpot.phone_tel()}"} class="brune-mega-link">
-                {CoffeeSpot.phone_display()}
-              </a>
-            </div>
-
-            <div class="brune-mega-block">
-              <p class="brune-mega-label">Location</p>
-              <a
-                href={CoffeeSpot.map_link_url()}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="brune-mega-link"
-              >
-                {CoffeeSpot.address_short()}
-              </a>
-            </div>
+          <div class="menu-footer-socials" aria-label="Social">
+            <a
+              :for={link <- CoffeeSpot.social_links()}
+              href={link.href}
+              id={"menu-footer-#{link.id}"}
+              class={"menu-footer-social menu-footer-social--#{link.id}"}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={"CoffeeSpot on #{link.label}"}
+            >
+              <.social_icon name={link.id} />
+            </a>
           </div>
         </footer>
       </div>
@@ -982,9 +988,9 @@ defmodule EspresoWeb.MenuLive do
               type="button"
               class="menu-buy-basket-link"
               phx-click="open_basket"
-              aria-label={"Your order, #{cart_count(@cart)} items"}
+              aria-label={"View your order, #{cart_count(@cart)} items"}
             >
-              Your Order · {cart_count(@cart)}
+              View Your Order →
             </button>
           </footer>
         </aside>
@@ -1255,6 +1261,121 @@ defmodule EspresoWeb.MenuLive do
           </div>
         </aside>
       </div>
+
+      <div
+        :if={@menu_stage == :menu && @my_orders_open? && @my_orders != []}
+        id="menu-my-orders"
+        class="menu-my-orders-layer"
+        phx-window-keydown="close_my_orders"
+        phx-key="Escape"
+      >
+        <button
+          type="button"
+          class="menu-my-orders-backdrop"
+          phx-click="close_my_orders"
+          aria-label="Close my orders"
+        >
+        </button>
+        <aside
+          id="menu-my-orders-panel"
+          class="menu-my-orders-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="menu-my-orders-title"
+        >
+          <header class="menu-my-orders-header">
+            <div>
+              <p class="menu-my-orders-eyebrow">CoffeeSpot</p>
+              <h2 id="menu-my-orders-title">My Orders</h2>
+            </div>
+            <button
+              type="button"
+              class="menu-my-orders-close"
+              phx-click="close_my_orders"
+              aria-label="Close my orders"
+            >
+              Close
+            </button>
+          </header>
+
+          <div class="menu-my-orders-body">
+            <section
+              :if={active_my_orders(@my_orders) != []}
+              class="menu-my-orders-section"
+              aria-labelledby="menu-my-orders-active-heading"
+            >
+              <h3 id="menu-my-orders-active-heading" class="menu-my-orders-section-title">
+                Active
+              </h3>
+              <ul class="menu-my-orders-list">
+                <li
+                  :for={order <- active_my_orders(@my_orders)}
+                  id={"menu-my-order-#{order.number}"}
+                  class="menu-my-orders-card"
+                  data-status={order.status}
+                >
+                  <div class="menu-my-orders-card-top">
+                    <p class="menu-my-orders-number">{order.number}</p>
+                    <p class="menu-my-orders-status">{customer_my_order_status_label(order.status)}</p>
+                  </div>
+                  <p class="menu-my-orders-meta">
+                    {order.item_count} {if order.item_count == 1, do: "item", else: "items"} · {Menu.format_price(
+                      order.total
+                    )}
+                  </p>
+                  <.link
+                    navigate={~p"/order/#{order.number}"}
+                    class="menu-my-orders-view"
+                  >
+                    View Order
+                  </.link>
+                </li>
+              </ul>
+            </section>
+
+            <section
+              :if={history_my_orders(@my_orders) != []}
+              class="menu-my-orders-section"
+              aria-labelledby="menu-my-orders-history-heading"
+            >
+              <h3 id="menu-my-orders-history-heading" class="menu-my-orders-section-title">
+                History
+              </h3>
+              <ul class="menu-my-orders-list">
+                <li
+                  :for={order <- history_my_orders(@my_orders)}
+                  id={"menu-my-order-#{order.number}"}
+                  class="menu-my-orders-card menu-my-orders-card--history"
+                  data-status={order.status}
+                >
+                  <div class="menu-my-orders-card-top">
+                    <p class="menu-my-orders-number">{order.number}</p>
+                    <p class="menu-my-orders-status">{customer_my_order_status_label(order.status)}</p>
+                  </div>
+                  <p class="menu-my-orders-meta">
+                    {order.item_count} {if order.item_count == 1, do: "item", else: "items"} · {Menu.format_price(
+                      order.total
+                    )}
+                  </p>
+                  <.link
+                    navigate={~p"/order/#{order.number}"}
+                    class="menu-my-orders-view"
+                  >
+                    View Order
+                  </.link>
+                </li>
+              </ul>
+            </section>
+
+            <p
+              :if={active_my_orders(@my_orders) == [] and history_my_orders(@my_orders) == []}
+              class="menu-my-orders-empty"
+            >
+              No orders to show right now.
+            </p>
+          </div>
+        </aside>
+      </div>
     </div>
     """
   end
@@ -1505,85 +1626,152 @@ defmodule EspresoWeb.MenuLive do
     _ -> socket
   end
 
-  defp maybe_restore_current_order(socket, params) do
-    number =
-      params
-      |> Map.get("number", Map.get(params, :number))
-      |> normalize_order_number()
-
-    cond do
-      is_nil(number) ->
-        clear_current_order(socket)
-
-      match_current_order?(socket.assigns.current_order, number) ->
-        socket
-
-      true ->
-        refresh_current_order(socket, number)
-    end
+  defp maybe_restore_my_orders(socket, params) do
+    numbers = extract_my_order_numbers(params)
+    load_my_orders(socket, numbers)
   rescue
-    _ -> clear_current_order(socket)
+    _ ->
+      socket
+      |> assign(:my_orders, [])
+      |> assign(:my_orders_open?, false)
   end
 
-  defp match_current_order?(%{number: number}, number), do: true
-  defp match_current_order?(_, _), do: false
+  defp extract_my_order_numbers(%{"numbers" => numbers}) when is_list(numbers), do: numbers
+  defp extract_my_order_numbers(%{numbers: numbers}) when is_list(numbers), do: numbers
 
-  defp refresh_current_order(socket, number) do
-    case Orders.get_order_by_number(number) do
-      nil ->
-        clear_current_order(socket)
+  defp extract_my_order_numbers(%{"number" => number}), do: [number]
+  defp extract_my_order_numbers(%{number: number}), do: [number]
 
-      order ->
-        assign_current_order(socket, order)
-    end
+  defp extract_my_order_numbers(_), do: []
+
+  defp load_my_orders(socket, numbers) do
+    orders = Orders.list_orders_by_numbers(numbers)
+    summaries = Enum.map(orders, &my_order_summary/1)
+
+    # Drop cancelled from UI; keep numbers for completed/active in client sync.
+    visible =
+      summaries
+      |> Enum.reject(&(&1.status == "cancelled"))
+
+    subscribe_my_orders(socket, visible)
+
+    socket
+    |> assign(:my_orders, visible)
+    |> push_event("sync_my_orders", %{numbers: Enum.map(visible, & &1.number)})
   end
 
-  defp assign_current_order(socket, order) do
-    previous = socket.assigns[:current_order]
+  defp remember_my_order(socket, order) do
+    summary = my_order_summary(order)
 
-    if connected?(socket) and (is_nil(previous) or previous.id != order.id) do
+    if connected?(socket) and not Enum.any?(socket.assigns.my_orders, &(&1.id == order.id)) do
       Orders.subscribe(order)
     end
 
-    assign(socket, :current_order, %{
+    my_orders =
+      socket.assigns.my_orders
+      |> Enum.reject(&(&1.id == order.id or &1.number == order.number))
+      |> then(fn rest -> [summary | rest] end)
+      |> Enum.reject(&(&1.status == "cancelled"))
+      |> Enum.take(20)
+
+    assign(socket, :my_orders, my_orders)
+  end
+
+  defp update_my_order_summary(socket, existing, order) do
+    summary = %{
+      existing
+      | status: order.status,
+        total: order.total || existing.total,
+        inserted_at: order.inserted_at || existing.inserted_at
+    }
+
+    my_orders =
+      socket.assigns.my_orders
+      |> Enum.map(fn entry ->
+        if entry.id == order.id, do: summary, else: entry
+      end)
+      |> Enum.reject(&(&1.status == "cancelled"))
+
+    assign(socket, :my_orders, my_orders)
+  end
+
+  defp subscribe_my_orders(socket, summaries) do
+    if connected?(socket) do
+      already = MapSet.new(Enum.map(socket.assigns.my_orders, & &1.id))
+
+      Enum.each(summaries, fn summary ->
+        if not MapSet.member?(already, summary.id) do
+          Orders.subscribe(summary.id)
+        end
+      end)
+    end
+
+    :ok
+  end
+
+  defp my_order_summary(order) do
+    item_count =
+      order.items
+      |> List.wrap()
+      |> Enum.reduce(0, fn item, acc -> acc + (item.quantity || 0) end)
+
+    %{
       id: order.id,
       number: order.number,
-      status: order.status
-    })
+      status: order.status,
+      item_count: item_count,
+      total: order.total,
+      inserted_at: order.inserted_at
+    }
   end
 
-  defp clear_current_order(socket) do
-    socket
-    |> assign(:current_order, nil)
-    |> push_event("clear_current_order", %{})
+  defp active_my_orders(orders) do
+    ready = Enum.filter(orders, &(&1.status == "ready"))
+    preparing = Enum.filter(orders, &(&1.status == "preparing"))
+    received = Enum.filter(orders, &(&1.status == "received"))
+
+    sort_newest = fn list ->
+      Enum.sort_by(list, & &1.inserted_at, {:desc, DateTime})
+    end
+
+    sort_newest.(ready) ++ sort_newest.(preparing) ++ sort_newest.(received)
   end
 
-  defp normalize_order_number(number) when is_binary(number) do
-    trimmed = String.trim(number)
+  defp history_my_orders(orders) do
+    orders
+    |> Enum.filter(&(&1.status == "completed"))
+    |> Enum.sort_by(& &1.inserted_at, {:desc, DateTime})
+  end
 
-    if Regex.match?(Orders.order_number_pattern(), trimmed) do
-      trimmed
-    else
-      nil
+  defp my_orders_trigger_label(orders) do
+    active = active_my_orders(orders)
+
+    cond do
+      Enum.any?(active, &(&1.status == "ready")) ->
+        "My Orders · Ready"
+
+      Enum.any?(active, &(&1.status == "preparing")) ->
+        "My Orders · Preparing"
+
+      active != [] ->
+        count = length(active)
+        "My Orders · #{count} active"
+
+      true ->
+        "My Orders"
     end
   end
 
-  defp normalize_order_number(_), do: nil
+  defp my_orders_trigger_aria(orders) do
+    active_count = length(active_my_orders(orders))
+    history_count = length(history_my_orders(orders))
 
-  defp my_order_label(%{status: status}) when status in ["preparing", "ready"] do
-    "My Order · #{Orders.status_label(status)}"
+    "My orders, #{active_count} active, #{history_count} in history"
   end
 
-  defp my_order_label(_current_order), do: "My Order"
-
-  defp my_order_aria_label(%{number: number, status: status})
-       when status in ["preparing", "ready"] do
-    "My order #{number}, #{Orders.status_label(status)}"
-  end
-
-  defp my_order_aria_label(%{number: number}) do
-    "My order #{number}"
-  end
+  # Customer-facing My Orders labels only — DB status remains unchanged.
+  defp customer_my_order_status_label("completed"), do: "Picked Up ✓"
+  defp customer_my_order_status_label(status), do: Orders.status_label(status)
 
   defp sanitize_restored_cart(%{"cart" => lines}, categories) when is_list(lines) do
     lines

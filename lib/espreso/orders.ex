@@ -144,6 +144,43 @@ defmodule Espreso.Orders do
     |> Repo.one()
   end
 
+  @doc """
+  Loads orders for the given order numbers.
+
+  - Ignores blank/invalid numbers
+  - Caps input length
+  - Returns only matching rows, newest first (`inserted_at` desc)
+  - Missing numbers are omitted (no error)
+  """
+  def list_orders_by_numbers(numbers) when is_list(numbers) do
+    cleaned =
+      numbers
+      |> Enum.map(&normalize_lookup_number/1)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+      |> Enum.take(40)
+
+    if cleaned == [] do
+      []
+    else
+      Order
+      |> where([o], o.number in ^cleaned)
+      |> order_by([o], desc: o.inserted_at)
+      |> preload(:items)
+      |> Repo.all()
+    end
+  end
+
+  def list_orders_by_numbers(_), do: []
+
+  defp normalize_lookup_number(number) when is_binary(number) do
+    trimmed = String.trim(number)
+
+    if Regex.match?(order_number_pattern(), trimmed), do: trimmed, else: nil
+  end
+
+  defp normalize_lookup_number(_), do: nil
+
   def list_active_orders do
     Order
     |> where([o], o.status in ^["received", "preparing"])
