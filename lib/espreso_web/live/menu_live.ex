@@ -8,7 +8,7 @@ defmodule EspresoWeb.MenuLive do
   @impl true
   def mount(_params, _session, socket) do
     categories = Menu.list_menu()
-    selected = categories |> List.first() |> then(&(&1 && &1.name))
+    selected = default_category(categories)
 
     {:ok,
      socket
@@ -37,7 +37,10 @@ defmodule EspresoWeb.MenuLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    {:noreply, apply_table_param(socket, params)}
+    {:noreply,
+     socket
+     |> apply_table_param(params)
+     |> apply_menu_stage_param(params)}
   end
 
   @impl true
@@ -65,35 +68,19 @@ defmodule EspresoWeb.MenuLive do
 
   @impl true
   def handle_event("enter_craving", _params, socket) do
-    {:noreply, assign(socket, :menu_stage, :craving)}
+    {:noreply, push_patch(socket, to: menu_path(socket, :craving))}
   end
 
   def handle_event("enter_visit", _params, socket) do
-    {:noreply, assign(socket, :menu_stage, :visit)}
+    {:noreply, push_patch(socket, to: menu_path(socket, :visit))}
   end
 
   def handle_event("back_to_landing", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:menu_stage, :landing)
-     |> assign(:menu_filter, nil)
-     |> assign(:search, "")
-     |> assign(:detail, nil)
-     |> assign(:detail_closing?, false)
-     |> assign(:basket_open?, false)
-     |> assign(:basket_closing?, false)}
+    {:noreply, push_patch(socket, to: menu_path(socket, :landing))}
   end
 
   def handle_event("back_to_craving", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:menu_stage, :craving)
-     |> assign(:menu_filter, nil)
-     |> assign(:search, "")
-     |> assign(:detail, nil)
-     |> assign(:detail_closing?, false)
-     |> assign(:basket_open?, false)
-     |> assign(:basket_closing?, false)}
+    {:noreply, push_patch(socket, to: menu_path(socket, :craving))}
   end
 
   def handle_event("select_craving", %{"id" => id}, socket) do
@@ -104,7 +91,7 @@ defmodule EspresoWeb.MenuLive do
       option ->
         {:noreply,
          socket
-         |> apply_craving_option(option)
+         |> push_patch(to: craving_option_path(socket, option))
          |> push_qr_nav_visibility(option)}
     end
   end
@@ -113,13 +100,9 @@ defmodule EspresoWeb.MenuLive do
     if Enum.any?(socket.assigns.categories, &(&1.name == name)) do
       {:noreply,
        socket
-       |> assign(:selected_category, name)
-       |> assign(:menu_filter, nil)
-       |> assign(:search, "")
-       |> assign(:detail, nil)
-       |> assign(:detail_closing?, false)
+       |> push_patch(to: menu_path(socket, :menu, category: name, filter: nil))
        |> push_event("scroll_active_chip", %{id: "menu-craving-chip-#{name}"})
-       |> push_event("scroll_to_category", %{name: name})}
+       |> push_event("scroll_to_menu_content", %{})}
     else
       {:noreply, socket}
     end
@@ -147,7 +130,6 @@ defmodule EspresoWeb.MenuLive do
 
         {:noreply,
          socket
-         |> assign(:selected_category, category.name)
          |> assign(:detail, detail)
          |> assign(:detail_closing?, false)
          |> assign(:basket_open?, false)
@@ -236,7 +218,8 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:detail_closing?, false)
      |> assign(:basket_open?, true)
      |> assign(:basket_closing?, false)
-     |> assign(:checkout_errors, %{})}
+     |> assign(:checkout_errors, %{})
+     |> push_event("scroll_basket_top", %{})}
   end
 
   def handle_event("set_fulfillment", %{"type" => type}, socket) do
@@ -331,6 +314,7 @@ defmodule EspresoWeb.MenuLive do
              |> assign(:basket_closing?, false)
              |> assign(:placing_order?, false)
              |> assign(:checkout_errors, %{})
+             |> push_event("clear_persisted_cart", %{})
              |> push_navigate(to: ~p"/order/#{order.number}")}
 
           {:error, {:unavailable, names}} ->
@@ -398,12 +382,17 @@ defmodule EspresoWeb.MenuLive do
     {:noreply, assign(socket, :cart, cart)}
   end
 
+  def handle_event("restore_cart", params, socket) do
+    {:noreply, maybe_restore_cart(socket, params)}
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
     <div
       id="menu-page"
       phx-hook="MenuBrowse"
+      data-cart={Jason.encode!(cart_storage_payload(@cart))}
       class={[
         "menu-live-root",
         @menu_stage != :menu && "menu-live-root--qr-entry",
@@ -636,7 +625,7 @@ defmodule EspresoWeb.MenuLive do
                   @basket_pulse? && "is-bag-confirm"
                 ]}
                 phx-click="open_basket"
-                aria-label={"Checkout, #{cart_count(@cart)} items"}
+                aria-label={"Your order, #{cart_count(@cart)} items"}
               >
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path
@@ -858,29 +847,30 @@ defmodule EspresoWeb.MenuLive do
 
       <div
         :if={@menu_stage == :menu && @detail}
-        class={["menu-buy-layer", @detail_closing? && "is-closing"]}
+        class={["menu-buy-layer", "menu-buy-layer--fullscreen", @detail_closing? && "is-closing"]}
         id="menu-detail"
         phx-window-keydown="close_detail"
         phx-key="Escape"
       >
-        <button type="button" class="menu-buy-backdrop" phx-click="close_detail" aria-label="Close">
-        </button>
-
-        <div
-          id="menu-buy-modal"
-          class="menu-buy-modal"
+        <aside
+          id="menu-buy-panel"
+          class="menu-buy-panel menu-buy-panel--fullscreen"
           role="dialog"
           aria-modal="true"
           aria-labelledby="menu-detail-title"
-          phx-hook="MenuSheet"
-          data-close-event="close_detail"
         >
-          <div class="menu-buy-handle" data-drag-handle>
-            <span class="menu-buy-handle-bar" aria-hidden="true"></span>
-            <span class="menu-buy-handle-label">Swipe down to close</span>
-          </div>
+          <header class="menu-buy-header">
+            <button
+              type="button"
+              class="menu-buy-close"
+              phx-click="close_detail"
+              aria-label="Back to menu"
+            >
+              Back
+            </button>
+          </header>
 
-          <div class={"menu-buy-visual menu-detail-visual--#{section_tone(@detail.category_name)}"}>
+          <div class="menu-buy-visual">
             <img
               src={Menu.product_image(@detail.category_name, @detail.product.name)}
               alt={@detail.product.name}
@@ -890,6 +880,10 @@ defmodule EspresoWeb.MenuLive do
 
           <div class="menu-buy-body">
             <h2 id="menu-detail-title" class="menu-detail-name">{@detail.product.name}</h2>
+
+            <p class="menu-detail-price menu-detail-price--sheet">
+              {Menu.format_price(selected_price(@detail).price)}
+            </p>
 
             <p :if={description?(@detail.product.description)} class="menu-detail-description">
               {@detail.product.description}
@@ -944,26 +938,23 @@ defmodule EspresoWeb.MenuLive do
                 </button>
               </div>
             </div>
-
-            <p class="menu-detail-price menu-detail-price--sheet">
-              {Menu.format_price(selected_price(@detail).price)}
-            </p>
           </div>
 
           <footer class="menu-buy-bar menu-buy-bar--detail">
             <button type="button" class="menu-buy-now" phx-click="buy_now">
-              Add to bag
+              Add to your order
             </button>
             <button
+              :if={cart_count(@cart) > 0}
               type="button"
               class="menu-buy-basket-link"
               phx-click="open_basket"
-              aria-label={"Checkout, #{cart_count(@cart)} items"}
+              aria-label={"Your order, #{cart_count(@cart)} items"}
             >
-              Bag · {cart_count(@cart)}
+              Your Order · {cart_count(@cart)}
             </button>
           </footer>
-        </div>
+        </aside>
       </div>
 
       <div
@@ -983,12 +974,12 @@ defmodule EspresoWeb.MenuLive do
         aria-label={floating_bag_label(@cart)}
       >
         <p class="menu-floating-bag-summary">
-          Your order · {cart_count(@cart)} {floating_bag_items_label(@cart)} · {Menu.format_price(
+          Your Order · {cart_count(@cart)} {floating_bag_items_label(@cart)} · {Menu.format_price(
             cart_total(@cart)
           )}
         </p>
         <button type="button" class="menu-floating-bag-cta" phx-click="open_basket">
-          View bag
+          View your order
         </button>
       </div>
 
@@ -1020,13 +1011,6 @@ defmodule EspresoWeb.MenuLive do
           </div>
 
           <header class="menu-basket-header">
-            <div class="menu-basket-heading">
-              <p class="menu-basket-eyebrow">CoffeeSpot</p>
-              <h2 id="menu-basket-title">Your bag</h2>
-              <p class="menu-basket-count-label">
-                {cart_count(@cart)} {if cart_count(@cart) == 1, do: "item", else: "items"}
-              </p>
-            </div>
             <button
               type="button"
               class="menu-basket-close"
@@ -1035,11 +1019,18 @@ defmodule EspresoWeb.MenuLive do
             >
               Back
             </button>
+            <div class="menu-basket-heading">
+              <p class="menu-basket-eyebrow">CoffeeSpot</p>
+              <h2 id="menu-basket-title">Your Order</h2>
+              <p class="menu-basket-count-label">
+                {cart_count_label(@cart)}
+              </p>
+            </div>
           </header>
 
           <div :if={@cart == []} class="menu-basket-empty">
             <p class="menu-basket-empty-title">Nothing here yet</p>
-            <p>Choose something from the menu, then add it to your basket.</p>
+            <p>Choose something from the menu, then add it to your order.</p>
             <button type="button" class="menu-basket-empty-cta" phx-click="close_basket">
               Back to menu
             </button>
@@ -1180,11 +1171,6 @@ defmodule EspresoWeb.MenuLive do
                   >{Phoenix.HTML.Form.normalize_value("textarea", @notes)}</textarea>
                 </div>
               </form>
-
-              <p class="menu-checkout-payment-info" aria-label="Payment">
-                <span class="menu-checkout-payment-info-label">Payment</span>
-                <span class="menu-checkout-payment-info-value">Pay at counter</span>
-              </p>
             </div>
           </div>
 
@@ -1193,8 +1179,6 @@ defmodule EspresoWeb.MenuLive do
               <span>Total</span>
               <strong>{Menu.format_price(cart_total(@cart))}</strong>
             </div>
-
-            <p class="menu-basket-submit-payment">Pay at counter</p>
 
             <p
               :if={checkout_summary_error(@checkout_errors)}
@@ -1391,72 +1375,23 @@ defmodule EspresoWeb.MenuLive do
     ]
   end
 
-  defp apply_craving_option(socket, %{filter: :matcha}) do
-    selected =
-      socket.assigns.categories
-      |> filter_matcha_categories()
-      |> List.first()
-      |> case do
-        %{name: name} -> name
-        _ -> socket.assigns.selected_category
-      end
-
-    socket
-    |> assign(:menu_stage, :menu)
-    |> assign(:menu_filter, :matcha)
-    |> assign(:selected_category, selected)
-    |> assign(:search, "")
-    |> assign(:detail, nil)
-    |> assign(:detail_closing?, false)
-  end
-
-  defp apply_craving_option(socket, %{filter: :sweets, category: "FOOD"}) do
-    socket
-    |> assign(:menu_stage, :menu)
-    |> assign(:menu_filter, :sweets)
-    |> assign(:selected_category, "FOOD")
-    |> assign(:search, "")
-    |> assign(:detail, nil)
-    |> assign(:detail_closing?, false)
-  end
-
-  defp apply_craving_option(socket, %{filter: nil, category: category})
-       when is_binary(category) do
-    if Enum.any?(socket.assigns.categories, &(&1.name == category)) do
-      socket
-      |> assign(:menu_stage, :menu)
-      |> assign(:menu_filter, nil)
-      |> assign(:selected_category, category)
-      |> assign(:search, "")
-      |> assign(:detail, nil)
-      |> assign(:detail_closing?, false)
-    else
-      # Category currently empty — still enter menu with empty state.
-      socket
-      |> assign(:menu_stage, :menu)
-      |> assign(:menu_filter, nil)
-      |> assign(:selected_category, category)
-      |> assign(:search, "")
-      |> assign(:detail, nil)
-      |> assign(:detail_closing?, false)
-    end
-  end
-
-  defp apply_craving_option(socket, _option), do: socket
-
   defp push_qr_nav_visibility(socket, %{filter: :matcha}) do
-    push_event(socket, "scroll_active_chip", %{id: "menu-craving-chip-matcha"})
+    socket
+    |> push_event("scroll_active_chip", %{id: "menu-craving-chip-matcha"})
+    |> push_event("scroll_to_menu_content", %{})
   end
 
   defp push_qr_nav_visibility(socket, %{filter: :sweets}) do
-    push_event(socket, "scroll_active_chip", %{id: "menu-craving-chip-sweets"})
+    socket
+    |> push_event("scroll_active_chip", %{id: "menu-craving-chip-sweets"})
+    |> push_event("scroll_to_menu_content", %{})
   end
 
   defp push_qr_nav_visibility(socket, %{filter: nil, category: category})
        when is_binary(category) do
     socket
     |> push_event("scroll_active_chip", %{id: "menu-craving-chip-#{category}"})
-    |> push_event("scroll_to_category", %{name: category})
+    |> push_event("scroll_to_menu_content", %{})
   end
 
   defp push_qr_nav_visibility(socket, _option), do: socket
@@ -1503,7 +1438,163 @@ defmodule EspresoWeb.MenuLive do
 
   defp line_key(product_id, %{id: price_id}), do: "#{product_id}:#{price_id}"
 
+  # Total quantity across all cart lines (not distinct product count).
   defp cart_count(cart), do: Enum.reduce(cart, 0, fn line, acc -> acc + line.quantity end)
+
+  defp cart_count_label(cart) do
+    count = cart_count(cart)
+    word = if count == 1, do: "item", else: "items"
+    "#{count} #{word} total"
+  end
+
+  defp cart_storage_payload(cart) do
+    Enum.map(cart, fn line ->
+      %{
+        "key" => line.key,
+        "product_id" => line.product_id,
+        "name" => line.name,
+        "size" => line.size,
+        "price" => Decimal.to_string(line.price),
+        "quantity" => line.quantity,
+        "image" => line.image
+      }
+    end)
+  end
+
+  defp maybe_restore_cart(socket, params) do
+    # Only hydrate an empty in-memory cart (fresh mount / refresh).
+    if socket.assigns.cart == [] do
+      assign(socket, :cart, sanitize_restored_cart(params, socket.assigns.categories))
+    else
+      socket
+    end
+  rescue
+    _ -> socket
+  end
+
+  defp sanitize_restored_cart(%{"cart" => lines}, categories) when is_list(lines) do
+    lines
+    |> Enum.flat_map(&sanitize_restored_line(&1, categories))
+    |> Enum.take(40)
+  end
+
+  defp sanitize_restored_cart(lines, categories) when is_list(lines) do
+    lines
+    |> Enum.flat_map(&sanitize_restored_line(&1, categories))
+    |> Enum.take(40)
+  end
+
+  defp sanitize_restored_cart(_, _), do: []
+
+  defp sanitize_restored_line(line, categories) when is_map(line) do
+    with product_id when is_integer(product_id) and product_id > 0 <-
+           parse_positive_int(Map.get(line, "product_id") || Map.get(line, :product_id)),
+         quantity when is_integer(quantity) and quantity >= 1 and quantity <= 99 <-
+           parse_positive_int(Map.get(line, "quantity") || Map.get(line, :quantity)),
+         %Decimal{} = price <-
+           parse_money(Map.get(line, "price") || Map.get(line, :price)),
+         name when is_binary(name) and name != "" <-
+           normalize_restored_string(Map.get(line, "name") || Map.get(line, :name)),
+         {category, product} <- find_product_with_category(categories, product_id),
+         true <- product.available == true,
+         true <- product.name == name do
+      size = normalize_restored_size(Map.get(line, "size") || Map.get(line, :size))
+
+      image =
+        case normalize_restored_image(Map.get(line, "image") || Map.get(line, :image)) do
+          nil -> Menu.product_image(category.name, product.name)
+          path -> path
+        end
+
+      key =
+        case Map.get(line, "key") || Map.get(line, :key) do
+          key when is_binary(key) and key != "" -> key
+          _ -> "#{product_id}:#{:erlang.phash2({name, size, Decimal.to_string(price)})}"
+        end
+
+      [
+        %{
+          key: key,
+          product_id: product_id,
+          name: name,
+          size: size,
+          price: price,
+          quantity: quantity,
+          image: image
+        }
+      ]
+    else
+      _ -> []
+    end
+  rescue
+    _ -> []
+  end
+
+  defp sanitize_restored_line(_, _), do: []
+
+  defp parse_positive_int(value) when is_integer(value) and value > 0, do: value
+
+  defp parse_positive_int(value) when is_binary(value) do
+    case Integer.parse(String.trim(value)) do
+      {int, ""} when int > 0 -> int
+      _ -> nil
+    end
+  end
+
+  defp parse_positive_int(_), do: nil
+
+  defp parse_money(%Decimal{} = price), do: price
+
+  defp parse_money(value) when is_binary(value) do
+    case Decimal.parse(String.trim(value)) do
+      {price, ""} -> price
+      {_price, _rest} -> nil
+      :error -> nil
+    end
+  end
+
+  defp parse_money(value) when is_integer(value) and value >= 0, do: Decimal.new(value)
+
+  defp parse_money(value) when is_float(value) and value >= 0 do
+    value |> Float.to_string() |> Decimal.new()
+  rescue
+    _ -> nil
+  end
+
+  defp parse_money(_), do: nil
+
+  defp normalize_restored_string(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp normalize_restored_string(_), do: nil
+
+  defp normalize_restored_size(nil), do: nil
+  defp normalize_restored_size(""), do: nil
+
+  defp normalize_restored_size(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp normalize_restored_size(_), do: nil
+
+  defp normalize_restored_image(value) when is_binary(value) do
+    trimmed = String.trim(value)
+
+    if String.starts_with?(trimmed, "/images/") do
+      trimmed
+    else
+      nil
+    end
+  end
+
+  defp normalize_restored_image(_), do: nil
 
   defp show_floating_bag?(cart, basket_open?, detail) do
     cart != [] && not basket_open? && is_nil(detail)
@@ -1514,7 +1605,7 @@ defmodule EspresoWeb.MenuLive do
   end
 
   defp floating_bag_label(cart) do
-    "Your order, #{cart_count(cart)} #{floating_bag_items_label(cart)}, #{Menu.format_price(cart_total(cart))}"
+    "Your Order, #{cart_count(cart)} #{floating_bag_items_label(cart)}, #{Menu.format_price(cart_total(cart))}"
   end
 
   defp cart_total(cart) do
@@ -1680,6 +1771,214 @@ defmodule EspresoWeb.MenuLive do
 
   defp apply_table_param(socket, _params), do: socket
 
+  defp apply_menu_stage_param(socket, params) do
+    case Map.get(params, "stage") do
+      "craving" ->
+        socket
+        |> assign(:menu_stage, :craving)
+        |> assign(:selected_category, default_category(socket.assigns.categories))
+        |> clear_transient_menu_state()
+
+      "visit" ->
+        socket
+        |> assign(:menu_stage, :visit)
+        |> assign(:selected_category, default_category(socket.assigns.categories))
+        |> clear_transient_menu_state()
+
+      "menu" ->
+        socket
+        |> assign(:menu_stage, :menu)
+        |> clear_transient_menu_state()
+        |> apply_menu_browse_param(params)
+        |> maybe_restore_menu_chip_visibility(params)
+
+      _ ->
+        socket
+        |> assign(:menu_stage, :landing)
+        |> assign(:selected_category, default_category(socket.assigns.categories))
+        |> clear_transient_menu_state()
+    end
+  end
+
+  defp clear_transient_menu_state(socket) do
+    socket
+    |> assign(:menu_filter, nil)
+    |> assign(:search, "")
+    |> assign(:detail, nil)
+    |> assign(:detail_closing?, false)
+    |> assign(:basket_open?, false)
+    |> assign(:basket_closing?, false)
+  end
+
+  defp apply_menu_browse_param(socket, params) do
+    filter = parse_menu_filter(Map.get(params, "filter"))
+    category = Map.get(params, "category")
+
+    case filter do
+      :matcha ->
+        selected =
+          socket.assigns.categories
+          |> filter_matcha_categories()
+          |> List.first()
+          |> case do
+            %{name: name} -> name
+            _ -> socket.assigns.selected_category
+          end
+
+        socket
+        |> assign(:menu_filter, :matcha)
+        |> assign(:selected_category, selected)
+
+      :sweets ->
+        socket
+        |> assign(:menu_filter, :sweets)
+        |> assign(:selected_category, "FOOD")
+
+      nil ->
+        selected = valid_category(socket.assigns.categories, category)
+
+        socket
+        |> assign(:menu_filter, nil)
+        |> assign(:selected_category, selected)
+    end
+  end
+
+  defp maybe_restore_menu_chip_visibility(socket, params) do
+    if connected?(socket) do
+      chip_id =
+        case parse_menu_filter(Map.get(params, "filter")) do
+          :matcha -> "menu-craving-chip-matcha"
+          :sweets -> "menu-craving-chip-sweets"
+          nil -> chip_id_for_category(Map.get(params, "category") || socket.assigns.selected_category)
+        end
+
+      socket =
+        if chip_id do
+          push_event(socket, "scroll_active_chip", %{id: chip_id})
+        else
+          socket
+        end
+
+      push_event(socket, "scroll_to_menu_content", %{})
+    else
+      socket
+    end
+  end
+
+  defp chip_id_for_category(category) when category in ["HOT", "COLD", "FRAPPE", "SODA", "FOOD"] do
+    "menu-craving-chip-#{category}"
+  end
+
+  defp chip_id_for_category(_category), do: nil
+
+  defp valid_category(categories, category) when is_binary(category) do
+    if Enum.any?(categories, &(&1.name == category)), do: category, else: default_category(categories)
+  end
+
+  defp valid_category(categories, _category), do: default_category(categories)
+
+  defp default_category(categories) do
+    cond do
+      Enum.any?(categories, &(&1.name == "HOT")) -> "HOT"
+      true -> categories |> List.first() |> then(&(&1 && &1.name))
+    end
+  end
+
+  defp parse_menu_filter("matcha"), do: :matcha
+  defp parse_menu_filter("sweets"), do: :sweets
+  defp parse_menu_filter(_), do: nil
+
+  defp menu_path(socket, stage, opts \\ []) do
+    params = build_menu_query(socket, stage, opts)
+
+    if params == %{} do
+      ~p"/menu"
+    else
+      ~p"/menu?#{params}"
+    end
+  end
+
+  defp craving_option_path(socket, option) do
+    case option do
+      %{filter: :matcha} ->
+        menu_path(socket, :menu, filter: :matcha)
+
+      %{filter: :sweets, category: category} ->
+        menu_path(socket, :menu, category: category, filter: :sweets)
+
+      %{filter: nil, category: category} when is_binary(category) ->
+        menu_path(socket, :menu, category: category, filter: nil)
+
+      _ ->
+        menu_path(socket, :menu)
+    end
+  end
+
+  defp build_menu_query(socket, stage, opts) do
+    filter = Keyword.get(opts, :filter, :__unset__)
+    category = Keyword.get(opts, :category, :__unset__)
+
+    %{}
+    |> maybe_put_table(socket.assigns.table_number)
+    |> maybe_put_stage(stage, category, filter, socket)
+  end
+
+  defp maybe_put_table(params, table) when table in [nil, ""], do: params
+
+  defp maybe_put_table(params, table) do
+    case Integer.parse(to_string(table)) do
+      {n, ""} when n in 1..99 -> Map.put(params, "table", Integer.to_string(n))
+      _ -> params
+    end
+  end
+
+  defp maybe_put_stage(params, :landing, _category, _filter, _socket), do: params
+
+  defp maybe_put_stage(params, stage, category, filter, socket) do
+    params = Map.put(params, "stage", Atom.to_string(stage))
+
+    if stage == :menu do
+      params
+      |> maybe_put_menu_category(category, filter, socket)
+      |> maybe_put_menu_filter(filter, socket)
+    else
+      params
+    end
+  end
+
+  defp maybe_put_menu_category(params, :__unset__, :__unset__, socket) do
+    if socket.assigns.selected_category do
+      Map.put(params, "category", socket.assigns.selected_category)
+    else
+      params
+    end
+  end
+
+  defp maybe_put_menu_category(params, :__unset__, filter, _socket) when filter != :__unset__ do
+    params
+  end
+
+  defp maybe_put_menu_category(params, category, _filter, _socket) when is_binary(category) do
+    Map.put(params, "category", category)
+  end
+
+  defp maybe_put_menu_category(params, _category, _filter, _socket), do: params
+
+  defp maybe_put_menu_filter(params, :__unset__, socket) do
+    case socket.assigns.menu_filter do
+      nil -> params
+      filter -> Map.put(params, "filter", Atom.to_string(filter))
+    end
+  end
+
+  defp maybe_put_menu_filter(params, nil, _socket), do: params
+
+  defp maybe_put_menu_filter(params, filter, _socket) when filter in [:matcha, :sweets] do
+    Map.put(params, "filter", Atom.to_string(filter))
+  end
+
+  defp maybe_put_menu_filter(params, _filter, _socket), do: params
+
   defp checkout_payload(assigns) do
     %{
       customer_name: assigns.customer_name,
@@ -1749,9 +2048,9 @@ defmodule EspresoWeb.MenuLive do
     end)
   end
 
-  defp unavailable_toast([name]), do: "#{name} is no longer available. Update your bag and try again."
+  defp unavailable_toast([name]), do: "#{name} is no longer available. Update your order and try again."
 
   defp unavailable_toast(names) when is_list(names) do
-    "#{Enum.join(names, ", ")} are no longer available. Update your bag and try again."
+    "#{Enum.join(names, ", ")} are no longer available. Update your order and try again."
   end
 end
