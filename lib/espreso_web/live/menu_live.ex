@@ -32,7 +32,8 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:notes, "")
      |> assign(:checkout_errors, %{})
      |> assign(:payment_method, :counter)
-     |> assign(:placing_order?, false), layout: false}
+     |> assign(:placing_order?, false)
+     |> assign(:current_order, nil), layout: false}
   end
 
   @impl true
@@ -64,6 +65,21 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:toast, nil)
      |> assign(:basket_pulse?, false)
      |> assign(:bag_add_delta, nil)}
+  end
+
+  def handle_info({:order_changed, %{id: id} = order}, socket) do
+    case socket.assigns.current_order do
+      %{id: ^id} ->
+        {:noreply,
+         assign(socket, :current_order, %{
+           id: order.id,
+           number: order.number,
+           status: order.status
+         })}
+
+      _ ->
+        {:noreply, socket}
+    end
   end
 
   @impl true
@@ -314,8 +330,10 @@ defmodule EspresoWeb.MenuLive do
              |> assign(:basket_closing?, false)
              |> assign(:placing_order?, false)
              |> assign(:checkout_errors, %{})
+             |> assign_current_order(order)
              |> push_event("clear_persisted_cart", %{})
-             |> push_navigate(to: ~p"/order/#{order.number}")}
+             |> push_event("persist_current_order", %{number: order.number})
+             |> push_navigate(to: ~p"/order/#{order.number}?confirm=1")}
 
           {:error, {:unavailable, names}} ->
             {:noreply,
@@ -384,6 +402,10 @@ defmodule EspresoWeb.MenuLive do
 
   def handle_event("restore_cart", params, socket) do
     {:noreply, maybe_restore_cart(socket, params)}
+  end
+
+  def handle_event("restore_current_order", params, socket) do
+    {:noreply, maybe_restore_current_order(socket, params)}
   end
 
   @impl true
@@ -657,6 +679,17 @@ defmodule EspresoWeb.MenuLive do
               </button>
             </div>
           </header>
+
+          <.link
+            :if={@current_order}
+            id="menu-qr-my-order"
+            navigate={~p"/order/#{@current_order.number}"}
+            class="menu-qr-my-order"
+            aria-label={my_order_aria_label(@current_order)}
+          >
+            <span class="menu-qr-my-order-label">{my_order_label(@current_order)}</span>
+            <span class="menu-qr-my-order-chevron" aria-hidden="true">→</span>
+          </.link>
 
           <nav
             id="menu-craving"
@@ -1470,6 +1503,86 @@ defmodule EspresoWeb.MenuLive do
     end
   rescue
     _ -> socket
+  end
+
+  defp maybe_restore_current_order(socket, params) do
+    number =
+      params
+      |> Map.get("number", Map.get(params, :number))
+      |> normalize_order_number()
+
+    cond do
+      is_nil(number) ->
+        clear_current_order(socket)
+
+      match_current_order?(socket.assigns.current_order, number) ->
+        socket
+
+      true ->
+        refresh_current_order(socket, number)
+    end
+  rescue
+    _ -> clear_current_order(socket)
+  end
+
+  defp match_current_order?(%{number: number}, number), do: true
+  defp match_current_order?(_, _), do: false
+
+  defp refresh_current_order(socket, number) do
+    case Orders.get_order_by_number(number) do
+      nil ->
+        clear_current_order(socket)
+
+      order ->
+        assign_current_order(socket, order)
+    end
+  end
+
+  defp assign_current_order(socket, order) do
+    previous = socket.assigns[:current_order]
+
+    if connected?(socket) and (is_nil(previous) or previous.id != order.id) do
+      Orders.subscribe(order)
+    end
+
+    assign(socket, :current_order, %{
+      id: order.id,
+      number: order.number,
+      status: order.status
+    })
+  end
+
+  defp clear_current_order(socket) do
+    socket
+    |> assign(:current_order, nil)
+    |> push_event("clear_current_order", %{})
+  end
+
+  defp normalize_order_number(number) when is_binary(number) do
+    trimmed = String.trim(number)
+
+    if Regex.match?(Orders.order_number_pattern(), trimmed) do
+      trimmed
+    else
+      nil
+    end
+  end
+
+  defp normalize_order_number(_), do: nil
+
+  defp my_order_label(%{status: status}) when status in ["preparing", "ready"] do
+    "My Order · #{Orders.status_label(status)}"
+  end
+
+  defp my_order_label(_current_order), do: "My Order"
+
+  defp my_order_aria_label(%{number: number, status: status})
+       when status in ["preparing", "ready"] do
+    "My order #{number}, #{Orders.status_label(status)}"
+  end
+
+  defp my_order_aria_label(%{number: number}) do
+    "My order #{number}"
   end
 
   defp sanitize_restored_cart(%{"cart" => lines}, categories) when is_list(lines) do

@@ -6257,6 +6257,44 @@ body:has(.home-page-landing) {
   justify-self: end;
 }
 
+.menu-qr-my-order {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.4rem 1rem 0.45rem;
+  border-top: 1px solid rgba(56, 32, 16, 0.06);
+  border-bottom: 1px solid rgba(56, 32, 16, 0.06);
+  background: color-mix(in srgb, #f85020 5%, #faf7f4);
+  color: #382010;
+  font-family: "DM Sans", sans-serif;
+  text-decoration: none;
+}
+
+.menu-qr-my-order:hover,
+.menu-qr-my-order:focus-visible {
+  color: #f85020;
+  background: color-mix(in srgb, #f85020 9%, #faf7f4);
+  outline: none;
+}
+
+.menu-qr-my-order-label {
+  min-width: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+.menu-qr-my-order-chevron {
+  flex: 0 0 auto;
+  color: #f85020;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
 .menu-qr-chrome-search,
 .menu-qr-chrome-bag {
   position: relative;
@@ -7715,6 +7753,79 @@ body:has(.home-page-landing) {
 .order-page .order-actions {
   margin-top: 1.35rem;
   text-align: center;
+}
+
+.order-page .order-actions--confirm {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1.5rem;
+}
+
+.order-page .order-card--confirm {
+  text-align: center;
+}
+
+.order-page .order-card--confirm .order-eyebrow {
+  margin: 0 0 0.35rem;
+  color: #b0a098;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.order-page .order-card--confirm .order-title {
+  margin: 0;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(1.85rem, 7vw, 2.45rem);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+}
+
+.order-page .order-card--confirm .order-lede {
+  margin: 0.75rem auto 0;
+  max-width: 22rem;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.order-page .order-number--confirm {
+  margin: 1.15rem 0 0;
+  color: #382010;
+  font-size: 1.15rem;
+  letter-spacing: 0.12em;
+}
+
+.order-page .order-view-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 3.1rem;
+  padding: 0.55rem 1.15rem;
+  border: 1.5px solid #f85020;
+  border-radius: 0.85rem;
+  background: #f85020;
+  color: #fff;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.order-page .order-view-link:hover,
+.order-page .order-view-link:focus-visible {
+  background: #e04518;
+  border-color: #e04518;
+  outline: none;
+}
+
+.order-page .order-actions--confirm .order-more-link {
+  width: 100%;
 }
 
 .order-page .order-more-link {

@@ -11,7 +11,8 @@ defmodule EspresoWeb.OrderLive do
         {:ok,
          socket
          |> assign(:page_title, "Order not found")
-         |> assign(:order, nil), layout: false}
+         |> assign(:order, nil)
+         |> assign(:confirming?, false), layout: false}
 
       order ->
         if connected?(socket), do: Orders.subscribe(order)
@@ -19,8 +20,27 @@ defmodule EspresoWeb.OrderLive do
         {:ok,
          socket
          |> assign(:page_title, "Order #{order.number}")
-         |> assign(:order, order), layout: false}
+         |> assign(:order, order)
+         |> assign(:confirming?, false), layout: false}
     end
+  end
+
+  @impl true
+  def handle_params(params, _uri, socket) do
+    confirming? =
+      not is_nil(socket.assigns.order) and Map.get(params, "confirm") in ["1", "true"]
+
+    page_title =
+      cond do
+        is_nil(socket.assigns.order) -> "Order not found"
+        confirming? -> "Order confirmed"
+        true -> "Order #{socket.assigns.order.number}"
+      end
+
+    {:noreply,
+     socket
+     |> assign(:confirming?, confirming?)
+     |> assign(:page_title, page_title)}
   end
 
   @impl true
@@ -47,10 +67,42 @@ defmodule EspresoWeb.OrderLive do
           <p class="order-lede">
             Check the number on your screen, or place a new order from the menu.
           </p>
-          <.link navigate={~p"/menu"} class="brune-primary-btn">Back to menu</.link>
+          <.link navigate={menu_browse_path()} class="brune-primary-btn">Back to menu</.link>
         </div>
 
-        <div :if={@order} class="order-card">
+        <div
+          :if={@order && @confirming?}
+          id="order-confirm"
+          class="order-card order-card--confirm"
+          phx-hook="OrderConfirm"
+          data-order-number={@order.number}
+        >
+          <p class="order-eyebrow">CoffeeSpot</p>
+          <h1 class="order-title" id="order-confirm-title">Order confirmed</h1>
+          <p class="order-lede">
+            Your order is in. Show your order number at the counter when you pick it up.
+          </p>
+          <p class="order-number order-number--confirm" id="order-confirm-number">{@order.number}</p>
+
+          <div class="order-actions order-actions--confirm">
+            <.link
+              navigate={~p"/order/#{@order.number}"}
+              class="order-view-link"
+              id="order-view-my-order"
+            >
+              View My Order
+            </.link>
+            <.link
+              navigate={menu_browse_path()}
+              class="order-more-link"
+              id="order-order-more"
+            >
+              Order More
+            </.link>
+          </div>
+        </div>
+
+        <div :if={@order && !@confirming?} class="order-card">
           <div class="order-status-block">
             <h1 class="order-status-message" id="order-status-message">
               {customer_status_message(@order.status)}
@@ -140,13 +192,17 @@ defmodule EspresoWeb.OrderLive do
           </section>
 
           <div class="order-actions">
-            <.link navigate={~p"/menu"} class="order-more-link">Order more</.link>
+            <.link navigate={menu_browse_path()} class="order-more-link" id="order-order-more">
+              Order More
+            </.link>
           </div>
         </div>
       </main>
     </div>
     """
   end
+
+  defp menu_browse_path, do: ~p"/menu?stage=menu"
 
   defp customer_status_message("received"), do: "Order received"
   defp customer_status_message("preparing"), do: "We're preparing your order"

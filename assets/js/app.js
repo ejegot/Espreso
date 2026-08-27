@@ -164,6 +164,31 @@ Hooks.SmoothScroll = {
   }
 }
 
+const MENU_CART_STORAGE_KEY = "coffeespot.menu.cart.v1"
+const CURRENT_ORDER_STORAGE_KEY = "coffeespot.current_order.v1"
+
+Hooks.OrderConfirm = {
+  mounted() {
+    try {
+      localStorage.removeItem(MENU_CART_STORAGE_KEY)
+    } catch (_error) {
+      // Ignore private-mode / storage failures.
+    }
+
+    this.persistCurrentOrder()
+  },
+
+  persistCurrentOrder() {
+    try {
+      const number = (this.el.dataset.orderNumber || "").trim()
+      if (!/^CS-[2-9A-HJ-NP-Z]{6}$/.test(number)) return
+      localStorage.setItem(CURRENT_ORDER_STORAGE_KEY, JSON.stringify({number}))
+    } catch (_error) {
+      // no-op
+    }
+  }
+}
+
 Hooks.MenuBrowse = {
   mounted() {
     this.handleEvent("scroll_to_items", () => this.scrollToItems())
@@ -172,6 +197,8 @@ Hooks.MenuBrowse = {
     this.handleEvent("scroll_active_chip", ({id}) => this.scrollActiveChip(id))
     this.handleEvent("scroll_basket_top", () => this.scrollBasketTop())
     this.handleEvent("clear_persisted_cart", () => this.clearPersistedCart())
+    this.handleEvent("persist_current_order", ({number}) => this.persistCurrentOrder(number))
+    this.handleEvent("clear_current_order", () => this.clearCurrentOrder())
 
     this.onChipClick = (event) => {
       const chip = event.target.closest(".menu-craving-chip")
@@ -180,6 +207,7 @@ Hooks.MenuBrowse = {
 
     this.el.addEventListener("click", this.onChipClick)
     this.restorePersistedCart()
+    this.restoreCurrentOrder()
     this.persistCartFromDom()
   },
 
@@ -192,7 +220,11 @@ Hooks.MenuBrowse = {
   },
 
   cartStorageKey() {
-    return "coffeespot.menu.cart.v1"
+    return MENU_CART_STORAGE_KEY
+  },
+
+  currentOrderStorageKey() {
+    return CURRENT_ORDER_STORAGE_KEY
   },
 
   readCartPayload() {
@@ -225,6 +257,50 @@ Hooks.MenuBrowse = {
     } catch (_error) {
       // no-op
     }
+  },
+
+  persistCurrentOrder(number) {
+    try {
+      const value = String(number || "").trim()
+      if (!/^CS-[2-9A-HJ-NP-Z]{6}$/.test(value)) return
+      localStorage.setItem(this.currentOrderStorageKey(), JSON.stringify({number: value}))
+    } catch (_error) {
+      // no-op
+    }
+  },
+
+  clearCurrentOrder() {
+    try {
+      localStorage.removeItem(this.currentOrderStorageKey())
+    } catch (_error) {
+      // no-op
+    }
+  },
+
+  readCurrentOrderNumber() {
+    try {
+      const raw = localStorage.getItem(this.currentOrderStorageKey())
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      const number = typeof parsed?.number === "string" ? parsed.number.trim() : ""
+      if (!/^CS-[2-9A-HJ-NP-Z]{6}$/.test(number)) {
+        this.clearCurrentOrder()
+        return null
+      }
+      return number
+    } catch (_error) {
+      this.clearCurrentOrder()
+      return null
+    }
+  },
+
+  restoreCurrentOrder() {
+    if (this._currentOrderRestoreAttempted) return
+    this._currentOrderRestoreAttempted = true
+
+    const number = this.readCurrentOrderNumber()
+    if (!number) return
+    this.pushEvent("restore_current_order", {number})
   },
 
   restorePersistedCart() {
