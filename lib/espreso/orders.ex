@@ -374,6 +374,8 @@ defmodule Espreso.Orders do
   Cancels an unpaid order that is still `received` or `preparing`.
 
   Reloads the order from the database before applying rules.
+  Orders with an attached PayMongo checkout session cannot be cancelled
+  (`{:error, :checkout_in_progress}`).
   """
   def cancel_order(%Order{id: id}) when is_integer(id) do
     case Repo.get(Order, id) do
@@ -387,6 +389,9 @@ defmodule Espreso.Orders do
 
           current.status not in ["received", "preparing"] ->
             {:error, :invalid_status}
+
+          checkout_session_attached?(current) ->
+            {:error, :checkout_in_progress}
 
           true ->
             current
@@ -429,11 +434,15 @@ defmodule Espreso.Orders do
   Attaching the same session id again to the same order is idempotent.
   A session id already stored on another order is rejected by the unique
   database constraint (returned as an Ecto changeset error).
+  Cancelled orders cannot receive a session (`{:error, :cancelled}`).
   """
   def attach_paymongo_session(%Order{id: id}, session_id) when is_binary(session_id) do
     case Repo.get(Order, id) do
       nil ->
         {:error, :not_found}
+
+      %Order{status: "cancelled"} ->
+        {:error, :cancelled}
 
       %Order{paymongo_checkout_session_id: ^session_id} = order ->
         {:ok, order}
@@ -590,4 +599,11 @@ defmodule Espreso.Orders do
   end
 
   defp blank_to_nil(value), do: value
+
+  defp checkout_session_attached?(%Order{paymongo_checkout_session_id: session_id})
+       when is_binary(session_id) and session_id != "" do
+    true
+  end
+
+  defp checkout_session_attached?(_order), do: false
 end

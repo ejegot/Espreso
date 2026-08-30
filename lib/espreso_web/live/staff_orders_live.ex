@@ -75,6 +75,14 @@ defmodule EspresoWeb.StaffOrdersLive do
       {:error, :paid} ->
         {:noreply, assign(socket, :flash_note, "Paid orders cannot be cancelled.")}
 
+      {:error, :checkout_in_progress} ->
+        {:noreply,
+         assign(
+           socket,
+           :flash_note,
+           "Online payment is in progress. This order cannot be cancelled."
+         )}
+
       {:error, :invalid_status} ->
         {:noreply, assign(socket, :flash_note, "This order can no longer be cancelled.")}
 
