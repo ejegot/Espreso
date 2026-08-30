@@ -70,8 +70,9 @@ defmodule Espreso.PayMongo do
   @doc """
   Handles a verified PayMongo webhook payload.
 
-  Marks the referenced order paid on `checkout_session.payment.paid`.
-  Unknown event types are acknowledged without action.
+  Marks the referenced order paid on `checkout_session.payment.paid` only when
+  the paid payment amount matches the order total. Unknown event types are
+  acknowledged without action.
   """
   def handle_webhook_event(payload) when is_map(payload) do
     event_type = get_in(payload, ["data", "attributes", "type"])
@@ -84,6 +85,23 @@ defmodule Espreso.PayMongo do
         :ok
     end
   end
+
+  @doc """
+  Converts a peso Decimal total to an exact integer centavo amount.
+
+  Rejects totals that are not an exact number of centavos (no float math).
+  """
+  def pesos_to_centavos(%Decimal{} = total) do
+    scaled = Decimal.mult(total, Decimal.new(100))
+
+    if Decimal.equal?(scaled, Decimal.round(scaled, 0)) do
+      {:ok, Decimal.to_integer(Decimal.round(scaled, 0))}
+    else
+      {:error, :invalid_order_total}
+    end
+  end
+
+  def pesos_to_centavos(_), do: {:error, :invalid_order_total}
 
   @doc """
   Builds a Paymongo-Signature header value for tests.
@@ -105,19 +123,78 @@ defmodule Espreso.PayMongo do
     session_id = Map.get(session, "id")
     reference_number = get_in(session, ["attributes", "reference_number"])
 
-    _ =
-      cond do
-        is_binary(reference_number) and reference_number != "" ->
-          Orders.mark_paid_from_paymongo(reference_number, session_id)
+    with {:ok, amount} <- extract_paid_amount_centavos(session),
+         {:ok, order} <- find_order(reference_number, session_id),
+         :ok <- verify_amount_matches(order, amount),
+         {:ok, _} <- mark_order_paid(order, session_id) do
+      :ok
+    else
+      {:error, :missing_amount} = error -> error
+      {:error, :invalid_amount} = error -> error
+      {:error, :amount_mismatch} = error -> error
+      {:error, :invalid_order_total} = error -> error
+      {:error, :not_found} -> :ok
+      {:error, :missing_reference} -> :ok
+      {:error, _} -> :ok
+    end
+  end
 
-        is_binary(session_id) and session_id != "" ->
-          Orders.mark_paid_from_paymongo_session(session_id)
+  defp extract_paid_amount_centavos(session) when is_map(session) do
+    case get_in(session, ["attributes", "payments"]) do
+      payments when is_list(payments) and payments != [] ->
+        paid =
+          Enum.filter(payments, fn payment ->
+            get_in(payment, ["attributes", "status"]) == "paid"
+          end)
 
-        true ->
-          {:error, :missing_reference}
-      end
+        amounts = Enum.map(paid, &get_in(&1, ["attributes", "amount"]))
 
-    :ok
+        cond do
+          paid == [] ->
+            {:error, :missing_amount}
+
+          Enum.any?(amounts, fn amount -> not is_integer(amount) or amount < 0 end) ->
+            {:error, :invalid_amount}
+
+          true ->
+            {:ok, Enum.sum(amounts)}
+        end
+
+      _ ->
+        {:error, :missing_amount}
+    end
+  end
+
+  defp find_order(reference_number, session_id) do
+    cond do
+      is_binary(reference_number) and reference_number != "" ->
+        case Orders.get_order_by_number(reference_number) do
+          %Order{} = order -> {:ok, order}
+          nil -> {:error, :not_found}
+        end
+
+      is_binary(session_id) and session_id != "" ->
+        case Espreso.Repo.get_by(Order, paymongo_checkout_session_id: session_id) do
+          %Order{} = order -> {:ok, order}
+          nil -> {:error, :not_found}
+        end
+
+      true ->
+        {:error, :missing_reference}
+    end
+  end
+
+  defp verify_amount_matches(%Order{total: total}, amount_centavos)
+       when is_integer(amount_centavos) do
+    case pesos_to_centavos(total) do
+      {:ok, ^amount_centavos} -> :ok
+      {:ok, _} -> {:error, :amount_mismatch}
+      {:error, _} = error -> error
+    end
+  end
+
+  defp mark_order_paid(%Order{number: number}, session_id) do
+    Orders.mark_paid_from_paymongo(number, session_id)
   end
 
   defp parse_signature_header(header) when is_binary(header) do
