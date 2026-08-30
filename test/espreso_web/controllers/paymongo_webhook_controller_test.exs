@@ -9,15 +9,19 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
   setup do
     {:ok, order} =
       Orders.create_order(
-        [line("Latte", 150)],
+        [line("Latte", "100.00")],
         %{customer_name: "Mia", fulfillment: :pickup, payment_method: :online}
       )
 
-    payload = paid_webhook_payload(order.number)
+    payload = paid_webhook_payload(order.number, amount: 10_000)
     {:ok, order: order, payload: payload}
   end
 
-  test "marks order paid on checkout_session.payment.paid", %{conn: conn, order: order, payload: payload} do
+  test "marks order paid when amount matches order total", %{
+    conn: conn,
+    order: order,
+    payload: payload
+  } do
     signature = PayMongo.sign_for_test(payload)
 
     conn =
@@ -30,6 +34,105 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
 
     order = Repo.get!(Order, order.id)
     assert order.payment_status == "paid"
+    assert Decimal.equal?(order.total, Decimal.new("100.00"))
+  end
+
+  test "rejects amount one centavo too low and does not mark order paid", %{
+    conn: conn,
+    order: order
+  } do
+    payload = paid_webhook_payload(order.number, amount: 9_999)
+    signature = PayMongo.sign_for_test(payload)
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("paymongo-signature", signature)
+      |> post(~p"/webhooks/paymongo", payload)
+
+    assert json_response(conn, 422) == %{"error" => "amount mismatch"}
+    assert Repo.get!(Order, order.id).payment_status == "unpaid"
+  end
+
+  test "rejects amount one centavo too high and does not mark order paid", %{
+    conn: conn,
+    order: order
+  } do
+    payload = paid_webhook_payload(order.number, amount: 10_001)
+    signature = PayMongo.sign_for_test(payload)
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("paymongo-signature", signature)
+      |> post(~p"/webhooks/paymongo", payload)
+
+    assert json_response(conn, 422) == %{"error" => "amount mismatch"}
+    assert Repo.get!(Order, order.id).payment_status == "unpaid"
+  end
+
+  test "rejects missing amount and does not mark order paid", %{conn: conn, order: order} do
+    payload = paid_webhook_payload(order.number, include_amount?: false)
+    signature = PayMongo.sign_for_test(payload)
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("paymongo-signature", signature)
+      |> post(~p"/webhooks/paymongo", payload)
+
+    assert json_response(conn, 400) == %{"error" => "missing amount"}
+    assert Repo.get!(Order, order.id).payment_status == "unpaid"
+  end
+
+  test "rejects negative amount and does not mark order paid", %{conn: conn, order: order} do
+    payload = paid_webhook_payload(order.number, amount: -100)
+    signature = PayMongo.sign_for_test(payload)
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("paymongo-signature", signature)
+      |> post(~p"/webhooks/paymongo", payload)
+
+    assert json_response(conn, 400) == %{"error" => "invalid amount"}
+    assert Repo.get!(Order, order.id).payment_status == "unpaid"
+  end
+
+  test "rejects non-integer amount and does not mark order paid", %{conn: conn, order: order} do
+    payload = paid_webhook_payload(order.number, amount: 100.5)
+    signature = PayMongo.sign_for_test(payload)
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("paymongo-signature", signature)
+      |> post(~p"/webhooks/paymongo", payload)
+
+    assert json_response(conn, 400) == %{"error" => "invalid amount"}
+    assert Repo.get!(Order, order.id).payment_status == "unpaid"
+  end
+
+  test "converts decimal peso totals to exact centavos without float math", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [line("Cookie", "12.50")],
+        %{customer_name: "Sam", fulfillment: :pickup, payment_method: :online}
+      )
+
+    assert {:ok, 1_250} = PayMongo.pesos_to_centavos(order.total)
+
+    payload = paid_webhook_payload(order.number, amount: 1_250)
+    signature = PayMongo.sign_for_test(payload)
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("paymongo-signature", signature)
+      |> post(~p"/webhooks/paymongo", payload)
+
+    assert json_response(conn, 200) == %{"received" => true}
+    assert Repo.get!(Order, order.id).payment_status == "paid"
   end
 
   test "rejects invalid HMAC with 401 and does not mark order paid", %{
@@ -91,7 +194,11 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
     assert Repo.get!(Order, order.id).payment_status == "unpaid"
   end
 
-  test "accepts test livemode when app is in test mode", %{conn: conn, order: order, payload: payload} do
+  test "accepts test livemode when app is in test mode", %{
+    conn: conn,
+    order: order,
+    payload: payload
+  } do
     signature = PayMongo.sign_for_test(payload)
 
     conn =
@@ -104,8 +211,11 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
     assert Repo.get!(Order, order.id).payment_status == "paid"
   end
 
-  test "rejects live livemode when app is in test mode", %{conn: conn, order: order} do
-    payload = paid_webhook_payload(order.number, livemode: true)
+  test "rejects live livemode when app is in test mode", %{
+    conn: conn,
+    order: order
+  } do
+    payload = paid_webhook_payload(order.number, amount: 10_000, livemode: true)
     signature = PayMongo.sign_for_test(payload)
 
     conn =
@@ -131,11 +241,11 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
 
     {:ok, order} =
       Orders.create_order(
-        [line("Latte", 150)],
+        [line("Latte", "100.00")],
         %{customer_name: "Mia", fulfillment: :pickup, payment_method: :online}
       )
 
-    payload = paid_webhook_payload(order.number, livemode: true)
+    payload = paid_webhook_payload(order.number, amount: 10_000, livemode: true)
     signature = PayMongo.sign_for_test(payload, mode: :live)
 
     conn =
@@ -161,11 +271,11 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
 
     {:ok, order} =
       Orders.create_order(
-        [line("Latte", 150)],
+        [line("Latte", "100.00")],
         %{customer_name: "Mia", fulfillment: :pickup, payment_method: :online}
       )
 
-    payload = paid_webhook_payload(order.number, livemode: false)
+    payload = paid_webhook_payload(order.number, amount: 10_000, livemode: false)
     signature = PayMongo.sign_for_test(payload, mode: :live)
 
     conn =
@@ -182,7 +292,13 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
     conn: conn,
     order: order
   } do
-    payload = paid_webhook_payload(order.number, include_livemode?: false)
+    payload =
+      paid_webhook_payload(
+        order.number,
+        amount: 10_000,
+        include_livemode?: false
+      )
+
     signature = PayMongo.sign_for_test(payload)
 
     conn =
@@ -198,6 +314,28 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
   defp paid_webhook_payload(reference_number, opts \\ []) do
     livemode? = Keyword.get(opts, :include_livemode?, true)
     livemode = Keyword.get(opts, :livemode, false)
+    include_amount? = Keyword.get(opts, :include_amount?, true)
+    amount = Keyword.get(opts, :amount, 10_000)
+
+    session_attributes =
+      %{"reference_number" => reference_number}
+      |> then(fn attrs ->
+        if include_amount? do
+          Map.put(attrs, "payments", [
+            %{
+              "id" => "pay_test_1",
+              "type" => "payment",
+              "attributes" => %{
+                "amount" => amount,
+                "currency" => "PHP",
+                "status" => "paid"
+              }
+            }
+          ])
+        else
+          attrs
+        end
+      end)
 
     attributes =
       %{
@@ -205,9 +343,7 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
         "data" => %{
           "id" => "cs_test_webhook",
           "type" => "checkout_session",
-          "attributes" => %{
-            "reference_number" => reference_number
-          }
+          "attributes" => session_attributes
         }
       }
       |> then(fn attrs ->

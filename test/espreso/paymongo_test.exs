@@ -54,11 +54,24 @@ defmodule Espreso.PayMongoTest do
     end
   end
 
+  describe "pesos_to_centavos/1" do
+    test "converts exact peso Decimals to integer centavos without float math" do
+      assert {:ok, 10_000} = PayMongo.pesos_to_centavos(Decimal.new("100.00"))
+      assert {:ok, 1_250} = PayMongo.pesos_to_centavos(Decimal.new("12.50"))
+      assert {:ok, 99} = PayMongo.pesos_to_centavos(Decimal.new("0.99"))
+    end
+
+    test "rejects totals that are not an exact number of centavos" do
+      assert {:error, :invalid_order_total} =
+               PayMongo.pesos_to_centavos(Decimal.new("10.001"))
+    end
+  end
+
   describe "handle_webhook_event/1" do
-    test "marks the referenced order paid" do
+    test "marks the referenced order paid when amount matches" do
       {:ok, order} =
         Orders.create_order(
-          [line("Espresso", 120)],
+          [line("Espresso", "120.00")],
           %{customer_name: "Ana", fulfillment: :pickup, payment_method: :online}
         )
 
@@ -66,9 +79,22 @@ defmodule Espreso.PayMongoTest do
 
       payload =
         webhook_payload(order.number,
+          amount: 12_000,
           session_data: %{
             "id" => "cs_test_123",
-            "attributes" => %{"reference_number" => order.number}
+            "attributes" => %{
+              "reference_number" => order.number,
+              "payments" => [
+                %{
+                  "id" => "pay_test_123",
+                  "attributes" => %{
+                    "amount" => 12_000,
+                    "status" => "paid",
+                    "currency" => "PHP"
+                  }
+                }
+              ]
+            }
           }
         )
         |> Jason.decode!()
@@ -77,6 +103,38 @@ defmodule Espreso.PayMongoTest do
 
       order = Repo.get!(Order, order.id)
       assert order.payment_status == "paid"
+    end
+
+    test "rejects amount mismatch without marking paid" do
+      {:ok, order} =
+        Orders.create_order(
+          [line("Espresso", "120.00")],
+          %{customer_name: "Ana", fulfillment: :pickup, payment_method: :online}
+        )
+
+      payload =
+        webhook_payload(order.number,
+          session_data: %{
+            "id" => "cs_test_123",
+            "attributes" => %{
+              "reference_number" => order.number,
+              "payments" => [
+                %{
+                  "id" => "pay_test_123",
+                  "attributes" => %{
+                    "amount" => 11_999,
+                    "status" => "paid",
+                    "currency" => "PHP"
+                  }
+                }
+              ]
+            }
+          }
+        )
+        |> Jason.decode!()
+
+      assert {:error, :amount_mismatch} = PayMongo.handle_webhook_event(payload)
+      assert Repo.get!(Order, order.id).payment_status == "unpaid"
     end
 
     test "ignores unrelated event types" do
@@ -95,18 +153,29 @@ defmodule Espreso.PayMongoTest do
 
   defp webhook_payload(reference_number, opts \\ []) do
     livemode = Keyword.get(opts, :livemode, false)
+    amount = Keyword.get(opts, :amount, 0)
 
     session_data = Keyword.get(opts, :session_data, %{})
 
-    session =
-      Map.merge(
-        %{
-          "id" => "cs_test_default",
-          "type" => "checkout_session",
-          "attributes" => %{"reference_number" => reference_number}
-        },
-        session_data
-      )
+    default_session = %{
+      "id" => "cs_test_default",
+      "type" => "checkout_session",
+      "attributes" => %{
+        "reference_number" => reference_number,
+        "payments" => [
+          %{
+            "id" => "pay_test_default",
+            "attributes" => %{
+              "amount" => amount,
+              "status" => "paid",
+              "currency" => "PHP"
+            }
+          }
+        ]
+      }
+    }
+
+    session = deep_merge(default_session, session_data)
 
     Jason.encode!(%{
       "data" => %{
@@ -119,6 +188,16 @@ defmodule Espreso.PayMongoTest do
         }
       }
     })
+  end
+
+  defp deep_merge(left, right) when is_map(left) and is_map(right) do
+    Map.merge(left, right, fn
+      _key, left_val, right_val when is_map(left_val) and is_map(right_val) ->
+        deep_merge(left_val, right_val)
+
+      _key, _left_val, right_val ->
+        right_val
+    end)
   end
 
   defp line(name, pesos) do
