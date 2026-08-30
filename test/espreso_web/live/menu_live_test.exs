@@ -792,11 +792,7 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "button.menu-basket-checkout", "Place order")
     assert has_element?(view, "#menu-basket-submit")
     assert has_element?(view, "#menu-basket-submit .menu-basket-total", "₱195")
-    refute has_element?(view, ".menu-basket-submit-payment")
-    refute has_element?(view, ".menu-checkout-payment-info")
     refute has_element?(view, ".menu-checkout-payment .menu-checkout-option")
-    refute render(view) =~ "Pay online"
-    refute render(view) =~ "Online payment"
 
     view |> element("button.menu-basket-checkout", "Place order") |> render_click()
     assert has_element?(view, "#menu-checkout-summary", "Enter your name and table number.")
@@ -810,8 +806,12 @@ defmodule EspresoWeb.MenuLiveTest do
     |> render_change()
 
     refute has_element?(view, "#menu-checkout-summary")
+    assert has_element?(view, ".menu-checkout-payment .menu-checkout-option", "GCash")
+    assert has_element?(view, ".menu-checkout-payment .menu-checkout-option", "Maya")
+    assert has_element?(view, ".menu-checkout-payment .menu-checkout-option", "Pay with cash at counter")
     assert has_element?(view, "button.menu-basket-checkout", "Place order · Pay at counter")
-    refute render(view) =~ "Pay online"
+    refute has_element?(view, ".menu-checkout-payment-info")
+    refute has_element?(view, ".menu-basket-submit-payment")
     assert has_element?(view, ".menu-basket-alt-label", "Other ways to order")
     assert has_element?(view, "a.menu-basket-whatsapp", "Message us on WhatsApp instead")
     assert has_element?(
@@ -892,6 +892,40 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(detail_view, "#order-receipt", "Espresso")
     assert has_element?(detail_view, "#order-receipt", "Americano")
     refute has_element?(detail_view, "#order-confirm")
+  end
+
+  test "/menu GCash checkout creates unpaid order and redirects to PayMongo", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view = enter_menu_browse(view)
+
+    view |> element("button[aria-label='Add Espresso']") |> render_click()
+    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view |> element("button.brune-icon-bag") |> render_click()
+
+    view
+    |> form("#menu-checkout-form", %{
+      customer_name: "Gina",
+      table_number: "3"
+    })
+    |> render_change()
+
+    view |> element("button.menu-checkout-option", "GCash") |> render_click()
+    assert has_element?(view, ".menu-checkout-payment-info-value", "GCash")
+    assert has_element?(view, ".menu-basket-submit-payment", "Secure payment via PayMongo")
+    assert has_element?(view, "button.menu-basket-checkout", "Pay with GCash")
+
+    assert {:error, {:redirect, %{to: checkout_url}}} =
+             view
+             |> element("button.menu-basket-checkout", "Pay with GCash")
+             |> render_click()
+
+    assert checkout_url =~ "checkout.paymongo.test"
+
+    [order] = Orders.list_active_orders()
+    assert order.customer_name == "Gina"
+    assert order.payment_method == "online"
+    assert order.payment_status == "unpaid"
+    assert is_binary(order.paymongo_checkout_session_id)
   end
 
   test "/menu Order More returns to menu browse with an empty cart", %{conn: conn} do
@@ -1375,8 +1409,6 @@ defmodule EspresoWeb.MenuLiveTest do
       |> render()
 
     assert html |> Floki.parse_fragment!() |> Floki.find(".menu-basket-line .menu-qty") |> length() == 1
-    refute has_element?(view, ".menu-basket-submit-payment")
-    refute has_element?(view, ".menu-checkout-payment-info")
   end
 
   test "/menu item count uses total quantity for one product qty 2", %{conn: conn} do

@@ -20,6 +20,7 @@ defmodule Espreso.Orders.Order do
     field :payment_method, :string, default: "counter"
     field :payment_status, :string, default: "unpaid"
     field :source, :string, default: "customer"
+    field :paymongo_checkout_session_id, :string
     field :total, :decimal
 
     has_many :items, OrderItem
@@ -45,6 +46,7 @@ defmodule Espreso.Orders.Order do
       :payment_method,
       :payment_status,
       :source,
+      :paymongo_checkout_session_id,
       :total
     ])
     |> validate_required([
@@ -90,7 +92,7 @@ defmodule Espreso.Orders.Order do
 
   def payment_changeset(order, attrs) do
     order
-    |> cast(attrs, [:payment_status, :payment_method])
+    |> cast(attrs, [:payment_status, :payment_method, :paymongo_checkout_session_id])
     |> validate_inclusion(:payment_status, @payment_statuses)
     |> validate_inclusion(:payment_method, @payment_methods)
   end

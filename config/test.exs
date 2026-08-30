@@ -35,3 +35,8 @@ config :phoenix, :plug_init_mode, :runtime
 # Enable helpful, but potentially expensive runtime checks
 config :phoenix_live_view,
   enable_expensive_runtime_checks: true
+
+config :espreso, :paymongo,
+  client: Espreso.PayMongo.StubClient,
+  secret_key: "sk_test_placeholder",
+  webhook_secret: "whsk_test_placeholder"

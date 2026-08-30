@@ -424,6 +424,50 @@ defmodule Espreso.Orders do
   def mark_paid(%Order{} = order), do: mark_paid(%Order{id: order.id})
 
   @doc """
+  Stores the PayMongo checkout session id on an order after session creation.
+  """
+  def attach_paymongo_session(%Order{id: id}, session_id) when is_binary(session_id) do
+    case Repo.get(Order, id) do
+      nil ->
+        {:error, :not_found}
+
+      %Order{} = order ->
+        order
+        |> Order.payment_changeset(%{paymongo_checkout_session_id: session_id})
+        |> Repo.update()
+    end
+  end
+
+  @doc """
+  Marks an order paid from a PayMongo webhook using the order number reference.
+  """
+  def mark_paid_from_paymongo(reference_number, session_id \\ nil)
+      when is_binary(reference_number) do
+    case Repo.get_by(Order, number: reference_number) do
+      nil ->
+        {:error, :not_found}
+
+      %Order{payment_status: "paid"} = order ->
+        {:ok, order}
+
+      %Order{} = order ->
+        maybe_attach_session(order, session_id)
+        mark_paid(order)
+    end
+  end
+
+  @doc """
+  Marks an order paid from a PayMongo webhook using the checkout session id.
+  """
+  def mark_paid_from_paymongo_session(session_id) when is_binary(session_id) do
+    case Repo.get_by(Order, paymongo_checkout_session_id: session_id) do
+      nil -> {:error, :not_found}
+      %Order{payment_status: "paid"} = order -> {:ok, order}
+      %Order{} = order -> mark_paid(order)
+    end
+  end
+
+  @doc """
   Marks a ready order as picked up / completed.
 
   Reloads from the database first. Does not change payment_status.
@@ -476,9 +520,18 @@ defmodule Espreso.Orders do
     do: "Paid online"
 
   def payment_label(%Order{payment_method: "online", payment_status: "unpaid"}),
-    do: "Online (unpaid)"
+    do: "Awaiting online payment"
 
   def payment_label(_), do: "Payment"
+
+  defp maybe_attach_session(%Order{paymongo_checkout_session_id: nil} = order, session_id)
+       when is_binary(session_id) do
+    order
+    |> Order.payment_changeset(%{paymongo_checkout_session_id: session_id})
+    |> Repo.update()
+  end
+
+  defp maybe_attach_session(_order, _session_id), do: :ok
 
   def order_number_pattern, do: ~r/^CS-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/
 
