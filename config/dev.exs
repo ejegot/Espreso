@@ -83,3 +83,7 @@ config :phoenix_live_view,
 
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
+
+config :espreso, :paymongo,
+  secret_key: System.get_env("PAYMONGO_SECRET_KEY"),
+  webhook_secret: System.get_env("PAYMONGO_WEBHOOK_SECRET")

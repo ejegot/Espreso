@@ -4,6 +4,7 @@ defmodule EspresoWeb.MenuLive do
   alias Espreso.CoffeeSpot
   alias Espreso.Menu
   alias Espreso.Orders
+  alias Espreso.PayMongo
 
   @impl true
   def mount(_params, _session, socket) do
@@ -297,7 +298,8 @@ defmodule EspresoWeb.MenuLive do
   def handle_event("set_payment_method", %{"method" => method}, socket) do
     payment_method =
       case method do
-        "online" -> :online
+        "gcash" -> :gcash
+        "maya" -> :maya
         _ -> :counter
       end
 
@@ -317,68 +319,11 @@ defmodule EspresoWeb.MenuLive do
       errors != %{} ->
         {:noreply, assign(socket, :checkout_errors, errors)}
 
-      socket.assigns.payment_method == :online ->
-        {:noreply,
-         socket
-         |> assign(:checkout_errors, %{})
-         |> assign(:toast, "Online payment coming soon — use Pay at counter")
-         |> then(fn s ->
-           Process.send_after(self(), :clear_toast, 2800)
-           s
-         end)}
+      socket.assigns.payment_method in [:gcash, :maya] ->
+        place_online_order(socket, socket.assigns.payment_method)
 
       true ->
-        socket = assign(socket, :placing_order?, true)
-
-        attrs = %{
-          customer_name: socket.assigns.customer_name,
-          fulfillment: socket.assigns.fulfillment,
-          table_number: socket.assigns.table_number,
-          notes: socket.assigns.notes,
-          payment_method: :counter
-        }
-
-        case Orders.create_order(socket.assigns.cart, attrs) do
-          {:ok, order} ->
-            {:noreply,
-             socket
-             |> assign(:cart, [])
-             |> assign(:basket_open?, false)
-             |> assign(:basket_closing?, false)
-             |> assign(:placing_order?, false)
-             |> assign(:checkout_errors, %{})
-             |> remember_my_order(order)
-             |> push_event("clear_persisted_cart", %{})
-             |> push_event("persist_my_order", %{number: order.number})
-             |> push_navigate(to: ~p"/order/#{order.number}?confirm=1")}
-
-          {:error, {:unavailable, names}} ->
-            {:noreply,
-             socket
-             |> assign(:placing_order?, false)
-             |> assign(:checkout_errors, %{})
-             |> assign(:toast, unavailable_toast(names))
-             |> then(fn s ->
-               Process.send_after(self(), :clear_toast, 3200)
-               s
-             end)}
-
-          {:error, %Ecto.Changeset{} = changeset} ->
-            {:noreply,
-             socket
-             |> assign(:placing_order?, false)
-             |> assign(:checkout_errors, checkout_errors_from_changeset(changeset))}
-
-          {:error, _} ->
-            {:noreply,
-             socket
-             |> assign(:placing_order?, false)
-             |> assign(:toast, "Could not place order — try again")
-             |> then(fn s ->
-               Process.send_after(self(), :clear_toast, 2400)
-               s
-             end)}
-        end
+        place_counter_order(socket)
     end
   end
 
@@ -1272,6 +1217,49 @@ defmodule EspresoWeb.MenuLive do
                     phx-debounce="200"
                   >{Phoenix.HTML.Form.normalize_value("textarea", @notes)}</textarea>
                 </div>
+
+                <fieldset
+                  :if={checkout_valid?(@fulfillment, @customer_name, @table_number)}
+                  class="menu-checkout-payment"
+                >
+                  <legend class="menu-checkout-label">How will you pay?</legend>
+                  <div class="menu-checkout-options" role="radiogroup" aria-label="Payment">
+                    <button
+                      type="button"
+                      class={["menu-checkout-option", @payment_method == :gcash && "is-active"]}
+                      phx-click="set_payment_method"
+                      phx-value-method="gcash"
+                      aria-pressed={to_string(@payment_method == :gcash)}
+                    >
+                      GCash
+                    </button>
+                    <button
+                      type="button"
+                      class={["menu-checkout-option", @payment_method == :maya && "is-active"]}
+                      phx-click="set_payment_method"
+                      phx-value-method="maya"
+                      aria-pressed={to_string(@payment_method == :maya)}
+                    >
+                      Maya
+                    </button>
+                    <button
+                      type="button"
+                      class={["menu-checkout-option", @payment_method == :counter && "is-active"]}
+                      phx-click="set_payment_method"
+                      phx-value-method="counter"
+                      aria-pressed={to_string(@payment_method == :counter)}
+                    >
+                      Pay with cash at counter
+                    </button>
+                  </div>
+                  <p class="menu-checkout-payment-note menu-basket-note">
+                    <%= if @payment_method == :counter do %>
+                      You'll pay at the counter when your order is ready.
+                    <% else %>
+                      You'll complete payment on PayMongo's secure checkout page.
+                    <% end %>
+                  </p>
+                </fieldset>
               </form>
             </div>
           </div>
@@ -1292,14 +1280,28 @@ defmodule EspresoWeb.MenuLive do
             </p>
 
             <%= if checkout_valid?(@fulfillment, @customer_name, @table_number) do %>
+              <div
+                :if={online_payment_method?(assigns)}
+                class="menu-checkout-payment-info"
+              >
+                <span class="menu-checkout-payment-info-label">Payment</span>
+                <span class="menu-checkout-payment-info-value">
+                  {payment_method_label(@payment_method)}
+                </span>
+              </div>
+
               <button
                 type="button"
                 class="menu-basket-checkout"
                 phx-click="place_order"
                 disabled={@placing_order?}
               >
-                {if @placing_order?, do: "Placing order…", else: "Place order · Pay at counter"}
+                {checkout_button_label(@payment_method, @placing_order?)}
               </button>
+
+              <p :if={online_payment_method?(assigns)} class="menu-basket-submit-payment">
+                Secure payment via PayMongo
+              </p>
               <div class="menu-basket-alt">
                 <p class="menu-basket-alt-label">Other ways to order</p>
                 <a
@@ -1320,7 +1322,12 @@ defmodule EspresoWeb.MenuLive do
               </button>
             <% end %>
 
-            <p class="menu-basket-note">You’ll get an order number to show at the counter.</p>
+            <p :if={@payment_method == :counter} class="menu-basket-note">
+              You'll get an order number to show at the counter.
+            </p>
+            <p :if={online_payment_method?(assigns)} class="menu-basket-note">
+              Your order starts after payment is confirmed.
+            </p>
           </div>
         </aside>
       </div>
@@ -2420,4 +2427,119 @@ defmodule EspresoWeb.MenuLive do
   defp unavailable_toast(names) when is_list(names) do
     "#{Enum.join(names, ", ")} are no longer available. Update your order and try again."
   end
+
+  defp place_counter_order(socket) do
+    socket = assign(socket, :placing_order?, true)
+
+    case Orders.create_order(socket.assigns.cart, order_attrs(socket, :counter)) do
+      {:ok, order} ->
+        {:noreply, finalize_counter_order(socket, order)}
+
+      {:error, {:unavailable, names}} ->
+        {:noreply, order_failure(socket, unavailable_toast(names))}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply,
+         socket
+         |> assign(:placing_order?, false)
+         |> assign(:checkout_errors, checkout_errors_from_changeset(changeset))}
+
+      {:error, _} ->
+        {:noreply, order_failure(socket, "Could not place order — try again")}
+    end
+  end
+
+  defp place_online_order(socket, channel) do
+    socket = assign(socket, :placing_order?, true)
+
+    with {:ok, order} <- Orders.create_order(socket.assigns.cart, order_attrs(socket, :online)),
+         return_urls <- checkout_return_urls(order),
+         {:ok, %{id: session_id, checkout_url: checkout_url}} <-
+           PayMongo.create_checkout_session(order, socket.assigns.cart,
+             channel: channel,
+             success_url: return_urls.success_url,
+             cancel_url: return_urls.cancel_url
+           ),
+         {:ok, _order} <- Orders.attach_paymongo_session(order, session_id) do
+      {:noreply,
+       socket
+       |> assign(:cart, [])
+       |> assign(:basket_open?, false)
+       |> assign(:basket_closing?, false)
+       |> assign(:placing_order?, false)
+       |> assign(:checkout_errors, %{})
+       |> remember_my_order(order)
+       |> push_event("clear_persisted_cart", %{})
+       |> push_event("persist_my_order", %{number: order.number})
+       |> redirect(external: checkout_url)}
+    else
+      {:error, {:unavailable, names}} ->
+        {:noreply, order_failure(socket, unavailable_toast(names))}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply,
+         socket
+         |> assign(:placing_order?, false)
+         |> assign(:checkout_errors, checkout_errors_from_changeset(changeset))}
+
+      {:error, _} ->
+        {:noreply,
+         order_failure(socket, "Could not start online payment — try again or pay at counter")}
+    end
+  end
+
+  defp finalize_counter_order(socket, order) do
+    socket
+    |> assign(:cart, [])
+    |> assign(:basket_open?, false)
+    |> assign(:basket_closing?, false)
+    |> assign(:placing_order?, false)
+    |> assign(:checkout_errors, %{})
+    |> remember_my_order(order)
+    |> push_event("clear_persisted_cart", %{})
+    |> push_event("persist_my_order", %{number: order.number})
+    |> push_navigate(to: ~p"/order/#{order.number}?confirm=1")
+  end
+
+  defp order_failure(socket, message) do
+    socket
+    |> assign(:placing_order?, false)
+    |> assign(:checkout_errors, %{})
+    |> assign(:toast, message)
+    |> then(fn s ->
+      Process.send_after(self(), :clear_toast, 3200)
+      s
+    end)
+  end
+
+  defp order_attrs(socket, payment_method) do
+    %{
+      customer_name: socket.assigns.customer_name,
+      fulfillment: socket.assigns.fulfillment,
+      table_number: socket.assigns.table_number,
+      notes: socket.assigns.notes,
+      payment_method: payment_method
+    }
+  end
+
+  defp checkout_return_urls(order) do
+    %{
+      success_url: url(~p"/order/#{order.number}?confirm=1"),
+      cancel_url: url(~p"/order/#{order.number}?payment=cancelled")
+    }
+  end
+
+  defp checkout_button_label(:counter, true), do: "Placing order…"
+  defp checkout_button_label(:gcash, true), do: "Starting GCash…"
+  defp checkout_button_label(:maya, true), do: "Starting Maya…"
+  defp checkout_button_label(:counter, false), do: "Place order · Pay at counter"
+  defp checkout_button_label(:gcash, false), do: "Pay with GCash"
+  defp checkout_button_label(:maya, false), do: "Pay with Maya"
+
+  defp payment_method_label(:counter), do: "Pay at counter"
+  defp payment_method_label(:gcash), do: "GCash"
+  defp payment_method_label(:maya), do: "Maya"
+
+  defp online_payment_method?(%{payment_method: method}) when method in [:gcash, :maya], do: true
+  defp online_payment_method?(_), do: false
 end

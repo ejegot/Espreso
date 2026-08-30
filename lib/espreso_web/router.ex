@@ -18,6 +18,12 @@ defmodule EspresoWeb.Router do
   end
 
   scope "/", EspresoWeb do
+    pipe_through :api
+
+    post "/webhooks/paymongo", PayMongoWebhookController, :create
+  end
+
+  scope "/", EspresoWeb do
     pipe_through :browser
 
     live "/", HomeLive

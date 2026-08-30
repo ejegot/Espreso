@@ -131,6 +131,16 @@ if config_env() == :prod do
   # See https://hexdocs.pm/swoosh/Swoosh.html#module-installation for details.
 end
 
+paymongo_secret_key = System.get_env("PAYMONGO_SECRET_KEY")
+paymongo_webhook_secret = System.get_env("PAYMONGO_WEBHOOK_SECRET")
+
+if config_env() == :prod and is_binary(paymongo_secret_key) and paymongo_secret_key != "" and
+     is_binary(paymongo_webhook_secret) and paymongo_webhook_secret != "" do
+  config :espreso, :paymongo,
+    secret_key: paymongo_secret_key,
+    webhook_secret: paymongo_webhook_secret
+end
+
 staff_password = System.get_env("STAFF_ORDERS_PASSWORD")
 
 if is_binary(staff_password) and staff_password != "" do
