@@ -30,24 +30,22 @@ defmodule EspresoWeb.OrderLive do
     confirming? =
       not is_nil(socket.assigns.order) and Map.get(params, "confirm") in ["1", "true"]
 
-    page_title =
-      cond do
-        is_nil(socket.assigns.order) -> "Order not found"
-        confirming? -> "Order confirmed"
-        true -> "Order #{socket.assigns.order.number}"
-      end
-
     {:noreply,
      socket
      |> assign(:confirming?, confirming?)
-     |> assign(:page_title, page_title)}
+     |> assign(:page_title, page_title(socket.assigns.order, confirming?))}
   end
 
   @impl true
   def handle_info({:order_changed, %{id: id}}, socket) do
     case socket.assigns.order do
       %{id: ^id, number: number} ->
-        {:noreply, assign(socket, :order, Orders.get_order_by_number!(number))}
+        order = Orders.get_order_by_number!(number)
+
+        {:noreply,
+         socket
+         |> assign(:order, order)
+         |> assign(:page_title, page_title(order, socket.assigns.confirming?))}
 
       _ ->
         {:noreply, socket}
@@ -78,10 +76,17 @@ defmodule EspresoWeb.OrderLive do
           data-order-number={@order.number}
         >
           <p class="order-eyebrow">CoffeeSpot</p>
-          <h1 class="order-title" id="order-confirm-title">Order confirmed</h1>
-          <p class="order-lede">
-            Your order is in. Show your order number at the counter when you pick it up.
-          </p>
+          <%= if confirm_payment_processing?(@order) do %>
+            <h1 class="order-title" id="order-confirm-title">Payment processing</h1>
+            <p class="order-lede" id="order-confirm-lede">
+              We’re confirming your payment. This page will update when it’s done.
+            </p>
+          <% else %>
+            <h1 class="order-title" id="order-confirm-title">Order confirmed</h1>
+            <p class="order-lede" id="order-confirm-lede">
+              Your order is in. Show your order number at the counter when you pick it up.
+            </p>
+          <% end %>
           <p class="order-number order-number--confirm" id="order-confirm-number">{@order.number}</p>
 
           <div class="order-actions order-actions--confirm">
@@ -92,11 +97,7 @@ defmodule EspresoWeb.OrderLive do
             >
               View My Order
             </.link>
-            <.link
-              navigate={menu_browse_path()}
-              class="order-more-link"
-              id="order-order-more"
-            >
+            <.link navigate={menu_browse_path()} class="order-more-link" id="order-order-more">
               Order More
             </.link>
           </div>
@@ -166,11 +167,7 @@ defmodule EspresoWeb.OrderLive do
               <p class="order-cancelled-lede">This order will not be prepared.</p>
             </div>
 
-            <p
-              :if={@order.status not in ["completed"]}
-              class="order-hint"
-              id="order-hint"
-            >
+            <p :if={@order.status not in ["completed"]} class="order-hint" id="order-hint">
               {customer_status_hint(@order)}
             </p>
           </div>
@@ -231,6 +228,21 @@ defmodule EspresoWeb.OrderLive do
 
   defp menu_browse_path, do: ~p"/menu?stage=menu"
 
+  defp page_title(nil, _confirming?), do: "Order not found"
+
+  defp page_title(order, true) do
+    if confirm_payment_processing?(order), do: "Payment processing", else: "Order confirmed"
+  end
+
+  defp page_title(order, _confirming?), do: "Order #{order.number}"
+
+  defp confirm_payment_processing?(%{payment_method: "online", payment_status: status})
+       when status != "paid" do
+    true
+  end
+
+  defp confirm_payment_processing?(_order), do: false
+
   defp customer_status_message("received"), do: "Order received"
   defp customer_status_message("preparing"), do: "We're preparing your order"
   defp customer_status_message("ready"), do: "Your order is ready"
@@ -257,7 +269,8 @@ defmodule EspresoWeb.OrderLive do
     do: "Keep this screen open for live updates on your order."
 
   defp customer_status_hint(%{status: "received", payment_method: "counter"}),
-    do: "Keep this screen and show it at the counter for your order. Payment is due at the counter."
+    do:
+      "Keep this screen and show it at the counter for your order. Payment is due at the counter."
 
   defp customer_status_hint(%{status: "received"}),
     do: "Keep this screen open for live updates on your order."
