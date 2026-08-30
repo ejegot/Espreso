@@ -209,7 +209,7 @@ defmodule EspresoWeb.OrderLiveTest do
     refute has_element?(view, "#order-confirm-title", "Order confirmed")
     refute has_element?(view, "#order-status-message")
 
-    assert {:ok, _} = Orders.mark_paid(order)
+    assert {:ok, _} = Orders.mark_paid_from_paymongo(order.number)
     assert has_element?(view, "#order-confirm-title", "Order confirmed")
 
     assert has_element?(
@@ -233,7 +233,7 @@ defmodule EspresoWeb.OrderLiveTest do
       )
 
     {:ok, order} = Orders.attach_paymongo_session(order, "cs_confirm_paid")
-    {:ok, order} = Orders.mark_paid(order)
+    {:ok, order} = Orders.mark_paid_from_paymongo(order.number)
 
     {:ok, view, _html} = live(conn, ~p"/order/#{order.number}?confirm=1")
 

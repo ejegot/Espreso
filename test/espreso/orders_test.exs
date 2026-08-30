@@ -193,6 +193,91 @@ defmodule Espreso.OrdersTest do
     assert {:error, :cancelled} = Orders.mark_paid(cancelled)
   end
 
+  test "online unpaid cannot be manually marked paid; PayMongo helper can" do
+    lines = [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("100")}]
+
+    {:ok, order} =
+      Orders.create_order(lines, %{
+        customer_name: "Online Manual Pay",
+        fulfillment: :pickup,
+        payment_method: :online
+      })
+
+    {:ok, order} = Orders.attach_paymongo_session(order, "cs_esp87_manual")
+    assert order.payment_status == "unpaid"
+
+    assert {:error, :online_payment_required} = Orders.mark_paid(order)
+    reloaded = Orders.get_order_by_number!(order.number)
+    assert reloaded.payment_status == "unpaid"
+
+    assert {:ok, paid} = Orders.mark_paid_from_paymongo(order.number)
+    assert paid.payment_status == "paid"
+    assert paid.payment_method == "online"
+
+    assert {:ok, again} = Orders.mark_paid(paid)
+    assert again.payment_status == "paid"
+  end
+
+  test "online unpaid can prepare but not become ready or completed" do
+    lines = [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("100")}]
+
+    {:ok, order} =
+      Orders.create_order(lines, %{
+        customer_name: "Online Fulfill Gate",
+        fulfillment: :pickup,
+        payment_method: :online
+      })
+
+    {:ok, order} = Orders.attach_paymongo_session(order, "cs_esp87_fulfill")
+
+    assert {:ok, preparing} = Orders.update_status(order, "preparing")
+    assert preparing.status == "preparing"
+    assert preparing.payment_status == "unpaid"
+
+    assert {:error, :payment_required} = Orders.update_status(preparing, "ready")
+    still_preparing = Orders.get_order_by_number!(order.number)
+    assert still_preparing.status == "preparing"
+    assert still_preparing.payment_status == "unpaid"
+
+    # Defense-in-depth: legacy ready + unpaid online cannot complete.
+    {:ok, legacy_ready} =
+      still_preparing
+      |> Ecto.Changeset.change(%{status: "ready"})
+      |> Espreso.Repo.update()
+
+    assert {:error, :payment_required} = Orders.complete_order(legacy_ready)
+    assert Orders.get_order_by_number!(order.number).status == "ready"
+    assert Orders.get_order_by_number!(order.number).payment_status == "unpaid"
+
+    assert {:ok, paid} = Orders.mark_paid_from_paymongo_session("cs_esp87_fulfill")
+    assert paid.payment_status == "paid"
+
+    assert {:ok, ready} = Orders.update_status(paid, "ready")
+    assert ready.status == "ready"
+    assert {:ok, completed} = Orders.complete_order(ready)
+    assert completed.status == "completed"
+    assert completed.payment_status == "paid"
+  end
+
+  test "abandoned online order stays unpaid and cannot be manually marked paid" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, order} =
+      Orders.create_order(lines, %{
+        customer_name: "Abandon Then Pay",
+        fulfillment: :pickup,
+        payment_method: :online
+      })
+
+    {:ok, order} = Orders.attach_paymongo_session(order, "cs_esp87_abandon")
+    assert {:ok, abandoned} = Orders.abandon_online_payment(order)
+    assert abandoned.status == "cancelled"
+    assert abandoned.payment_status == "unpaid"
+
+    assert {:error, :cancelled} = Orders.mark_paid(abandoned)
+    assert {:error, :cancelled} = Orders.mark_paid_from_paymongo(abandoned.number)
+  end
+
   test "attach_paymongo_session enforces unique checkout session binding" do
     lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
 
@@ -337,7 +422,7 @@ defmodule Espreso.OrdersTest do
       })
 
     {:ok, paid} = Orders.attach_paymongo_session(paid, "cs_abandon_paid")
-    {:ok, paid} = Orders.mark_paid(paid)
+    assert {:ok, paid} = Orders.mark_paid_from_paymongo(paid.number)
     assert {:error, :paid} = Orders.abandon_online_payment(paid)
 
     {:ok, ready} =
@@ -349,7 +434,12 @@ defmodule Espreso.OrdersTest do
 
     {:ok, ready} = Orders.attach_paymongo_session(ready, "cs_abandon_ready")
     {:ok, ready} = Orders.update_status(ready, "preparing")
-    {:ok, ready} = Orders.update_status(ready, "ready")
+
+    {:ok, ready} =
+      ready
+      |> Ecto.Changeset.change(%{status: "ready"})
+      |> Espreso.Repo.update()
+
     assert {:error, :invalid_status} = Orders.abandon_online_payment(ready)
 
     {:ok, to_cancel} =
