@@ -928,6 +928,77 @@ defmodule EspresoWeb.MenuLiveTest do
     assert is_binary(order.paymongo_checkout_session_id)
   end
 
+  test "/menu cancels orphan order when PayMongo checkout creation fails", %{conn: conn} do
+    original = Application.get_env(:espreso, :paymongo)
+
+    on_exit(fn ->
+      Application.put_env(:espreso, :paymongo, original)
+    end)
+
+    Application.put_env(
+      :espreso,
+      :paymongo,
+      Keyword.put(original, :client, EspresoWeb.MenuLiveTest.FailingCheckoutClient)
+    )
+
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view = prepare_gcash_checkout(view, "Checkout Fail")
+
+    html =
+      view
+      |> element("button.menu-basket-checkout", "Pay with GCash")
+      |> render_click()
+
+    assert html =~ "Could not start online payment"
+    assert Orders.list_active_orders() == []
+
+    assert [%{status: "cancelled", payment_status: "unpaid", paymongo_checkout_session_id: nil}] =
+             orders_named("Checkout Fail")
+  end
+
+  test "/menu cancels orphan order when session attach fails", %{conn: conn} do
+    original = Application.get_env(:espreso, :paymongo)
+
+    on_exit(fn ->
+      Application.put_env(:espreso, :paymongo, original)
+    end)
+
+    {:ok, blocker} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Session Blocker",
+          fulfillment: :pickup,
+          payment_method: :online
+        }
+      )
+
+    {:ok, blocker} = Orders.attach_paymongo_session(blocker, "cs_menu_attach_taken")
+
+    Application.put_env(
+      :espreso,
+      :paymongo,
+      Keyword.put(original, :client, EspresoWeb.MenuLiveTest.FixedSessionClient)
+    )
+
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view = prepare_gcash_checkout(view, "Attach Fail")
+
+    html =
+      view
+      |> element("button.menu-basket-checkout", "Pay with GCash")
+      |> render_click()
+
+    assert html =~ "Could not start online payment"
+    refute Enum.any?(Orders.list_active_orders(), &(&1.customer_name == "Attach Fail"))
+
+    assert [%{status: "cancelled", payment_status: "unpaid", paymongo_checkout_session_id: nil}] =
+             orders_named("Attach Fail")
+
+    # Blocker with the taken session remains active until staff abandons it.
+    assert Enum.any?(Orders.list_active_orders(), &(&1.id == blocker.id))
+  end
+
   test "/menu Order More returns to menu browse with an empty cart", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
     view = enter_menu_browse(view)
@@ -1572,6 +1643,28 @@ defmodule EspresoWeb.MenuLiveTest do
     view
   end
 
+  defp prepare_gcash_checkout(view, customer_name) do
+    view = enter_menu_browse(view)
+
+    view |> element("button[aria-label='Add Espresso']") |> render_click()
+    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view |> element("button.brune-icon-bag") |> render_click()
+
+    view
+    |> form("#menu-checkout-form", %{
+      customer_name: customer_name,
+      table_number: "3"
+    })
+    |> render_change()
+
+    view |> element("button.menu-checkout-option", "GCash") |> render_click()
+    view
+  end
+
+  defp orders_named(name) do
+    Enum.filter(Repo.all(Espreso.Orders.Order), &(&1.customer_name == name))
+  end
+
   defp insert_category!(name) do
     %Category{}
     |> Category.changeset(%{name: name})
@@ -1600,5 +1693,30 @@ defmodule EspresoWeb.MenuLiveTest do
     end)
 
     product
+  end
+end
+
+defmodule EspresoWeb.MenuLiveTest.FailingCheckoutClient do
+  @moduledoc false
+  @behaviour Espreso.PayMongo.Client
+
+  @impl true
+  def create_checkout_session(_order, _lines, _opts) do
+    {:error, :checkout_unavailable}
+  end
+end
+
+defmodule EspresoWeb.MenuLiveTest.FixedSessionClient do
+  @moduledoc false
+  @behaviour Espreso.PayMongo.Client
+
+  @impl true
+  def create_checkout_session(_order, _lines, opts) do
+    {:ok,
+     %{
+       id: "cs_menu_attach_taken",
+       checkout_url:
+         Keyword.get(opts, :checkout_url, "https://checkout.paymongo.test/cs_menu_attach_taken")
+     }}
   end
 end
