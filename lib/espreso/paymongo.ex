@@ -34,6 +34,40 @@ defmodule Espreso.PayMongo do
   end
 
   @doc """
+  Verifies that a signed webhook payload's `livemode` matches this app.
+
+  Must only be called after `verify_webhook_signature/2` succeeds.
+  """
+  def verify_webhook_livemode(payload) when is_map(payload) do
+    with {:ok, expected} <- expected_livemode(),
+         {:ok, actual} <- parse_payload_livemode(payload),
+         true <- actual == expected do
+      :ok
+    else
+      {:error, reason} -> {:error, reason}
+      false -> {:error, :livemode_mismatch}
+    end
+  end
+
+  @doc """
+  Returns the application's expected PayMongo `livemode` flag.
+
+  Uses explicit `:livemode` config when set; otherwise derives from
+  `:secret_key` (`sk_test_*` → false, `sk_live_*` → true).
+  """
+  def expected_livemode do
+    config = Application.get_env(:espreso, :paymongo, [])
+
+    case Keyword.get(config, :livemode) do
+      livemode when is_boolean(livemode) ->
+        {:ok, livemode}
+
+      _ ->
+        derive_livemode_from_secret_key(Keyword.get(config, :secret_key))
+    end
+  end
+
+  @doc """
   Handles a verified PayMongo webhook payload.
 
   Marks the referenced order paid on `checkout_session.payment.paid`.
@@ -136,4 +170,15 @@ defmodule Espreso.PayMongo do
       _ -> raise "PayMongo webhook secret is not configured"
     end
   end
+
+  defp parse_payload_livemode(payload) do
+    case get_in(payload, ["data", "attributes", "livemode"]) do
+      livemode when is_boolean(livemode) -> {:ok, livemode}
+      _ -> {:error, :missing_livemode}
+    end
+  end
+
+  defp derive_livemode_from_secret_key("sk_live_" <> _), do: {:ok, true}
+  defp derive_livemode_from_secret_key("sk_test_" <> _), do: {:ok, false}
+  defp derive_livemode_from_secret_key(_), do: {:error, :unconfigured_livemode}
 end

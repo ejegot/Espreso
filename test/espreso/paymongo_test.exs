@@ -22,6 +22,38 @@ defmodule Espreso.PayMongoTest do
     end
   end
 
+  describe "verify_webhook_livemode/1" do
+    test "accepts matching test livemode" do
+      payload =
+        webhook_payload("CS-TEST01")
+        |> Jason.decode!()
+
+      assert :ok = PayMongo.verify_webhook_livemode(payload)
+      assert {:ok, false} = PayMongo.expected_livemode()
+    end
+
+    test "rejects mismatched livemode" do
+      payload =
+        webhook_payload("CS-TEST01", livemode: true)
+        |> Jason.decode!()
+
+      assert {:error, :livemode_mismatch} = PayMongo.verify_webhook_livemode(payload)
+    end
+
+    test "rejects missing livemode" do
+      payload = %{
+        "data" => %{
+          "attributes" => %{
+            "type" => "checkout_session.payment.paid",
+            "data" => %{}
+          }
+        }
+      }
+
+      assert {:error, :missing_livemode} = PayMongo.verify_webhook_livemode(payload)
+    end
+  end
+
   describe "handle_webhook_event/1" do
     test "marks the referenced order paid" do
       {:ok, order} =
@@ -33,10 +65,12 @@ defmodule Espreso.PayMongoTest do
       assert order.payment_status == "unpaid"
 
       payload =
-        webhook_payload(order.number, %{
-          "id" => "cs_test_123",
-          "attributes" => %{"reference_number" => order.number}
-        })
+        webhook_payload(order.number,
+          session_data: %{
+            "id" => "cs_test_123",
+            "attributes" => %{"reference_number" => order.number}
+          }
+        )
         |> Jason.decode!()
 
       assert :ok = PayMongo.handle_webhook_event(payload)
@@ -59,7 +93,11 @@ defmodule Espreso.PayMongoTest do
     end
   end
 
-  defp webhook_payload(reference_number, session_data \\ %{}) do
+  defp webhook_payload(reference_number, opts \\ []) do
+    livemode = Keyword.get(opts, :livemode, false)
+
+    session_data = Keyword.get(opts, :session_data, %{})
+
     session =
       Map.merge(
         %{
@@ -76,7 +114,7 @@ defmodule Espreso.PayMongoTest do
         "type" => "event",
         "attributes" => %{
           "type" => "checkout_session.payment.paid",
-          "livemode" => false,
+          "livemode" => livemode,
           "data" => session
         }
       }
