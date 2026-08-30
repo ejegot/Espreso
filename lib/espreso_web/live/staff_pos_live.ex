@@ -16,6 +16,7 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:selected_category, selected)
      |> assign(:cart, [])
      |> assign(:customer_name, "Walk-in")
+     |> assign(:notes, "")
      |> assign(:payment_choice, :unpaid)
      |> assign(:placing_order?, false)
      |> assign(:size_picker, nil)
@@ -99,7 +100,16 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:error, nil)
      |> assign(:payment_choice, :unpaid)
      |> assign(:placing_order?, false)
-     |> assign(:customer_name, "Walk-in")}
+     |> assign(:customer_name, "Walk-in")
+     |> assign(:notes, "")}
+  end
+
+  def handle_event("set_customer_name", %{"customer_name" => name}, socket) do
+    {:noreply, assign(socket, :customer_name, String.trim(name))}
+  end
+
+  def handle_event("set_notes", %{"notes" => notes}, socket) do
+    {:noreply, assign(socket, :notes, notes)}
   end
 
   def handle_event("set_payment_choice", %{"choice" => choice}, socket) do
@@ -120,7 +130,14 @@ defmodule EspresoWeb.StaffPosLive do
       socket.assigns.cart == [] ->
         {:noreply, assign(socket, :error, "Add at least one item before placing an order.")}
 
+      String.trim(socket.assigns.customer_name) == "" ||
+          String.length(String.trim(socket.assigns.customer_name)) < 2 ->
+        {:noreply,
+         assign(socket, :error, "Enter a customer name (at least 2 characters).")}
+
       true ->
+        customer_name = String.trim(socket.assigns.customer_name)
+
         lines =
           Enum.map(socket.assigns.cart, fn line ->
             %{
@@ -133,7 +150,8 @@ defmodule EspresoWeb.StaffPosLive do
           end)
 
         attrs = %{
-          customer_name: socket.assigns.customer_name,
+          customer_name: customer_name,
+          notes: blank_notes(socket.assigns.notes),
           fulfillment: :pickup,
           payment_method: :counter,
           payment_status: socket.assigns.payment_choice,
@@ -152,6 +170,7 @@ defmodule EspresoWeb.StaffPosLive do
              |> assign(:last_order, order)
              |> assign(:payment_choice, :unpaid)
              |> assign(:placing_order?, false)
+             |> assign(:notes, "")
              |> assign(:categories, Menu.list_menu())}
 
           {:error, :empty_cart} ->
@@ -179,80 +198,143 @@ defmodule EspresoWeb.StaffPosLive do
   def render(assigns) do
     ~H"""
     <.staff_shell current={:pos} current_user={@current_user} page_title="POS">
-      <main class="staff-pos-main">
-        <p :if={@error} class="staff-admin-note" id="pos-error">{@error}</p>
+      <div class="staff-pos-page staff-pos-shell-root">
+        <main class="staff-pos-main">
+          <p :if={@error} class="staff-pos-flash" id="pos-error">{@error}</p>
 
-        <div class="staff-pos-layout">
-          <section class="staff-pos-catalog" id="pos-catalog">
-            <nav class="staff-pos-categories" aria-label="Categories">
-              <button
-                :for={category <- @categories}
-                type="button"
-                class={[
-                  "staff-pos-category",
-                  @selected_category == category.name && "is-active"
-                ]}
-                phx-click="select_category"
-                phx-value-name={category.name}
-                id={"pos-category-#{category.name}"}
-              >
-                {category.name}
-              </button>
-            </nav>
-
-            <div class="staff-pos-products" id="pos-products">
-              <button
-                :for={product <- products_for(@categories, @selected_category)}
-                type="button"
-                class="staff-pos-product"
-                id={"pos-product-#{product.id}"}
-                phx-click="add_product"
-                phx-value-product-id={product.id}
-              >
-                <span class="staff-pos-product-name">{product.name}</span>
-                <span class="staff-pos-product-price">
-                  {price_label(product)}
-                </span>
-              </button>
-              <p :if={products_for(@categories, @selected_category) == []} class="staff-empty">
-                No available products in this category.
-              </p>
-            </div>
-          </section>
-
-          <aside class="staff-pos-ticket" id="pos-ticket">
-            <%= if @last_order do %>
-              <div class="staff-pos-success" id="pos-confirmation">
-                <p class="staff-home-card-eyebrow">Order placed</p>
-                <p class="staff-order-number">{@last_order.number}</p>
-                <p class="staff-order-meta">
-                  Status: {Orders.status_label(@last_order.status)} · {@last_order.customer_name}
-                  · {Orders.payment_label(@last_order)}
-                </p>
-                <div class="staff-pos-success-actions">
+          <div class="staff-pos-layout">
+            <section class="staff-pos-catalog" id="pos-catalog">
+              <div class="staff-pos-catalog-layout">
+                <nav class="staff-pos-categories" aria-label="Categories">
                   <button
+                    :for={category <- @categories}
                     type="button"
-                    class="menu-basket-checkout staff-pos-place"
-                    id="pos-new-order"
-                    phx-click="new_order"
+                    class={[
+                      "staff-pos-category",
+                      @selected_category == category.name && "is-active"
+                    ]}
+                    phx-click="select_category"
+                    phx-value-name={category.name}
+                    id={"pos-category-#{category.name}"}
                   >
-                    New Order
+                    {category.name}
                   </button>
-                  <.link navigate={~p"/orders"} class="staff-refresh staff-pos-view-orders">
-                    View Orders
-                  </.link>
+                </nav>
+
+                <div class="staff-pos-catalog-main">
+                  <header class="staff-pos-catalog-head">
+                    <div>
+                      <p class="staff-pos-catalog-eyebrow">Menu</p>
+                      <h2 class="staff-pos-catalog-title">{@selected_category || "Products"}</h2>
+                    </div>
+                    <span class="staff-pos-catalog-count">
+                      {length(products_for(@categories, @selected_category))} items
+                    </span>
+                  </header>
+
+                  <div class="staff-pos-products" id="pos-products">
+                    <button
+                      :for={product <- products_for(@categories, @selected_category)}
+                      type="button"
+                      class="staff-pos-product"
+                      id={"pos-product-#{product.id}"}
+                      phx-click="add_product"
+                      phx-value-product-id={product.id}
+                    >
+                      <span class="staff-pos-product-mark" aria-hidden="true">
+                        {product_mark(product.name)}
+                      </span>
+                      <span class="staff-pos-product-copy">
+                        <span class="staff-pos-product-name">{product.name}</span>
+                        <span class="staff-pos-product-price">
+                          {price_label(product)}
+                        </span>
+                      </span>
+                    </button>
+                    <p
+                      :if={products_for(@categories, @selected_category) == []}
+                      class="staff-empty"
+                    >
+                      No available products in this category.
+                    </p>
+                  </div>
                 </div>
               </div>
-            <% else %>
-              <div class="staff-pos-ticket-head">
-                <h2>Current Order</h2>
-                <p class="staff-pos-customer">Customer: {@customer_name}</p>
-              </div>
+            </section>
 
-              <div class="staff-pos-ticket-body">
-                <p :if={@cart == []} class="staff-empty" id="pos-cart-empty">No items yet.</p>
+            <aside class="staff-pos-ticket" id="pos-ticket">
+              <%= if @last_order do %>
+                <div class="staff-pos-success" id="pos-confirmation">
+                  <div class="staff-pos-success-badge" aria-hidden="true">✓</div>
+                  <p class="staff-pos-success-eyebrow">Order placed</p>
+                  <p class="staff-order-number">{@last_order.number}</p>
+                  <p class="staff-order-meta">
+                    Status: {Orders.status_label(@last_order.status)} · {@last_order.customer_name}
+                    · {Orders.payment_label(@last_order)}
+                  </p>
+                  <p :if={order_note(@last_order)} class="staff-pos-success-note">
+                    Note: {order_note(@last_order)}
+                  </p>
+                  <div class="staff-pos-success-actions">
+                    <button
+                      type="button"
+                      class="staff-pos-place staff-pos-place--secondary"
+                      id="pos-new-order"
+                      phx-click="new_order"
+                    >
+                      New Order
+                    </button>
+                    <.link navigate={~p"/orders"} class="staff-pos-view-orders">
+                      View Orders
+                    </.link>
+                  </div>
+                </div>
+              <% else %>
+                <div class="staff-pos-ticket-head">
+                  <div class="staff-pos-ticket-title-row">
+                    <h2>Current Order</h2>
+                    <span :if={cart_item_count(@cart) > 0} class="staff-pos-cart-count">
+                      {cart_item_count(@cart)}
+                    </span>
+                  </div>
 
-                <ul class="staff-pos-cart" id="pos-cart-lines">
+                  <div class="staff-pos-panel-section">
+                    <p class="staff-pos-section-label">Customer</p>
+                    <label class="staff-pos-field" for="pos-customer-name">
+                      <span class="staff-pos-field-label">Name</span>
+                      <input
+                        type="text"
+                        class="staff-pos-field-input"
+                        id="pos-customer-name"
+                        name="customer_name"
+                        value={@customer_name}
+                        phx-change="set_customer_name"
+                        phx-debounce="300"
+                        autocomplete="off"
+                        maxlength="60"
+                        placeholder="Walk-in or customer name"
+                      />
+                    </label>
+                    <label class="staff-pos-field staff-pos-field--notes" for="pos-notes">
+                      <span class="staff-pos-field-label">Notes</span>
+                      <textarea
+                        class="staff-pos-field-textarea"
+                        id="pos-notes"
+                        name="notes"
+                        phx-change="set_notes"
+                        phx-debounce="300"
+                        rows="2"
+                        placeholder="Less ice, oat milk, etc."
+                      >{@notes}</textarea>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="staff-pos-ticket-body">
+                  <p class="staff-pos-section-label">Items</p>
+                  <p :if={@cart == []} class="staff-empty" id="pos-cart-empty">No items yet.</p>
+
+                  <ul class="staff-pos-cart" id="pos-cart-lines">
                   <li :for={line <- @cart} class="staff-pos-cart-line" id={"pos-line-#{line.key}"}>
                     <div class="staff-pos-cart-info">
                       <p class="staff-pos-cart-name">
@@ -300,6 +382,7 @@ defmodule EspresoWeb.StaffPosLive do
               </div>
 
               <div class="staff-pos-ticket-footer">
+                <p class="staff-pos-section-label">Payment</p>
                 <div class="staff-pos-totals">
                   <div class="staff-pos-total-row">
                     <span>Subtotal</span>
@@ -342,7 +425,7 @@ defmodule EspresoWeb.StaffPosLive do
                 <button
                   type="button"
                   class={[
-                    "menu-basket-checkout staff-pos-place",
+                    "staff-pos-place",
                     (@cart == [] or @placing_order?) && "is-disabled"
                   ]}
                   id="pos-place-order"
@@ -354,12 +437,12 @@ defmodule EspresoWeb.StaffPosLive do
               </div>
             <% end %>
           </aside>
-        </div>
-      </main>
+          </div>
+        </main>
 
-      <div
-        :if={@size_picker}
-        class="staff-pos-modal"
+        <div
+          :if={@size_picker}
+          class="staff-pos-modal"
         id="pos-size-picker"
         phx-window-keydown="cancel_size"
         phx-key="Escape"
@@ -390,6 +473,7 @@ defmodule EspresoWeb.StaffPosLive do
             </button>
           </div>
         </div>
+      </div>
       </div>
     </.staff_shell>
     """
@@ -462,9 +546,34 @@ defmodule EspresoWeb.StaffPosLive do
     end)
   end
 
+  defp cart_item_count(cart) do
+    Enum.reduce(cart, 0, fn line, acc -> acc + line.quantity end)
+  end
+
+  defp product_mark(name) when is_binary(name) do
+    case String.trim(name) |> String.first() do
+      nil -> "?"
+      char -> String.upcase(char)
+    end
+  end
+
   defp unavailable_error([name]), do: "#{name} is no longer available. Remove it or choose something else."
 
   defp unavailable_error(names) when is_list(names) do
     "#{Enum.join(names, ", ")} are no longer available. Remove them or choose something else."
   end
+
+  defp blank_notes(notes) when is_binary(notes) do
+    trimmed = String.trim(notes)
+    if trimmed == "", do: nil, else: trimmed
+  end
+
+  defp blank_notes(_), do: nil
+
+  defp order_note(%{notes: notes}) when is_binary(notes) do
+    trimmed = String.trim(notes)
+    if trimmed == "", do: nil, else: trimmed
+  end
+
+  defp order_note(_), do: nil
 end

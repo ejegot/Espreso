@@ -322,8 +322,67 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     assert {:noreply, next} = StaffPosLive.handle_event("place_order", %{}, socket)
     assert next.assigns.placing_order? == false
-    assert next.assigns.error == "Could not place order. Check items and try again."
+    assert next.assigns.error == "Enter a customer name (at least 2 characters)."
     assert next.assigns.cart == cart
+    assert Orders.list_active_orders() == []
+  end
+
+  test "POS saves custom customer name and notes on placed order", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    view
+    |> element("#pos-customer-name")
+    |> render_change(%{"customer_name" => "Maria"})
+
+    view
+    |> element("#pos-notes")
+    |> render_change(%{"notes" => "Less ice"})
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-place-order") |> render_click()
+
+    assert has_element?(view, "#pos-confirmation", "Maria")
+    assert has_element?(view, "#pos-confirmation", "Less ice")
+
+    [order] = Orders.list_active_orders()
+    assert order.customer_name == "Maria"
+    assert order.notes == "Less ice"
+  end
+
+  test "empty notes are not stored on the order", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-place-order") |> render_click()
+
+    [order] = Orders.list_active_orders()
+    assert order.notes == nil
+  end
+
+  test "short customer name shows validation error before placing", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    view
+    |> element("#pos-customer-name")
+    |> render_change(%{"customer_name" => "A"})
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-place-order") |> render_click()
+
+    assert has_element?(view, "#pos-error", "Enter a customer name")
+    refute has_element?(view, "#pos-confirmation")
     assert Orders.list_active_orders() == []
   end
 
@@ -382,7 +441,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
           selected_category: nil,
           size_picker: nil,
           last_order: nil,
-          error: nil
+          error: nil,
+          notes: ""
         },
         assigns
       )
