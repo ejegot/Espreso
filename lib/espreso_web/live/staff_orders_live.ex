@@ -39,8 +39,19 @@ defmodule EspresoWeb.StaffOrdersLive do
     order = Espreso.Repo.get!(Espreso.Orders.Order, id)
 
     case Orders.update_status(order, status) do
-      {:ok, _} -> {:noreply, load_orders(assign(socket, :flash_note, nil))}
-      {:error, _} -> {:noreply, socket}
+      {:ok, _} ->
+        {:noreply, load_orders(assign(socket, :flash_note, nil))}
+
+      {:error, :payment_required} ->
+        {:noreply,
+         assign(
+           socket,
+           :flash_note,
+           "Online payment must be verified before this order can be marked ready."
+         )}
+
+      {:error, _} ->
+        {:noreply, assign(socket, :flash_note, "Could not update order status.")}
     end
   end
 
@@ -56,6 +67,14 @@ defmodule EspresoWeb.StaffOrdersLive do
 
       {:error, :cancelled} ->
         {:noreply, assign(socket, :flash_note, "Cancelled orders cannot be marked paid.")}
+
+      {:error, :online_payment_required} ->
+        {:noreply,
+         assign(
+           socket,
+           :flash_note,
+           "Online orders are marked paid only after PayMongo verifies payment."
+         )}
 
       {:error, _} ->
         {:noreply, assign(socket, :flash_note, "Could not mark order paid.")}
@@ -134,6 +153,14 @@ defmodule EspresoWeb.StaffOrdersLive do
 
       {:error, :invalid_status} ->
         {:noreply, assign(socket, :flash_note, "Only ready orders can be marked picked up.")}
+
+      {:error, :payment_required} ->
+        {:noreply,
+         assign(
+           socket,
+           :flash_note,
+           "Online payment must be verified before this order can be picked up."
+         )}
 
       {:error, _} ->
         {:noreply, assign(socket, :flash_note, "Could not mark order picked up.")}
@@ -280,7 +307,7 @@ defmodule EspresoWeb.StaffOrdersLive do
                   </span>
                 </p>
               </div>
-              <div class="staff-order-actions">
+              <div :if={order.payment_method != "online"} class="staff-order-actions">
                 <button
                   type="button"
                   class="staff-action staff-action-primary"
@@ -386,7 +413,7 @@ defmodule EspresoWeb.StaffOrdersLive do
           Prepare
         </button>
         <button
-          :if={@order.status == "preparing"}
+          :if={@order.status == "preparing" and not unpaid_online?(@order)}
           type="button"
           class="staff-action staff-action-primary"
           id={"order-ready-#{@order.id}"}
@@ -397,7 +424,7 @@ defmodule EspresoWeb.StaffOrdersLive do
           Ready
         </button>
         <button
-          :if={@order.status == "ready"}
+          :if={@order.status == "ready" and not unpaid_online?(@order)}
           type="button"
           class="staff-action staff-action-primary staff-action-complete"
           id={"ready-complete-#{@order.id}"}
@@ -409,6 +436,7 @@ defmodule EspresoWeb.StaffOrdersLive do
 
         <div :if={@order.payment_status == "unpaid"} class="staff-order-secondary-actions">
           <button
+            :if={@order.payment_method != "online"}
             type="button"
             class="staff-action staff-action-secondary"
             id={if(@order.status == "ready", do: "ready-mark-paid-#{@order.id}")}
@@ -451,6 +479,12 @@ defmodule EspresoWeb.StaffOrdersLive do
   end
 
   defp checkout_session_attached?(_order), do: false
+
+  defp unpaid_online?(%{payment_method: "online", payment_status: status})
+       when status != "paid",
+       do: true
+
+  defp unpaid_online?(_order), do: false
 
   defp source_badge(%{source: "pos"}), do: %{label: "WALK-IN", class: "staff-order-source--pos"}
   defp source_badge(_), do: %{label: "QR", class: "staff-order-source--customer"}

@@ -203,6 +203,65 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert Orders.list_active_orders() == []
   end
 
+  test "unpaid online ticket can prepare but cannot mark paid or ready", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("100")}],
+        %{
+          customer_name: "Online Gate",
+          fulfillment: :pickup,
+          payment_method: :online
+        }
+      )
+
+    {:ok, order} = Orders.attach_paymongo_session(order, "cs_staff_online_gate")
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    assert has_element?(view, "#order-prepare-#{order.id}", "Prepare")
+    refute has_element?(view, "#unpaid-mark-paid-#{order.id}")
+    refute has_element?(view, "#order-card-#{order.id} button", "Mark paid")
+
+    view |> element("#order-prepare-#{order.id}") |> render_click()
+
+    assert has_element?(view, "#{detail_id(order.id)} .staff-order-pay", "Unpaid")
+    refute has_element?(view, "#order-ready-#{order.id}")
+    refute has_element?(view, "#order-card-#{order.id} button", "Mark paid")
+    assert has_element?(view, "#abandon-online-payment-#{order.id}", "Abandon payment")
+
+    reloaded = Orders.get_order_by_number!(order.number)
+    assert reloaded.status == "preparing"
+    assert reloaded.payment_status == "unpaid"
+  end
+
+  test "online paid ticket can ready and be picked up", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("100")}],
+        %{
+          customer_name: "Online Paid Gate",
+          fulfillment: :pickup,
+          payment_method: :online
+        }
+      )
+
+    {:ok, order} = Orders.attach_paymongo_session(order, "cs_staff_online_paid")
+    assert {:ok, _} = Orders.mark_paid_from_paymongo(order.number)
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    view |> element("#order-prepare-#{order.id}") |> render_click()
+    assert has_element?(view, "#order-ready-#{order.id}", "Ready")
+    refute has_element?(view, "#order-card-#{order.id} button", "Mark paid")
+
+    view |> element("#order-ready-#{order.id}") |> render_click()
+    assert has_element?(view, "#ready-complete-#{order.id}", "Picked up")
+
+    view |> element("#ready-complete-#{order.id}") |> render_click()
+    assert has_element?(view, "#orders-flash", "#{order.number} picked up.")
+    refute has_element?(view, "#orders-ready .staff-order-number", order.number)
+  end
+
   test "cancel is unavailable for paid orders; mark paid still works", %{conn: conn} do
     {:ok, order} =
       Orders.create_order(

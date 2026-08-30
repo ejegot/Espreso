@@ -363,11 +363,26 @@ defmodule Espreso.Orders do
     |> Repo.aggregate(:count, :id)
   end
 
+  def update_status(%Order{id: id}, status)
+      when is_integer(id) and status in ["received", "preparing", "ready"] do
+    case Repo.get(Order, id) do
+      nil ->
+        {:error, :not_found}
+
+      %Order{} = current ->
+        if status == "ready" and online_unpaid?(current) do
+          {:error, :payment_required}
+        else
+          current
+          |> Order.status_changeset(status)
+          |> Repo.update()
+          |> broadcast()
+        end
+    end
+  end
+
   def update_status(%Order{} = order, status) when status in ["received", "preparing", "ready"] do
-    order
-    |> Order.status_changeset(status)
-    |> Repo.update()
-    |> broadcast()
+    update_status(%Order{id: order.id}, status)
   end
 
   @doc """
@@ -442,9 +457,11 @@ defmodule Espreso.Orders do
   def abandon_online_payment(%Order{} = order), do: abandon_online_payment(%Order{id: order.id})
 
   @doc """
-  Marks an order paid. Reloads from the database first.
+  Marks an order paid via the staff/manual path. Reloads from the database first.
 
   Cancelled orders cannot be paid. Already-paid orders return idempotent success.
+  Unpaid online orders cannot be marked paid manually
+  (`{:error, :online_payment_required}`); use the PayMongo webhook helpers instead.
   """
   def mark_paid(%Order{id: id}) when is_integer(id) do
     case Repo.get(Order, id) do
@@ -457,11 +474,11 @@ defmodule Espreso.Orders do
       %Order{payment_status: "paid"} = current ->
         {:ok, current}
 
+      %Order{payment_method: "online"} ->
+        {:error, :online_payment_required}
+
       %Order{} = current ->
-        current
-        |> Order.payment_changeset(%{payment_status: "paid"})
-        |> Repo.update()
-        |> broadcast()
+        apply_paid(current)
     end
   end
 
@@ -495,6 +512,8 @@ defmodule Espreso.Orders do
 
   @doc """
   Marks an order paid from a PayMongo webhook using the order number reference.
+
+  Bypasses the staff/manual online restriction on `mark_paid/1`.
   """
   def mark_paid_from_paymongo(reference_number, _session_id \\ nil)
       when is_binary(reference_number) do
@@ -502,22 +521,20 @@ defmodule Espreso.Orders do
       nil ->
         {:error, :not_found}
 
-      %Order{payment_status: "paid"} = order ->
-        {:ok, order}
-
       %Order{} = order ->
-        mark_paid(order)
+        apply_paid(order)
     end
   end
 
   @doc """
   Marks an order paid from a PayMongo webhook using the checkout session id.
+
+  Bypasses the staff/manual online restriction on `mark_paid/1`.
   """
   def mark_paid_from_paymongo_session(session_id) when is_binary(session_id) do
     case Repo.get_by(Order, paymongo_checkout_session_id: session_id) do
       nil -> {:error, :not_found}
-      %Order{payment_status: "paid"} = order -> {:ok, order}
-      %Order{} = order -> mark_paid(order)
+      %Order{} = order -> apply_paid(order)
     end
   end
 
@@ -525,6 +542,7 @@ defmodule Espreso.Orders do
   Marks a ready order as picked up / completed.
 
   Reloads from the database first. Does not change payment_status.
+  Unpaid online orders cannot be completed (`{:error, :payment_required}`).
   Already-completed orders return idempotent success without broadcasting.
   """
   def complete_order(%Order{id: id}) when is_integer(id) do
@@ -539,10 +557,14 @@ defmodule Espreso.Orders do
         {:ok, current}
 
       %Order{status: "ready"} = current ->
-        current
-        |> Order.complete_changeset()
-        |> Repo.update()
-        |> broadcast()
+        if online_unpaid?(current) do
+          {:error, :payment_required}
+        else
+          current
+          |> Order.complete_changeset()
+          |> Repo.update()
+          |> broadcast()
+        end
 
       %Order{} ->
         {:error, :invalid_status}
@@ -626,6 +648,24 @@ defmodule Espreso.Orders do
   end
 
   defp broadcast(other), do: other
+
+  # Verified PayMongo path — does not enforce the staff/manual online restriction.
+  defp apply_paid(%Order{status: "cancelled"}), do: {:error, :cancelled}
+
+  defp apply_paid(%Order{payment_status: "paid"} = order), do: {:ok, order}
+
+  defp apply_paid(%Order{} = order) do
+    order
+    |> Order.payment_changeset(%{payment_status: "paid"})
+    |> Repo.update()
+    |> broadcast()
+  end
+
+  defp online_unpaid?(%Order{payment_method: "online", payment_status: status})
+       when status != "paid",
+       do: true
+
+  defp online_unpaid?(_order), do: false
 
   defp blank_to_nil(nil), do: nil
   defp blank_to_nil(""), do: nil
