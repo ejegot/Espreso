@@ -4,6 +4,7 @@ defmodule Espreso.PayMongo.HTTPClient do
   @behaviour Espreso.PayMongo.Client
 
   alias Espreso.Orders.Order
+  alias Espreso.PayMongo
 
   @api_url "https://api.paymongo.com/v2/checkout_sessions"
   @finch Espreso.Finch
@@ -14,37 +15,39 @@ defmodule Espreso.PayMongo.HTTPClient do
     success_url = Keyword.fetch!(opts, :success_url)
     cancel_url = Keyword.fetch!(opts, :cancel_url)
 
-    body =
-      %{
-        data: %{
-          attributes: %{
-            billing: %{
-              name: order.customer_name
-            },
-            line_items: line_items(lines),
-            payment_method_types: [payment_method_type(channel)],
-            reference_number: order.number,
-            success_url: success_url,
-            cancel_url: cancel_url,
-            metadata: %{
-              order_number: order.number,
-              order_id: order.id
+    with {:ok, line_items} <- PayMongo.build_checkout_line_items(lines) do
+      body =
+        %{
+          data: %{
+            attributes: %{
+              billing: %{
+                name: order.customer_name
+              },
+              line_items: line_items,
+              payment_method_types: [payment_method_type(channel)],
+              reference_number: order.number,
+              success_url: success_url,
+              cancel_url: cancel_url,
+              metadata: %{
+                order_number: order.number,
+                order_id: order.id
+              }
             }
           }
         }
-      }
-      |> Jason.encode!()
+        |> Jason.encode!()
 
-    case Finch.build(:post, @api_url, headers(), body)
-         |> Finch.request(@finch) do
-      {:ok, %{status: status, body: response_body}} when status in 200..299 ->
-        decode_checkout_response(response_body)
+      case Finch.build(:post, @api_url, headers(), body)
+           |> Finch.request(@finch) do
+        {:ok, %{status: status, body: response_body}} when status in 200..299 ->
+          decode_checkout_response(response_body)
 
-      {:ok, %{status: status, body: response_body}} ->
-        {:error, {:http_error, status, response_body}}
+        {:ok, %{status: status, body: response_body}} ->
+          {:error, {:http_error, status, response_body}}
 
-      {:error, reason} ->
-        {:error, reason}
+        {:error, reason} ->
+          {:error, reason}
+      end
     end
   end
 
@@ -64,34 +67,6 @@ defmodule Espreso.PayMongo.HTTPClient do
   defp payment_method_type(:maya), do: "paymaya"
   defp payment_method_type("gcash"), do: "gcash"
   defp payment_method_type("maya"), do: "paymaya"
-
-  defp line_items(lines) do
-    Enum.map(lines, fn line ->
-      name =
-        case Map.get(line, :size) || Map.get(line, "size") do
-          nil -> Map.get(line, :name) || Map.get(line, "name")
-          "" -> Map.get(line, :name) || Map.get(line, "name")
-          size -> "#{Map.get(line, :name) || Map.get(line, "name")} (#{size})"
-        end
-
-      %{
-        name: name,
-        amount: to_centavos(Map.get(line, :price) || Map.get(line, "price")),
-        currency: "PHP",
-        quantity: Map.get(line, :quantity) || Map.get(line, "quantity")
-      }
-    end)
-  end
-
-  defp to_centavos(%Decimal{} = amount) do
-    amount
-    |> Decimal.mult(100)
-    |> Decimal.round(0)
-    |> Decimal.to_integer()
-  end
-
-  defp to_centavos(amount) when is_binary(amount), do: amount |> Decimal.new() |> to_centavos()
-  defp to_centavos(amount) when is_number(amount), do: round(amount * 100)
 
   defp decode_checkout_response(body) do
     with {:ok, %{"data" => %{"id" => id, "attributes" => attrs}}} <- Jason.decode(body),

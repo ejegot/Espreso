@@ -13,9 +13,30 @@ defmodule Espreso.PayMongo do
 
   `channel` is `:gcash` or `:maya`. Redirect the customer to the returned
   `checkout_url`. Payment confirmation arrives via webhook.
+
+  Fails closed with `{:error, :checkout_amount_mismatch}` when the checkout
+  line-item centavo total does not exactly equal `order.total`.
   """
   def create_checkout_session(%Order{} = order, lines, opts) when is_list(lines) do
-    client().create_checkout_session(order, lines, opts)
+    with {:ok, line_items} <- build_checkout_line_items(lines),
+         :ok <- assert_checkout_amount_matches_order(order, line_items) do
+      client().create_checkout_session(order, lines, opts)
+    end
+  end
+
+  @doc false
+  def build_checkout_line_items(lines) when is_list(lines) do
+    lines
+    |> Enum.reduce_while([], fn line, acc ->
+      case build_checkout_line_item(line) do
+        {:ok, item} -> {:cont, [item | acc]}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
+    |> case do
+      {:error, _} = error -> error
+      items when is_list(items) -> {:ok, Enum.reverse(items)}
+    end
   end
 
   @doc """
@@ -286,4 +307,66 @@ defmodule Espreso.PayMongo do
   defp derive_livemode_from_secret_key("sk_live_" <> _), do: {:ok, true}
   defp derive_livemode_from_secret_key("sk_test_" <> _), do: {:ok, false}
   defp derive_livemode_from_secret_key(_), do: {:error, :unconfigured_livemode}
+
+  defp assert_checkout_amount_matches_order(%Order{total: total}, line_items)
+       when is_list(line_items) do
+    with {:ok, expected_centavos} <- pesos_to_centavos(total) do
+      checkout_centavos =
+        Enum.reduce(line_items, 0, fn item, acc ->
+          acc + item.amount * item.quantity
+        end)
+
+      if checkout_centavos == expected_centavos do
+        :ok
+      else
+        {:error, :checkout_amount_mismatch}
+      end
+    end
+  end
+
+  defp build_checkout_line_item(line) when is_map(line) do
+    price = Map.get(line, :price) || Map.get(line, "price")
+    quantity = Map.get(line, :quantity) || Map.get(line, "quantity")
+
+    with {:ok, amount} <- unit_price_to_centavos(price),
+         true <- is_integer(quantity) and quantity >= 1 do
+      {:ok,
+       %{
+         name: line_item_name(line),
+         amount: amount,
+         currency: "PHP",
+         quantity: quantity
+       }}
+    else
+      false ->
+        {:error, :invalid_line_quantity}
+
+      {:error, :invalid_order_total} ->
+        {:error, :invalid_line_amount}
+
+      {:error, _} = error ->
+        error
+    end
+  end
+
+  defp unit_price_to_centavos(%Decimal{} = price), do: pesos_to_centavos(price)
+
+  defp unit_price_to_centavos(price) when is_binary(price) do
+    pesos_to_centavos(Decimal.new(price))
+  rescue
+    ArgumentError -> {:error, :invalid_line_amount}
+    Decimal.Error -> {:error, :invalid_line_amount}
+  end
+
+  defp unit_price_to_centavos(_price), do: {:error, :invalid_line_amount}
+
+  defp line_item_name(line) do
+    name = Map.get(line, :name) || Map.get(line, "name")
+
+    case Map.get(line, :size) || Map.get(line, "size") do
+      nil -> name
+      "" -> name
+      size -> "#{name} (#{size})"
+    end
+  end
 end
