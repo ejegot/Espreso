@@ -71,8 +71,9 @@ defmodule Espreso.PayMongo do
   Handles a verified PayMongo webhook payload.
 
   Marks the referenced order paid on `checkout_session.payment.paid` only when
-  the paid payment amount matches the order total. Unknown event types are
-  acknowledged without action.
+  the paid payment amount matches the order total and the webhook checkout
+  session id matches the session already stored on the order. Unknown event
+  types are acknowledged without action.
   """
   def handle_webhook_event(payload) when is_map(payload) do
     event_type = get_in(payload, ["data", "attributes", "type"])
@@ -126,6 +127,7 @@ defmodule Espreso.PayMongo do
     with {:ok, amount} <- extract_paid_amount_centavos(session),
          {:ok, order} <- find_order(reference_number, session_id),
          :ok <- verify_amount_matches(order, amount),
+         :ok <- verify_checkout_session(order, session_id),
          {:ok, _} <- mark_order_paid(order, session_id) do
       :ok
     else
@@ -133,6 +135,8 @@ defmodule Espreso.PayMongo do
       {:error, :invalid_amount} = error -> error
       {:error, :amount_mismatch} = error -> error
       {:error, :invalid_order_total} = error -> error
+      {:error, :missing_session} = error -> error
+      {:error, :session_mismatch} = error -> error
       {:error, :not_found} -> :ok
       {:error, :missing_reference} -> :ok
       {:error, _} -> :ok
@@ -193,6 +197,23 @@ defmodule Espreso.PayMongo do
     end
   end
 
+  defp verify_checkout_session(_order, session_id)
+       when not is_binary(session_id) or session_id == "" do
+    {:error, :missing_session}
+  end
+
+  defp verify_checkout_session(%Order{paymongo_checkout_session_id: stored}, _session_id)
+       when not is_binary(stored) or stored == "" do
+    {:error, :missing_session}
+  end
+
+  defp verify_checkout_session(%Order{paymongo_checkout_session_id: stored}, session_id)
+       when stored == session_id do
+    :ok
+  end
+
+  defp verify_checkout_session(_order, _session_id), do: {:error, :session_mismatch}
+
   defp mark_order_paid(%Order{number: number}, session_id) do
     Orders.mark_paid_from_paymongo(number, session_id)
   end
@@ -209,8 +230,11 @@ defmodule Espreso.PayMongo do
       end)
 
     case Map.fetch(parts, "t") do
-      {:ok, timestamp} -> {:ok, %{timestamp: timestamp, te: Map.get(parts, "te"), li: Map.get(parts, "li")}}
-      :error -> {:error, :missing_timestamp}
+      {:ok, timestamp} ->
+        {:ok, %{timestamp: timestamp, te: Map.get(parts, "te"), li: Map.get(parts, "li")}}
+
+      :error ->
+        {:error, :missing_timestamp}
     end
   end
 

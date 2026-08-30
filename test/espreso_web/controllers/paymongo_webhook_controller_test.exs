@@ -17,11 +17,12 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
     {:ok, order: order, payload: payload}
   end
 
-  test "marks order paid when amount matches order total", %{
+  test "marks order paid when amount and session match", %{
     conn: conn,
     order: order,
     payload: payload
   } do
+    {:ok, order} = Orders.attach_paymongo_session(order, "cs_test_webhook")
     signature = PayMongo.sign_for_test(payload)
 
     conn =
@@ -35,6 +36,63 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
     order = Repo.get!(Order, order.id)
     assert order.payment_status == "paid"
     assert Decimal.equal?(order.total, Decimal.new("100.00"))
+    assert order.paymongo_checkout_session_id == "cs_test_webhook"
+  end
+
+  test "rejects mismatched checkout session and does not mark order paid", %{
+    conn: conn,
+    order: order
+  } do
+    {:ok, order} = Orders.attach_paymongo_session(order, "cs_stored")
+    payload = paid_webhook_payload(order.number, amount: 10_000, session_id: "cs_webhook")
+    signature = PayMongo.sign_for_test(payload)
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("paymongo-signature", signature)
+      |> post(~p"/webhooks/paymongo", payload)
+
+    assert json_response(conn, 422) == %{"error" => "session mismatch"}
+    order = Repo.get!(Order, order.id)
+    assert order.payment_status == "unpaid"
+    assert order.paymongo_checkout_session_id == "cs_stored"
+  end
+
+  test "rejects missing stored session and does not backfill", %{conn: conn, order: order} do
+    payload = paid_webhook_payload(order.number, amount: 10_000)
+    signature = PayMongo.sign_for_test(payload)
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("paymongo-signature", signature)
+      |> post(~p"/webhooks/paymongo", payload)
+
+    assert json_response(conn, 400) == %{"error" => "missing session"}
+    order = Repo.get!(Order, order.id)
+    assert order.payment_status == "unpaid"
+    assert is_nil(order.paymongo_checkout_session_id)
+  end
+
+  test "rejects missing webhook session id and does not mark order paid", %{
+    conn: conn,
+    order: order
+  } do
+    {:ok, order} = Orders.attach_paymongo_session(order, "cs_test_webhook")
+    payload = paid_webhook_payload(order.number, amount: 10_000, include_session_id?: false)
+    signature = PayMongo.sign_for_test(payload)
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("paymongo-signature", signature)
+      |> post(~p"/webhooks/paymongo", payload)
+
+    assert json_response(conn, 400) == %{"error" => "missing session"}
+    order = Repo.get!(Order, order.id)
+    assert order.payment_status == "unpaid"
+    assert order.paymongo_checkout_session_id == "cs_test_webhook"
   end
 
   test "rejects amount one centavo too low and does not mark order paid", %{
@@ -51,7 +109,9 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
       |> post(~p"/webhooks/paymongo", payload)
 
     assert json_response(conn, 422) == %{"error" => "amount mismatch"}
-    assert Repo.get!(Order, order.id).payment_status == "unpaid"
+    order = Repo.get!(Order, order.id)
+    assert order.payment_status == "unpaid"
+    assert is_nil(order.paymongo_checkout_session_id)
   end
 
   test "rejects amount one centavo too high and does not mark order paid", %{
@@ -68,7 +128,9 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
       |> post(~p"/webhooks/paymongo", payload)
 
     assert json_response(conn, 422) == %{"error" => "amount mismatch"}
-    assert Repo.get!(Order, order.id).payment_status == "unpaid"
+    order = Repo.get!(Order, order.id)
+    assert order.payment_status == "unpaid"
+    assert is_nil(order.paymongo_checkout_session_id)
   end
 
   test "rejects missing amount and does not mark order paid", %{conn: conn, order: order} do
@@ -122,6 +184,7 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
 
     assert {:ok, 1_250} = PayMongo.pesos_to_centavos(order.total)
 
+    {:ok, order} = Orders.attach_paymongo_session(order, "cs_test_webhook")
     payload = paid_webhook_payload(order.number, amount: 1_250)
     signature = PayMongo.sign_for_test(payload)
 
@@ -147,7 +210,9 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
       |> post(~p"/webhooks/paymongo", payload)
 
     assert json_response(conn, 401) == %{"error" => "invalid signature"}
-    assert Repo.get!(Order, order.id).payment_status == "unpaid"
+    order = Repo.get!(Order, order.id)
+    assert order.payment_status == "unpaid"
+    assert is_nil(order.paymongo_checkout_session_id)
   end
 
   test "rejects missing signature with 401 and does not mark order paid", %{
@@ -199,6 +264,7 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
     order: order,
     payload: payload
   } do
+    {:ok, order} = Orders.attach_paymongo_session(order, "cs_test_webhook")
     signature = PayMongo.sign_for_test(payload)
 
     conn =
@@ -225,7 +291,9 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
       |> post(~p"/webhooks/paymongo", payload)
 
     assert json_response(conn, 403) == %{"error" => "livemode mismatch"}
-    assert Repo.get!(Order, order.id).payment_status == "unpaid"
+    order = Repo.get!(Order, order.id)
+    assert order.payment_status == "unpaid"
+    assert is_nil(order.paymongo_checkout_session_id)
   end
 
   test "accepts live livemode when app is in live mode", %{conn: conn} do
@@ -245,6 +313,7 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
         %{customer_name: "Mia", fulfillment: :pickup, payment_method: :online}
       )
 
+    {:ok, order} = Orders.attach_paymongo_session(order, "cs_test_webhook")
     payload = paid_webhook_payload(order.number, amount: 10_000, livemode: true)
     signature = PayMongo.sign_for_test(payload, mode: :live)
 
@@ -311,11 +380,13 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
     assert Repo.get!(Order, order.id).payment_status == "unpaid"
   end
 
-  defp paid_webhook_payload(reference_number, opts \\ []) do
+  defp paid_webhook_payload(reference_number, opts) do
     livemode? = Keyword.get(opts, :include_livemode?, true)
     livemode = Keyword.get(opts, :livemode, false)
     include_amount? = Keyword.get(opts, :include_amount?, true)
+    include_session_id? = Keyword.get(opts, :include_session_id?, true)
     amount = Keyword.get(opts, :amount, 10_000)
+    session_id = Keyword.get(opts, :session_id, "cs_test_webhook")
 
     session_attributes =
       %{"reference_number" => reference_number}
@@ -337,14 +408,16 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
         end
       end)
 
+    session =
+      %{"type" => "checkout_session", "attributes" => session_attributes}
+      |> then(fn data ->
+        if include_session_id?, do: Map.put(data, "id", session_id), else: data
+      end)
+
     attributes =
       %{
         "type" => "checkout_session.payment.paid",
-        "data" => %{
-          "id" => "cs_test_webhook",
-          "type" => "checkout_session",
-          "attributes" => session_attributes
-        }
+        "data" => session
       }
       |> then(fn attrs ->
         if livemode?, do: Map.put(attrs, "livemode", livemode), else: attrs
