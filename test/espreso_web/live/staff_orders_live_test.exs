@@ -164,20 +164,43 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     {:ok, order} = Orders.attach_paymongo_session(order, "cs_staff_cancel")
 
     {:ok, view, _html} = live(conn, ~p"/orders")
-    assert has_element?(view, "#cancel-order-#{order.id}", "Cancel")
+    refute has_element?(view, "#cancel-order-#{order.id}")
+    assert has_element?(view, "#abandon-online-payment-#{order.id}", "Abandon payment")
 
-    view |> element("#cancel-order-#{order.id}") |> render_click()
-
-    assert has_element?(
-             view,
-             "#orders-flash",
-             "Online payment is in progress. This order cannot be cancelled."
-           )
+    assert {:error, :checkout_in_progress} = Orders.cancel_order(order)
 
     order = Espreso.Repo.get!(Espreso.Orders.Order, order.id)
     assert order.status == "received"
     assert order.paymongo_checkout_session_id == "cs_staff_cancel"
     assert Enum.any?(Orders.list_active_orders(), &(&1.id == order.id))
+  end
+
+  test "abandon payment closes unpaid online checkout and removes ticket", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Abandoned Pay",
+          fulfillment: :pickup,
+          payment_method: :online
+        }
+      )
+
+    {:ok, order} = Orders.attach_paymongo_session(order, "cs_staff_abandon")
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    assert has_element?(view, "#abandon-online-payment-#{order.id}", "Abandon payment")
+
+    view |> element("#abandon-online-payment-#{order.id}") |> render_click()
+
+    assert has_element?(view, "#orders-flash", "#{order.number} online payment abandoned.")
+    refute has_element?(view, ".staff-order-number", order.number)
+
+    order = Espreso.Repo.get!(Espreso.Orders.Order, order.id)
+    assert order.status == "cancelled"
+    assert order.payment_status == "unpaid"
+    assert order.paymongo_checkout_session_id == "cs_staff_abandon"
+    assert Orders.list_active_orders() == []
   end
 
   test "cancel is unavailable for paid orders; mark paid still works", %{conn: conn} do
