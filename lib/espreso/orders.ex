@@ -425,11 +425,18 @@ defmodule Espreso.Orders do
 
   @doc """
   Stores the PayMongo checkout session id on an order after session creation.
+
+  Attaching the same session id again to the same order is idempotent.
+  A session id already stored on another order is rejected by the unique
+  database constraint (returned as an Ecto changeset error).
   """
   def attach_paymongo_session(%Order{id: id}, session_id) when is_binary(session_id) do
     case Repo.get(Order, id) do
       nil ->
         {:error, :not_found}
+
+      %Order{paymongo_checkout_session_id: ^session_id} = order ->
+        {:ok, order}
 
       %Order{} = order ->
         order
