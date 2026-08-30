@@ -2452,27 +2452,10 @@ defmodule EspresoWeb.MenuLive do
   defp place_online_order(socket, channel) do
     socket = assign(socket, :placing_order?, true)
 
-    with {:ok, order} <- Orders.create_order(socket.assigns.cart, order_attrs(socket, :online)),
-         return_urls <- checkout_return_urls(order),
-         {:ok, %{id: session_id, checkout_url: checkout_url}} <-
-           PayMongo.create_checkout_session(order, socket.assigns.cart,
-             channel: channel,
-             success_url: return_urls.success_url,
-             cancel_url: return_urls.cancel_url
-           ),
-         {:ok, _order} <- Orders.attach_paymongo_session(order, session_id) do
-      {:noreply,
-       socket
-       |> assign(:cart, [])
-       |> assign(:basket_open?, false)
-       |> assign(:basket_closing?, false)
-       |> assign(:placing_order?, false)
-       |> assign(:checkout_errors, %{})
-       |> remember_my_order(order)
-       |> push_event("clear_persisted_cart", %{})
-       |> push_event("persist_my_order", %{number: order.number})
-       |> redirect(external: checkout_url)}
-    else
+    case Orders.create_order(socket.assigns.cart, order_attrs(socket, :online)) do
+      {:ok, order} ->
+        finish_online_checkout(socket, order, channel)
+
       {:error, {:unavailable, names}} ->
         {:noreply, order_failure(socket, unavailable_toast(names))}
 
@@ -2483,8 +2466,60 @@ defmodule EspresoWeb.MenuLive do
          |> assign(:checkout_errors, checkout_errors_from_changeset(changeset))}
 
       {:error, _} ->
+        {:noreply, order_failure(socket, "Could not place order — try again")}
+    end
+  end
+
+  defp finish_online_checkout(socket, order, channel) do
+    return_urls = checkout_return_urls(order)
+
+    case begin_online_checkout_session(order, socket.assigns.cart, channel, return_urls) do
+      {:ok, checkout_url} ->
+        {:noreply,
+         socket
+         |> assign(:cart, [])
+         |> assign(:basket_open?, false)
+         |> assign(:basket_closing?, false)
+         |> assign(:placing_order?, false)
+         |> assign(:checkout_errors, %{})
+         |> remember_my_order(order)
+         |> push_event("clear_persisted_cart", %{})
+         |> push_event("persist_my_order", %{number: order.number})
+         |> redirect(external: checkout_url)}
+
+      {:error, _} ->
+        _ = compensate_failed_online_checkout(order)
+
         {:noreply,
          order_failure(socket, "Could not start online payment — try again or pay at counter")}
+    end
+  end
+
+  defp begin_online_checkout_session(order, cart, channel, return_urls) do
+    with {:ok, %{id: session_id, checkout_url: checkout_url}} <-
+           PayMongo.create_checkout_session(order, cart,
+             channel: channel,
+             success_url: return_urls.success_url,
+             cancel_url: return_urls.cancel_url
+           ),
+         {:ok, _order} <- Orders.attach_paymongo_session(order, session_id) do
+      {:ok, checkout_url}
+    end
+  end
+
+  # If PayMongo checkout or session attach fails after create_order, remove the
+  # unpaid online ticket from the KDS. Prefer cancel; if a session is already
+  # bound, abandon so ESP-83/85 session retention stays intact.
+  defp compensate_failed_online_checkout(order) do
+    case Orders.cancel_order(order) do
+      {:ok, cancelled} ->
+        {:ok, cancelled}
+
+      {:error, :checkout_in_progress} ->
+        Orders.abandon_online_payment(order)
+
+      {:error, _} = error ->
+        error
     end
   end
 
