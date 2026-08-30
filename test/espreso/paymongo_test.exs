@@ -252,6 +252,50 @@ defmodule Espreso.PayMongoTest do
       assert order.paymongo_checkout_session_id == "cs_test_123"
     end
 
+    test "rejects cancelled orders without marking paid" do
+      {:ok, order} =
+        Orders.create_order(
+          [line("Espresso", "120.00")],
+          %{customer_name: "Ana", fulfillment: :pickup, payment_method: :online}
+        )
+
+      {:ok, order} = Orders.attach_paymongo_session(order, "cs_test_123")
+
+      {:ok, order} =
+        order
+        |> Order.cancel_changeset()
+        |> Repo.update()
+
+      payload =
+        webhook_payload(order.number,
+          amount: 12_000,
+          session_data: %{
+            "id" => "cs_test_123",
+            "attributes" => %{
+              "reference_number" => order.number,
+              "payments" => [
+                %{
+                  "id" => "pay_test_123",
+                  "attributes" => %{
+                    "amount" => 12_000,
+                    "status" => "paid",
+                    "currency" => "PHP"
+                  }
+                }
+              ]
+            }
+          }
+        )
+        |> Jason.decode!()
+
+      assert {:error, :order_cancelled} = PayMongo.handle_webhook_event(payload)
+
+      order = Repo.get!(Order, order.id)
+      assert order.status == "cancelled"
+      assert order.payment_status == "unpaid"
+      assert order.paymongo_checkout_session_id == "cs_test_123"
+    end
+
     test "ignores unrelated event types" do
       payload = %{
         "data" => %{

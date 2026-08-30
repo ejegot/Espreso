@@ -239,6 +239,86 @@ defmodule Espreso.OrdersTest do
     assert is_nil(Repo.get!(Order, order3.id).paymongo_checkout_session_id)
   end
 
+  test "cancel_order rejects unpaid orders with an attached PayMongo session" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, received} =
+      Orders.create_order(lines, %{
+        customer_name: "Online Rec",
+        fulfillment: :pickup,
+        payment_method: :online
+      })
+
+    {:ok, received} = Orders.attach_paymongo_session(received, "cs_cancel_rec")
+
+    assert {:error, :checkout_in_progress} = Orders.cancel_order(received)
+    received = Repo.get!(Order, received.id)
+    assert received.status == "received"
+    assert received.payment_status == "unpaid"
+    assert received.paymongo_checkout_session_id == "cs_cancel_rec"
+
+    {:ok, preparing} =
+      Orders.create_order(lines, %{
+        customer_name: "Online Prep",
+        fulfillment: :pickup,
+        payment_method: :online
+      })
+
+    {:ok, preparing} = Orders.update_status(preparing, "preparing")
+    {:ok, preparing} = Orders.attach_paymongo_session(preparing, "cs_cancel_prep")
+
+    assert {:error, :checkout_in_progress} = Orders.cancel_order(preparing)
+    preparing = Repo.get!(Order, preparing.id)
+    assert preparing.status == "preparing"
+    assert preparing.payment_status == "unpaid"
+    assert preparing.paymongo_checkout_session_id == "cs_cancel_prep"
+  end
+
+  test "cancel_order still voids unpaid orders without a PayMongo session" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, counter} =
+      Orders.create_order(lines, %{
+        customer_name: "Counter Void",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, online} =
+      Orders.create_order(lines, %{
+        customer_name: "Online Unbound",
+        fulfillment: :pickup,
+        payment_method: :online
+      })
+
+    assert is_nil(counter.paymongo_checkout_session_id)
+    assert is_nil(online.paymongo_checkout_session_id)
+
+    assert {:ok, cancelled_counter} = Orders.cancel_order(counter)
+    assert cancelled_counter.status == "cancelled"
+
+    assert {:ok, cancelled_online} = Orders.cancel_order(online)
+    assert cancelled_online.status == "cancelled"
+  end
+
+  test "attach_paymongo_session rejects cancelled orders" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, order} =
+      Orders.create_order(lines, %{
+        customer_name: "Attach Cancelled",
+        fulfillment: :pickup,
+        payment_method: :online
+      })
+
+    assert {:ok, cancelled} = Orders.cancel_order(order)
+    assert cancelled.status == "cancelled"
+    assert is_nil(cancelled.paymongo_checkout_session_id)
+
+    assert {:error, :cancelled} = Orders.attach_paymongo_session(cancelled, "cs_after_cancel")
+    assert is_nil(Repo.get!(Order, cancelled.id).paymongo_checkout_session_id)
+  end
+
   test "create_order allows paid only for counter payment" do
     lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
 

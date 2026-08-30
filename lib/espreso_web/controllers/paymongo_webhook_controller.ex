@@ -49,6 +49,11 @@ defmodule EspresoWeb.PayMongoWebhookController do
           {:error, :missing_session} ->
             conn |> put_status(:bad_request) |> json(%{error: "missing session"})
 
+          {:error, :order_cancelled} ->
+            conn
+            |> put_status(:unprocessable_entity)
+            |> json(%{error: "order cancelled"})
+
           {:error, _} ->
             json(conn, %{received: true})
         end

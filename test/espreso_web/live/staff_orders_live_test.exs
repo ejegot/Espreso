@@ -150,6 +150,36 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert Orders.list_active_orders() == []
   end
 
+  test "cancel is blocked when online checkout session is attached", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Paying Online",
+          fulfillment: :pickup,
+          payment_method: :online
+        }
+      )
+
+    {:ok, order} = Orders.attach_paymongo_session(order, "cs_staff_cancel")
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    assert has_element?(view, "#cancel-order-#{order.id}", "Cancel")
+
+    view |> element("#cancel-order-#{order.id}") |> render_click()
+
+    assert has_element?(
+             view,
+             "#orders-flash",
+             "Online payment is in progress. This order cannot be cancelled."
+           )
+
+    order = Espreso.Repo.get!(Espreso.Orders.Order, order.id)
+    assert order.status == "received"
+    assert order.paymongo_checkout_session_id == "cs_staff_cancel"
+    assert Enum.any?(Orders.list_active_orders(), &(&1.id == order.id))
+  end
+
   test "cancel is unavailable for paid orders; mark paid still works", %{conn: conn} do
     {:ok, order} =
       Orders.create_order(

@@ -137,6 +137,7 @@ defmodule Espreso.PayMongo do
       {:error, :invalid_order_total} = error -> error
       {:error, :missing_session} = error -> error
       {:error, :session_mismatch} = error -> error
+      {:error, :order_cancelled} = error -> error
       {:error, :not_found} -> :ok
       {:error, :missing_reference} -> :ok
       {:error, _} -> :ok
@@ -215,7 +216,10 @@ defmodule Espreso.PayMongo do
   defp verify_checkout_session(_order, _session_id), do: {:error, :session_mismatch}
 
   defp mark_order_paid(%Order{number: number}, session_id) do
-    Orders.mark_paid_from_paymongo(number, session_id)
+    case Orders.mark_paid_from_paymongo(number, session_id) do
+      {:error, :cancelled} -> {:error, :order_cancelled}
+      other -> other
+    end
   end
 
   defp parse_signature_header(header) when is_binary(header) do
