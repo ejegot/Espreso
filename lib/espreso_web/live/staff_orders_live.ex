@@ -91,6 +91,34 @@ defmodule EspresoWeb.StaffOrdersLive do
     end
   end
 
+  def handle_event("abandon_online_payment", %{"id" => id}, socket) do
+    order = Espreso.Repo.get!(Espreso.Orders.Order, id)
+
+    case Orders.abandon_online_payment(order) do
+      {:ok, abandoned} ->
+        {:noreply,
+         socket
+         |> assign(:flash_note, "#{abandoned.number} online payment abandoned.")
+         |> load_orders()}
+
+      {:error, :paid} ->
+        {:noreply, assign(socket, :flash_note, "Paid orders cannot be abandoned.")}
+
+      {:error, :missing_checkout_session} ->
+        {:noreply,
+         assign(socket, :flash_note, "No online checkout session to abandon on this order.")}
+
+      {:error, :not_online} ->
+        {:noreply, assign(socket, :flash_note, "Only online payments can be abandoned.")}
+
+      {:error, :invalid_status} ->
+        {:noreply, assign(socket, :flash_note, "This order can no longer be abandoned.")}
+
+      {:error, _} ->
+        {:noreply, assign(socket, :flash_note, "Could not abandon online payment.")}
+    end
+  end
+
   def handle_event("complete_order", %{"id" => id}, socket) do
     order = Espreso.Repo.get!(Espreso.Orders.Order, id)
 
@@ -390,7 +418,9 @@ defmodule EspresoWeb.StaffOrdersLive do
             Mark paid
           </button>
           <button
-            :if={@order.status in ["received", "preparing"]}
+            :if={
+              @order.status in ["received", "preparing"] and not checkout_session_attached?(@order)
+            }
             type="button"
             class="staff-action staff-action-muted"
             id={"cancel-order-#{@order.id}"}
@@ -399,11 +429,28 @@ defmodule EspresoWeb.StaffOrdersLive do
           >
             Cancel
           </button>
+          <button
+            :if={@order.status in ["received", "preparing"] and checkout_session_attached?(@order)}
+            type="button"
+            class="staff-action staff-action-muted"
+            id={"abandon-online-payment-#{@order.id}"}
+            phx-value-id={@order.id}
+            phx-click="abandon_online_payment"
+          >
+            Abandon payment
+          </button>
         </div>
       </div>
     </article>
     """
   end
+
+  defp checkout_session_attached?(%{paymongo_checkout_session_id: session_id})
+       when is_binary(session_id) and session_id != "" do
+    true
+  end
+
+  defp checkout_session_attached?(_order), do: false
 
   defp source_badge(%{source: "pos"}), do: %{label: "WALK-IN", class: "staff-order-source--pos"}
   defp source_badge(_), do: %{label: "QR", class: "staff-order-source--customer"}

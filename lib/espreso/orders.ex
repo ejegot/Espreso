@@ -403,6 +403,45 @@ defmodule Espreso.Orders do
   end
 
   @doc """
+  Abandons an unpaid online order that has an attached PayMongo checkout session.
+
+  Sets status to `cancelled` while leaving `payment_status` unpaid and preserving
+  `paymongo_checkout_session_id` so a late paid webhook cannot mark the order paid
+  (ESP-83 `:order_cancelled` path).
+
+  Use this instead of `cancel_order/1` when a checkout session is attached.
+  """
+  def abandon_online_payment(%Order{id: id}) when is_integer(id) do
+    case Repo.get(Order, id) do
+      nil ->
+        {:error, :not_found}
+
+      %Order{} = current ->
+        cond do
+          current.payment_status == "paid" ->
+            {:error, :paid}
+
+          current.payment_method != "online" ->
+            {:error, :not_online}
+
+          current.status not in ["received", "preparing"] ->
+            {:error, :invalid_status}
+
+          not checkout_session_attached?(current) ->
+            {:error, :missing_checkout_session}
+
+          true ->
+            current
+            |> Order.cancel_changeset()
+            |> Repo.update()
+            |> broadcast()
+        end
+    end
+  end
+
+  def abandon_online_payment(%Order{} = order), do: abandon_online_payment(%Order{id: order.id})
+
+  @doc """
   Marks an order paid. Reloads from the database first.
 
   Cancelled orders cannot be paid. Already-paid orders return idempotent success.

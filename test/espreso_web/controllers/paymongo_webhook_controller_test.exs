@@ -70,6 +70,33 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
     assert order.paymongo_checkout_session_id == "cs_test_webhook"
   end
 
+  test "rejects paid webhook after abandon_online_payment and does not mark paid", %{
+    conn: conn,
+    order: order
+  } do
+    {:ok, order} = Orders.attach_paymongo_session(order, "cs_test_webhook")
+    assert {:ok, order} = Orders.abandon_online_payment(order)
+    assert order.status == "cancelled"
+    assert order.payment_status == "unpaid"
+    assert order.paymongo_checkout_session_id == "cs_test_webhook"
+
+    payload = paid_webhook_payload(order.number, amount: 10_000)
+    signature = PayMongo.sign_for_test(payload)
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("paymongo-signature", signature)
+      |> post(~p"/webhooks/paymongo", payload)
+
+    assert json_response(conn, 422) == %{"error" => "order cancelled"}
+
+    order = Repo.get!(Order, order.id)
+    assert order.status == "cancelled"
+    assert order.payment_status == "unpaid"
+    assert order.paymongo_checkout_session_id == "cs_test_webhook"
+  end
+
   test "rejects mismatched checkout session and does not mark order paid", %{
     conn: conn,
     order: order

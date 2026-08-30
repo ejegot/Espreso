@@ -274,6 +274,97 @@ defmodule Espreso.OrdersTest do
     assert preparing.paymongo_checkout_session_id == "cs_cancel_prep"
   end
 
+  test "abandon_online_payment cancels unpaid online orders with a session preserved" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, order} =
+      Orders.create_order(lines, %{
+        customer_name: "Abandon Me",
+        fulfillment: :pickup,
+        payment_method: :online
+      })
+
+    {:ok, order} = Orders.attach_paymongo_session(order, "cs_abandon_ok")
+
+    assert {:ok, abandoned} = Orders.abandon_online_payment(order)
+    assert abandoned.status == "cancelled"
+    assert abandoned.payment_status == "unpaid"
+    assert abandoned.paymongo_checkout_session_id == "cs_abandon_ok"
+
+    abandoned = Repo.get!(Order, abandoned.id)
+    assert abandoned.status == "cancelled"
+    assert abandoned.payment_status == "unpaid"
+    assert abandoned.paymongo_checkout_session_id == "cs_abandon_ok"
+    assert {:error, :invalid_status} = Orders.cancel_order(abandoned)
+
+    {:ok, still_open} =
+      Orders.create_order(lines, %{
+        customer_name: "Still Paying",
+        fulfillment: :pickup,
+        payment_method: :online
+      })
+
+    {:ok, still_open} = Orders.attach_paymongo_session(still_open, "cs_still_open")
+    assert {:error, :checkout_in_progress} = Orders.cancel_order(still_open)
+  end
+
+  test "abandon_online_payment rejects paid, unbound, ready, and already cancelled orders" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, unbound} =
+      Orders.create_order(lines, %{
+        customer_name: "No Session",
+        fulfillment: :pickup,
+        payment_method: :online
+      })
+
+    assert {:error, :missing_checkout_session} = Orders.abandon_online_payment(unbound)
+
+    {:ok, counter} =
+      Orders.create_order(lines, %{
+        customer_name: "Counter",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    assert {:error, :not_online} = Orders.abandon_online_payment(counter)
+
+    {:ok, paid} =
+      Orders.create_order(lines, %{
+        customer_name: "Paid Online",
+        fulfillment: :pickup,
+        payment_method: :online
+      })
+
+    {:ok, paid} = Orders.attach_paymongo_session(paid, "cs_abandon_paid")
+    {:ok, paid} = Orders.mark_paid(paid)
+    assert {:error, :paid} = Orders.abandon_online_payment(paid)
+
+    {:ok, ready} =
+      Orders.create_order(lines, %{
+        customer_name: "Ready Online",
+        fulfillment: :pickup,
+        payment_method: :online
+      })
+
+    {:ok, ready} = Orders.attach_paymongo_session(ready, "cs_abandon_ready")
+    {:ok, ready} = Orders.update_status(ready, "preparing")
+    {:ok, ready} = Orders.update_status(ready, "ready")
+    assert {:error, :invalid_status} = Orders.abandon_online_payment(ready)
+
+    {:ok, to_cancel} =
+      Orders.create_order(lines, %{
+        customer_name: "Already Gone",
+        fulfillment: :pickup,
+        payment_method: :online
+      })
+
+    {:ok, to_cancel} = Orders.attach_paymongo_session(to_cancel, "cs_abandon_done")
+    {:ok, cancelled} = Orders.abandon_online_payment(to_cancel)
+    assert {:error, :invalid_status} = Orders.abandon_online_payment(cancelled)
+    assert {:error, :cancelled} = Orders.attach_paymongo_session(cancelled, "cs_new")
+  end
+
   test "cancel_order still voids unpaid orders without a PayMongo session" do
     lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
 
