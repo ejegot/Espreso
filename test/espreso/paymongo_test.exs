@@ -67,6 +67,118 @@ defmodule Espreso.PayMongoTest do
     end
   end
 
+  describe "create_checkout_session/3" do
+    test "creates a session when line-item centavos exactly match order.total" do
+      lines = [
+        %{name: "Latte", size: "12oz", quantity: 2, price: Decimal.new("12.50")},
+        %{name: "Cookie", size: nil, quantity: 1, price: Decimal.new("75.00")}
+      ]
+
+      {:ok, order} =
+        Orders.create_order(lines, %{
+          customer_name: "Mia",
+          fulfillment: :pickup,
+          payment_method: :online
+        })
+
+      assert {:ok, 10_000} = PayMongo.pesos_to_centavos(order.total)
+      assert {:ok, line_items} = PayMongo.build_checkout_line_items(lines)
+
+      assert Enum.find(line_items, &(&1.name == "Latte (12oz)")) ==
+               %{name: "Latte (12oz)", amount: 1_250, currency: "PHP", quantity: 2}
+
+      assert Enum.find(line_items, &(&1.name == "Cookie")) ==
+               %{name: "Cookie", amount: 7_500, currency: "PHP", quantity: 1}
+
+      assert 1_250 * 2 + 7_500 == 10_000
+
+      assert {:ok, %{id: session_id, checkout_url: checkout_url}} =
+               PayMongo.create_checkout_session(order, lines,
+                 channel: :gcash,
+                 success_url: "https://example.test/success",
+                 cancel_url: "https://example.test/cancel"
+               )
+
+      assert is_binary(session_id)
+      assert is_binary(checkout_url)
+      assert is_nil(Repo.get!(Order, order.id).paymongo_checkout_session_id)
+    end
+
+    test "rejects mismatched line totals before calling PayMongo" do
+      lines = [
+        %{name: "Latte", size: nil, quantity: 1, price: Decimal.new("100.00")}
+      ]
+
+      {:ok, order} =
+        Orders.create_order(lines, %{
+          customer_name: "Mia",
+          fulfillment: :pickup,
+          payment_method: :online
+        })
+
+      mismatched = [
+        %{name: "Latte", size: nil, quantity: 1, price: Decimal.new("99.00")}
+      ]
+
+      assert {:ok, _} =
+               PayMongo.create_checkout_session(order, lines,
+                 channel: :gcash,
+                 success_url: "https://example.test/success",
+                 cancel_url: "https://example.test/cancel"
+               )
+
+      assert {:error, :checkout_amount_mismatch} =
+               PayMongo.create_checkout_session(order, mismatched,
+                 channel: :gcash,
+                 success_url: "https://example.test/success",
+                 cancel_url: "https://example.test/cancel"
+               )
+
+      assert is_nil(Repo.get!(Order, order.id).paymongo_checkout_session_id)
+    end
+
+    test "rejects sub-centavo Decimal unit prices without rounding into a gateway amount" do
+      lines = [
+        %{name: "Weird", size: nil, quantity: 1, price: Decimal.new("10.001")}
+      ]
+
+      {:ok, order} =
+        Orders.create_order(
+          [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("100.00")}],
+          %{customer_name: "Mia", fulfillment: :pickup, payment_method: :online}
+        )
+
+      assert {:error, :invalid_line_amount} = PayMongo.build_checkout_line_items(lines)
+
+      assert {:error, :invalid_line_amount} =
+               PayMongo.create_checkout_session(order, lines,
+                 channel: :gcash,
+                 success_url: "https://example.test/success",
+                 cancel_url: "https://example.test/cancel"
+               )
+    end
+
+    test "accepts exact two-decimal Decimal prices" do
+      lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("120.00")}]
+
+      {:ok, order} =
+        Orders.create_order(lines, %{
+          customer_name: "Ana",
+          fulfillment: :pickup,
+          payment_method: :online
+        })
+
+      assert {:ok, [%{amount: 12_000, quantity: 1}]} = PayMongo.build_checkout_line_items(lines)
+
+      assert {:ok, %{id: _}} =
+               PayMongo.create_checkout_session(order, lines,
+                 channel: :maya,
+                 success_url: "https://example.test/success",
+                 cancel_url: "https://example.test/cancel"
+               )
+    end
+  end
+
   describe "handle_webhook_event/1" do
     test "marks the referenced order paid when amount and session match" do
       {:ok, order} =
