@@ -68,13 +68,14 @@ defmodule Espreso.PayMongoTest do
   end
 
   describe "handle_webhook_event/1" do
-    test "marks the referenced order paid when amount matches" do
+    test "marks the referenced order paid when amount and session match" do
       {:ok, order} =
         Orders.create_order(
           [line("Espresso", "120.00")],
           %{customer_name: "Ana", fulfillment: :pickup, payment_method: :online}
         )
 
+      {:ok, order} = Orders.attach_paymongo_session(order, "cs_test_123")
       assert order.payment_status == "unpaid"
 
       payload =
@@ -103,6 +104,116 @@ defmodule Espreso.PayMongoTest do
 
       order = Repo.get!(Order, order.id)
       assert order.payment_status == "paid"
+      assert order.paymongo_checkout_session_id == "cs_test_123"
+    end
+
+    test "rejects session mismatch without marking paid" do
+      {:ok, order} =
+        Orders.create_order(
+          [line("Espresso", "120.00")],
+          %{customer_name: "Ana", fulfillment: :pickup, payment_method: :online}
+        )
+
+      {:ok, order} = Orders.attach_paymongo_session(order, "cs_stored")
+
+      payload =
+        webhook_payload(order.number,
+          amount: 12_000,
+          session_data: %{
+            "id" => "cs_webhook",
+            "attributes" => %{
+              "reference_number" => order.number,
+              "payments" => [
+                %{
+                  "id" => "pay_test_123",
+                  "attributes" => %{
+                    "amount" => 12_000,
+                    "status" => "paid",
+                    "currency" => "PHP"
+                  }
+                }
+              ]
+            }
+          }
+        )
+        |> Jason.decode!()
+
+      assert {:error, :session_mismatch} = PayMongo.handle_webhook_event(payload)
+      order = Repo.get!(Order, order.id)
+      assert order.payment_status == "unpaid"
+      assert order.paymongo_checkout_session_id == "cs_stored"
+    end
+
+    test "rejects missing stored session without backfilling" do
+      {:ok, order} =
+        Orders.create_order(
+          [line("Espresso", "120.00")],
+          %{customer_name: "Ana", fulfillment: :pickup, payment_method: :online}
+        )
+
+      payload =
+        webhook_payload(order.number,
+          amount: 12_000,
+          session_data: %{
+            "id" => "cs_test_123",
+            "attributes" => %{
+              "reference_number" => order.number,
+              "payments" => [
+                %{
+                  "id" => "pay_test_123",
+                  "attributes" => %{
+                    "amount" => 12_000,
+                    "status" => "paid",
+                    "currency" => "PHP"
+                  }
+                }
+              ]
+            }
+          }
+        )
+        |> Jason.decode!()
+
+      assert {:error, :missing_session} = PayMongo.handle_webhook_event(payload)
+      order = Repo.get!(Order, order.id)
+      assert order.payment_status == "unpaid"
+      assert is_nil(order.paymongo_checkout_session_id)
+    end
+
+    test "rejects missing webhook session id" do
+      {:ok, order} =
+        Orders.create_order(
+          [line("Espresso", "120.00")],
+          %{customer_name: "Ana", fulfillment: :pickup, payment_method: :online}
+        )
+
+      {:ok, order} = Orders.attach_paymongo_session(order, "cs_test_123")
+
+      payload =
+        webhook_payload(order.number,
+          amount: 12_000,
+          session_data: %{
+            "attributes" => %{
+              "reference_number" => order.number,
+              "payments" => [
+                %{
+                  "id" => "pay_test_123",
+                  "attributes" => %{
+                    "amount" => 12_000,
+                    "status" => "paid",
+                    "currency" => "PHP"
+                  }
+                }
+              ]
+            }
+          }
+        )
+        |> Jason.decode!()
+        |> update_in(["data", "attributes", "data"], &Map.delete(&1, "id"))
+
+      assert {:error, :missing_session} = PayMongo.handle_webhook_event(payload)
+      order = Repo.get!(Order, order.id)
+      assert order.payment_status == "unpaid"
+      assert order.paymongo_checkout_session_id == "cs_test_123"
     end
 
     test "rejects amount mismatch without marking paid" do
@@ -111,6 +222,8 @@ defmodule Espreso.PayMongoTest do
           [line("Espresso", "120.00")],
           %{customer_name: "Ana", fulfillment: :pickup, payment_method: :online}
         )
+
+      {:ok, order} = Orders.attach_paymongo_session(order, "cs_test_123")
 
       payload =
         webhook_payload(order.number,
@@ -134,7 +247,9 @@ defmodule Espreso.PayMongoTest do
         |> Jason.decode!()
 
       assert {:error, :amount_mismatch} = PayMongo.handle_webhook_event(payload)
-      assert Repo.get!(Order, order.id).payment_status == "unpaid"
+      order = Repo.get!(Order, order.id)
+      assert order.payment_status == "unpaid"
+      assert order.paymongo_checkout_session_id == "cs_test_123"
     end
 
     test "ignores unrelated event types" do
