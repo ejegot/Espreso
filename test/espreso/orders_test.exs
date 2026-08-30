@@ -4,6 +4,8 @@ defmodule Espreso.OrdersTest do
   import Ecto.Query
 
   alias Espreso.Orders
+  alias Espreso.Orders.Order
+  alias Espreso.Repo
 
   test "create_order assigns CS number and stores lines" do
     lines = [
@@ -189,6 +191,52 @@ defmodule Espreso.OrdersTest do
     assert {:ok, cancelled} = Orders.cancel_order(order)
     assert cancelled.status == "cancelled"
     assert {:error, :cancelled} = Orders.mark_paid(cancelled)
+  end
+
+  test "attach_paymongo_session enforces unique checkout session binding" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, order1} =
+      Orders.create_order(lines, %{
+        customer_name: "Session One",
+        fulfillment: :pickup,
+        payment_method: :online
+      })
+
+    {:ok, order2} =
+      Orders.create_order(lines, %{
+        customer_name: "Session Two",
+        fulfillment: :pickup,
+        payment_method: :online
+      })
+
+    {:ok, order3} =
+      Orders.create_order(lines, %{
+        customer_name: "Session Three",
+        fulfillment: :pickup,
+        payment_method: :online
+      })
+
+    assert is_nil(order1.paymongo_checkout_session_id)
+    assert is_nil(order2.paymongo_checkout_session_id)
+    assert is_nil(order3.paymongo_checkout_session_id)
+
+    assert {:ok, order1} = Orders.attach_paymongo_session(order1, "cs_A")
+    assert order1.paymongo_checkout_session_id == "cs_A"
+
+    assert {:error, changeset} = Orders.attach_paymongo_session(order2, "cs_A")
+    assert %{paymongo_checkout_session_id: ["has already been taken"]} = errors_on(changeset)
+    assert is_nil(Repo.get!(Order, order2.id).paymongo_checkout_session_id)
+    assert Repo.get!(Order, order1.id).paymongo_checkout_session_id == "cs_A"
+
+    assert {:ok, again} = Orders.attach_paymongo_session(order1, "cs_A")
+    assert again.id == order1.id
+    assert again.paymongo_checkout_session_id == "cs_A"
+
+    assert {:ok, order2} = Orders.attach_paymongo_session(order2, "cs_B")
+    assert order2.paymongo_checkout_session_id == "cs_B"
+    assert Repo.get!(Order, order1.id).paymongo_checkout_session_id == "cs_A"
+    assert is_nil(Repo.get!(Order, order3.id).paymongo_checkout_session_id)
   end
 
   test "create_order allows paid only for counter payment" do
@@ -977,19 +1025,28 @@ defmodule Espreso.OrdersTest do
     {1, _} =
       Espreso.Repo.update_all(
         from(o in Espreso.Orders.Order, where: o.id == ^ready.id),
-        set: [inserted_at: DateTime.add(now, -10, :second), updated_at: DateTime.add(now, -10, :second)]
+        set: [
+          inserted_at: DateTime.add(now, -10, :second),
+          updated_at: DateTime.add(now, -10, :second)
+        ]
       )
 
     {1, _} =
       Espreso.Repo.update_all(
         from(o in Espreso.Orders.Order, where: o.id == ^preparing.id),
-        set: [inserted_at: DateTime.add(now, -20, :second), updated_at: DateTime.add(now, -20, :second)]
+        set: [
+          inserted_at: DateTime.add(now, -20, :second),
+          updated_at: DateTime.add(now, -20, :second)
+        ]
       )
 
     {1, _} =
       Espreso.Repo.update_all(
         from(o in Espreso.Orders.Order, where: o.id == ^received.id),
-        set: [inserted_at: DateTime.add(now, -30, :second), updated_at: DateTime.add(now, -30, :second)]
+        set: [
+          inserted_at: DateTime.add(now, -30, :second),
+          updated_at: DateTime.add(now, -30, :second)
+        ]
       )
 
     unpaid = Orders.list_todays_unpaid()

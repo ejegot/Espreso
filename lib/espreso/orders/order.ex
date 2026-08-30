@@ -95,6 +95,7 @@ defmodule Espreso.Orders.Order do
     |> cast(attrs, [:payment_status, :payment_method, :paymongo_checkout_session_id])
     |> validate_inclusion(:payment_status, @payment_statuses)
     |> validate_inclusion(:payment_method, @payment_methods)
+    |> unique_constraint(:paymongo_checkout_session_id)
   end
 
   defp validate_fulfillment_table(changeset) do
