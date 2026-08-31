@@ -9,9 +9,10 @@ defmodule Espreso.MenuTest do
     test "groups FOOD products into subcategories in order" do
       food = insert_category!("FOOD")
 
-      insert_product!(food, "Red Velvet", true, [{nil, "75"}])
+      insert_product!(food, "Big Assorted Muffin", true, [{nil, "99"}])
       insert_product!(food, "Chicken Flakes", true, [{nil, "179"}])
       insert_product!(food, "Solo Fries", true, [{nil, "99"}])
+      insert_product!(food, "Slow-Roasted Chicken Sourdough", true, [{nil, "249"}])
       insert_product!(food, "Choco Chip Cookies", true, [{nil, "65"}])
 
       food_menu =
@@ -21,14 +22,20 @@ defmodule Espreso.MenuTest do
       assert Enum.map(food_menu.groups, & &1.name) == [
                "Rice Meal",
                "Appetizers",
+               "Sandwiches & Wraps",
                "Muffins",
                "Cakes / Breads"
              ]
 
       assert Enum.map(hd(food_menu.groups).products, & &1.name) == ["Chicken Flakes"]
       assert Enum.map(Enum.at(food_menu.groups, 1).products, & &1.name) == ["Solo Fries"]
-      assert Enum.map(Enum.at(food_menu.groups, 2).products, & &1.name) == ["Red Velvet"]
-      assert Enum.map(Enum.at(food_menu.groups, 3).products, & &1.name) == ["Choco Chip Cookies"]
+
+      assert Enum.map(Enum.at(food_menu.groups, 2).products, & &1.name) == [
+               "Slow-Roasted Chicken Sourdough"
+             ]
+
+      assert Enum.map(Enum.at(food_menu.groups, 3).products, & &1.name) == ["Big Assorted Muffin"]
+      assert Enum.map(Enum.at(food_menu.groups, 4).products, & &1.name) == ["Choco Chip Cookies"]
     end
 
     test "does not add subcategory headings for drink categories" do
@@ -153,6 +160,77 @@ defmodule Espreso.MenuTest do
     test "returns the configured public menu URL for QR deployment" do
       assert Menu.public_url() == "http://localhost:4000/menu"
       assert String.ends_with?(Menu.public_url(), "/menu")
+    end
+  end
+
+  describe "ESP-91 FOOD catalog" do
+    test "Sandwiches & Wraps subgroup includes all three new products with descriptions and prices" do
+      food = insert_category!("FOOD")
+
+      insert_product!(food, "Slow-Roasted Chicken Sourdough", true, [{nil, "249"}])
+      insert_product!(food, "Golden Egg Royale", true, [{nil, "199"}])
+      insert_product!(food, "Tuna Royale Baguette", true, [{nil, "249"}])
+
+      food_menu = Menu.list_menu() |> Enum.find(&(&1.name == "FOOD"))
+      sandwiches = Enum.find(food_menu.groups, &(&1.name == "Sandwiches & Wraps"))
+
+      assert Enum.map(sandwiches.products, & &1.name) == [
+               "Slow-Roasted Chicken Sourdough",
+               "Golden Egg Royale",
+               "Tuna Royale Baguette"
+             ]
+
+      chicken = Enum.find(sandwiches.products, &(&1.name == "Slow-Roasted Chicken Sourdough"))
+
+      assert chicken.description =~ "Slow-marinated chicken"
+      assert [%{price: price}] = chicken.product_prices
+      assert Decimal.equal?(price, Decimal.new("249"))
+    end
+
+    test "Muffins subgroup contains only Big Assorted Muffin" do
+      food = insert_category!("FOOD")
+
+      insert_product!(food, "Big Assorted Muffin", true, [{nil, "99"}])
+      insert_product!(food, "BNN Cream Cheese", false, [{nil, "75"}])
+      insert_product!(food, "Red Velvet", false, [{nil, "75"}])
+
+      food_menu = Menu.list_menu() |> Enum.find(&(&1.name == "FOOD"))
+      muffins = Enum.find(food_menu.groups, &(&1.name == "Muffins"))
+
+      assert Enum.map(muffins.products, & &1.name) == ["Big Assorted Muffin"]
+      assert [%{price: price}] = hd(muffins.products).product_prices
+      assert Decimal.equal?(price, Decimal.new("99"))
+    end
+
+    test "sweets_product_names/0 includes Big Assorted Muffin and cakes but not retired muffins" do
+      assert "Big Assorted Muffin" in Menu.sweets_product_names()
+      assert "Choco Chip Cookies" in Menu.sweets_product_names()
+      refute "BNN Cream Cheese" in Menu.sweets_product_names()
+      refute "Red Velvet" in Menu.sweets_product_names()
+    end
+
+    test "retired muffin products are excluded from list_menu/0" do
+      food = insert_category!("FOOD")
+
+      insert_product!(food, "Big Assorted Muffin", true, [{nil, "99"}])
+      insert_product!(food, "BNN Cream Cheese", false, [{nil, "75"}])
+
+      food_menu = Menu.list_menu() |> Enum.find(&(&1.name == "FOOD"))
+      names = Enum.map(food_menu.products, & &1.name)
+
+      assert "Big Assorted Muffin" in names
+      refute "BNN Cream Cheese" in names
+    end
+
+    test "new sandwich products have explicit product images" do
+      assert Menu.product_image("FOOD", "Slow-Roasted Chicken Sourdough") ==
+               "/images/coffeespot/food-slow-roasted-chicken-sourdough.png"
+
+      assert Menu.product_image("FOOD", "Golden Egg Royale") ==
+               "/images/coffeespot/food-golden-egg-royale.png"
+
+      assert Menu.product_image("FOOD", "Tuna Royale Baguette") ==
+               "/images/coffeespot/food-tuna-royale-baguette.png"
     end
   end
 

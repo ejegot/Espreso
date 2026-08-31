@@ -246,8 +246,8 @@ defmodule EspresoWeb.MenuLiveTest do
   test "/menu craving Sweets filters existing FOOD sweets", %{conn: conn, food: food} do
     insert_product!(food, "Beef Tapa", true, [{nil, "150"}])
     insert_product!(food, "Solo Fries", true, [{nil, "90"}])
-    insert_product!(food, "BNN Cream Cheese", true, [{nil, "95"}])
-    insert_product!(food, "BNN Choco Overload", true, [{nil, "95"}])
+    insert_product!(food, "Big Assorted Muffin", true, [{nil, "99"}])
+    insert_product!(food, "BNN Cream Cheese", false, [{nil, "95"}])
     insert_product!(food, "Choco Chip Cookies", true, [{nil, "85"}])
     insert_product!(food, "Dark Choco Dream Cake", true, [{nil, "120"}])
     insert_product!(food, "Carrot Moist Slice", true, [{nil, "110"}])
@@ -259,11 +259,11 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, ".brune-menu-heading-title", "Sweets")
     assert has_element?(view, "#menu-craving-chip-sweets.is-active", "Sweets")
     assert has_element?(view, ".brune-menu-category-title", "Sweets")
-    assert has_element?(view, ".brune-menu-item-name", "BNN Cream Cheese")
-    assert has_element?(view, ".brune-menu-item-name", "BNN Choco Overload")
+    assert has_element?(view, ".brune-menu-item-name", "Big Assorted Muffin")
     assert has_element?(view, ".brune-menu-item-name", "Choco Chip Cookies")
     assert has_element?(view, ".brune-menu-item-name", "Dark Choco Dream Cake")
     assert has_element?(view, ".brune-menu-item-name", "Carrot Moist Slice")
+    refute has_element?(view, ".brune-menu-item-name", "BNN Cream Cheese")
     refute has_element?(view, ".brune-menu-item-name", "Beef Tapa")
     refute has_element?(view, ".brune-menu-item-name", "Solo Fries")
     refute has_element?(view, ".brune-menu-subgroup", "Rice Meal")
@@ -310,15 +310,18 @@ defmodule EspresoWeb.MenuLiveTest do
 
   test "/menu craving Food still returns full FOOD browsing", %{conn: conn, food: food} do
     insert_product!(food, "Beef Tapa", true, [{nil, "150"}])
-    insert_product!(food, "BNN Cream Cheese", true, [{nil, "95"}])
+    insert_product!(food, "Big Assorted Muffin", true, [{nil, "99"}])
+    insert_product!(food, "Slow-Roasted Chicken Sourdough", true, [{nil, "249"}])
 
     {:ok, view, _html} = live(conn, ~p"/menu?stage=craving")
     view |> element("#menu-craving-option-food") |> render_click()
 
     assert has_element?(view, "#category-FOOD")
     assert has_element?(view, ".brune-menu-item-name", "Beef Tapa")
-    assert has_element?(view, ".brune-menu-item-name", "BNN Cream Cheese")
+    assert has_element?(view, ".brune-menu-item-name", "Big Assorted Muffin")
+    assert has_element?(view, ".brune-menu-item-name", "Slow-Roasted Chicken Sourdough")
     assert has_element?(view, ".brune-menu-subgroup", "Rice Meal")
+    assert has_element?(view, ".brune-menu-subgroup", "Sandwiches & Wraps")
     assert has_element?(view, ".brune-menu-subgroup", "Muffins")
   end
 
@@ -543,7 +546,8 @@ defmodule EspresoWeb.MenuLiveTest do
   test "/menu groups FOOD products by subcategory", %{conn: conn, food: food} do
     insert_product!(food, "Chicken Flakes", true, [{nil, "179"}])
     insert_product!(food, "Solo Fries", true, [{nil, "99"}])
-    insert_product!(food, "Red Velvet", true, [{nil, "75"}])
+    insert_product!(food, "Slow-Roasted Chicken Sourdough", true, [{nil, "249"}])
+    insert_product!(food, "Big Assorted Muffin", true, [{nil, "99"}])
     insert_product!(food, "Choco Chip Cookies", true, [{nil, "65"}])
 
     {:ok, view, _html} = live(conn, ~p"/menu")
@@ -555,23 +559,28 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#category-FOOD")
     assert html =~ "Rice Meal"
     assert html =~ "Appetizers"
+    assert has_element?(view, ".brune-menu-subgroup", "Sandwiches & Wraps")
     assert html =~ "Muffins"
     assert html =~ "Cakes / Breads"
     assert html =~ "Chicken Flakes"
     assert html =~ "Solo Fries"
-    assert html =~ "Red Velvet"
+    assert html =~ "Slow-Roasted Chicken Sourdough"
+    assert html =~ "Big Assorted Muffin"
     assert html =~ "Choco Chip Cookies"
     assert html =~ "₱179"
     assert html =~ "₱99"
+    assert html =~ "₱249"
     assert html =~ "₱65"
 
     rice_index = :binary.match(html, "Rice Meal") |> elem(0)
     appetizers_index = :binary.match(html, "Appetizers") |> elem(0)
+    sandwiches_index = :binary.match(html, "Sandwiches &amp; Wraps") |> elem(0)
     muffins_index = :binary.match(html, "Muffins") |> elem(0)
     cakes_index = :binary.match(html, "Cakes / Breads") |> elem(0)
 
     assert rice_index < appetizers_index
-    assert appetizers_index < muffins_index
+    assert appetizers_index < sandwiches_index
+    assert sandwiches_index < muffins_index
     assert muffins_index < cakes_index
   end
 
