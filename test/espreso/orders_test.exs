@@ -278,6 +278,33 @@ defmodule Espreso.OrdersTest do
     assert {:error, :cancelled} = Orders.mark_paid_from_paymongo(abandoned.number)
   end
 
+  test "record_paymongo_reconciliation is idempotent on checkout session id" do
+    lines = [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("100")}]
+
+    {:ok, order} =
+      Orders.create_order(lines, %{
+        customer_name: "Recon Idempotent",
+        fulfillment: :pickup,
+        payment_method: :online
+      })
+
+    attrs = %{
+      order_id: order.id,
+      order_number: order.number,
+      paymongo_checkout_session_id: "cs_recon_once",
+      paymongo_payment_id: "pay_recon_1",
+      paymongo_webhook_event_id: "evt_recon_1",
+      amount_centavos: 10_000,
+      currency: "PHP"
+    }
+
+    assert {:ok, first} = Orders.record_paymongo_reconciliation(attrs)
+    assert {:ok, second} = Orders.record_paymongo_reconciliation(attrs)
+    assert first.id == second.id
+
+    assert Espreso.Repo.aggregate(Espreso.Orders.PaymentReconciliation, :count, :id) == 1
+  end
+
   test "attach_paymongo_session enforces unique checkout session binding" do
     lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
 

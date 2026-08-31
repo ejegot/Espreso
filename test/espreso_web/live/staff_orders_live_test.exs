@@ -203,6 +203,55 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert Orders.list_active_orders() == []
   end
 
+  test "reconciliation drawer shows captured PayMongo payments for cancelled orders", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("100")}],
+        %{
+          customer_name: "Recon UI",
+          fulfillment: :pickup,
+          payment_method: :online
+        }
+      )
+
+    assert {:ok, _record} =
+             Orders.record_paymongo_reconciliation(%{
+               order_id: order.id,
+               order_number: order.number,
+               paymongo_checkout_session_id: "cs_staff_recon_ui",
+               paymongo_payment_id: "pay_staff_recon",
+               paymongo_webhook_event_id: "evt_staff_recon",
+               amount_centavos: 10_000,
+               currency: "PHP"
+             })
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    assert has_element?(view, "#reconciliation-drawer-toggle", "Reconciliation")
+    assert has_element?(view, ".staff-orders-reconciliation-toggle-count", "1")
+
+    view |> element("#reconciliation-drawer-toggle") |> render_click()
+
+    assert has_element?(view, "#paymongo-reconciliations")
+    assert has_element?(view, "#paymongo-reconciliations", order.number)
+    assert has_element?(view, "#paymongo-reconciliations", "₱100")
+    assert has_element?(view, "#paymongo-reconciliations", "cs_staff_rec…")
+    assert has_element?(
+             view,
+             "#paymongo-reconciliations",
+             "Payment captured at PayMongo — order cancelled locally"
+           )
+  end
+
+  test "reconciliation drawer is empty when there are no records", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    assert has_element?(view, ".staff-orders-reconciliation-toggle-count", "0")
+
+    view |> element("#reconciliation-drawer-toggle") |> render_click()
+    assert has_element?(view, "#paymongo-reconciliations-empty", "No PayMongo reconciliation items.")
+  end
+
   test "unpaid online ticket can prepare but cannot mark paid or ready", %{conn: conn} do
     {:ok, order} =
       Orders.create_order(

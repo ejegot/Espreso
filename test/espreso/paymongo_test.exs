@@ -3,6 +3,7 @@ defmodule Espreso.PayMongoTest do
 
   alias Espreso.Orders
   alias Espreso.Orders.Order
+  alias Espreso.Orders.PaymentReconciliation
   alias Espreso.PayMongo
   alias Espreso.Repo
 
@@ -362,6 +363,7 @@ defmodule Espreso.PayMongoTest do
       order = Repo.get!(Order, order.id)
       assert order.payment_status == "unpaid"
       assert order.paymongo_checkout_session_id == "cs_test_123"
+      assert Repo.aggregate(PaymentReconciliation, :count, :id) == 0
     end
 
     test "rejects cancelled orders without marking paid" do
@@ -406,6 +408,14 @@ defmodule Espreso.PayMongoTest do
       assert order.status == "cancelled"
       assert order.payment_status == "unpaid"
       assert order.paymongo_checkout_session_id == "cs_test_123"
+
+      assert [%PaymentReconciliation{} = record] = Repo.all(PaymentReconciliation)
+      assert record.order_number == order.number
+      assert record.paymongo_checkout_session_id == "cs_test_123"
+      assert record.amount_centavos == 12_000
+      assert record.currency == "PHP"
+      assert record.paymongo_payment_id == "pay_test_123"
+      assert record.paymongo_webhook_event_id == "evt_test_1"
     end
 
     test "ignores unrelated event types" do
@@ -419,6 +429,7 @@ defmodule Espreso.PayMongoTest do
       }
 
       assert :ok = PayMongo.handle_webhook_event(payload)
+      assert Repo.aggregate(PaymentReconciliation, :count, :id) == 0
     end
   end
 

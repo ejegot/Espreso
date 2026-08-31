@@ -3,6 +3,7 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
 
   alias Espreso.Orders
   alias Espreso.Orders.Order
+  alias Espreso.Orders.PaymentReconciliation
   alias Espreso.PayMongo
   alias Espreso.Repo
 
@@ -37,6 +38,7 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
     assert order.payment_status == "paid"
     assert Decimal.equal?(order.total, Decimal.new("100.00"))
     assert order.paymongo_checkout_session_id == "cs_test_webhook"
+    assert Repo.aggregate(PaymentReconciliation, :count, :id) == 0
   end
 
   test "rejects paid webhook for cancelled order and does not mark paid", %{
@@ -68,6 +70,14 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
     assert order.status == "cancelled"
     assert order.payment_status == "unpaid"
     assert order.paymongo_checkout_session_id == "cs_test_webhook"
+
+    assert [%PaymentReconciliation{} = record] = Repo.all(PaymentReconciliation)
+    assert record.order_number == order.number
+    assert record.paymongo_checkout_session_id == "cs_test_webhook"
+    assert record.amount_centavos == 10_000
+    assert record.currency == "PHP"
+    assert record.paymongo_payment_id == "pay_test_1"
+    assert record.paymongo_webhook_event_id == "evt_live_1"
   end
 
   test "rejects paid webhook after abandon_online_payment and does not mark paid", %{
@@ -95,6 +105,39 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
     assert order.status == "cancelled"
     assert order.payment_status == "unpaid"
     assert order.paymongo_checkout_session_id == "cs_test_webhook"
+
+    assert [%PaymentReconciliation{} = record] = Repo.all(PaymentReconciliation)
+    assert record.order_id == order.id
+    assert record.order_number == order.number
+    assert record.paymongo_checkout_session_id == "cs_test_webhook"
+    assert record.amount_centavos == 10_000
+  end
+
+  test "duplicate cancelled-order webhook creates one reconciliation row", %{
+    conn: _conn,
+    order: order
+  } do
+    {:ok, order} = Orders.attach_paymongo_session(order, "cs_test_webhook")
+
+    {:ok, order} =
+      order
+      |> Order.cancel_changeset()
+      |> Repo.update()
+
+    payload = paid_webhook_payload(order.number, amount: 10_000)
+    signature = PayMongo.sign_for_test(payload)
+
+    for _ <- 1..2 do
+      conn =
+        build_conn()
+        |> put_req_header("content-type", "application/json")
+        |> put_req_header("paymongo-signature", signature)
+        |> post(~p"/webhooks/paymongo", payload)
+
+      assert json_response(conn, 422) == %{"error" => "order cancelled"}
+    end
+
+    assert Repo.aggregate(PaymentReconciliation, :count, :id) == 1
   end
 
   test "rejects mismatched checkout session and does not mark order paid", %{
@@ -115,6 +158,7 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
     order = Repo.get!(Order, order.id)
     assert order.payment_status == "unpaid"
     assert order.paymongo_checkout_session_id == "cs_stored"
+    assert Repo.aggregate(PaymentReconciliation, :count, :id) == 0
   end
 
   test "rejects missing stored session and does not backfill", %{conn: conn, order: order} do
@@ -131,6 +175,29 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
     order = Repo.get!(Order, order.id)
     assert order.payment_status == "unpaid"
     assert is_nil(order.paymongo_checkout_session_id)
+    assert Repo.aggregate(PaymentReconciliation, :count, :id) == 0
+  end
+
+  test "rejects cancelled order without stored session and does not reconcile", %{
+    conn: conn,
+    order: order
+  } do
+    {:ok, order} =
+      order
+      |> Order.cancel_changeset()
+      |> Repo.update()
+
+    payload = paid_webhook_payload(order.number, amount: 10_000)
+    signature = PayMongo.sign_for_test(payload)
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("paymongo-signature", signature)
+      |> post(~p"/webhooks/paymongo", payload)
+
+    assert json_response(conn, 400) == %{"error" => "missing session"}
+    assert Repo.aggregate(PaymentReconciliation, :count, :id) == 0
   end
 
   test "rejects missing webhook session id and does not mark order paid", %{
@@ -170,6 +237,7 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
     order = Repo.get!(Order, order.id)
     assert order.payment_status == "unpaid"
     assert is_nil(order.paymongo_checkout_session_id)
+    assert Repo.aggregate(PaymentReconciliation, :count, :id) == 0
   end
 
   test "rejects amount one centavo too high and does not mark order paid", %{
@@ -271,6 +339,7 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
     order = Repo.get!(Order, order.id)
     assert order.payment_status == "unpaid"
     assert is_nil(order.paymongo_checkout_session_id)
+    assert Repo.aggregate(PaymentReconciliation, :count, :id) == 0
   end
 
   test "rejects missing signature with 401 and does not mark order paid", %{
@@ -352,6 +421,7 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
     order = Repo.get!(Order, order.id)
     assert order.payment_status == "unpaid"
     assert is_nil(order.paymongo_checkout_session_id)
+    assert Repo.aggregate(PaymentReconciliation, :count, :id) == 0
   end
 
   test "accepts live livemode when app is in live mode", %{conn: conn} do
@@ -436,6 +506,47 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
 
     assert json_response(conn, 400) == %{"error" => "missing livemode"}
     assert Repo.get!(Order, order.id).payment_status == "unpaid"
+    assert Repo.aggregate(PaymentReconciliation, :count, :id) == 0
+  end
+
+  test "acknowledges unknown order without creating reconciliation", %{conn: conn} do
+    payload = paid_webhook_payload("ORD-NOT-REAL", amount: 10_000)
+    signature = PayMongo.sign_for_test(payload)
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("paymongo-signature", signature)
+      |> post(~p"/webhooks/paymongo", payload)
+
+    assert json_response(conn, 200) == %{"received" => true}
+    assert Repo.aggregate(PaymentReconciliation, :count, :id) == 0
+  end
+
+  test "ignores non-paid webhook events without creating reconciliation", %{conn: conn} do
+    payload =
+      Jason.encode!(%{
+        "data" => %{
+          "id" => "evt_other",
+          "type" => "event",
+          "attributes" => %{
+            "type" => "payment.failed",
+            "livemode" => false,
+            "data" => %{}
+          }
+        }
+      })
+
+    signature = PayMongo.sign_for_test(payload)
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("paymongo-signature", signature)
+      |> post(~p"/webhooks/paymongo", payload)
+
+    assert json_response(conn, 200) == %{"received" => true}
+    assert Repo.aggregate(PaymentReconciliation, :count, :id) == 0
   end
 
   defp paid_webhook_payload(reference_number, opts) do
