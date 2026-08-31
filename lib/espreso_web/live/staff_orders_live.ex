@@ -14,6 +14,7 @@ defmodule EspresoWeb.StaffOrdersLive do
      |> assign(:page_title, "Orders")
      |> assign(:flash_note, nil)
      |> assign(:unpaid_drawer_open, false)
+     |> assign(:reconciliation_drawer_open, false)
      |> load_orders(), layout: false}
   end
 
@@ -33,6 +34,14 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   def handle_event("close_unpaid_drawer", _params, socket) do
     {:noreply, assign(socket, :unpaid_drawer_open, false)}
+  end
+
+  def handle_event("toggle_reconciliation_drawer", _params, socket) do
+    {:noreply, assign(socket, :reconciliation_drawer_open, !socket.assigns.reconciliation_drawer_open)}
+  end
+
+  def handle_event("close_reconciliation_drawer", _params, socket) do
+    {:noreply, assign(socket, :reconciliation_drawer_open, false)}
   end
 
   def handle_event("set_status", %{"id" => id, "status" => status}, socket) do
@@ -194,6 +203,19 @@ defmodule EspresoWeb.StaffOrdersLive do
         >
           Unpaid <span class="staff-orders-unpaid-toggle-count">{length(@unpaid_orders)}</span>
         </button>
+        <button
+          type="button"
+          class="staff-shell-tool staff-orders-reconciliation-toggle"
+          id="reconciliation-drawer-toggle"
+          phx-click="toggle_reconciliation_drawer"
+          aria-expanded={to_string(@reconciliation_drawer_open)}
+          aria-controls="paymongo-reconciliations"
+        >
+          Reconciliation
+          <span class="staff-orders-reconciliation-toggle-count">
+            {length(@paymongo_reconciliations)}
+          </span>
+        </button>
       </:tools>
 
       <div class="staff-orders-page staff-orders-shell-root">
@@ -318,6 +340,67 @@ defmodule EspresoWeb.StaffOrdersLive do
                   Mark paid
                 </button>
               </div>
+            </article>
+          </div>
+        </aside>
+
+        <div
+          :if={@reconciliation_drawer_open}
+          class="staff-orders-drawer-backdrop"
+          phx-click="close_reconciliation_drawer"
+          aria-hidden="true"
+        />
+
+        <aside
+          class={[
+            "staff-orders-unpaid-drawer",
+            "staff-orders-section",
+            "staff-orders-section--reconciliation",
+            "staff-orders-collections",
+            @reconciliation_drawer_open && "staff-orders-unpaid-drawer--open"
+          ]}
+          id="paymongo-reconciliations"
+          role="region"
+          aria-label="PayMongo reconciliation"
+          aria-hidden={to_string(!@reconciliation_drawer_open)}
+        >
+          <header class="staff-orders-kds-head staff-orders-unpaid-drawer-head">
+            <h2>Reconciliation</h2>
+            <span class="staff-orders-count">{length(@paymongo_reconciliations)}</span>
+            <button
+              type="button"
+              class="staff-orders-drawer-close"
+              phx-click="close_reconciliation_drawer"
+              aria-label="Close reconciliation drawer"
+            >
+              ×
+            </button>
+          </header>
+          <p :if={@paymongo_reconciliations == []} class="staff-empty" id="paymongo-reconciliations-empty">
+            No PayMongo reconciliation items.
+          </p>
+          <div :if={@paymongo_reconciliations != []} class="staff-orders-unpaid-list">
+            <article
+              :for={record <- @paymongo_reconciliations}
+              class="staff-order-card staff-order-card--reconciliation"
+              id={"paymongo-reconciliation-#{record.id}"}
+            >
+              <div class="staff-order-unpaid-main">
+                <p class="staff-order-number">{record.order_number}</p>
+                <span class="staff-order-unpaid-sep" aria-hidden="true">·</span>
+                <p class="staff-order-pay">
+                  <span class="staff-order-pay-amount">
+                    {Orders.format_reconciliation_amount(record.amount_centavos)}
+                  </span>
+                </p>
+                <span class="staff-order-unpaid-sep" aria-hidden="true">·</span>
+                <p class="staff-order-meta staff-order-meta--session">
+                  {truncate_session_id(record.paymongo_checkout_session_id)}
+                </p>
+              </div>
+              <p class="staff-order-reconciliation-note">
+                Payment captured at PayMongo — order cancelled locally
+              </p>
             </article>
           </div>
         </aside>
@@ -556,5 +639,16 @@ defmodule EspresoWeb.StaffOrdersLive do
     |> assign(:active_orders, Orders.list_active_orders())
     |> assign(:ready_orders, Orders.list_recent_ready(@ready_lane_limit))
     |> assign(:unpaid_orders, Orders.list_todays_unpaid())
+    |> assign(:paymongo_reconciliations, Orders.list_open_paymongo_reconciliations())
   end
+
+  defp truncate_session_id(session_id) when is_binary(session_id) do
+    if String.length(session_id) > 16 do
+      String.slice(session_id, 0, 12) <> "…"
+    else
+      session_id
+    end
+  end
+
+  defp truncate_session_id(_), do: ""
 end

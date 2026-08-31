@@ -6,6 +6,8 @@ defmodule Espreso.PayMongo do
   alias Espreso.Orders
   alias Espreso.Orders.Order
 
+  require Logger
+
   @type payment_channel :: :gcash | :maya
 
   @doc """
@@ -148,9 +150,18 @@ defmodule Espreso.PayMongo do
     with {:ok, amount} <- extract_paid_amount_centavos(session),
          {:ok, order} <- find_order(reference_number, session_id),
          :ok <- verify_amount_matches(order, amount),
-         :ok <- verify_checkout_session(order, session_id),
-         {:ok, _} <- mark_order_paid(order, session_id) do
-      :ok
+         :ok <- verify_checkout_session(order, session_id) do
+      case mark_order_paid(order, session_id) do
+        {:ok, _} ->
+          :ok
+
+        {:error, :order_cancelled} = error ->
+          record_cancelled_payment_reconciliation(payload, session, session_id, order, amount)
+          error
+
+        other ->
+          other
+      end
     else
       {:error, :missing_amount} = error -> error
       {:error, :invalid_amount} = error -> error
@@ -158,7 +169,6 @@ defmodule Espreso.PayMongo do
       {:error, :invalid_order_total} = error -> error
       {:error, :missing_session} = error -> error
       {:error, :session_mismatch} = error -> error
-      {:error, :order_cancelled} = error -> error
       {:error, :not_found} -> :ok
       {:error, :missing_reference} -> :ok
       {:error, _} -> :ok
@@ -240,6 +250,67 @@ defmodule Espreso.PayMongo do
     case Orders.mark_paid_from_paymongo(number, session_id) do
       {:error, :cancelled} -> {:error, :order_cancelled}
       other -> other
+    end
+  end
+
+  defp record_cancelled_payment_reconciliation(payload, session, session_id, order, amount_centavos) do
+    {payment_id, currency} = extract_paid_payment_audit(session)
+    event_id = get_in(payload, ["data", "id"])
+
+    case Orders.record_paymongo_reconciliation(%{
+           order_id: order.id,
+           order_number: order.number,
+           paymongo_checkout_session_id: session_id,
+           paymongo_payment_id: payment_id,
+           paymongo_webhook_event_id: event_id,
+           amount_centavos: amount_centavos,
+           currency: currency || "PHP"
+         }) do
+      {:ok, _record} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.error(
+          "failed to record PayMongo reconciliation for order #{order.number}: #{inspect(reason)}"
+        )
+
+        :ok
+    end
+  end
+
+  defp extract_paid_payment_audit(session) when is_map(session) do
+    case get_in(session, ["attributes", "payments"]) do
+      payments when is_list(payments) ->
+        paid =
+          Enum.filter(payments, fn payment ->
+            get_in(payment, ["attributes", "status"]) == "paid"
+          end)
+
+        payment_ids =
+          paid
+          |> Enum.map(&Map.get(&1, "id"))
+          |> Enum.filter(&(is_binary(&1) and &1 != ""))
+
+        currency =
+          paid
+          |> Enum.find_value(fn payment ->
+            case get_in(payment, ["attributes", "currency"]) do
+              c when is_binary(c) and c != "" -> c
+              _ -> nil
+            end
+          end)
+
+        payment_id =
+          case payment_ids do
+            [only] -> only
+            many when many != [] -> Enum.join(many, ",")
+            _ -> nil
+          end
+
+        {payment_id, currency}
+
+      _ ->
+        {nil, nil}
     end
   end
 

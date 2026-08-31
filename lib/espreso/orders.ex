@@ -6,7 +6,7 @@ defmodule Espreso.Orders do
   import Ecto.Query
 
   alias Espreso.Repo
-  alias Espreso.Orders.{Order, OrderItem}
+  alias Espreso.Orders.{Order, OrderItem, PaymentReconciliation}
   alias Espreso.Menu
 
   @doc """
@@ -572,6 +572,46 @@ defmodule Espreso.Orders do
   end
 
   def complete_order(%Order{} = order), do: complete_order(%Order{id: order.id})
+
+  @doc """
+  Records a verified PayMongo payment that could not be applied because the
+  order was already cancelled. Idempotent on `paymongo_checkout_session_id`.
+  """
+  def record_paymongo_reconciliation(attrs) when is_map(attrs) do
+    session_id = Map.fetch!(attrs, :paymongo_checkout_session_id)
+
+    case %PaymentReconciliation{}
+         |> PaymentReconciliation.changeset(attrs)
+         |> Repo.insert(on_conflict: :nothing, conflict_target: :paymongo_checkout_session_id) do
+      {:ok, %PaymentReconciliation{id: id}} when is_integer(id) ->
+        {:ok, Repo.get!(PaymentReconciliation, id)}
+
+      {:ok, _} ->
+        case Repo.get_by(PaymentReconciliation, paymongo_checkout_session_id: session_id) do
+          %PaymentReconciliation{} = record -> {:ok, record}
+          nil -> {:error, :not_persisted}
+        end
+
+      {:error, changeset} ->
+        {:error, changeset}
+    end
+  end
+
+  @doc """
+  Lists all open PayMongo payment reconciliation records, newest first.
+  """
+  def list_open_paymongo_reconciliations do
+    PaymentReconciliation
+    |> order_by([r], desc: r.inserted_at)
+    |> Repo.all()
+  end
+
+  def format_reconciliation_amount(centavos) when is_integer(centavos) do
+    centavos
+    |> Decimal.new()
+    |> Decimal.div(100)
+    |> Menu.format_price()
+  end
 
   def format_total(%Order{total: total}), do: Menu.format_price(total)
 
