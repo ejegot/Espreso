@@ -409,10 +409,7 @@ defmodule Espreso.Orders do
             {:error, :checkout_in_progress}
 
           true ->
-            current
-            |> Order.cancel_changeset()
-            |> Repo.update()
-            |> broadcast()
+            atomically_cancel_order(id, :without_session)
         end
     end
   end
@@ -446,10 +443,7 @@ defmodule Espreso.Orders do
             {:error, :missing_checkout_session}
 
           true ->
-            current
-            |> Order.cancel_changeset()
-            |> Repo.update()
-            |> broadcast()
+            atomically_cancel_order(id, :with_online_session)
         end
     end
   end
@@ -690,15 +684,135 @@ defmodule Espreso.Orders do
   defp broadcast(other), do: other
 
   # Verified PayMongo path — does not enforce the staff/manual online restriction.
-  defp apply_paid(%Order{status: "cancelled"}), do: {:error, :cancelled}
+  defp apply_paid(%Order{id: order_id}) do
+    invoke_apply_paid_barrier!()
 
-  defp apply_paid(%Order{payment_status: "paid"} = order), do: {:ok, order}
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-  defp apply_paid(%Order{} = order) do
-    order
-    |> Order.payment_changeset(%{payment_status: "paid"})
-    |> Repo.update()
-    |> broadcast()
+    {count, _} =
+      from(o in Order,
+        where: o.id == ^order_id and o.status != "cancelled" and o.payment_status != "paid",
+        update: [set: [payment_status: "paid", updated_at: ^now]]
+      )
+      |> Repo.update_all([])
+
+    case count do
+      1 ->
+        order = Repo.get!(Order, order_id)
+        broadcast({:ok, order})
+
+      0 ->
+        case Repo.get(Order, order_id) do
+          nil ->
+            {:error, :not_found}
+
+          %Order{payment_status: "paid"} = order ->
+            {:ok, order}
+
+          %Order{status: "cancelled"} ->
+            {:error, :cancelled}
+
+          %Order{} = order ->
+            {:error, {:unexpected_apply_paid_state, order}}
+        end
+
+      _ ->
+        {:error, :unexpected_update_count}
+    end
+  end
+
+  defp atomically_cancel_order(order_id, scope)
+       when is_integer(order_id) and scope in [:without_session, :with_online_session] do
+    invoke_cancel_barrier!()
+
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    base_query =
+      from o in Order,
+        where:
+          o.id == ^order_id and o.status in ["received", "preparing"] and
+            o.payment_status != "paid"
+
+    scoped_query =
+      case scope do
+        :without_session -> without_checkout_session(base_query)
+        :with_online_session -> with_online_checkout_session(base_query)
+      end
+
+    {count, _} =
+      scoped_query
+      |> update([o], set: [status: "cancelled", updated_at: ^now])
+      |> Repo.update_all([])
+
+    case count do
+      1 ->
+        order = Repo.get!(Order, order_id)
+        broadcast({:ok, order})
+
+      0 ->
+        case Repo.get(Order, order_id) do
+          nil ->
+            {:error, :not_found}
+
+          %Order{payment_status: "paid"} ->
+            {:error, :paid}
+
+          %Order{status: status} when status not in ["received", "preparing"] ->
+            {:error, :invalid_status}
+
+          %Order{} = order ->
+            interpret_cancel_conflict(order, scope)
+        end
+
+      _ ->
+        {:error, :unexpected_update_count}
+    end
+  end
+
+  defp interpret_cancel_conflict(%Order{} = order, :with_online_session) do
+    cond do
+      order.payment_method != "online" ->
+        {:error, :not_online}
+
+      not checkout_session_attached?(order) ->
+        {:error, :missing_checkout_session}
+
+      true ->
+        {:error, :invalid_status}
+    end
+  end
+
+  defp interpret_cancel_conflict(%Order{} = order, :without_session) do
+    if checkout_session_attached?(order) do
+      {:error, :checkout_in_progress}
+    else
+      {:error, :invalid_status}
+    end
+  end
+
+  defp without_checkout_session(query) do
+    from o in query,
+      where: is_nil(o.paymongo_checkout_session_id) or o.paymongo_checkout_session_id == ""
+  end
+
+  defp with_online_checkout_session(query) do
+    from o in query,
+      where: o.payment_method == "online",
+      where: not is_nil(o.paymongo_checkout_session_id) and o.paymongo_checkout_session_id != ""
+  end
+
+  defp invoke_apply_paid_barrier! do
+    case Application.get_env(:espreso, :orders_apply_paid_barrier) do
+      fun when is_function(fun, 0) -> fun.()
+      _ -> :ok
+    end
+  end
+
+  defp invoke_cancel_barrier! do
+    case Application.get_env(:espreso, :orders_cancel_barrier) do
+      fun when is_function(fun, 0) -> fun.()
+      _ -> :ok
+    end
   end
 
   defp online_unpaid?(%Order{payment_method: "online", payment_status: status})
