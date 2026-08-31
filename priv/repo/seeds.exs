@@ -47,6 +47,8 @@ seed_products = fn category, products ->
 
         existing_product ->
           existing_product
+          |> Product.changeset(%{available: true})
+          |> Repo.update!()
       end
 
     Enum.each(prices, fn {size, price} ->
@@ -70,9 +72,21 @@ seed_products = fn category, products ->
           price: Decimal.new(price)
         })
         |> Repo.insert!()
+      else
+        existing_price
+        |> ProductPrice.changeset(%{price: Decimal.new(price)})
+        |> Repo.update!()
       end
     end)
   end)
+end
+
+retire_food_products = fn names ->
+  food_category = find_or_create_category.("FOOD")
+
+  Product
+  |> where([p], p.category_id == ^food_category.id and p.name in ^names)
+  |> Repo.update_all(set: [available: false])
 end
 
 hot_category = find_or_create_category.("HOT")
@@ -162,12 +176,12 @@ food_products = [
   {"Quesadillas", [{nil, "249"}]},
   {"Chicken & Chips", [{nil, "150"}]},
   {"Spam & Chips", [{nil, "150"}]},
+  # Sandwiches & Wraps
+  {"Slow-Roasted Chicken Sourdough", [{nil, "249"}]},
+  {"Golden Egg Royale", [{nil, "199"}]},
+  {"Tuna Royale Baguette", [{nil, "249"}]},
   # Muffins
-  {"BNN Cream Cheese", [{nil, "75"}]},
-  {"BNN Choco Overload", [{nil, "75"}]},
-  {"BNN Biscoff", [{nil, "75"}]},
-  {"Choco Chips", [{nil, "75"}]},
-  {"Red Velvet", [{nil, "75"}]},
+  {"Big Assorted Muffin", [{nil, "99"}]},
   # Cakes / Breads
   {"Dark Choco Dream Cake", [{nil, "229"}]},
   {"Choco Chip Cookies", [{nil, "65"}]},
@@ -177,6 +191,14 @@ food_products = [
 ]
 
 seed_products.(food_category, food_products)
+
+retire_food_products.([
+  "BNN Cream Cheese",
+  "BNN Choco Overload",
+  "BNN Biscoff",
+  "Choco Chips",
+  "Red Velvet"
+])
 
 # —— Staff accounts (Phase A) ——
 alias Espreso.Accounts

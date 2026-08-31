@@ -67,6 +67,10 @@ defmodule Espreso.Menu do
     {"FOOD", "Quesadillas"} => "/images/coffeespot/IMG_3472.JPG",
     {"FOOD", "Chicken & Chips"} => "/images/coffeespot/IMG_3473.JPG",
     {"FOOD", "Spam & Chips"} => "/images/coffeespot/IMG_3473.JPG",
+    {"FOOD", "Slow-Roasted Chicken Sourdough"} =>
+      "/images/coffeespot/food-slow-roasted-chicken-sourdough.png",
+    {"FOOD", "Golden Egg Royale"} => "/images/coffeespot/food-golden-egg-royale.png",
+    {"FOOD", "Tuna Royale Baguette"} => "/images/coffeespot/food-tuna-royale-baguette.png",
     {"FOOD", "BNN Cream Cheese"} => "/images/coffeespot/IMG_3485.JPG",
     {"FOOD", "BNN Choco Overload"} => "/images/coffeespot/IMG_3484.JPG",
     {"FOOD", "BNN Biscoff"} => "/images/coffeespot/IMG_3483.JPG",
@@ -193,6 +197,13 @@ defmodule Espreso.Menu do
       "Grilled flour tortilla filled with melted cheese and savory filling.",
     {"FOOD", "Chicken & Chips"} => "Crispy chicken tenders served with a side of seasoned fries.",
     {"FOOD", "Spam & Chips"} => "Pan-fried Spam slices paired with crispy seasoned fries.",
+    # FOOD — Sandwiches & Wraps
+    {"FOOD", "Slow-Roasted Chicken Sourdough"} =>
+      "Slow-marinated chicken, gently cooked to tender perfection, layered with melted cheese and roasted vegetables between golden, toasted sourdough.",
+    {"FOOD", "Golden Egg Royale"} =>
+      "Fluffy seasoned eggs wrapped in a warm, lightly toasted tortilla, served with fresh vegetables and a delicate savory finish.",
+    {"FOOD", "Tuna Royale Baguette"} =>
+      "Creamy seasoned tuna layered generously over a crisp, artisan baguette, finished with fresh herbs and a delicate savory touch.",
     # FOOD — Muffins
     {"FOOD", "BNN Cream Cheese"} => "Moist banana muffin topped with a rich cream cheese swirl.",
     {"FOOD", "BNN Choco Overload"} =>
@@ -231,13 +242,15 @@ defmodule Espreso.Menu do
        "Chicken & Chips",
        "Spam & Chips"
      ]},
+    {"Sandwiches & Wraps",
+     [
+       "Slow-Roasted Chicken Sourdough",
+       "Golden Egg Royale",
+       "Tuna Royale Baguette"
+     ]},
     {"Muffins",
      [
-       "BNN Cream Cheese",
-       "BNN Choco Overload",
-       "BNN Biscoff",
-       "Choco Chips",
-       "Red Velvet"
+       "Big Assorted Muffin"
      ]},
     {"Cakes / Breads",
      [
