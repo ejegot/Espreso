@@ -89,6 +89,22 @@ retire_food_products = fn names ->
   |> Repo.update_all(set: [available: false])
 end
 
+rename_product = fn category_name, old_name, new_name ->
+  category = find_or_create_category.(category_name)
+
+  case Repo.get_by(Product, name: old_name, category_id: category.id) do
+    nil ->
+      :ok
+
+    product ->
+      product
+      |> Product.changeset(%{name: new_name})
+      |> Repo.update!()
+  end
+end
+
+rename_product.("SODA", "Green Apple Campaign", "Green Apple Campagna")
+
 hot_category = find_or_create_category.("HOT")
 
 hot_products = [
@@ -122,7 +138,8 @@ cold_products = [
   {"Butter Scotch", [{"16oz", "180"}]},
   {"Matcha Caramel", [{"16oz", "180"}]},
   {"Strawberry Matcha", [{"16oz", "180"}]},
-  {"Choco Berry", [{"16oz", "180"}]}
+  {"Choco Berry", [{"16oz", "180"}]},
+  {"Iced Bellagio Choco", [{"16oz", "180"}]}
 ]
 
 seed_products.(cold_category, cold_products)
@@ -148,7 +165,7 @@ soda_category = find_or_create_category.("SODA")
 
 soda_products = [
   {"Tropical Passion Fruit", [{"16oz", "120"}]},
-  {"Green Apple Campaign", [{"16oz", "120"}]},
+  {"Green Apple Campagna", [{"16oz", "120"}]},
   {"Minty Peach", [{"16oz", "120"}]},
   {"Scarlet Berry", [{"16oz", "120"}]},
   {"Majestic Mango", [{"16oz", "120"}]},
@@ -187,7 +204,9 @@ food_products = [
   {"Choco Chip Cookies", [{nil, "65"}]},
   {"BNN Moist Slice", [{nil, "75"}]},
   {"Choco Moist Slice", [{nil, "75"}]},
-  {"Carrot Moist Slice", [{nil, "75"}]}
+  {"Carrot Moist Slice", [{nil, "75"}]},
+  {"Belgian Waffles", [{nil, "149"}]},
+  {"Chocolate Almond Waffles", [{nil, "149"}]}
 ]
 
 seed_products.(food_category, food_products)
