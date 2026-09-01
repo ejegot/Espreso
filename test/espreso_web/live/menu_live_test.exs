@@ -42,30 +42,27 @@ defmodule EspresoWeb.MenuLiveTest do
 
     assert html =~ "CoffeeSpot"
     assert has_element?(view, "#menu-landing")
-    assert has_element?(view, ".menu-qr-landing-scene")
-    assert has_element?(view, ".menu-qr-landing-brand", "CoffeeSpot Marikina")
+    assert has_element?(view, ".menu-qr-landing-top-brand", "CoffeeSpot")
+    assert has_element?(view, "#menu-landing-carousel[phx-hook='LandingCarousel']")
+    assert has_element?(view, "#menu-landing-slide-welcome")
+    assert has_element?(view, "#menu-landing-slide-visit")
     assert has_element?(view, ".menu-qr-landing-headline", "Your coffee moment starts here.")
+    assert has_element?(view, ".menu-qr-landing-headline", "Visit CoffeeSpot")
     assert has_element?(view, ".menu-qr-landing-lede", "Browse the menu. Order from your table.")
-    assert has_element?(view, ".menu-qr-landing-lede", "We'll take care of the rest.")
-    assert has_element?(view, "#menu-cta-view-menu", "View the menu")
-    assert has_element?(view, "#menu-cta-visit-coffeespot", "Visit CoffeeSpot")
+    assert has_element?(view, "#menu-cta-view-menu", "Get Started")
+    assert has_element?(view, "#menu-cta-visit-coffeespot", "See hours & directions")
     assert has_element?(
              view,
              ~s(.menu-qr-landing-photo[src="/images/coffeespot/IMG_3498.png"])
            )
-    assert has_element?(view, ".menu-qr-landing-footer")
-    assert has_element?(view, ".menu-qr-landing-footer-brand", "CoffeeSpot Marikina")
-    assert has_element?(view, ".menu-qr-landing-footer-owned", "Owned and Operated by Elilai Kafe")
-    assert has_element?(view, "#menu-landing-instagram")
-    assert has_element?(view, "#menu-landing-facebook")
-    assert has_element?(view, "#menu-landing-tiktok")
-
-    assert view
-           |> element("#menu-landing-instagram")
-           |> render()
-           |> Floki.parse_fragment!()
-           |> Floki.attribute("href")
-           |> List.first() == CoffeeSpot.instagram_url()
+    assert has_element?(
+             view,
+             ~s(.menu-qr-landing-photo--visit[src="/images/coffeespot/cold-signature-01.jpg"])
+           )
+    assert has_element?(view, ".menu-qr-landing-dots [data-landing-dot='0']")
+    assert has_element?(view, ".menu-qr-landing-dots [data-landing-dot='1']")
+    refute has_element?(view, ".menu-qr-landing-footer")
+    refute has_element?(view, "#menu-landing-instagram")
 
     refute has_element?(view, ".menu-qr-landing-cravings")
     refute has_element?(view, "#menu-landing-cravings-title")
@@ -93,10 +90,11 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, ".brune-top")
   end
 
-  test "/menu sticky craving chips still offer seven options without Brunch", %{conn: conn} do
+  test "/menu sticky craving chips still offer eight options without Brunch", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
     view |> element("#menu-cta-view-menu") |> render_click()
 
+    assert has_element?(view, "#menu-craving-chip-ALL", "All")
     assert has_element?(view, "#menu-craving-chip-HOT", "Coffee")
     assert has_element?(view, "#menu-craving-chip-COLD", "Iced")
     assert has_element?(view, "#menu-craving-chip-FRAPPE", "Frappe")
@@ -110,7 +108,7 @@ defmodule EspresoWeb.MenuLiveTest do
     assert html
            |> Floki.parse_document!()
            |> Floki.find("#menu-craving button.menu-craving-chip")
-           |> length() == 7
+           |> length() == 8
 
     refute html =~ "Brunch"
     refute has_element?(view, "#menu-craving-chip-brunch")
@@ -129,7 +127,6 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "button.menu-craving-chip.is-active", "Coffee")
     refute has_element?(view, "#menu-craving-chip-FOOD.is-active")
     refute has_element?(view, "button.menu-craving-chip.is-active", "Food")
-    assert has_element?(view, ".brune-menu-heading-title", "Menu")
     assert has_element?(view, "#menu-search")
     refute has_element?(view, "#menu-craving-chooser")
   end
@@ -158,18 +155,16 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#menu-craving-chip-HOT.is-active", "Coffee")
     refute has_element?(view, "#menu-craving-chip-FOOD.is-active")
     assert has_element?(view, "#category-HOT")
-    assert has_element?(view, ".brune-menu-heading-title", "Menu")
     assert has_element?(view, "#menu-search")
   end
 
-  test "/menu category switch keeps heading and search in the page", %{conn: conn} do
+  test "/menu category switch keeps search in the page", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
     view = enter_menu_browse(view)
 
     view |> element("#menu-craving-chip-COLD") |> render_click()
 
     assert has_element?(view, "#menu-craving-chip-COLD.is-active", "Iced")
-    assert has_element?(view, ".brune-menu-heading-title", "Menu")
     assert has_element?(view, "#menu-search")
     assert has_element?(view, "#category-COLD")
   end
@@ -228,7 +223,6 @@ defmodule EspresoWeb.MenuLiveTest do
     view |> element("#menu-craving-option-matcha") |> render_click()
 
     assert has_element?(view, "#menu-items")
-    assert has_element?(view, ".brune-menu-heading-title", "Matcha")
     assert has_element?(view, "#menu-craving-chip-matcha.is-active", "Matcha")
     assert has_element?(view, "#menu-qr-chrome")
     refute has_element?(view, ".brune-top")
@@ -256,7 +250,6 @@ defmodule EspresoWeb.MenuLiveTest do
     view |> element("#menu-craving-option-sweets") |> render_click()
 
     assert has_element?(view, "#category-FOOD")
-    assert has_element?(view, ".brune-menu-heading-title", "Sweets")
     assert has_element?(view, "#menu-craving-chip-sweets.is-active", "Sweets")
     assert has_element?(view, ".brune-menu-category-title", "Sweets")
     assert has_element?(view, ".brune-menu-item-name", "Big Assorted Muffin")
@@ -275,7 +268,8 @@ defmodule EspresoWeb.MenuLiveTest do
     view |> element("#menu-cta-view-menu") |> render_click()
 
     assert has_element?(view, "#menu-items")
-    assert has_element?(view, "#menu-qr-back", "Back")
+    assert has_element?(view, "#menu-qr-back[aria-label='Back to CoffeeSpot home']")
+    refute has_element?(view, "#menu-qr-back", "Back")
     refute has_element?(view, ".brune-drawer")
     refute has_element?(view, ".brune-top-nav")
 
@@ -341,8 +335,7 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#menu-items")
     refute has_element?(view, "#menu-craving-chooser")
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
-    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view = add_to_order(view, "Espresso")
     view |> element("button.brune-icon-bag") |> render_click()
 
     assert has_element?(view, "#checkout-table[value='12']")
@@ -354,8 +347,7 @@ defmodule EspresoWeb.MenuLiveTest do
     view |> element("#menu-craving-option-coffee") |> render_click()
     assert has_element?(view, "#menu-items")
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
-    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view = add_to_order(view, "Espresso")
     view |> element("button.brune-icon-bag") |> render_click()
 
     assert has_element?(view, "#checkout-table[value='12']")
@@ -375,8 +367,9 @@ defmodule EspresoWeb.MenuLiveTest do
              "84 Lilac St., Concepcion Dos, Marikina City, Philippines"
            )
     assert has_element?(view, "#menu-visit-maps", "Open in Maps")
-    assert has_element?(view, ".menu-qr-visit-text", "Mon–Thu · 8:00 AM – 12:00 AM")
-    assert has_element?(view, ".menu-qr-visit-text", "Fri–Sun · 8:00 AM – 10:00 PM")
+    assert has_element?(view, ".menu-qr-visit-text", "Sun–Wed · 11:00 AM – 11:00 PM")
+    assert has_element?(view, ".menu-qr-visit-text", "Thu · 11:00 AM – 12:00 AM")
+    assert has_element?(view, ".menu-qr-visit-text", "Fri–Sat · 11:00 AM – 2:00 AM")
     assert has_element?(view, ".menu-qr-visit-text", "Holiday hours on Instagram")
     refute render(view) =~ "Student Hour"
     assert has_element?(view, "#menu-visit-phone", "+639566728906")
@@ -427,8 +420,7 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#menu-items")
     refute has_element?(view, "#menu-craving-chooser")
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
-    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view = add_to_order(view, "Espresso")
     view |> element("button.brune-icon-bag") |> render_click()
 
     assert has_element?(view, "#checkout-table[value='12']")
@@ -442,7 +434,6 @@ defmodule EspresoWeb.MenuLiveTest do
     assert html =~ "CoffeeSpot"
     assert has_element?(view, ".menu-page-brune")
     assert has_element?(view, ".brune-menu-shell")
-    assert has_element?(view, ".brune-menu-heading-title", "Menu")
     assert has_element?(view, "#menu-search")
     assert has_element?(view, "#menu-items")
     refute has_element?(view, ".brune-menu-hero")
@@ -456,12 +447,88 @@ defmodule EspresoWeb.MenuLiveTest do
 
     view = enter_menu_browse(view)
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
-    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view = add_to_order(view, "Espresso")
     view |> element("button.brune-icon-bag") |> render_click()
 
     assert has_element?(view, "#checkout-table[value='12']")
     assert has_element?(view, "button.menu-checkout-option.is-active", "Dine-in")
+  end
+
+  test "/menu chrome is back arrow, search, and bag", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu")
+
+    assert has_element?(view, "#menu-qr-search-toggle .hero-magnifying-glass")
+    assert has_element?(view, "#menu-qr-back[aria-label='Back to CoffeeSpot home']")
+    refute has_element?(view, "#menu-qr-back", "Back")
+    assert has_element?(view, "#menu-qr-back .hero-arrow-left")
+    assert has_element?(view, "#menu-qr-bag .hero-shopping-bag")
+    assert has_element?(view, "#menu-qr-bag[aria-label='Your order, 0 items']")
+    refute has_element?(view, "#menu-search.is-open")
+  end
+
+  test "/menu product cards use plus-only add controls with orange accent", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu")
+    html = render(view)
+
+    refute html =~ "+ Add"
+    refute html =~ ">Add</button>"
+    assert has_element?(view, "button.brune-menu-add--icon[aria-label='Add Espresso'] .hero-plus")
+    assert has_element?(view, "button.brune-menu-add--icon[aria-label='Add Americano'] .hero-plus")
+
+    add_button =
+      view
+      |> element("button[aria-label='Add Espresso']")
+      |> render()
+
+    assert add_button =~ "brune-menu-add--icon"
+    assert add_button =~ "hero-plus"
+  end
+
+  test "/menu My Orders restored before browse appears on menu stage without refresh", %{
+    conn: conn
+  } do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Restore Test",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    refute has_element?(view, "#menu-qr-my-orders")
+
+    render_hook(view, "restore_my_orders", %{"numbers" => [order.number]})
+    refute has_element?(view, "#menu-qr-my-orders")
+
+    view = enter_menu_browse(view)
+    assert has_element?(view, "#menu-qr-my-orders", "My Order")
+
+    view |> element("#menu-craving-chip-COLD") |> render_click()
+    assert has_element?(view, "#menu-qr-my-orders", "My Order")
+
+    view |> element("#menu-qr-my-orders") |> render_click()
+    assert has_element?(view, "#menu-my-order-#{order.number}", order.number)
+  end
+
+  test "/menu?stage=menu shows My Orders when restored on connected menu", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Menu Stage",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu")
+    refute has_element?(view, "#menu-qr-my-orders")
+
+    render_hook(view, "restore_my_orders", %{"numbers" => [order.number]})
+    assert has_element?(view, "#menu-qr-my-orders", "My Order")
   end
 
   test "/menu displays categories in order", %{conn: conn} do
@@ -477,9 +544,161 @@ defmodule EspresoWeb.MenuLiveTest do
       |> Floki.find("button.menu-craving-chip .menu-craving-label")
       |> Enum.map(fn node -> node |> Floki.text() |> String.trim() end)
 
-    assert labels == ["Coffee", "Iced", "Frappe", "Soda", "Food", "Matcha", "Sweets"]
+    assert labels == ["All", "Coffee", "Iced", "Frappe", "Soda", "Food", "Matcha", "Sweets"]
     refute has_element?(view, ".brune-menu-tabs-line")
     refute has_element?(view, "#category-FOOD")
+  end
+
+  test "/menu My Orders FAB uses dynamic inline labels", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+
+    {:ok, received} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "One", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, preparing} =
+      Orders.create_order(
+        [%{name: "Americano", size: "8oz", quantity: 1, price: Decimal.new("110")}],
+        %{customer_name: "Prep", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, ready} =
+      Orders.create_order(
+        [%{name: "Hazelnut", size: "16oz", quantity: 1, price: Decimal.new("180")}],
+        %{customer_name: "Ready", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    assert {:ok, preparing} = Orders.update_status(preparing, "preparing")
+    assert {:ok, ready} = Orders.update_status(ready, "ready")
+
+    render_hook(view, "restore_my_orders", %{"numbers" => [received.number]})
+    assert has_element?(view, "#menu-qr-my-orders", "My Order")
+    refute has_element?(view, ".menu-qr-my-orders-badge")
+
+    render_hook(view, "restore_my_orders", %{"numbers" => [preparing.number]})
+    assert has_element?(view, "#menu-qr-my-orders", "My Order · Preparing")
+
+    render_hook(view, "restore_my_orders", %{"numbers" => [ready.number]})
+    assert has_element?(view, "#menu-qr-my-orders", "My Order · Ready")
+
+    render_hook(view, "restore_my_orders", %{
+      "numbers" => [received.number, preparing.number, ready.number]
+    })
+
+    assert has_element?(view, "#menu-qr-my-orders", "My Orders · Ready")
+    refute has_element?(view, ".menu-qr-my-orders-badge")
+    assert has_element?(view, "#menu-qr-my-orders .hero-clipboard-document-list")
+  end
+
+  test "/menu All chip is first and shows multiple category sections", %{conn: conn, food: food} do
+    insert_product!(food, "Beef Tapa", true, [{nil, "180"}])
+
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view = enter_menu_browse(view)
+
+    labels =
+      view
+      |> element("#menu-craving")
+      |> render()
+      |> Floki.parse_fragment!()
+      |> Floki.find("button.menu-craving-chip .menu-craving-label")
+      |> Enum.map(fn node -> node |> Floki.text() |> String.trim() end)
+
+    assert List.first(labels) == "All"
+    assert has_element?(view, "#menu-craving-chip-HOT.is-active", "Coffee")
+    refute has_element?(view, "#menu-craving-chip-ALL.is-active")
+    assert has_element?(view, "#category-HOT")
+    refute has_element?(view, "#category-COLD")
+
+    view |> element("#menu-craving-chip-ALL") |> render_click()
+
+    assert has_element?(view, "#menu-craving-chip-ALL.is-active", "All")
+    refute has_element?(view, "#menu-craving-chip-HOT.is-active")
+    assert has_element?(view, "#category-HOT")
+    assert has_element?(view, "#category-COLD")
+    assert has_element?(view, "#category-FRAPPE")
+    assert has_element?(view, "#category-SODA")
+    assert has_element?(view, "#category-FOOD")
+    assert has_element?(view, ".brune-menu-item-card")
+    assert has_element?(view, ".brune-menu-item-name", "Espresso")
+    assert has_element?(view, ".brune-menu-item-name", "Hazelnut")
+    assert has_element?(view, ".brune-menu-item-name", "Beef Tapa")
+  end
+
+  test "/menu search sits below chrome and above craving chips", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view = enter_menu_browse(view)
+
+    assert has_element?(view, "#menu-qr-search-toggle")
+    refute has_element?(view, "#menu-search.is-open")
+
+    html =
+      view
+      |> element("#menu-qr-sticky")
+      |> render()
+      |> Floki.parse_fragment!()
+
+    sticky_ids =
+      html
+      |> Floki.find("#menu-qr-chrome, #menu-search, #menu-craving")
+      |> Enum.map(fn {_, attrs, _} ->
+        attrs |> Enum.find_value(fn {k, v} -> if k == "id", do: v end)
+      end)
+
+    assert sticky_ids == ["menu-qr-chrome", "menu-search", "menu-craving"]
+    assert has_element?(view, "#menu-search-input")
+
+    view |> element("#menu-qr-search-toggle") |> render_click()
+    assert has_element?(view, "#menu-search.is-open")
+  end
+
+  test "/menu?stage=menu&category=ALL restores All browse on mount", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=ALL")
+
+    assert has_element?(view, "#menu-craving-chip-ALL.is-active", "All")
+    assert has_element?(view, "#category-HOT")
+    assert has_element?(view, "#category-COLD")
+    refute has_element?(view, "#menu-landing")
+  end
+
+  test "/menu All keeps HOT as default entry and Matcha/Sweets intact", %{
+    conn: conn,
+    hot: hot,
+    cold: cold,
+    food: food
+  } do
+    insert_product!(hot, "Matcha Latte", true, [{"12oz", "160"}])
+    insert_product!(cold, "Matcha Caramel", true, [{"16oz", "180"}])
+    insert_product!(food, "Dark Choco Dream Cake", true, [{nil, "120"}])
+    insert_product!(food, "Beef Tapa", true, [{nil, "180"}])
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu")
+
+    assert has_element?(view, "#menu-craving-chip-HOT.is-active", "Coffee")
+    refute has_element?(view, "#menu-craving-chip-ALL.is-active")
+    assert has_element?(view, "#category-HOT")
+    refute has_element?(view, "#category-FOOD")
+
+    view |> element("#menu-craving-chip-ALL") |> render_click()
+    assert has_element?(view, "#menu-craving-chip-ALL.is-active", "All")
+
+    view |> element("#menu-craving-chip-matcha") |> render_click()
+    assert has_element?(view, "#menu-craving-chip-matcha.is-active", "Matcha")
+    assert has_element?(view, ".brune-menu-item-name", "Matcha Latte")
+    assert has_element?(view, ".brune-menu-item-name", "Matcha Caramel")
+    refute has_element?(view, ".brune-menu-item-name", "Beef Tapa")
+
+    view |> element("#menu-craving-chip-sweets") |> render_click()
+    assert has_element?(view, "#menu-craving-chip-sweets.is-active", "Sweets")
+    assert has_element?(view, ".brune-menu-item-name", "Dark Choco Dream Cake")
+    refute has_element?(view, ".brune-menu-item-name", "Beef Tapa")
+
+    {:ok, hot_view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    assert has_element?(hot_view, "#menu-craving-chip-HOT.is-active", "Coffee")
+    assert has_element?(hot_view, "#category-HOT")
+    refute has_element?(hot_view, "#category-COLD")
   end
 
   test "/menu displays HOT products by default", %{conn: conn} do
@@ -637,10 +856,11 @@ defmodule EspresoWeb.MenuLiveTest do
     assert html =~ "₱75"
 
     view |> element("button[aria-label='Add Espresso']") |> render_click()
-    refute has_element?(view, ".menu-size-pill")
-    assert has_element?(view, "button.menu-buy-now", "Add to your order")
-
-    view |> element("button.menu-buy-close", "Back") |> render_click()
+    assert has_element?(view, "#menu-detail")
+    assert has_element?(view, "#menu-detail-title", "Espresso")
+    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    assert has_element?(view, ".brune-bag-count", "1")
+    assert has_element?(view, "#menu-qr-bag.is-bag-confirm")
 
     view |> element("button[aria-label='Add Americano']") |> render_click()
     html = render(view)
@@ -683,6 +903,7 @@ defmodule EspresoWeb.MenuLiveTest do
     view = enter_menu_browse(view)
 
     assert has_element?(view, "#menu-craving.menu-craving--sticky")
+    assert has_element?(view, "#menu-craving-context", "Categories")
     assert has_element?(view, "#menu-craving button.menu-craving-chip", "Coffee")
     assert has_element?(view, "#menu-craving button.menu-craving-chip", "Iced")
     assert has_element?(view, "#menu-craving button.menu-craving-chip", "Frappe")
@@ -692,6 +913,7 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#menu-craving-chip-sweets", "Sweets")
     refute has_element?(view, ".brune-menu-tabs-line")
     refute has_element?(view, "#menu-craving-title")
+    refute has_element?(view, "#menu-craving-chooser")
 
     assert has_element?(view, "#menu-craving button.menu-craving-chip.is-active", "Coffee")
     assert has_element?(view, "#category-HOT")
@@ -721,7 +943,7 @@ defmodule EspresoWeb.MenuLiveTest do
   end
 
   test "/menu shows product description in detail when present", %{conn: conn, hot: hot} do
-    insert_product!(hot, "Spanish Latte", true, [{"8oz", "160"}], "Rich and creamy")
+    insert_product!(hot, "Spanish Latte", true, [{"8oz", "160"}, {"12oz", "170"}], "Rich and creamy")
 
     {:ok, view, _html} = live(conn, ~p"/menu")
     view = enter_menu_browse(view)
@@ -743,33 +965,20 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, ".brune-menu-tabs-line")
     refute has_element?(view, ".brune-bag-count")
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
-    assert has_element?(view, "#menu-detail")
-    assert has_element?(view, ".menu-buy-panel--fullscreen")
-    assert has_element?(view, ".menu-buy-close", "Back")
-    assert has_element?(view, "#menu-detail-title", "Espresso")
-
-    assert has_element?(
-             view,
-             ~s(.menu-buy-photo[src="/images/coffeespot/coffee-espresso-01.jpg"][alt="Espresso"])
-           )
-
-    assert has_element?(view, "button.menu-buy-now", "Add to your order")
-
-    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view = add_to_order(view, "Espresso")
     refute has_element?(view, "#menu-detail")
     refute has_element?(view, "#menu-basket")
     refute has_element?(view, ".menu-toast", "Added to bag")
     assert has_element?(view, "#menu-qr-bag.is-bag-confirm")
     assert has_element?(view, ".menu-qr-bag-plus", "+1")
     assert has_element?(view, ".brune-bag-count", "1")
+    assert has_element?(view, "button.brune-menu-add--icon[aria-label='Add Espresso'] .hero-plus")
 
     view |> element("#menu-qr-bag") |> render_click()
     assert has_element?(view, "#menu-basket")
     assert has_element?(view, ".menu-basket-layer--fullscreen")
     assert has_element?(view, ".menu-basket-panel--fullscreen")
-    assert has_element?(view, "#menu-basket-title", "Your Order")
-    assert has_element?(view, ".menu-basket-count-label", "1 item total")
+    assert has_element?(view, "#menu-basket-title", "Your order")
     assert has_element?(view, ".menu-basket-line-name", "Espresso")
 
     assert has_element?(
@@ -777,7 +986,7 @@ defmodule EspresoWeb.MenuLiveTest do
              ~s(.menu-basket-line-photo[src="/images/coffeespot/coffee-espresso-01.jpg"])
            )
 
-    view |> element("button.menu-basket-close", "Back") |> render_click()
+    view |> element("button[aria-label='Back to menu']") |> render_click()
     Process.sleep(300)
     html = render(view)
     refute html =~ ~s(id="menu-basket")
@@ -798,56 +1007,40 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, ".menu-basket-line-name", "Americano")
     assert has_element?(view, ".menu-basket-line-size", "12oz")
 
-    assert has_element?(view, "button.menu-basket-checkout", "Place order")
+    assert has_element?(view, "button.menu-basket-checkout", "Enter your details")
     assert has_element?(view, "#menu-basket-submit")
-    assert has_element?(view, "#menu-basket-submit .menu-basket-total", "₱195")
+    assert has_element?(view, "#menu-basket-submit .menu-basket-total strong", "₱195")
+    assert has_element?(view, ".menu-basket-total-meta", "2 items total")
     refute has_element?(view, ".menu-checkout-payment .menu-checkout-option")
 
-    view |> element("button.menu-basket-checkout", "Place order") |> render_click()
+    view |> element("button.menu-basket-checkout", "Enter your details") |> render_click()
     assert has_element?(view, "#menu-checkout-summary", "Enter your name and table number.")
 
     view
     |> form("#menu-checkout-form", %{
       customer_name: "Juan",
-      table_number: "7",
-      notes: "less ice"
+      table_number: "7"
     })
     |> render_change()
 
     refute has_element?(view, "#menu-checkout-summary")
     assert has_element?(view, ".menu-checkout-payment .menu-checkout-option", "GCash")
     assert has_element?(view, ".menu-checkout-payment .menu-checkout-option", "Maya")
-    assert has_element?(view, ".menu-checkout-payment .menu-checkout-option", "Pay with cash at counter")
-    assert has_element?(view, "button.menu-basket-checkout", "Place order · Pay at counter")
+    assert has_element?(view, ".menu-checkout-payment .menu-checkout-option", "Cash at counter")
+    assert has_element?(view, "button.menu-basket-checkout", "Place order")
     refute has_element?(view, ".menu-checkout-payment-info")
     refute has_element?(view, ".menu-basket-submit-payment")
-    assert has_element?(view, ".menu-basket-alt-label", "Other ways to order")
-    assert has_element?(view, "a.menu-basket-whatsapp", "Message us on WhatsApp instead")
-    assert has_element?(
-             view,
-             ".menu-basket-whatsapp-note",
-             "WhatsApp orders don’t create a tracked order number."
-           )
-    assert has_element?(view, "label[for='checkout-notes']", "Add a note")
-
-    href =
-      view
-      |> element("a.menu-basket-whatsapp")
-      |> render()
-      |> Floki.parse_fragment!()
-      |> Floki.attribute("href")
-      |> List.first()
-
-    assert href =~ "https://wa.me/639566728906?text="
-    assert href =~ URI.encode_www_form("Espresso")
-    assert href =~ URI.encode_www_form("Americano")
-    assert href =~ URI.encode_www_form("Juan")
-    assert href =~ URI.encode_www_form("Table 7")
-    assert href =~ URI.encode_www_form("less ice")
+    assert has_element?(view, ".menu-checkout-payment-note", "Pay at the counter when your order is ready.")
+    refute has_element?(view, ".menu-basket-submit-payment")
+    refute has_element?(view, ".menu-basket-alt-label")
+    refute has_element?(view, ".menu-basket-body .menu-basket-alt")
+    refute has_element?(view, "a.menu-basket-whatsapp")
+    refute has_element?(view, "#checkout-notes-trigger")
+    refute has_element?(view, "#checkout-notes")
 
     {:ok, order_view, html} =
       view
-      |> element("button.menu-basket-checkout", "Place order · Pay at counter")
+      |> element("button.menu-basket-checkout", "Place order")
       |> render_click()
       |> follow_redirect(conn)
 
@@ -907,8 +1100,7 @@ defmodule EspresoWeb.MenuLiveTest do
     {:ok, view, _html} = live(conn, ~p"/menu")
     view = enter_menu_browse(view)
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
-    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view = add_to_order(view, "Espresso")
     view |> element("button.brune-icon-bag") |> render_click()
 
     view
@@ -919,13 +1111,14 @@ defmodule EspresoWeb.MenuLiveTest do
     |> render_change()
 
     view |> element("button.menu-checkout-option", "GCash") |> render_click()
-    assert has_element?(view, ".menu-checkout-payment-info-value", "GCash")
-    assert has_element?(view, ".menu-basket-submit-payment", "Secure payment via PayMongo")
-    assert has_element?(view, "button.menu-basket-checkout", "Pay with GCash")
+    refute has_element?(view, ".menu-checkout-payment-info")
+    refute has_element?(view, ".menu-basket-submit-payment")
+    assert has_element?(view, ".menu-checkout-payment-note", "Continue to PayMongo to complete payment.")
+    assert has_element?(view, "button.menu-basket-checkout", "Continue to GCash")
 
     assert {:error, {:redirect, %{to: checkout_url}}} =
              view
-             |> element("button.menu-basket-checkout", "Pay with GCash")
+             |> element("button.menu-basket-checkout", "Continue to GCash")
              |> render_click()
 
     assert checkout_url =~ "checkout.paymongo.test"
@@ -935,6 +1128,33 @@ defmodule EspresoWeb.MenuLiveTest do
     assert order.payment_method == "online"
     assert order.payment_status == "unpaid"
     assert is_binary(order.paymongo_checkout_session_id)
+  end
+
+  test "/menu Maya checkout shows Continue to Maya CTA and starts PayMongo flow", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view = enter_menu_browse(view)
+
+    view = add_to_order(view, "Espresso")
+    view |> element("button.brune-icon-bag") |> render_click()
+
+    view
+    |> form("#menu-checkout-form", %{
+      customer_name: "Maya Test",
+      table_number: "5"
+    })
+    |> render_change()
+
+    view |> element("button.menu-checkout-option", "Maya") |> render_click()
+    assert has_element?(view, "button.menu-basket-checkout", "Continue to Maya")
+    refute has_element?(view, ".menu-checkout-payment-info")
+    refute has_element?(view, ".menu-basket-submit-payment")
+
+    assert {:error, {:redirect, %{to: checkout_url}}} =
+             view
+             |> element("button.menu-basket-checkout", "Continue to Maya")
+             |> render_click()
+
+    assert checkout_url =~ "checkout.paymongo.test"
   end
 
   test "/menu cancels orphan order when PayMongo checkout creation fails", %{conn: conn} do
@@ -955,7 +1175,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
     html =
       view
-      |> element("button.menu-basket-checkout", "Pay with GCash")
+      |> element("button.menu-basket-checkout", "Continue to GCash")
       |> render_click()
 
     assert html =~ "Could not start online payment"
@@ -995,7 +1215,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
     html =
       view
-      |> element("button.menu-basket-checkout", "Pay with GCash")
+      |> element("button.menu-basket-checkout", "Continue to GCash")
       |> render_click()
 
     assert html =~ "Could not start online payment"
@@ -1012,8 +1232,7 @@ defmodule EspresoWeb.MenuLiveTest do
     {:ok, view, _html} = live(conn, ~p"/menu")
     view = enter_menu_browse(view)
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
-    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view = add_to_order(view, "Espresso")
     view |> element("button.brune-icon-bag") |> render_click()
 
     view
@@ -1025,7 +1244,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
     {:ok, confirm_view, _html} =
       view
-      |> element("button.menu-basket-checkout", "Place order · Pay at counter")
+      |> element("button.menu-basket-checkout", "Place order")
       |> render_click()
       |> follow_redirect(conn)
 
@@ -1058,7 +1277,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
     render_hook(menu_view, "restore_my_orders", %{"numbers" => [order_number]})
 
-    assert has_element?(menu_view, "#menu-qr-my-orders", "My Orders")
+    assert has_element?(menu_view, "#menu-qr-my-orders", "My Order")
     menu_view |> element("#menu-qr-my-orders") |> render_click()
     assert has_element?(menu_view, "#menu-my-orders-panel")
     assert has_element?(menu_view, "#menu-my-orders-active-heading", "Active")
@@ -1114,7 +1333,7 @@ defmodule EspresoWeb.MenuLiveTest do
       "numbers" => [first.number, second.number, third.number, first.number]
     })
 
-    assert has_element?(view, "#menu-qr-my-orders", "My Orders")
+    assert has_element?(view, "#menu-qr-my-orders", "My Orders · 3 active")
     view |> element("#menu-qr-my-orders") |> render_click()
 
     assert has_element?(view, "#menu-my-order-#{first.number}")
@@ -1139,7 +1358,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
     render_hook(view, "restore_my_orders", %{"numbers" => [order.number]})
 
-    assert has_element?(view, "#menu-qr-my-orders", "My Orders")
+    assert has_element?(view, "#menu-qr-my-orders", "My Order")
     refute has_element?(view, "#menu-qr-sticky #menu-qr-my-orders")
 
     view |> element("#menu-qr-my-orders") |> render_click()
@@ -1147,18 +1366,17 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, "#menu-qr-my-orders")
 
     view |> element("button.menu-my-orders-close") |> render_click()
-    assert has_element?(view, "#menu-qr-my-orders", "My Orders")
+    assert has_element?(view, "#menu-qr-my-orders", "My Order")
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
+    view |> element("button[aria-label='Add Americano']") |> render_click()
     assert has_element?(view, "#menu-detail")
     refute has_element?(view, "#menu-qr-my-orders")
 
-    view |> element("button.menu-buy-close", "Back") |> render_click()
+    view |> element("button[aria-label='Back to menu']") |> render_click()
     Process.sleep(300)
-    assert has_element?(view, "#menu-qr-my-orders", "My Orders")
+    assert has_element?(view, "#menu-qr-my-orders", "My Order")
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
-    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view = add_to_order(view, "Espresso")
     view |> element("button.brune-icon-bag") |> render_click()
     assert has_element?(view, "#menu-basket")
     refute has_element?(view, "#menu-qr-my-orders")
@@ -1213,8 +1431,8 @@ defmodule EspresoWeb.MenuLiveTest do
       ]
     })
 
-    assert has_element?(view, "#menu-qr-my-orders", "My Orders")
-    assert has_element?(view, ".menu-qr-my-orders-badge", "Ready")
+    assert has_element?(view, "#menu-qr-my-orders", "My Orders · Ready")
+    refute has_element?(view, ".menu-qr-my-orders-badge")
     refute has_element?(view, "#menu-qr-sticky #menu-qr-my-orders")
 
     view |> element("#menu-qr-my-orders") |> render_click()
@@ -1257,6 +1475,37 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, "#menu-qr-my-orders")
   end
 
+  test "/menu checkout places pickup order without notes field", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view = enter_menu_browse(view)
+
+    view = add_to_order(view, "Espresso")
+    view |> element("button.brune-icon-bag") |> render_click()
+
+    refute has_element?(view, "#checkout-notes-trigger")
+    refute has_element?(view, "#checkout-notes")
+
+    view
+    |> form("#menu-checkout-form", %{
+      customer_name: "Ana Lee",
+      table_number: "4"
+    })
+    |> render_change()
+
+    view |> element("button.menu-checkout-option", "Pickup at counter") |> render_click()
+
+    {:ok, _order_view, _html} =
+      view
+      |> element("button.menu-basket-checkout", "Place order")
+      |> render_click()
+      |> follow_redirect(conn)
+
+    [order] = Orders.list_active_orders()
+    assert order.customer_name == "Ana Lee"
+    assert order.notes == nil
+    assert order.fulfillment == "pickup"
+  end
+
   test "/menu legacy restore_current_order still hydrates My Orders", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
 
@@ -1267,15 +1516,14 @@ defmodule EspresoWeb.MenuLiveTest do
       )
 
     render_hook(view, "restore_current_order", %{"number" => order.number})
-    assert has_element?(view, "#menu-qr-my-orders", "My Orders")
+    assert has_element?(view, "#menu-qr-my-orders", "My Order")
   end
 
   test "/menu confirmation page carries order number for client persistence", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
     view = enter_menu_browse(view)
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
-    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view = add_to_order(view, "Espresso")
     view |> element("button.brune-icon-bag") |> render_click()
 
     view
@@ -1287,7 +1535,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
     {:ok, confirm_view, html} =
       view
-      |> element("button.menu-basket-checkout", "Place order · Pay at counter")
+      |> element("button.menu-basket-checkout", "Place order")
       |> render_click()
       |> follow_redirect(conn)
 
@@ -1312,8 +1560,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
     view = enter_menu_browse(view)
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
-    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view = add_to_order(view, "Espresso")
 
     view |> element("button.brune-icon-bag") |> render_click()
 
@@ -1329,7 +1576,7 @@ defmodule EspresoWeb.MenuLiveTest do
     |> Repo.update!()
 
     view
-    |> element("button.menu-basket-checkout", "Place order · Pay at counter")
+    |> element("button.menu-basket-checkout", "Place order")
     |> render_click()
 
     assert has_element?(view, ".menu-toast", "Espresso is no longer available")
@@ -1342,15 +1589,21 @@ defmodule EspresoWeb.MenuLiveTest do
 
     view = enter_menu_browse(view)
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
-    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view = add_to_order(view, "Espresso")
     view |> element("button.brune-icon-bag") |> render_click()
 
     assert has_element?(view, "#menu-basket-panel .menu-basket-body")
     assert has_element?(view, "#menu-basket-panel .menu-basket-checkout-fields #menu-checkout-form")
-    assert has_element?(view, "#menu-basket-submit")
+    refute has_element?(view, "#menu-basket-panel #menu-basket-submit")
+    assert has_element?(view, "#menu-basket-submit.menu-basket-submit--floating")
+    assert has_element?(view, "#menu-basket-submit .menu-basket-submit-row")
+    assert has_element?(view, "#menu-basket-submit .menu-basket-total-meta")
     assert has_element?(view, "#menu-basket-submit button.menu-basket-checkout")
     refute has_element?(view, ".menu-checkout-payment-info")
+    refute has_element?(view, ".menu-basket-submit-payment")
+    refute has_element?(view, "#menu-basket-submit > .menu-basket-note")
+    refute has_element?(view, "#menu-basket-submit .menu-basket-alt")
+    refute has_element?(view, ".menu-basket-body .menu-basket-alt")
     refute has_element?(view, ".menu-basket-body button.menu-basket-checkout")
     refute has_element?(view, ".menu-basket-footer")
 
@@ -1358,7 +1611,7 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, "#checkout-table")
     assert has_element?(view, "button.menu-checkout-option.is-active", "Pickup at counter")
 
-    view |> element("button.menu-basket-checkout", "Place order") |> render_click()
+    view |> element("button.menu-basket-checkout", "Enter your details") |> render_click()
     assert has_element?(view, "#menu-checkout-summary", "Please enter your name.")
   end
 
@@ -1367,14 +1620,25 @@ defmodule EspresoWeb.MenuLiveTest do
 
     view = enter_menu_browse(view)
 
-    assert has_element?(view, ".brune-menu-heading-title", "Menu")
+    refute has_element?(view, ".menu-qr-menu-bridge")
     assert has_element?(view, "#menu-qr-sticky")
+    assert has_element?(view, "#menu-qr-chrome.menu-qr-top")
+    assert has_element?(view, "#menu-qr-search-toggle")
     assert has_element?(view, "#menu-craving.menu-craving--sticky")
+    assert has_element?(view, "#menu-craving-context", "Categories")
     assert has_element?(view, "#menu-qr-chrome")
     assert has_element?(view, ".menu-qr-chrome-brand", "CoffeeSpot")
+    refute has_element?(view, "#menu-craving-chooser")
     refute has_element?(view, ".brune-menu-tabs-line")
     assert has_element?(view, "#menu-search.brune-menu-search--compact")
+    refute has_element?(view, "#menu-search.is-open")
     assert has_element?(view, ".brune-student-promo")
+    assert has_element?(view, ".brune-hours-strip")
+    assert has_element?(view, "#brune-hours-strip-label", "Hours")
+    assert has_element?(view, ".brune-hours-strip-line", "Sun–Wed · 11:00 AM – 11:00 PM")
+    assert has_element?(view, ".brune-hours-strip-line", "Thu · 11:00 AM – 12:00 AM")
+    assert has_element?(view, ".brune-hours-strip-line", "Fri–Sat · 11:00 AM – 2:00 AM")
+    assert has_element?(view, ".brune-hours-strip-line--note", "Holiday hours on Instagram")
     assert has_element?(view, ".brune-mega-footer--secondary")
     assert has_element?(view, ".brune-mega-brand", "CoffeeSpot Marikina")
     assert has_element?(view, ".menu-footer-owned-label", "Owned and Operated by:")
@@ -1407,20 +1671,19 @@ defmodule EspresoWeb.MenuLiveTest do
 
     refute has_element?(view, "#menu-floating-bag")
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
-    refute has_element?(view, "#menu-floating-bag")
-
-    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view = add_to_order(view, "Espresso")
     assert has_element?(view, "#menu-floating-bag")
-    assert has_element?(view, ".menu-floating-bag-summary", "Your Order · 1 item · ₱75")
-    assert has_element?(view, "button.menu-floating-bag-cta", "View your order")
+    assert has_element?(view, ".menu-floating-bag-count", "1")
+    assert has_element?(view, ".menu-floating-bag-total", "₱75")
+    assert has_element?(view, ".menu-floating-bag-cta", "View order")
+    refute has_element?(view, ".menu-floating-bag-label")
 
-    view |> element("button.menu-floating-bag-cta", "View your order") |> render_click()
+    view |> element("#menu-floating-bag") |> render_click()
     assert has_element?(view, "#menu-basket")
     assert has_element?(view, ".menu-basket-panel--fullscreen")
     refute has_element?(view, "#menu-floating-bag")
 
-    view |> element("button.menu-basket-close", "Back") |> render_click()
+    view |> element("button[aria-label='Back to menu']") |> render_click()
     Process.sleep(300)
     assert has_element?(view, "#menu-floating-bag")
 
@@ -1429,7 +1692,38 @@ defmodule EspresoWeb.MenuLiveTest do
 
     view |> element("button.menu-buy-now", "Add to your order") |> render_click()
     assert has_element?(view, "#menu-floating-bag")
-    assert has_element?(view, ".menu-floating-bag-summary", "Your Order · 2 items · ₱195")
+    assert has_element?(view, ".menu-floating-bag-count", "2")
+    assert has_element?(view, ".menu-floating-bag-total", "₱195")
+  end
+
+  test "/menu floating bag coexists with My Orders FAB", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Pat", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    render_hook(view, "restore_my_orders", %{"numbers" => [order.number]})
+
+    view = add_to_order(view, "Espresso")
+
+    assert has_element?(view, "#menu-floating-bag")
+    assert has_element?(view, "#menu-qr-my-orders", "My Order")
+  end
+
+  test "/menu floating bag is a single open_basket control", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view = enter_menu_browse(view)
+
+    view = add_to_order(view, "Espresso")
+
+    html = view |> element("#menu-floating-bag") |> render()
+    assert html =~ ~s(phx-click="open_basket")
+    assert html =~ "button"
+    assert html =~ "menu-floating-bag-cta"
+    assert html =~ "View order"
   end
 
   test "/menu?stage=craving restores craving chooser on mount", %{conn: conn} do
@@ -1468,8 +1762,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
     assert has_element?(view, "#menu-items")
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
-    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view = add_to_order(view, "Espresso")
     view |> element("button.brune-icon-bag") |> render_click()
 
     assert has_element?(view, "#checkout-table[value='12']")
@@ -1479,8 +1772,7 @@ defmodule EspresoWeb.MenuLiveTest do
     {:ok, view, _html} = live(conn, ~p"/menu")
     view = enter_menu_browse(view)
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
-    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view = add_to_order(view, "Espresso")
     view |> element("button.brune-icon-bag") |> render_click()
 
     html =
@@ -1495,15 +1787,14 @@ defmodule EspresoWeb.MenuLiveTest do
     {:ok, view, _html} = live(conn, ~p"/menu")
     view = enter_menu_browse(view)
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
-    view |> element("button[aria-label='Increase quantity']") |> render_click()
-    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view = add_to_order(view, "Espresso")
+    view = add_to_order(view, "Espresso")
 
     assert has_element?(view, ".brune-bag-count", "2")
 
     view |> element("button.brune-icon-bag") |> render_click()
 
-    assert has_element?(view, ".menu-basket-count-label", "2 items total")
+    assert has_element?(view, ".menu-basket-total-meta", "2 items total")
     assert has_element?(view, ".menu-basket-line-name", "Espresso")
     html = view |> element("#menu-basket") |> render()
     assert html |> Floki.parse_fragment!() |> Floki.find(".menu-basket-line") |> length() == 1
@@ -1514,8 +1805,7 @@ defmodule EspresoWeb.MenuLiveTest do
     {:ok, view, _html} = live(conn, ~p"/menu")
     view = enter_menu_browse(view)
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
-    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view = add_to_order(view, "Espresso")
 
     view |> element("button[aria-label='Add Americano']") |> render_click()
     view |> element("button.menu-buy-now", "Add to your order") |> render_click()
@@ -1524,7 +1814,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
     view |> element("button.brune-icon-bag") |> render_click()
 
-    assert has_element?(view, ".menu-basket-count-label", "2 items total")
+    assert has_element?(view, ".menu-basket-total-meta", "2 items total")
     assert has_element?(view, ".menu-basket-line-name", "Espresso")
     assert has_element?(view, ".menu-basket-line-name", "Americano")
 
@@ -1559,7 +1849,7 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#menu-page[data-cart]")
 
     view |> element("button.brune-icon-bag") |> render_click()
-    assert has_element?(view, ".menu-basket-count-label", "2 items total")
+    assert has_element?(view, ".menu-basket-total-meta", "2 items total")
     assert has_element?(view, ".menu-basket-line-name", "Espresso")
     assert has_element?(view, ".menu-basket-line .menu-qty span", "2")
   end
@@ -1581,18 +1871,48 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "button.brune-icon-bag[aria-label='Your order, 0 items']")
   end
 
+  test "/menu plus opens detail sheet for all products", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view = enter_menu_browse(view)
+
+    assert has_element?(view, "button.brune-menu-add--icon[aria-label='Add Espresso'] .hero-plus")
+    assert has_element?(view, "button.brune-menu-add--icon[aria-label='Add Americano'] .hero-plus")
+    refute has_element?(view, "button.brune-menu-add--icon", "+ Add")
+    refute has_element?(view, "button.brune-menu-add--icon", "Add")
+
+    view |> element("button[aria-label='Add Espresso']") |> render_click()
+
+    assert has_element?(view, "#menu-detail")
+    assert has_element?(view, "#menu-detail-title", "Espresso")
+    assert has_element?(view, ".menu-buy-hero .menu-buy-photo")
+    assert has_element?(view, "button.menu-buy-now", "Add to your order")
+    refute has_element?(view, ".menu-size-pill")
+
+    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    assert has_element?(view, ".brune-bag-count", "1")
+    assert has_element?(view, "#menu-qr-bag.is-bag-confirm")
+    assert has_element?(view, ".menu-qr-bag-plus", "+1")
+
+    view |> element("button[aria-label='Add Americano']") |> render_click()
+    assert has_element?(view, "#menu-detail")
+    assert has_element?(view, ".menu-size-pill", "8oz")
+  end
+
   test "/menu product detail shows price before quantity and omits empty order link", %{
     conn: conn
   } do
     {:ok, view, _html} = live(conn, ~p"/menu")
     view = enter_menu_browse(view)
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
+    view |> element("button[aria-label='Add Americano']") |> render_click()
 
-    assert has_element?(view, "#menu-detail.menu-buy-layer--fullscreen")
-    assert has_element?(view, ".menu-buy-panel--fullscreen")
-    assert has_element?(view, ".menu-buy-header")
-    assert has_element?(view, ".menu-buy-visual .menu-buy-photo")
+    assert has_element?(view, "#menu-detail.menu-buy-layer--sheet")
+    assert has_element?(view, ".menu-buy-panel--sheet")
+    assert has_element?(view, ".menu-buy-backdrop")
+    assert has_element?(view, ".menu-buy-handle")
+    assert has_element?(view, ".menu-buy-hero .menu-buy-photo")
+    assert has_element?(view, ".menu-detail-heading")
+    assert has_element?(view, ".menu-detail-options")
     assert has_element?(view, ".menu-buy-bar--detail button.menu-buy-now", "Add to your order")
 
     html = view |> element("#menu-detail") |> render()
@@ -1610,41 +1930,36 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, ".menu-buy-basket-link")
     refute html =~ "View Your Order"
     refute html =~ "Place order"
-    assert has_element?(view, "button.menu-buy-close", "Back")
+    assert has_element?(view, "button.menu-buy-hero-back[aria-label='Back to menu']")
+    assert has_element?(view, ".menu-buy-hero-back .hero-arrow-left")
   end
 
-  test "/menu product detail shows View Your Order when cart has items", %{conn: conn} do
+  test "/menu product detail omits basket link even when cart has items", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
     view = enter_menu_browse(view)
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
-    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
-    refute has_element?(view, "#menu-detail")
+    view = add_to_order(view, "Espresso")
 
     view |> element("button[aria-label='Add Americano']") |> render_click()
-    assert has_element?(view, "#menu-detail.menu-buy-layer--fullscreen")
-    assert has_element?(view, ".menu-buy-basket-link", "View Your Order →")
+    assert has_element?(view, "#menu-detail.menu-buy-layer--sheet")
+    refute has_element?(view, ".menu-buy-basket-link")
     refute has_element?(view, "#menu-detail button", "Place order")
     refute has_element?(view, "#menu-detail .menu-basket-checkout")
 
-    view |> element(".menu-buy-basket-link", "View Your Order →") |> render_click()
-    assert has_element?(view, "#menu-basket")
-    assert has_element?(view, "#menu-basket-title", "Your Order")
-    assert has_element?(view, "button.menu-basket-checkout", "Place order")
+    view |> element("button[aria-label='Back to menu']") |> render_click()
+    Process.sleep(300)
+    assert has_element?(view, "#menu-floating-bag")
   end
 
-  test "/menu Your Order keeps Back on the left", %{conn: conn} do
+  test "/menu Your Order keeps back control on the left", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
     view = enter_menu_browse(view)
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
-    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view = add_to_order(view, "Espresso")
     view |> element("button.brune-icon-bag") |> render_click()
 
-    html = view |> element(".menu-basket-header") |> render()
-    back_pos = :binary.match(html, "menu-basket-close") |> elem(0)
-    title_pos = :binary.match(html, "menu-basket-title") |> elem(0)
-    assert back_pos < title_pos
+    assert has_element?(view, "button.menu-basket-close[aria-label='Back to menu']")
+    assert has_element?(view, ".menu-basket-close .hero-arrow-left")
   end
 
   defp enter_menu_browse(view) do
@@ -1652,11 +1967,22 @@ defmodule EspresoWeb.MenuLiveTest do
     view
   end
 
+  defp add_to_order(view, product_name) do
+    view
+    |> element("button[aria-label='Add #{product_name}']")
+    |> render_click()
+
+    view
+    |> element("button.menu-buy-now", "Add to your order")
+    |> render_click()
+
+    view
+  end
+
   defp prepare_gcash_checkout(view, customer_name) do
     view = enter_menu_browse(view)
 
-    view |> element("button[aria-label='Add Espresso']") |> render_click()
-    view |> element("button.menu-buy-now", "Add to your order") |> render_click()
+    view = add_to_order(view, "Espresso")
     view |> element("button.brune-icon-bag") |> render_click()
 
     view

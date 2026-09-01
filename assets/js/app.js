@@ -256,6 +256,52 @@ Hooks.OrderConfirm = {
   }
 }
 
+Hooks.LandingCarousel = {
+  mounted() {
+    this.carousel = this.el
+    this.root = this.el.closest("#menu-landing")
+    this.dots = this.root ? Array.from(this.root.querySelectorAll("[data-landing-dot]")) : []
+    this.onScroll = () => this.syncDots()
+    this.carousel.addEventListener("scroll", this.onScroll, {passive: true})
+    this.dotHandlers = this.dots.map((dot) => {
+      const handler = () => this.scrollToIndex(Number(dot.dataset.landingDot || 0))
+      dot.addEventListener("click", handler)
+      return {dot, handler}
+    })
+    this.syncDots()
+  },
+
+  updated() {
+    this.syncDots()
+  },
+
+  destroyed() {
+    if (this.carousel && this.onScroll) {
+      this.carousel.removeEventListener("scroll", this.onScroll)
+    }
+    if (this.dotHandlers) {
+      this.dotHandlers.forEach(({dot, handler}) => dot.removeEventListener("click", handler))
+    }
+  },
+
+  scrollToIndex(index) {
+    const width = this.carousel.clientWidth
+    if (!width) return
+    this.carousel.scrollTo({left: width * index, behavior: "smooth"})
+  },
+
+  syncDots() {
+    const width = this.carousel.clientWidth || 1
+    const index = Math.max(0, Math.min(this.dots.length - 1, Math.round(this.carousel.scrollLeft / width)))
+
+    this.dots.forEach((dot, dotIndex) => {
+      const active = dotIndex === index
+      dot.classList.toggle("is-active", active)
+      dot.setAttribute("aria-selected", active ? "true" : "false")
+    })
+  }
+}
+
 Hooks.MenuBrowse = {
   mounted() {
     this.handleEvent("scroll_to_items", () => this.scrollToItems())
@@ -263,6 +309,7 @@ Hooks.MenuBrowse = {
     this.handleEvent("scroll_to_menu_content", () => this.scrollToMenuContent())
     this.handleEvent("scroll_active_chip", ({id}) => this.scrollActiveChip(id))
     this.handleEvent("scroll_basket_top", () => this.scrollBasketTop())
+    this.handleEvent("focus_menu_search", () => this.focusMenuSearch())
     this.handleEvent("clear_persisted_cart", () => this.clearPersistedCart())
     this.handleEvent("persist_my_order", ({number}) => this.persistMyOrder(number))
     this.handleEvent("persist_current_order", ({number}) => this.persistMyOrder(number))
@@ -277,12 +324,13 @@ Hooks.MenuBrowse = {
 
     this.el.addEventListener("click", this.onChipClick)
     this.restorePersistedCart()
-    this.restoreMyOrders()
+    requestAnimationFrame(() => requestAnimationFrame(() => this.ensureMyOrdersRestored()))
     this.persistCartFromDom()
   },
 
   updated() {
     this.persistCartFromDom()
+    this.ensureMyOrdersRestored()
   },
 
   destroyed() {
@@ -342,12 +390,21 @@ Hooks.MenuBrowse = {
     }
   },
 
-  restoreMyOrders() {
-    if (this._myOrdersRestoreAttempted) return
-    this._myOrdersRestoreAttempted = true
-
+  ensureMyOrdersRestored() {
     const numbers = readMyOrderNumbers()
     if (!numbers.length) return
+
+    // Only restore once the menu browse surface is rendered.
+    if (!this.el.querySelector("#menu-items")) return
+    if (this.el.querySelector("#menu-qr-my-orders")) return
+
+    this._myOrdersRestoreAttempts = (this._myOrdersRestoreAttempts || 0) + 1
+    if (this._myOrdersRestoreAttempts > 5) return
+
+    const now = Date.now()
+    if (this._myOrdersRestoreLastAt && now - this._myOrdersRestoreLastAt < 200) return
+    this._myOrdersRestoreLastAt = now
+
     this.pushEvent("restore_my_orders", {numbers})
   },
 
@@ -381,6 +438,15 @@ Hooks.MenuBrowse = {
     requestAnimationFrame(() => requestAnimationFrame(go))
   },
 
+  focusMenuSearch() {
+    const input = this.el.querySelector("#menu-search-input")
+    if (!input) return
+    requestAnimationFrame(() => {
+      input.focus()
+      if (typeof input.select === "function") input.select()
+    })
+  },
+
   scrollOffset() {
     const sticky = this.el.querySelector("#menu-qr-sticky")
     if (sticky) return Math.ceil(sticky.getBoundingClientRect().height) + 8
@@ -407,14 +473,12 @@ Hooks.MenuBrowse = {
   scrollToMenuContent() {
     const go = () => {
       const target =
-        this.el.querySelector(".brune-menu-heading") ||
-        this.el.querySelector("#menu-search") ||
+        this.el.querySelector("#menu-items .brune-menu-section") ||
         this.el.querySelector("#menu-items")
       if (!target) return
 
       const offset = this.scrollOffset()
       const rectTop = target.getBoundingClientRect().top
-      // Already sitting just under the sticky stack — keep Menu title + search visible.
       if (rectTop >= offset - 4 && rectTop <= offset + 48) return
 
       const top = Math.max(0, rectTop + window.scrollY - offset)

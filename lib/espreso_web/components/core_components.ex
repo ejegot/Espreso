@@ -849,6 +849,28 @@ defmodule EspresoWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Operating hours strip for the Menu page, shown below the student promo.
+  """
+  def brune_hours_strip(assigns) do
+    ~H"""
+    <aside class="brune-hours-strip" aria-labelledby="brune-hours-strip-label">
+      <h2 id="brune-hours-strip-label" class="brune-hours-strip-title">Hours</h2>
+      <ul class="brune-hours-strip-list">
+        <li
+          :for={line <- CoffeeSpot.public_hours_lines()}
+          class={[
+            "brune-hours-strip-line",
+            CoffeeSpot.public_hours_note?(line) && "brune-hours-strip-line--note"
+          ]}
+        >
+          {line}
+        </li>
+      </ul>
+    </aside>
+    """
+  end
+
   def brune_cups(assigns) do
     ~H"""
     <svg class="brune-cups" viewBox="0 0 180 220" fill="none" aria-hidden="true">

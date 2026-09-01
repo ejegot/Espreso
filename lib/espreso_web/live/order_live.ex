@@ -84,10 +84,32 @@ defmodule EspresoWeb.OrderLive do
           <% else %>
             <h1 class="order-title" id="order-confirm-title">Order confirmed</h1>
             <p class="order-lede" id="order-confirm-lede">
-              Your order is in. Show your order number at the counter when you pick it up.
+              {confirm_lede(@order)}
             </p>
           <% end %>
           <p class="order-number order-number--confirm" id="order-confirm-number">{@order.number}</p>
+
+          <dl
+            :if={not confirm_payment_processing?(@order)}
+            id="order-confirm-recap"
+            class="order-confirm-recap"
+          >
+            <div class="order-confirm-recap-row">
+              <dt>Type</dt>
+              <dd>{Orders.fulfillment_label(@order.fulfillment)}</dd>
+            </div>
+            <div
+              :if={@order.fulfillment == "dine_in" && @order.table_number not in [nil, ""]}
+              class="order-confirm-recap-row"
+            >
+              <dt>Table</dt>
+              <dd>{@order.table_number}</dd>
+            </div>
+            <div class="order-confirm-recap-row order-confirm-recap-total">
+              <dt>Total</dt>
+              <dd>{Orders.format_total(@order)}</dd>
+            </div>
+          </dl>
 
           <div class="order-actions order-actions--confirm">
             <.link
@@ -242,6 +264,23 @@ defmodule EspresoWeb.OrderLive do
   end
 
   defp confirm_payment_processing?(_order), do: false
+
+  defp confirm_lede(%{fulfillment: "dine_in", table_number: table})
+       when is_binary(table) and table != "" do
+    "Your order is in. Show your order number at the counter — we'll bring it to table #{table}."
+  end
+
+  defp confirm_lede(%{fulfillment: "dine_in"}) do
+    "Your order is in. Show your order number at the counter for your dine-in order."
+  end
+
+  defp confirm_lede(%{fulfillment: "pickup"}) do
+    "Your order is in. Pick it up at the counter when it's ready."
+  end
+
+  defp confirm_lede(_order) do
+    "Your order is in."
+  end
 
   defp customer_status_message("received"), do: "Order received"
   defp customer_status_message("preparing"), do: "We're preparing your order"

@@ -232,6 +232,32 @@ defmodule Espreso.MenuTest do
       assert Menu.product_image("FOOD", "Tuna Royale Baguette") ==
                "/images/coffeespot/food-tuna-royale-baguette.png"
     end
+
+    test "studio product photos map to the correct menu items" do
+      assert Menu.product_image("SODA", "Green Apple Campagna") ==
+               "/images/coffeespot/drink-green-apple-campagna.png"
+
+      assert Menu.product_image("FRAPPE", "Double Chocolate") ==
+               "/images/coffeespot/drink-double-chocolate.png"
+
+      assert Menu.product_image("FRAPPE", "Biscoff") ==
+               "/images/coffeespot/drink-biscoff-frappe.png"
+
+      assert Menu.product_image("SODA", "Scarlet Berry") ==
+               "/images/coffeespot/drink-scarlet-berry.png"
+
+      assert Menu.product_image("COLD", "Iced Bellagio Choco") ==
+               "/images/coffeespot/drink-iced-bellagio-choco.png"
+
+      assert Menu.product_image("FOOD", "Spam Musubi") ==
+               "/images/coffeespot/food-spam-musubi.png"
+
+      assert Menu.product_image("FOOD", "Belgian Waffles") ==
+               "/images/coffeespot/food-belgian-waffles.png"
+
+      assert Menu.product_image("FOOD", "Chocolate Almond Waffles") ==
+               "/images/coffeespot/food-chocolate-almond-waffles.png"
+    end
   end
 
   describe "product_image/2" do
@@ -290,5 +316,29 @@ defmodule Espreso.MenuTest do
     end)
 
     product
+  end
+
+  describe "format_price/1" do
+    test "formats small whole amounts without comma or decimals" do
+      assert Menu.format_price(Decimal.new("75")) == "₱75"
+      assert Menu.format_price(Decimal.new("249")) == "₱249"
+      assert Menu.format_price(Decimal.new("999")) == "₱999"
+    end
+
+    test "formats fractional amounts with two decimals" do
+      assert Menu.format_price(Decimal.new("75.5")) == "₱75.50"
+      assert Menu.format_price(Decimal.new("110.25")) == "₱110.25"
+    end
+
+    test "adds thousands separators for large whole amounts" do
+      assert Menu.format_price(Decimal.new("1000")) == "₱1,000"
+      assert Menu.format_price(Decimal.new("1500")) == "₱1,500"
+      assert Menu.format_price(Decimal.new("12500")) == "₱12,500"
+    end
+
+    test "adds thousands separators for large fractional amounts" do
+      assert Menu.format_price(Decimal.new("1500.5")) == "₱1,500.50"
+      assert Menu.format_price(Decimal.new("10000.99")) == "₱10,000.99"
+    end
   end
 end

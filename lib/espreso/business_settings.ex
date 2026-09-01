@@ -16,9 +16,9 @@ defmodule Espreso.BusinessSettings do
     phone: "+639566728906",
     email: "elilaicorp.ph@gmail.com",
     hours_lines: [
-      "Mon–Thu · 8:00 AM – 12:00 AM",
-      "Fri–Sun · 8:00 AM – 10:00 PM",
-      "Student Hour · Mon–Thu, 2:00 PM – 5:00 PM",
+      "Sun–Wed · 11:00 AM – 11:00 PM",
+      "Thu · 11:00 AM – 12:00 AM",
+      "Fri–Sat · 11:00 AM – 2:00 AM",
       "Holiday hours on Instagram"
     ],
     instagram_url: "https://www.instagram.com/coffeespot_lilac.marikina/",

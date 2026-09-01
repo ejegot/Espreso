@@ -37,20 +37,21 @@ defmodule Espreso.Menu do
     {"COLD", "Matcha Caramel"} => "/images/coffeespot/IMG_3471.JPG",
     {"COLD", "Strawberry Matcha"} => "/images/coffeespot/IMG_3467.JPG",
     {"COLD", "Choco Berry"} => "/images/coffeespot/IMG_3481.JPG",
+    {"COLD", "Iced Bellagio Choco"} => "/images/coffeespot/drink-iced-bellagio-choco.png",
     {"FRAPPE", "Salted Caramel"} => "/images/coffeespot/IMG_3458.JPG",
     {"FRAPPE", "Mocha"} => "/images/coffeespot/cold-detail-01.jpg",
     {"FRAPPE", "Butter Scotch"} => "/images/coffeespot/IMG_3469.JPG",
     {"FRAPPE", "Mocha Crumble"} => "/images/coffeespot/cold-detail-01.jpg",
-    {"FRAPPE", "Biscoff"} => "/images/coffeespot/IMG_3483.JPG",
+    {"FRAPPE", "Biscoff"} => "/images/coffeespot/drink-biscoff-frappe.png",
     {"FRAPPE", "Cookies & Cream"} => "/images/coffeespot/IMG_3479.JPG",
     {"FRAPPE", "Matcha"} => "/images/coffeespot/IMG_3471.JPG",
-    {"FRAPPE", "Double Chocolate"} => "/images/coffeespot/IMG_3481.JPG",
+    {"FRAPPE", "Double Chocolate"} => "/images/coffeespot/drink-double-chocolate.png",
     {"FRAPPE", "Vanilla Bean Hazelnut"} => "/images/coffeespot/cold-signature-01.jpg",
     {"FRAPPE", "Strawberry"} => "/images/coffeespot/IMG_3467.JPG",
     {"SODA", "Tropical Passion Fruit"} => "/images/coffeespot/soda-signature-01.jpg",
-    {"SODA", "Green Apple Campaign"} => "/images/coffeespot/IMG_3457.JPG",
+    {"SODA", "Green Apple Campagna"} => "/images/coffeespot/drink-green-apple-campagna.png",
     {"SODA", "Minty Peach"} => "/images/coffeespot/IMG_3457.JPG",
-    {"SODA", "Scarlet Berry"} => "/images/coffeespot/IMG_3477.JPG",
+    {"SODA", "Scarlet Berry"} => "/images/coffeespot/drink-scarlet-berry.png",
     {"SODA", "Majestic Mango"} => "/images/coffeespot/soda-signature-01.jpg",
     {"SODA", "Peach Berry"} => "/images/coffeespot/IMG_3477.JPG",
     {"SODA", "Hummingbird"} => "/images/coffeespot/IMG_3477.JPG",
@@ -59,7 +60,7 @@ defmodule Espreso.Menu do
     {"FOOD", "Corned Beef"} => "/images/coffeespot/IMG_3480.JPG",
     {"FOOD", "Spam"} => "/images/coffeespot/IMG_3487.JPG",
     {"FOOD", "Pork Liempo"} => "/images/coffeespot/food-savory-01.jpg",
-    {"FOOD", "Spam Musubi"} => "/images/coffeespot/IMG_3487.JPG",
+    {"FOOD", "Spam Musubi"} => "/images/coffeespot/food-spam-musubi.png",
     {"FOOD", "Nugget"} => "/images/coffeespot/IMG_3474.JPG",
     {"FOOD", "Solo Fries"} => "/images/coffeespot/food-savory-01.jpg",
     {"FOOD", "Fries w/ Nuggets"} => "/images/coffeespot/IMG_3474.JPG",
@@ -80,7 +81,9 @@ defmodule Espreso.Menu do
     {"FOOD", "Choco Chip Cookies"} => "/images/coffeespot/IMG_3479.JPG",
     {"FOOD", "BNN Moist Slice"} => "/images/coffeespot/IMG_3462.JPG",
     {"FOOD", "Choco Moist Slice"} => "/images/coffeespot/IMG_3461.JPG",
-    {"FOOD", "Carrot Moist Slice"} => "/images/coffeespot/pastry-signature-01.jpg"
+    {"FOOD", "Carrot Moist Slice"} => "/images/coffeespot/pastry-signature-01.jpg",
+    {"FOOD", "Belgian Waffles"} => "/images/coffeespot/food-belgian-waffles.png",
+    {"FOOD", "Chocolate Almond Waffles"} => "/images/coffeespot/food-chocolate-almond-waffles.png"
   }
 
   @category_images %{
@@ -152,6 +155,8 @@ defmodule Espreso.Menu do
     {"COLD", "Strawberry Matcha"} =>
       "Fresh strawberry layered with iced matcha — fruity and vibrant.",
     {"COLD", "Choco Berry"} => "Chocolate and mixed berry flavors blended into a chilled drink.",
+    {"COLD", "Iced Bellagio Choco"} =>
+      "Rich iced chocolate with Bellagio-style drizzle — cool, creamy, and indulgent.",
     # FRAPPE
     {"FRAPPE", "Salted Caramel"} =>
       "Sweet caramel with a hint of sea salt blended into a frosty frappe.",
@@ -171,7 +176,8 @@ defmodule Espreso.Menu do
     # SODA
     {"SODA", "Tropical Passion Fruit"} =>
       "Tangy passion fruit fizzing with sparkling soda — bright and tropical.",
-    {"SODA", "Green Apple Campaign"} => "Crisp green apple soda with a refreshing tart finish.",
+    {"SODA", "Green Apple Campagna"} =>
+      "Crisp green apple soda with a refreshing tart finish.",
     {"SODA", "Minty Peach"} => "Cool mint meets sweet peach in a sparkling, refreshing drink.",
     {"SODA", "Scarlet Berry"} => "A vibrant berry soda with a deep, fruity sweetness.",
     {"SODA", "Majestic Mango"} => "Sweet Philippine mango blended into a fizzy, golden soda.",
@@ -219,7 +225,11 @@ defmodule Espreso.Menu do
       "A thick slice of ultra-moist banana bread — homestyle comfort.",
     {"FOOD", "Choco Moist Slice"} => "Rich chocolate banana bread — soft, moist, and indulgent.",
     {"FOOD", "Carrot Moist Slice"} =>
-      "Spiced carrot bread with a moist crumb and subtle sweetness."
+      "Spiced carrot bread with a moist crumb and subtle sweetness.",
+    {"FOOD", "Belgian Waffles"} =>
+      "Golden Belgian waffles with butter and maple syrup — warm and comforting.",
+    {"FOOD", "Chocolate Almond Waffles"} =>
+      "Crisp waffles drizzled with chocolate and topped with almond slivers."
   }
 
   @food_subcategories [
@@ -258,7 +268,9 @@ defmodule Espreso.Menu do
        "Choco Chip Cookies",
        "BNN Moist Slice",
        "Choco Moist Slice",
-       "Carrot Moist Slice"
+       "Carrot Moist Slice",
+       "Belgian Waffles",
+       "Chocolate Almond Waffles"
      ]}
   ]
 
@@ -496,6 +508,7 @@ defmodule Espreso.Menu do
   Formats a price as Philippine peso.
 
   Whole peso amounts omit decimals (₱75). Fractional amounts use two decimals (₱75.50).
+  Amounts of ₱1,000 and above include thousands separators (₱1,500).
   """
   def format_price(price) do
     rounded = Decimal.round(price, 2)
@@ -505,13 +518,32 @@ defmodule Espreso.Menu do
         rounded
         |> Decimal.round(0)
         |> Decimal.to_string(:normal)
+        |> add_thousands_separator()
       else
         rounded
         |> Decimal.to_string(:normal)
         |> ensure_two_decimals()
+        |> add_thousands_separator_to_amount()
       end
 
     "₱#{formatted}"
+  end
+
+  defp add_thousands_separator_to_amount(string) do
+    case String.split(string, ".") do
+      [whole, fraction] -> "#{add_thousands_separator(whole)}.#{fraction}"
+      [whole] -> add_thousands_separator(whole)
+    end
+  end
+
+  defp add_thousands_separator(whole) when is_binary(whole) do
+    whole
+    |> String.reverse()
+    |> String.graphemes()
+    |> Enum.chunk_every(3)
+    |> Enum.map(&Enum.join/1)
+    |> Enum.join(",")
+    |> String.reverse()
   end
 
   defp ensure_two_decimals(string) do

@@ -70,6 +70,20 @@ defmodule Espreso.CoffeeSpot do
 
   def service_area, do: "Marikina City, Philippines"
 
+  @doc """
+  Operating hours for public surfaces, excluding student-promo lines stored in settings.
+  """
+  def public_hours_lines do
+    hours_lines()
+    |> Enum.reject(&String.contains?(&1, "Student"))
+  end
+
+  def public_hours_note?(line) when is_binary(line) do
+    String.contains?(String.downcase(line), "holiday")
+  end
+
+  def public_hours_note?(_), do: false
+
   def hours_label, do: "Open now"
 
   def hours_note, do: "Hours · check Instagram for holiday updates"

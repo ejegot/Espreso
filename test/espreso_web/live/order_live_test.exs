@@ -135,6 +135,17 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, "#order-confirm-title", "Order confirmed")
     assert has_element?(view, "#order-confirm-number", order.number)
     assert has_element?(view, ~s(#order-confirm[data-order-number="#{order.number}"]))
+    assert has_element?(view, "#order-confirm-recap")
+    assert has_element?(view, "#order-confirm-recap .order-confirm-recap-total", "₱75")
+
+    assert has_element?(
+             view,
+             "#order-confirm-lede",
+             "Your order is in. Pick it up at the counter when it's ready."
+           )
+
+    assert has_element?(view, "#order-confirm-recap", "Pickup at counter")
+    refute has_element?(view, "#order-confirm-recap", "Table")
     assert has_element?(view, "#order-view-my-order", "View My Order")
     assert has_element?(view, "#order-order-more", "Order More")
     assert html =~ ~s(phx-hook="OrderConfirm")
@@ -208,6 +219,7 @@ defmodule EspresoWeb.OrderLiveTest do
 
     refute has_element?(view, "#order-confirm-title", "Order confirmed")
     refute has_element?(view, "#order-status-message")
+    refute has_element?(view, "#order-confirm-recap")
 
     assert {:ok, _} = Orders.mark_paid_from_paymongo(order.number)
     assert has_element?(view, "#order-confirm-title", "Order confirmed")
@@ -215,10 +227,41 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(
              view,
              "#order-confirm-lede",
-             "Your order is in. Show your order number at the counter when you pick it up."
+             "Your order is in. Pick it up at the counter when it's ready."
            )
 
+    assert has_element?(view, "#order-confirm-recap .order-confirm-recap-total", "₱100")
+
     refute has_element?(view, "#order-confirm-title", "Payment processing")
+  end
+
+  test "dine-in order confirmation shows table-aware lede and recap", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Dine In",
+          fulfillment: :dine_in,
+          table_number: "12",
+          payment_method: :counter
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/order/#{order.number}?confirm=1")
+
+    assert has_element?(view, "#order-confirm-title", "Order confirmed")
+
+    assert has_element?(
+             view,
+             "#order-confirm-lede",
+             "Your order is in. Show your order number at the counter — we'll bring it to table 12."
+           )
+
+    assert has_element?(view, "#order-confirm-recap", "Dine-in")
+    assert has_element?(view, "#order-confirm-recap", "Table")
+    assert has_element?(view, "#order-confirm-recap", "12")
+    assert has_element?(view, "#order-confirm-recap .order-confirm-recap-total", "₱75")
+    refute has_element?(view, "#order-receipt")
   end
 
   test "online paid confirm shows order confirmed", %{conn: conn} do
@@ -239,6 +282,7 @@ defmodule EspresoWeb.OrderLiveTest do
 
     assert has_element?(view, "#order-confirm-title", "Order confirmed")
     refute has_element?(view, "#order-confirm-title", "Payment processing")
+    assert has_element?(view, "#order-confirm-recap .order-confirm-recap-total", "₱100")
   end
 
   test "online order without confirm shows normal detail", %{conn: conn} do
