@@ -16,6 +16,8 @@ defmodule EspresoWeb.StaffOrdersLive do
      |> assign(:flash_note, nil)
      |> assign(:unpaid_drawer_open, false)
      |> assign(:reconciliation_drawer_open, false)
+     |> assign(:mark_paid_order, nil)
+     |> assign(:last_received_count, 0)
      |> load_orders(), layout: false}
   end
 
@@ -65,6 +67,20 @@ defmodule EspresoWeb.StaffOrdersLive do
     end
   end
 
+  def handle_event("open_mark_paid", %{"id" => id}, socket) do
+    order = Espreso.Repo.get!(Espreso.Orders.Order, id)
+
+    if staff_mark_paid?(order) do
+      {:noreply, assign(socket, :mark_paid_order, order)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("close_mark_paid", _params, socket) do
+    {:noreply, assign(socket, :mark_paid_order, nil)}
+  end
+
   def handle_event("mark_paid", %{"id" => id} = params, socket) do
     order = Espreso.Repo.get!(Espreso.Orders.Order, id)
     paid_via = Map.get(params, "paid_via", "counter")
@@ -73,6 +89,7 @@ defmodule EspresoWeb.StaffOrdersLive do
       {:ok, paid} ->
         {:noreply,
          socket
+         |> assign(:mark_paid_order, nil)
          |> assign(:flash_note, "#{paid.number} marked paid (#{paid_via_label(paid_via)}).")
          |> load_orders()}
 
@@ -228,6 +245,7 @@ defmodule EspresoWeb.StaffOrdersLive do
             <div
               class="staff-orders-workboard"
               id="orders-kitchen"
+              phx-hook="StaffOrdersBoard"
               role="region"
               aria-label="Kitchen"
             >
@@ -241,7 +259,7 @@ defmodule EspresoWeb.StaffOrdersLive do
                 </header>
                 <div class="staff-orders-new-grid">
                   <p :if={@received_orders == []} class="staff-empty">No new orders.</p>
-                  <.kds_ticket :for={order <- @received_orders} order={order} />
+                  <.kds_ticket :for={order <- @received_orders} order={order} lane="new" />
                 </div>
               </section>
 
@@ -253,7 +271,7 @@ defmodule EspresoWeb.StaffOrdersLive do
                   </header>
                   <div class="staff-orders-strip-grid">
                     <p :if={@preparing_orders == []} class="staff-empty">Nothing preparing.</p>
-                    <.kds_ticket :for={order <- @preparing_orders} order={order} />
+                    <.kds_ticket :for={order <- @preparing_orders} order={order} lane="preparing" />
                   </div>
                 </section>
 
@@ -264,7 +282,7 @@ defmodule EspresoWeb.StaffOrdersLive do
                   </header>
                   <div class="staff-orders-strip-grid">
                     <p :if={@ready_orders == []} class="staff-empty">None yet.</p>
-                    <.kds_ticket :for={order <- @ready_orders} order={order} />
+                    <.kds_ticket :for={order <- @ready_orders} order={order} lane="ready" />
                   </div>
                 </section>
               </div>
@@ -332,7 +350,7 @@ defmodule EspresoWeb.StaffOrdersLive do
                 </p>
               </div>
               <div class="staff-order-actions">
-                {mark_paid_buttons(%{order: order, id_prefix: "unpaid"})}
+                {mark_paid_buttons(%{order: order, id_prefix: "unpaid", lane: "drawer"})}
               </div>
             </article>
           </div>
@@ -398,10 +416,15 @@ defmodule EspresoWeb.StaffOrdersLive do
             </article>
           </div>
         </aside>
+
+        {mark_paid_modal(assigns)}
       </div>
     </.staff_shell>
     """
   end
+
+  attr :order, :map, required: true
+  attr :lane, :string, default: "ticket"
 
   defp kds_ticket(assigns) do
     source = source_badge(assigns.order)
@@ -427,13 +450,13 @@ defmodule EspresoWeb.StaffOrdersLive do
         @handoff? && "staff-order-ticket--handoff",
         @arrived? && "staff-order-card--arrived"
       ]}
-      id={"order-card-#{@order.id}"}
+      id={"order-card-#{@lane}-#{@order.id}"}
     >
-      <div class="staff-order-ticket-body" id={"order-detail-#{@order.id}"}>
+      <div class="staff-order-ticket-body" id={"order-detail-#{@lane}-#{@order.id}"}>
         <div :if={!@compact?} class="staff-order-ticket-source-row">
           <span
             class={["staff-order-source", @source_class]}
-            id={"order-source-#{@order.id}"}
+            id={"order-source-#{@lane}-#{@order.id}"}
           >
             {@source_label}
           </span>
@@ -512,7 +535,7 @@ defmodule EspresoWeb.StaffOrdersLive do
         </button>
 
         <div :if={needs_payment_actions?(@order)} class="staff-order-secondary-actions">
-          {mark_paid_buttons(%{order: @order, id_prefix: "ticket"})}
+          {mark_paid_buttons(%{order: @order, id_prefix: "ticket", lane: @lane})}
           <button
             :if={
               @order.status in ["received", "preparing"] and not checkout_session_attached?(@order)
@@ -577,55 +600,89 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   defp mark_paid_buttons(assigns) do
     ~H"""
-    <div
+    <button
       :if={staff_mark_paid?(@order)}
-      class="staff-order-mark-paid"
-      id={"#{@id_prefix}-mark-paid-#{@order.id}"}
+      type="button"
+      class="staff-action staff-action-secondary staff-action-mark-paid"
+      id={"#{@id_prefix}-#{@lane}-mark-paid-#{@order.id}"}
+      phx-click="open_mark_paid"
+      phx-value-id={@order.id}
     >
+      Confirm payment
+    </button>
+    """
+  end
+
+  defp mark_paid_modal(%{mark_paid_order: nil}), do: nil
+
+  defp mark_paid_modal(assigns) do
+    order = assigns.mark_paid_order
+
+    assigns =
+      assigns
+      |> assign(:order, order)
+      |> assign(:suggested_paid_via, suggested_paid_via(order))
+
+    ~H"""
+    <div class="staff-mark-paid-modal" id="mark-paid-modal" role="dialog" aria-modal="true">
       <button
         type="button"
-        class="staff-action staff-action-secondary"
-        id={"#{@id_prefix}-mark-paid-cash-#{@order.id}"}
-        phx-click="mark_paid"
-        phx-value-id={@order.id}
-        phx-value-paid_via="cash"
-      >
-        Cash
-      </button>
-      <button
-        type="button"
-        class="staff-action staff-action-secondary"
-        id={"#{@id_prefix}-mark-paid-gcash-#{@order.id}"}
-        phx-click="mark_paid"
-        phx-value-id={@order.id}
-        phx-value-paid_via="gcash"
-      >
-        GCash
-      </button>
-      <button
-        type="button"
-        class="staff-action staff-action-secondary"
-        id={"#{@id_prefix}-mark-paid-maya-#{@order.id}"}
-        phx-click="mark_paid"
-        phx-value-id={@order.id}
-        phx-value-paid_via="maya"
-      >
-        Maya
-      </button>
-      <button
-        :if={@order.payment_method == "counter"}
-        type="button"
-        class="staff-action staff-action-secondary"
-        id={"#{@id_prefix}-mark-paid-counter-#{@order.id}"}
-        phx-click="mark_paid"
-        phx-value-id={@order.id}
-        phx-value-paid_via="counter"
-      >
-        Counter
-      </button>
+        class="staff-mark-paid-modal-backdrop"
+        phx-click="close_mark_paid"
+        aria-label="Close payment dialog"
+      />
+      <div class="staff-mark-paid-modal-panel">
+        <header class="staff-mark-paid-modal-head">
+          <div>
+            <p class="staff-mark-paid-modal-eyebrow">Confirm payment</p>
+            <h2 class="staff-mark-paid-modal-title">{@order.number}</h2>
+            <p class="staff-mark-paid-modal-sub">
+              {@order.customer_name} · {Orders.format_total(@order)}
+            </p>
+          </div>
+          <button type="button" class="staff-mark-paid-modal-close" phx-click="close_mark_paid">
+            ×
+          </button>
+        </header>
+
+        <p class="staff-mark-paid-modal-note">
+          How did the customer pay? This updates the order and clears it from unpaid.
+        </p>
+
+        <div class="staff-mark-paid-modal-options">
+          <button
+            :for={{paid_via, label} <- mark_paid_options(@order)}
+            type="button"
+            class={[
+              "staff-mark-paid-option",
+              @suggested_paid_via == paid_via && "is-suggested"
+            ]}
+            id={"mark-paid-modal-#{paid_via}"}
+            phx-click="mark_paid"
+            phx-value-id={@order.id}
+            phx-value-paid_via={paid_via}
+          >
+            {label}
+          </button>
+        </div>
+      </div>
     </div>
     """
   end
+
+  defp mark_paid_options(%{payment_method: "counter"}) do
+    [{"cash", "Cash"}, {"gcash", "GCash"}, {"maya", "Maya"}, {"counter", "Counter"}]
+  end
+
+  defp mark_paid_options(_order) do
+    [{"gcash", "GCash"}, {"maya", "Maya"}, {"cash", "Cash"}]
+  end
+
+  defp suggested_paid_via(%{payment_method: "online", online_wallet: wallet})
+       when wallet in ["gcash", "maya"],
+       do: wallet
+
+  defp suggested_paid_via(_), do: "cash"
 
   defp paid_via_label("cash"), do: "cash"
   defp paid_via_label("gcash"), do: "GCash"
@@ -701,11 +758,23 @@ defmodule EspresoWeb.StaffOrdersLive do
   defp order_age_class(_), do: ["staff-order-age"]
 
   defp load_orders(socket) do
-    socket
-    |> assign(:active_orders, Orders.list_active_orders())
-    |> assign(:ready_orders, Orders.list_recent_ready(@ready_lane_limit))
-    |> assign(:unpaid_orders, Orders.list_todays_unpaid())
-    |> assign(:paymongo_reconciliations, Orders.list_open_paymongo_reconciliations())
+    active_orders = Orders.list_active_orders()
+    received_count = Enum.count(active_orders, &(&1.status == "received"))
+    prev_count = socket.assigns[:last_received_count] || 0
+
+    socket =
+      socket
+      |> assign(:active_orders, active_orders)
+      |> assign(:ready_orders, Orders.list_recent_ready(@ready_lane_limit))
+      |> assign(:unpaid_orders, Orders.list_todays_unpaid())
+      |> assign(:paymongo_reconciliations, Orders.list_open_paymongo_reconciliations())
+      |> assign(:last_received_count, received_count)
+
+    if connected?(socket) and received_count > prev_count do
+      push_event(socket, "staff_new_order", %{})
+    else
+      socket
+    end
   end
 
   defp truncate_session_id(session_id) when is_binary(session_id) do

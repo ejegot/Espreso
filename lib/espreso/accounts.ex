@@ -166,6 +166,21 @@ defmodule Espreso.Accounts do
   end
 
   @doc """
+  Active staff with a PIN configured — for the tablet login grid.
+  """
+  def list_staff_for_pin_login do
+    User
+    |> where(
+      [u],
+      u.active == true and u.role in ^@staff_roster_roles and not is_nil(u.pin_hash) and
+        u.pin_hash != ""
+    )
+    |> order_by([u], asc: u.name)
+    |> select([u], %{id: u.id, name: u.name, role: u.role})
+    |> Repo.all()
+  end
+
+  @doc """
   Returns whether the user has a PIN configured.
   """
   def pin_set?(%User{pin_hash: pin_hash}) when is_binary(pin_hash) and pin_hash != "",

@@ -431,7 +431,7 @@ defmodule EspresoWeb.OrderLiveTest do
     {:ok, view, html} = live(conn, ~p"/order/#{order.number}")
 
     assert has_element?(view, "#order-qrph-payment")
-    assert has_element?(view, "#order-qrph-payment-title", "Pay with GCash")
+    assert has_element?(view, "#order-qrph-payment .order-qrph-wallet", "GCash")
     assert html =~ order.number
     assert html =~ "₱120"
     assert html =~ "/images/gcash-qrph.png"

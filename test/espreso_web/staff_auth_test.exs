@@ -91,7 +91,7 @@ defmodule EspresoWeb.StaffAuthTest do
       |> follow_redirect(conn, ~p"/login")
 
     html = html_response(conn, 200)
-    assert html =~ "Hello, welcome back"
+    assert html =~ "Owner login"
     assert html =~ "Account created"
 
     conn =
@@ -453,15 +453,25 @@ defmodule EspresoWeb.StaffAuthTest do
     end
   end
 
-  test "/staff redirects barista to orders and managers to dashboard", %{
+  test "/staff shows role-aware shortcuts", %{
     conn: conn,
     barista: barista,
     manager: manager,
     owner: owner
   } do
-    assert {:error, {:redirect, %{to: "/orders"}}} = live(log_in(conn, barista), ~p"/staff")
-    assert {:error, {:redirect, %{to: "/dashboard"}}} = live(log_in(conn, manager), ~p"/staff")
-    assert {:error, {:redirect, %{to: "/dashboard"}}} = live(log_in(conn, owner), ~p"/staff")
+    {:ok, barista_view, _html} = live(log_in(conn, barista), ~p"/staff")
+    assert has_element?(barista_view, ".staff-shell-title", "Home")
+    assert has_element?(barista_view, "#staff-home-orders", "Orders")
+    assert has_element?(barista_view, "#staff-home-pos", "POS")
+    refute has_element?(barista_view, "#staff-home-dashboard")
+
+    {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/staff")
+    assert has_element?(manager_view, "#staff-home-dashboard", "Dashboard")
+    assert has_element?(manager_view, "#staff-home-availability", "Availability")
+
+    {:ok, owner_view, _html} = live(log_in(conn, owner), ~p"/staff")
+    assert has_element?(owner_view, "#staff-home-staff", "Staff")
+    assert has_element?(owner_view, "#staff-home-settings", "Settings")
   end
 
   test "orders shell is active for barista with Orders and POS only", %{
@@ -524,6 +534,39 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(view, "#staff-nav-pos.is-active", "POS")
     assert has_element?(view, "#pos-catalog")
     refute render(view) =~ "Coming soon"
+  end
+
+  test "pin login lands barista on orders", %{conn: conn, barista: barista} do
+    assert {:ok, _} = Accounts.set_pin(barista, "4321")
+
+    conn =
+      post(conn, ~p"/session/pin", %{
+        "user_id" => barista.id,
+        "pin" => "4321"
+      })
+
+    assert redirected_to(conn) == ~p"/orders"
+  end
+
+  test "invalid pin login returns to login", %{conn: conn, barista: barista} do
+    assert {:ok, _} = Accounts.set_pin(barista, "4321")
+
+    conn =
+      post(conn, ~p"/session/pin", %{
+        "user_id" => barista.id,
+        "pin" => "9999"
+      })
+
+    assert redirected_to(conn) == ~p"/login"
+    assert Phoenix.Flash.get(conn.assigns.flash, :error)
+  end
+
+  test "login page shows staff pin grid when pins configured", %{conn: conn, barista: barista} do
+    assert {:ok, _} = Accounts.set_pin(barista, "4321")
+
+    {:ok, view, _html} = live(conn, ~p"/login")
+    assert has_element?(view, "#staff-pin-login")
+    assert has_element?(view, "#staff-pin-user-#{barista.id}", barista.name)
   end
 
   defp log_in(conn, user) do
