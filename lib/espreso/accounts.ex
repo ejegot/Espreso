@@ -149,6 +149,109 @@ defmodule Espreso.Accounts do
 
   def authenticate_user(_, _), do: {:error, :invalid_credentials}
 
+  @pin_pattern ~r/^\d{4,6}$/
+  @staff_roster_roles ~w(barista manager owner)
+
+  @doc """
+  Lists active staff for the employee login grid.
+
+  Returns maps with `id`, `name`, and `role` only — no secrets.
+  """
+  def list_active_staff_for_roster do
+    User
+    |> where([u], u.active == true and u.role in ^@staff_roster_roles)
+    |> order_by([u], asc: u.name)
+    |> select([u], %{id: u.id, name: u.name, role: u.role})
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns whether the user has a PIN configured.
+  """
+  def pin_set?(%User{pin_hash: pin_hash}) when is_binary(pin_hash) and pin_hash != "",
+    do: true
+
+  def pin_set?(_), do: false
+
+  @doc """
+  Sets a 4–6 digit PIN for a user. Hashes with Pbkdf2.
+  """
+  def set_pin(%User{} = user, pin) when is_binary(pin) do
+    with :ok <- validate_pin_format(pin) do
+      user
+      |> Ecto.Changeset.change(%{pin_hash: Pbkdf2.hash_pwd_salt(pin)})
+      |> Repo.update()
+    end
+  end
+
+  @doc """
+  Clears a user's PIN.
+  """
+  def clear_pin(%User{} = user) do
+    user
+    |> Ecto.Changeset.change(%{pin_hash: nil})
+    |> Repo.update()
+  end
+
+  @doc """
+  Sets a user's PIN when the actor has `:user_management` permission.
+  """
+  def set_pin_as(%User{} = actor, %User{} = target, pin) when is_binary(pin) do
+    with :ok <- Authorization.authorize(actor, :user_management) do
+      set_pin(target, pin)
+    end
+  end
+
+  @doc """
+  Clears a user's PIN when the actor has `:user_management` permission.
+  """
+  def clear_pin_as(%User{} = actor, %User{} = target) do
+    with :ok <- Authorization.authorize(actor, :user_management) do
+      clear_pin(target)
+    end
+  end
+
+  @doc """
+  Verifies a PIN for an active user.
+
+  Returns `{:ok, user}` or `{:error, reason}` where reason is
+  `:invalid_pin`, `:pin_not_set`, `:inactive`, or `:not_found`.
+  """
+  def verify_pin(%User{id: id}, pin) when is_binary(pin), do: verify_pin(id, pin)
+
+  def verify_pin(user_id, pin) when is_integer(user_id) and is_binary(pin) do
+    case Repo.get(User, user_id) do
+      nil ->
+        Pbkdf2.no_user_verify()
+        {:error, :not_found}
+
+      %User{active: false} ->
+        Pbkdf2.no_user_verify()
+        {:error, :inactive}
+
+      %User{pin_hash: hash} when is_binary(hash) and hash != "" ->
+        if Pbkdf2.verify_pass(pin, hash) do
+          {:ok, Repo.get!(User, user_id)}
+        else
+          {:error, :invalid_pin}
+        end
+
+      %User{} ->
+        Pbkdf2.no_user_verify()
+        {:error, :pin_not_set}
+    end
+  end
+
+  def verify_pin(_, _), do: {:error, :invalid_pin}
+
+  defp validate_pin_format(pin) do
+    if Regex.match?(@pin_pattern, pin) do
+      :ok
+    else
+      {:error, :invalid_pin_format}
+    end
+  end
+
   def ensure_owner!(attrs) when is_map(attrs) do
     email = attrs[:email] || attrs["email"]
 

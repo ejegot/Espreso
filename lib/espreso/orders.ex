@@ -6,8 +6,12 @@ defmodule Espreso.Orders do
   import Ecto.Query
 
   alias Espreso.Repo
+  alias Espreso.BusinessSettings
   alias Espreso.Orders.{Order, OrderItem, PaymentReconciliation}
   alias Espreso.Menu
+
+  @unpaid_payment_statuses ~w(unpaid awaiting_payment)
+  @paid_vias ~w(cash gcash maya counter paymongo)
 
   @doc """
   Creates an order from cart lines and checkout attrs.
@@ -17,8 +21,8 @@ defmodule Espreso.Orders do
   `attrs` — `:customer_name`, `:fulfillment` (`:dine_in` | `:pickup` or strings),
   `:table_number`, `:notes`, `:payment_method` (`:counter` | `:online`),
   `:source` (`:customer` | `:pos` or strings; default `"customer"`),
-  optional `:payment_status` (`:unpaid` | `:paid`) — `:paid` only allowed with
-  `:counter` (POS pay-at-create). Online is always unpaid. Default unpaid.
+  optional `:payment_status` (`:unpaid` | `:awaiting_payment` | `:paid`) — `:paid` only
+  allowed with `:counter` (POS pay-at-create). Online uses shop `payments_mode`.
 
   Rejects the whole order with `{:error, {:unavailable, names}}` when any
   referenced product is unavailable (application-level check).
@@ -53,7 +57,8 @@ defmodule Espreso.Orders do
     payment_status =
       normalize_payment_status(
         payment_method,
-        Map.get(attrs, :payment_status) || Map.get(attrs, "payment_status")
+        Map.get(attrs, :payment_status) || Map.get(attrs, "payment_status"),
+        BusinessSettings.payments_mode()
       )
 
     total =
@@ -213,7 +218,8 @@ defmodule Espreso.Orders do
       active_count: count_orders(status: active_statuses),
       received_count: count_orders(status: ["received"]),
       preparing_count: count_orders(status: ["preparing"]),
-      unpaid_active_count: count_orders(status: active_statuses, payment_status: "unpaid"),
+      unpaid_active_count:
+        count_orders(status: active_statuses, payment_status: @unpaid_payment_statuses),
       todays_count: count_orders(inserted_at_gte: today_start, exclude_cancelled: true)
     }
   end
@@ -246,7 +252,7 @@ defmodule Espreso.Orders do
     Order
     |> where(
       [o],
-      o.inserted_at >= ^today_start and o.payment_status == "unpaid" and
+      o.inserted_at >= ^today_start and o.payment_status in ^@unpaid_payment_statuses and
         o.status in ^["received", "preparing", "ready", "completed"]
     )
     |> order_by([o], desc: o.inserted_at)
@@ -343,6 +349,7 @@ defmodule Espreso.Orders do
     end)
     |> then(fn query ->
       case Keyword.get(opts, :payment_status) do
+        statuses when is_list(statuses) -> where(query, [o], o.payment_status in ^statuses)
         status when is_binary(status) -> where(query, [o], o.payment_status == ^status)
         _ -> query
       end
@@ -453,11 +460,19 @@ defmodule Espreso.Orders do
   @doc """
   Marks an order paid via the staff/manual path. Reloads from the database first.
 
+  Options:
+  - `:paid_via` — `"cash"`, `"gcash"`, `"maya"`, `"counter"` (default `"counter"` for
+    counter orders). PayMongo webhooks use `"paymongo"` internally.
+
   Cancelled orders cannot be paid. Already-paid orders return idempotent success.
-  Unpaid online orders cannot be marked paid manually
-  (`{:error, :online_payment_required}`); use the PayMongo webhook helpers instead.
+  Unpaid online PayMongo orders cannot be marked paid manually
+  (`{:error, :online_payment_required}`). Online `awaiting_payment` orders can be
+  confirmed when shop `payments_mode` is `qrph_manual`.
   """
-  def mark_paid(%Order{id: id}) when is_integer(id) do
+  def mark_paid(order, opts \\ [])
+  def mark_paid(%Order{id: id}, opts) when is_integer(id) do
+    paid_via = normalize_paid_via(opts)
+
     case Repo.get(Order, id) do
       nil ->
         {:error, :not_found}
@@ -468,15 +483,22 @@ defmodule Espreso.Orders do
       %Order{payment_status: "paid"} = current ->
         {:ok, current}
 
+      %Order{payment_method: "online", payment_status: "awaiting_payment"} = current ->
+        if BusinessSettings.qrph_manual?() do
+          apply_paid(current, paid_via)
+        else
+          {:error, :online_payment_required}
+        end
+
       %Order{payment_method: "online"} ->
         {:error, :online_payment_required}
 
       %Order{} = current ->
-        apply_paid(current)
+        apply_paid(current, paid_via)
     end
   end
 
-  def mark_paid(%Order{} = order), do: mark_paid(%Order{id: order.id})
+  def mark_paid(%Order{} = order, opts), do: mark_paid(%Order{id: order.id}, opts)
 
   @doc """
   Stores the PayMongo checkout session id on an order after session creation.
@@ -516,19 +538,19 @@ defmodule Espreso.Orders do
         {:error, :not_found}
 
       %Order{} = order ->
-        apply_paid(order)
+        apply_paid(order, "paymongo")
     end
   end
 
   @doc """
   Marks an order paid from a PayMongo webhook using the checkout session id.
 
-  Bypasses the staff/manual online restriction on `mark_paid/1`.
+  Bypasses the staff/manual online restriction on `mark_paid/2`.
   """
   def mark_paid_from_paymongo_session(session_id) when is_binary(session_id) do
     case Repo.get_by(Order, paymongo_checkout_session_id: session_id) do
       nil -> {:error, :not_found}
-      %Order{} = order -> apply_paid(order)
+      %Order{} = order -> apply_paid(order, "paymongo")
     end
   end
 
@@ -626,6 +648,9 @@ defmodule Espreso.Orders do
   def payment_label(%Order{payment_method: "counter", payment_status: "paid"}),
     do: "Paid at counter"
 
+  def payment_label(%Order{payment_method: "online", payment_status: "awaiting_payment"}),
+    do: "Awaiting QR payment"
+
   def payment_label(%Order{payment_method: "online", payment_status: "paid"}),
     do: "Paid online"
 
@@ -664,9 +689,25 @@ defmodule Espreso.Orders do
   defp normalize_payment_method(value) when value in [:online, "online"], do: "online"
   defp normalize_payment_method(_), do: "counter"
 
-  # Paid is only allowed for counter (POS pay-at-create). Online stays unpaid.
-  defp normalize_payment_status("counter", value) when value in [:paid, "paid"], do: "paid"
-  defp normalize_payment_status(_method, _value), do: "unpaid"
+  # Paid is only allowed for counter (POS pay-at-create).
+  defp normalize_payment_status("counter", value, _mode) when value in [:paid, "paid"],
+    do: "paid"
+
+  defp normalize_payment_status("counter", _value, _mode), do: "unpaid"
+
+  defp normalize_payment_status("online", _value, "qrph_manual"), do: "awaiting_payment"
+  defp normalize_payment_status("online", _value, _mode), do: "unpaid"
+
+  defp normalize_paid_via(opts) when is_list(opts) do
+    case Keyword.get(opts, :paid_via) do
+      value when value in @paid_vias -> value
+      value when is_atom(value) -> value |> Atom.to_string() |> normalize_paid_via_value()
+      _ -> "counter"
+    end
+  end
+
+  defp normalize_paid_via_value(value) when value in @paid_vias, do: value
+  defp normalize_paid_via_value(_), do: "counter"
 
   defp normalize_source(value) when value in [:pos, "pos"], do: "pos"
   defp normalize_source(_), do: "customer"
@@ -684,15 +725,16 @@ defmodule Espreso.Orders do
   defp broadcast(other), do: other
 
   # Verified PayMongo path — does not enforce the staff/manual online restriction.
-  defp apply_paid(%Order{id: order_id}) do
+  defp apply_paid(%Order{id: order_id}, paid_via) do
     invoke_apply_paid_barrier!()
 
     now = DateTime.utc_now() |> DateTime.truncate(:second)
+    paid_via = normalize_paid_via_value(paid_via)
 
     {count, _} =
       from(o in Order,
         where: o.id == ^order_id and o.status != "cancelled" and o.payment_status != "paid",
-        update: [set: [payment_status: "paid", updated_at: ^now]]
+        update: [set: [payment_status: "paid", paid_via: ^paid_via, updated_at: ^now]]
       )
       |> Repo.update_all([])
 

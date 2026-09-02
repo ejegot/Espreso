@@ -9,6 +9,7 @@ defmodule Espreso.Accounts.User do
     field :email, :string
     field :password, :string, virtual: true, redact: true
     field :password_hash, :string, redact: true
+    field :pin_hash, :string, redact: true
     field :role, :string, default: "barista"
     field :active, :boolean, default: true
 

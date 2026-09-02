@@ -96,6 +96,46 @@ defmodule Espreso.BusinessSettingsTest do
     assert BusinessSettings.get().business_name == BusinessSettings.defaults().business_name
   end
 
+  test "owner can update payment settings" do
+    owner = register!("Owner", "owner.payments@test.local", "owner")
+
+    assert {:ok, updated} =
+             BusinessSettings.update_as(owner, payment_attrs(%{"payments_mode" => "qrph_manual"}))
+
+    assert updated.payments_mode == "qrph_manual"
+    assert updated.gcash_qrph_path == "/images/gcash-qrph.png"
+    assert updated.maya_qrph_path == "/images/maya-qrph.png"
+    assert BusinessSettings.qrph_manual?()
+    assert BusinessSettings.payment_config().payments_mode == "qrph_manual"
+  end
+
+  test "invalid payments_mode fails validation" do
+    owner = register!("Owner", "owner.payments.invalid@test.local", "owner")
+
+    assert {:error, changeset} =
+             BusinessSettings.update_as(owner, payment_attrs(%{"payments_mode" => "bitcoin"}))
+
+    assert errors_on(changeset).payments_mode
+  end
+
+  defp payment_attrs(overrides \\ %{}) do
+    Map.merge(
+      %{
+        "business_name" => "CoffeeSpot Lilac",
+        "address" => "84 Lilac St., Concepcion Dos, Marikina City, Philippines, 1811",
+        "phone" => "+639566728906",
+        "email" => "hello@coffeespot.local",
+        "hours_text" => "Daily · 8:00 AM – 10:00 PM",
+        "instagram_url" => "https://www.instagram.com/coffeespot_lilac.marikina/",
+        "facebook_url" => "https://www.facebook.com/profile.php?id=61572602608495",
+        "tiktok_url" => "https://www.tiktok.com/@coffeespotlilac_",
+        "gcash_qrph_path" => "/images/gcash-qrph.png",
+        "maya_qrph_path" => "/images/maya-qrph.png"
+      },
+      overrides
+    )
+  end
+
   defp register!(name, email, role) do
     {:ok, user} =
       Accounts.register_user(%{
