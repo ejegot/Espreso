@@ -80,7 +80,8 @@ if config_env() == :prod do
     ],
     secret_key_base: secret_key_base
 
-  # ## SSL Support
+  config :espreso, Espreso.Accounts.Token,
+    signing_secret: secret_key_base
   #
   # To get SSL working, you will need to add the `https` key
   # to your endpoint configuration:

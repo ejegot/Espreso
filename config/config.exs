@@ -16,6 +16,10 @@ config :espreso,
   # Staff board at /orders — override with STAFF_ORDERS_PASSWORD in production.
   staff_orders_password: "coffeespot"
 
+config :espreso, Espreso.Accounts.Token,
+  access_ttl: 15 * 60,
+  refresh_ttl: 7 * 24 * 60 * 60
+
 # Configures the endpoint
 config :espreso, EspresoWeb.Endpoint,
   url: [host: "localhost"],

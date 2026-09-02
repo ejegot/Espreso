@@ -28,6 +28,7 @@ defmodule EspresoWeb.ConnCase do
       import Plug.Conn
       import Phoenix.ConnTest
       import EspresoWeb.ConnCase
+      import EspresoWeb.ApiCase
     end
   end
 

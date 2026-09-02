@@ -26,7 +26,7 @@ defmodule Espreso.BusinessSettings do
     instagram_url: "https://www.instagram.com/coffeespot_lilac.marikina/",
     facebook_url: "https://www.facebook.com/profile.php?id=61572602608495",
     tiktok_url: "https://www.tiktok.com/@coffeespotlilac_",
-    payments_mode: "paymongo",
+    payments_mode: "counter_only",
     gcash_qrph_path: nil,
     maya_qrph_path: nil,
     singleton_key: 1
@@ -65,7 +65,7 @@ defmodule Espreso.BusinessSettings do
   Returns the configured payments mode: `paymongo`, `qrph_manual`, or `counter_only`.
   """
   def payments_mode do
-    get().payments_mode || "paymongo"
+    get().payments_mode || "counter_only"
   end
 
   @doc """
@@ -75,7 +75,7 @@ defmodule Espreso.BusinessSettings do
     setting = get()
 
     %{
-      payments_mode: setting.payments_mode || "paymongo",
+      payments_mode: setting.payments_mode || "counter_only",
       gcash_qrph_path: setting.gcash_qrph_path,
       maya_qrph_path: setting.maya_qrph_path
     }

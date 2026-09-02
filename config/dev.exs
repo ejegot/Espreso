@@ -29,6 +29,9 @@ config :espreso, EspresoWeb.Endpoint,
     tailwind: {Tailwind, :install_and_run, [:espreso, ~w(--watch)]}
   ]
 
+config :espreso, Espreso.Accounts.Token,
+  signing_secret: "zQ+B6y8Wr7a+S2/gNmqDCDKy0yElwMncgOupK7++GNPp7lP/uyY01s8yEYJnCTZC"
+
 # ## SSL Support
 #
 # In order to use HTTPS in development, a self-signed
