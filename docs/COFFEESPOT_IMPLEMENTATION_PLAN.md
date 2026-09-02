@@ -1,7 +1,8 @@
 # CoffeeSpot — Implementation Plan (Option A)
 
 **Approach:** Functionality & connections first. UI/UX polish after everything works end-to-end.  
-**Status:** Layer 1 complete — Layer 2 next (API + JWT).  
+**Default payments mode:** `counter_only` (PayMongo disabled until owner QRPh ready → switch to `qrph_manual`).  
+**Status:** Layer 2 complete — Layer 3 next (wire existing LiveView UI).  
 **Updated:** 2026-09-02
 
 ---

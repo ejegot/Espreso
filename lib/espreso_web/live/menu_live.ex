@@ -4,6 +4,7 @@ defmodule EspresoWeb.MenuLive do
   alias Espreso.CoffeeSpot
   alias Espreso.Menu
   alias Espreso.Orders
+  alias Espreso.BusinessSettings
   alias Espreso.PayMongo
 
   @impl true
@@ -11,9 +12,12 @@ defmodule EspresoWeb.MenuLive do
     categories = Menu.list_menu()
     selected = default_category(categories)
 
+    payment_config = BusinessSettings.payment_config()
+
     {:ok,
      socket
      |> assign(:page_title, "Menu")
+     |> assign(:payments_mode, payment_config.payments_mode)
      |> assign(:menu_stage, :landing)
      |> assign(:menu_filter, nil)
      |> assign(:categories, categories)
@@ -287,13 +291,7 @@ defmodule EspresoWeb.MenuLive do
   end
 
   def handle_event("set_payment_method", %{"method" => method}, socket) do
-    payment_method =
-      case method do
-        "gcash" -> :gcash
-        "maya" -> :maya
-        _ -> :counter
-      end
-
+    payment_method = resolve_payment_method(method, socket.assigns.payments_mode)
     {:noreply, assign(socket, :payment_method, payment_method)}
   end
 
@@ -311,7 +309,11 @@ defmodule EspresoWeb.MenuLive do
         {:noreply, assign(socket, :checkout_errors, errors)}
 
       socket.assigns.payment_method in [:gcash, :maya] ->
-        place_online_order(socket, socket.assigns.payment_method)
+        case socket.assigns.payments_mode do
+          "paymongo" -> place_online_order(socket, socket.assigns.payment_method)
+          "qrph_manual" -> place_qrph_order(socket, socket.assigns.payment_method)
+          _ -> place_counter_order(socket)
+        end
 
       true ->
         place_counter_order(socket)
@@ -1224,12 +1226,16 @@ defmodule EspresoWeb.MenuLive do
                 </div>
 
                 <fieldset
-                  :if={checkout_valid?(@fulfillment, @customer_name, @table_number)}
+                  :if={
+                    checkout_valid?(@fulfillment, @customer_name, @table_number) &&
+                      @payments_mode != "counter_only"
+                  }
                   class="menu-checkout-payment"
                 >
                   <legend class="menu-checkout-label">How will you pay?</legend>
                   <div class="menu-checkout-options" role="radiogroup" aria-label="Payment">
                     <button
+                      :if={@payments_mode in ["paymongo", "qrph_manual"]}
                       type="button"
                       class={["menu-checkout-option", @payment_method == :gcash && "is-active"]}
                       phx-click="set_payment_method"
@@ -1239,6 +1245,7 @@ defmodule EspresoWeb.MenuLive do
                       GCash
                     </button>
                     <button
+                      :if={@payments_mode in ["paymongo", "qrph_manual"]}
                       type="button"
                       class={["menu-checkout-option", @payment_method == :maya && "is-active"]}
                       phx-click="set_payment_method"
@@ -1258,13 +1265,18 @@ defmodule EspresoWeb.MenuLive do
                     </button>
                   </div>
                   <p class="menu-checkout-payment-note menu-basket-note">
-                    <%= if @payment_method == :counter do %>
-                      Pay at the counter when your order is ready.
-                    <% else %>
-                      Continue to PayMongo to complete payment.
-                    <% end %>
+                    {payment_checkout_note(@payment_method, @payments_mode)}
                   </p>
                 </fieldset>
+                <p
+                  :if={
+                    checkout_valid?(@fulfillment, @customer_name, @table_number) &&
+                      @payments_mode == "counter_only"
+                  }
+                  class="menu-checkout-payment-note menu-basket-note"
+                >
+                  Pay at the counter when your order is ready.
+                </p>
                 </div>
               </form>
             </div>
@@ -2485,6 +2497,27 @@ defmodule EspresoWeb.MenuLive do
     end
   end
 
+  defp place_qrph_order(socket, _channel) do
+    socket = assign(socket, :placing_order?, true)
+
+    case Orders.create_order(socket.assigns.cart, order_attrs(socket, :online)) do
+      {:ok, order} ->
+        {:noreply, finalize_counter_order(socket, order)}
+
+      {:error, {:unavailable, names}} ->
+        {:noreply, order_failure(socket, unavailable_toast(names))}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply,
+         socket
+         |> assign(:placing_order?, false)
+         |> assign(:checkout_errors, checkout_errors_from_changeset(changeset))}
+
+      {:error, _} ->
+        {:noreply, order_failure(socket, "Could not place order — try again")}
+    end
+  end
+
   defp place_online_order(socket, channel) do
     socket = assign(socket, :placing_order?, true)
 
@@ -2606,4 +2639,24 @@ defmodule EspresoWeb.MenuLive do
   defp checkout_button_label(:counter, false), do: "Place order"
   defp checkout_button_label(:gcash, false), do: "Continue to GCash"
   defp checkout_button_label(:maya, false), do: "Continue to Maya"
+
+  defp resolve_payment_method("gcash", mode) when mode in ["paymongo", "qrph_manual"], do: :gcash
+  defp resolve_payment_method("maya", mode) when mode in ["paymongo", "qrph_manual"], do: :maya
+  defp resolve_payment_method(_, _), do: :counter
+
+  defp payment_checkout_note(:counter, _), do: "Pay at the counter when your order is ready."
+
+  defp payment_checkout_note(:gcash, "paymongo"),
+    do: "Continue to PayMongo to complete payment."
+
+  defp payment_checkout_note(:maya, "paymongo"),
+    do: "Continue to PayMongo to complete payment."
+
+  defp payment_checkout_note(:gcash, "qrph_manual"),
+    do: "You'll get a GCash QR code on the next screen."
+
+  defp payment_checkout_note(:maya, "qrph_manual"),
+    do: "You'll get a Maya QR code on the next screen."
+
+  defp payment_checkout_note(_, _), do: "Pay at the counter when your order is ready."
 end

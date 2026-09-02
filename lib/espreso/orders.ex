@@ -194,6 +194,60 @@ defmodule Espreso.Orders do
     |> Repo.all()
   end
 
+  @doc """
+  Lists orders for the staff API.
+
+  Supported `scope` values: `active` (default), `unpaid`, `today`.
+  """
+  def list_orders_for_api(scope \\ "active") when is_binary(scope) do
+    orders =
+      case scope do
+        "unpaid" -> list_todays_unpaid()
+        "today" -> list_todays_orders(100)
+        _ -> list_active_orders()
+      end
+
+    Repo.preload(orders, :items)
+  end
+
+  @doc """
+  Loads a single order with items for the staff API.
+  """
+  def get_order_for_api(id) when is_integer(id) do
+    case Repo.get(Order, id) |> Repo.preload(:items) do
+      nil -> {:error, :not_found}
+      %Order{} = order -> {:ok, order}
+    end
+  end
+
+  @doc """
+  Updates order status from the staff API.
+
+  Accepts `received`, `preparing`, `ready`, `completed`, and `cancelled`.
+  """
+  def update_status_for_api(%Order{} = order, status) when is_binary(status) do
+    case status do
+      status when status in ["received", "preparing", "ready"] ->
+        update_status(order, status)
+
+      "completed" ->
+        complete_order(order)
+
+      "cancelled" ->
+        cancel_order_for_api(order)
+
+      _ ->
+        {:error, :invalid_status}
+    end
+  end
+
+  defp cancel_order_for_api(%Order{payment_method: "online", paymongo_checkout_session_id: session_id} = order)
+       when is_binary(session_id) and session_id != "" do
+    abandon_online_payment(order)
+  end
+
+  defp cancel_order_for_api(%Order{} = order), do: cancel_order(order)
+
   def list_recent_ready(limit \\ 10) do
     Order
     |> where([o], o.status == "ready")

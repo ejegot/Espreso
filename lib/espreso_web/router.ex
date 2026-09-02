@@ -17,6 +17,54 @@ defmodule EspresoWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :api_auth do
+    plug :accepts, ["json"]
+    plug EspresoWeb.Plugs.ApiAuth
+  end
+
+  pipeline :api_orders do
+    plug :accepts, ["json"]
+    plug EspresoWeb.Plugs.ApiAuth
+    plug EspresoWeb.Plugs.RequirePermission, :orders
+  end
+
+  pipeline :api_view_menu do
+    plug :accepts, ["json"]
+    plug EspresoWeb.Plugs.ApiAuth
+    plug EspresoWeb.Plugs.RequirePermission, :view_menu
+  end
+
+  scope "/api/v1", EspresoWeb.Api.V1, as: :api_v1 do
+    pipe_through :api
+
+    get "/staff/roster", StaffController, :roster
+    post "/auth/pin", AuthController, :pin
+    post "/auth/email", AuthController, :email
+    post "/auth/refresh", AuthController, :refresh
+  end
+
+  scope "/api/v1", EspresoWeb.Api.V1, as: :api_v1 do
+    pipe_through :api_view_menu
+
+    get "/menu", MenuController, :index
+  end
+
+  scope "/api/v1", EspresoWeb.Api.V1, as: :api_v1 do
+    pipe_through :api_auth
+
+    get "/settings/business", SettingsController, :business
+  end
+
+  scope "/api/v1", EspresoWeb.Api.V1, as: :api_v1 do
+    pipe_through :api_orders
+
+    get "/orders", OrderController, :index
+    get "/orders/:id", OrderController, :show
+    post "/orders", OrderController, :create
+    patch "/orders/:id/status", OrderController, :update_status
+    patch "/orders/:id/mark_paid", OrderController, :mark_paid
+  end
+
   scope "/", EspresoWeb do
     pipe_through :api
 

@@ -36,6 +36,9 @@ config :phoenix, :plug_init_mode, :runtime
 config :phoenix_live_view,
   enable_expensive_runtime_checks: true
 
+config :espreso, Espreso.Accounts.Token,
+  signing_secret: "ASqZUTSI162nDKoh0v2IG76nhVX/zWIBtSdTgK5OZTGy+NAWNKFrVraBuTqtVd/A"
+
 config :espreso, :paymongo,
   client: Espreso.PayMongo.StubClient,
   secret_key: "sk_test_placeholder",

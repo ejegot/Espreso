@@ -1024,12 +1024,8 @@ defmodule EspresoWeb.MenuLiveTest do
     |> render_change()
 
     refute has_element?(view, "#menu-checkout-summary")
-    assert has_element?(view, ".menu-checkout-payment .menu-checkout-option", "GCash")
-    assert has_element?(view, ".menu-checkout-payment .menu-checkout-option", "Maya")
-    assert has_element?(view, ".menu-checkout-payment .menu-checkout-option", "Cash at counter")
+    refute has_element?(view, ".menu-checkout-payment .menu-checkout-option")
     assert has_element?(view, "button.menu-basket-checkout", "Place order")
-    refute has_element?(view, ".menu-checkout-payment-info")
-    refute has_element?(view, ".menu-basket-submit-payment")
     assert has_element?(view, ".menu-checkout-payment-note", "Pay at the counter when your order is ready.")
     refute has_element?(view, ".menu-basket-submit-payment")
     refute has_element?(view, ".menu-basket-alt-label")
@@ -1097,6 +1093,7 @@ defmodule EspresoWeb.MenuLiveTest do
   end
 
   test "/menu GCash checkout creates unpaid order and redirects to PayMongo", %{conn: conn} do
+    set_payments_mode!("paymongo")
     {:ok, view, _html} = live(conn, ~p"/menu")
     view = enter_menu_browse(view)
 
@@ -1131,6 +1128,7 @@ defmodule EspresoWeb.MenuLiveTest do
   end
 
   test "/menu Maya checkout shows Continue to Maya CTA and starts PayMongo flow", %{conn: conn} do
+    set_payments_mode!("paymongo")
     {:ok, view, _html} = live(conn, ~p"/menu")
     view = enter_menu_browse(view)
 
@@ -1157,7 +1155,41 @@ defmodule EspresoWeb.MenuLiveTest do
     assert checkout_url =~ "checkout.paymongo.test"
   end
 
+  test "/menu QRPh GCash checkout places awaiting_payment order without PayMongo", %{conn: conn} do
+    set_payments_mode!("qrph_manual")
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view = enter_menu_browse(view)
+
+    view = add_to_order(view, "Espresso")
+    view |> element("button.brune-icon-bag") |> render_click()
+
+    view
+    |> form("#menu-checkout-form", %{
+      customer_name: "QR Guest",
+      table_number: "5"
+    })
+    |> render_change()
+
+    view |> element("button.menu-checkout-option", "GCash") |> render_click()
+    assert has_element?(view, ".menu-checkout-payment-note", "GCash QR code on the next screen")
+
+    {:ok, order_view, _html} =
+      view
+      |> element("button.menu-basket-checkout", "Continue to GCash")
+      |> render_click()
+      |> follow_redirect(conn)
+
+    assert has_element?(order_view, "#order-confirm")
+
+    [order] = Orders.list_active_orders()
+    assert order.customer_name == "QR Guest"
+    assert order.payment_method == "online"
+    assert order.payment_status == "awaiting_payment"
+    assert is_nil(order.paymongo_checkout_session_id)
+  end
+
   test "/menu cancels orphan order when PayMongo checkout creation fails", %{conn: conn} do
+    set_payments_mode!("paymongo")
     original = Application.get_env(:espreso, :paymongo)
 
     on_exit(fn ->
@@ -1186,6 +1218,7 @@ defmodule EspresoWeb.MenuLiveTest do
   end
 
   test "/menu cancels orphan order when session attach fails", %{conn: conn} do
+    set_payments_mode!("paymongo")
     original = Application.get_env(:espreso, :paymongo)
 
     on_exit(fn ->
@@ -1980,6 +2013,7 @@ defmodule EspresoWeb.MenuLiveTest do
   end
 
   defp prepare_gcash_checkout(view, customer_name) do
+    set_payments_mode!("paymongo")
     view = enter_menu_browse(view)
 
     view = add_to_order(view, "Espresso")
@@ -1998,6 +2032,12 @@ defmodule EspresoWeb.MenuLiveTest do
 
   defp orders_named(name) do
     Enum.filter(Repo.all(Espreso.Orders.Order), &(&1.customer_name == name))
+  end
+
+  defp set_payments_mode!(mode) do
+    Espreso.BusinessSettings.get()
+    |> Ecto.Changeset.change(%{payments_mode: mode})
+    |> Repo.update!()
   end
 
   defp insert_category!(name) do
