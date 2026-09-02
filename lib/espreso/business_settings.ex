@@ -10,6 +10,8 @@ defmodule Espreso.BusinessSettings do
   alias Espreso.BusinessSettings.Setting
   alias Espreso.Repo
 
+  @payments_modes ~w(paymongo qrph_manual counter_only)
+
   @defaults %{
     business_name: "CoffeeSpot",
     address: "84 Lilac St., Concepcion Dos, Marikina City, Philippines, 1811",
@@ -24,6 +26,9 @@ defmodule Espreso.BusinessSettings do
     instagram_url: "https://www.instagram.com/coffeespot_lilac.marikina/",
     facebook_url: "https://www.facebook.com/profile.php?id=61572602608495",
     tiktok_url: "https://www.tiktok.com/@coffeespotlilac_",
+    payments_mode: "paymongo",
+    gcash_qrph_path: nil,
+    maya_qrph_path: nil,
     singleton_key: 1
   }
 
@@ -53,6 +58,32 @@ defmodule Espreso.BusinessSettings do
   end
 
   def defaults, do: @defaults
+
+  def payments_modes, do: @payments_modes
+
+  @doc """
+  Returns the configured payments mode: `paymongo`, `qrph_manual`, or `counter_only`.
+  """
+  def payments_mode do
+    get().payments_mode || "paymongo"
+  end
+
+  @doc """
+  Payment-related settings for checkout and staff flows.
+  """
+  def payment_config do
+    setting = get()
+
+    %{
+      payments_mode: setting.payments_mode || "paymongo",
+      gcash_qrph_path: setting.gcash_qrph_path,
+      maya_qrph_path: setting.maya_qrph_path
+    }
+  end
+
+  def qrph_manual?, do: payments_mode() == "qrph_manual"
+  def counter_only?, do: payments_mode() == "counter_only"
+  def paymongo?, do: payments_mode() == "paymongo"
 
   def change(%Setting{} = setting, attrs \\ %{}) do
     setting

@@ -6,6 +6,8 @@ defmodule Espreso.BusinessSettings.Setting do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @payments_modes ~w(paymongo qrph_manual counter_only)
+
   schema "business_settings" do
     field :business_name, :string
     field :address, :string
@@ -15,11 +17,16 @@ defmodule Espreso.BusinessSettings.Setting do
     field :instagram_url, :string
     field :facebook_url, :string
     field :tiktok_url, :string
+    field :payments_mode, :string, default: "paymongo"
+    field :gcash_qrph_path, :string
+    field :maya_qrph_path, :string
     field :singleton_key, :integer, default: 1
     field :hours_text, :string, virtual: true
 
     timestamps(type: :utc_datetime)
   end
+
+  def payments_modes, do: @payments_modes
 
   @required_fields [
     :business_name,
@@ -33,7 +40,10 @@ defmodule Espreso.BusinessSettings.Setting do
 
   def changeset(setting, attrs) do
     setting
-    |> cast(attrs, @required_fields ++ [:hours_lines, :hours_text])
+    |> cast(attrs, @required_fields ++ [:hours_lines, :hours_text, :payments_mode, :gcash_qrph_path, :maya_qrph_path])
+    |> update_change(:payments_mode, &trim/1)
+    |> update_change(:gcash_qrph_path, &blank_to_nil/1)
+    |> update_change(:maya_qrph_path, &blank_to_nil/1)
     |> put_hours_lines_from_text()
     |> update_change(:business_name, &trim/1)
     |> update_change(:address, &trim/1)
@@ -50,6 +60,7 @@ defmodule Espreso.BusinessSettings.Setting do
     |> validate_url(:instagram_url)
     |> validate_url(:facebook_url)
     |> validate_url(:tiktok_url)
+    |> validate_inclusion(:payments_mode, @payments_modes)
     |> validate_hours_lines()
     |> unique_constraint(:singleton_key)
   end
@@ -99,6 +110,15 @@ defmodule Espreso.BusinessSettings.Setting do
 
   defp trim(nil), do: nil
   defp trim(value) when is_binary(value), do: String.trim(value)
+
+  defp blank_to_nil(nil), do: nil
+
+  defp blank_to_nil(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
 
   defp normalize_email(nil), do: nil
 

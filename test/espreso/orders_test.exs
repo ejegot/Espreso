@@ -1346,4 +1346,137 @@ defmodule Espreso.OrdersTest do
     refute yesterday_unpaid.id in unpaid_ids
     refute Enum.any?(unpaid, &Ecto.assoc_loaded?(&1.items))
   end
+
+  describe "payment model layer 1" do
+    alias Espreso.Accounts
+    alias Espreso.BusinessSettings
+
+    setup do
+      {:ok, owner} =
+        Accounts.register_user(%{
+          name: "Payment Owner",
+          email: "payment.owner@coffeespot.local",
+          password: "password123",
+          role: "owner"
+        })
+
+      {:ok, _} =
+        BusinessSettings.update_as(owner, %{
+          "business_name" => "CoffeeSpot",
+          "address" => "84 Lilac St., Concepcion Dos, Marikina City, Philippines, 1811",
+          "phone" => "+639566728906",
+          "email" => "payment@coffeespot.local",
+          "hours_text" => "Daily · 8:00 AM – 10:00 PM",
+          "instagram_url" => "https://www.instagram.com/coffeespot_lilac.marikina/",
+          "facebook_url" => "https://www.facebook.com/profile.php?id=61572602608495",
+          "tiktok_url" => "https://www.tiktok.com/@coffeespotlilac_"
+        })
+
+      :ok
+    end
+
+    test "online order in qrph_manual mode starts as awaiting_payment" do
+      set_payments_mode!("qrph_manual")
+
+      lines = [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("100")}]
+
+      assert {:ok, order} =
+               Orders.create_order(lines, %{
+                 customer_name: "QR Guest",
+                 fulfillment: :pickup,
+                 payment_method: :online
+               })
+
+      assert order.payment_status == "awaiting_payment"
+      assert Orders.payment_label(order) == "Awaiting QR payment"
+    end
+
+    test "staff can mark awaiting_payment paid with paid_via in qrph_manual mode" do
+      set_payments_mode!("qrph_manual")
+
+      lines = [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("100")}]
+
+      {:ok, order} =
+        Orders.create_order(lines, %{
+          customer_name: "QR Confirm",
+          fulfillment: :pickup,
+          payment_method: :online
+        })
+
+      assert {:ok, paid} = Orders.mark_paid(order, paid_via: "gcash")
+      assert paid.payment_status == "paid"
+      assert paid.paid_via == "gcash"
+    end
+
+    test "online unpaid paymongo orders still block manual mark_paid" do
+      set_payments_mode!("paymongo")
+
+      lines = [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("100")}]
+
+      {:ok, order} =
+        Orders.create_order(lines, %{
+          customer_name: "PayMongo Guest",
+          fulfillment: :pickup,
+          payment_method: :online
+        })
+
+      assert order.payment_status == "unpaid"
+      assert {:error, :online_payment_required} = Orders.mark_paid(order, paid_via: "gcash")
+    end
+
+    test "counter mark_paid stores paid_via" do
+      lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+      {:ok, order} =
+        Orders.create_order(lines, %{
+          customer_name: "Cash Guest",
+          fulfillment: :pickup,
+          payment_method: :counter
+        })
+
+      assert {:ok, paid} = Orders.mark_paid(order, paid_via: "cash")
+      assert paid.payment_status == "paid"
+      assert paid.paid_via == "cash"
+    end
+
+    test "paymongo webhook sets paid_via to paymongo" do
+      set_payments_mode!("paymongo")
+
+      lines = [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("100")}]
+
+      {:ok, order} =
+        Orders.create_order(lines, %{
+          customer_name: "Webhook Guest",
+          fulfillment: :pickup,
+          payment_method: :online
+        })
+
+      assert {:ok, paid} = Orders.mark_paid_from_paymongo(order.number)
+      assert paid.paid_via == "paymongo"
+    end
+
+    test "list_todays_unpaid includes awaiting_payment orders" do
+      set_payments_mode!("qrph_manual")
+
+      lines = [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("100")}]
+
+      {:ok, order} =
+        Orders.create_order(lines, %{
+          customer_name: "Unpaid QR",
+          fulfillment: :pickup,
+          payment_method: :online
+        })
+
+      unpaid_numbers = Orders.list_todays_unpaid() |> Enum.map(& &1.number)
+      assert order.number in unpaid_numbers
+    end
+  end
+
+  defp set_payments_mode!(mode) do
+    setting = Espreso.BusinessSettings.get()
+
+    setting
+    |> Ecto.Changeset.change(%{payments_mode: mode})
+    |> Repo.update!()
+  end
 end

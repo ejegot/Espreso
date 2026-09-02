@@ -223,4 +223,95 @@ defmodule Espreso.AccountsTest do
 
     assert promoted.role == "manager"
   end
+
+  test "set_pin, verify_pin, and clear_pin" do
+    {:ok, user} =
+      Accounts.register_user(%{
+        name: "Pin User",
+        email: "pin@coffeespot.local",
+        password: "password123",
+        role: "barista"
+      })
+
+    refute Accounts.pin_set?(user)
+
+    assert {:ok, with_pin} = Accounts.set_pin(user, "1234")
+    assert Accounts.pin_set?(with_pin)
+    assert {:ok, verified} = Accounts.verify_pin(with_pin, "1234")
+    assert verified.id == user.id
+
+    assert {:error, :invalid_pin} = Accounts.verify_pin(with_pin, "9999")
+    assert {:error, :invalid_pin_format} = Accounts.set_pin(with_pin, "12")
+    assert {:error, :invalid_pin_format} = Accounts.set_pin(with_pin, "1234567")
+
+    assert {:ok, cleared} = Accounts.clear_pin(with_pin)
+    refute Accounts.pin_set?(cleared)
+    assert {:error, :pin_not_set} = Accounts.verify_pin(cleared, "1234")
+  end
+
+  test "inactive user cannot verify pin" do
+    {:ok, user} =
+      Accounts.register_user(%{
+        name: "Inactive Pin",
+        email: "inactive.pin@coffeespot.local",
+        password: "password123",
+        role: "barista"
+      })
+
+    {:ok, user} = Accounts.set_pin(user, "4321")
+    {:ok, _} = Accounts.update_user(user, %{active: false})
+
+    assert {:error, :inactive} = Accounts.verify_pin(user, "4321")
+  end
+
+  test "owner can set pin for staff via set_pin_as" do
+    {:ok, owner} =
+      Accounts.register_user(%{
+        name: "Owner Pin",
+        email: "owner.pin@coffeespot.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    {:ok, staff} =
+      Accounts.register_user(%{
+        name: "Staff Pin",
+        email: "staff.pin@coffeespot.local",
+        password: "password123",
+        role: "barista"
+      })
+
+    assert {:ok, staff} = Accounts.set_pin_as(owner, staff, "5678")
+    assert {:ok, _} = Accounts.verify_pin(staff, "5678")
+
+    assert {:error, :unauthorized} = Accounts.set_pin_as(staff, owner, "1111")
+  end
+
+  test "list_active_staff_for_roster excludes inactive users" do
+    {:ok, active} =
+      Accounts.register_user(%{
+        name: "Zara",
+        email: "zara@coffeespot.local",
+        password: "password123",
+        role: "barista"
+      })
+
+    {:ok, inactive} =
+      Accounts.register_user(%{
+        name: "Inactive",
+        email: "inactive.roster@coffeespot.local",
+        password: "password123",
+        role: "barista"
+      })
+
+    {:ok, _} = Accounts.update_user(inactive, %{active: false})
+
+    roster = Accounts.list_active_staff_for_roster()
+    ids = Enum.map(roster, & &1.id)
+
+    assert active.id in ids
+    refute inactive.id in ids
+    assert Enum.all?(roster, &match?(%{id: _, name: _, role: _}, &1))
+    refute Enum.any?(roster, &Map.has_key?(&1, :pin_hash))
+  end
 end

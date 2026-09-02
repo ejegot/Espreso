@@ -6,7 +6,8 @@ defmodule Espreso.Orders.Order do
 
   @statuses ~w(received preparing ready completed cancelled)
   @payment_methods ~w(counter online)
-  @payment_statuses ~w(unpaid paid)
+  @payment_statuses ~w(unpaid awaiting_payment paid)
+  @paid_vias ~w(cash gcash maya counter paymongo)
   @fulfillments ~w(dine_in pickup)
   @sources ~w(customer pos)
 
@@ -19,6 +20,7 @@ defmodule Espreso.Orders.Order do
     field :status, :string, default: "received"
     field :payment_method, :string, default: "counter"
     field :payment_status, :string, default: "unpaid"
+    field :paid_via, :string
     field :source, :string, default: "customer"
     field :paymongo_checkout_session_id, :string
     field :total, :decimal
@@ -31,6 +33,7 @@ defmodule Espreso.Orders.Order do
   def statuses, do: @statuses
   def payment_methods, do: @payment_methods
   def payment_statuses, do: @payment_statuses
+  def paid_vias, do: @paid_vias
   def fulfillments, do: @fulfillments
   def sources, do: @sources
 
@@ -45,6 +48,7 @@ defmodule Espreso.Orders.Order do
       :status,
       :payment_method,
       :payment_status,
+      :paid_via,
       :source,
       :paymongo_checkout_session_id,
       :total
@@ -64,6 +68,7 @@ defmodule Espreso.Orders.Order do
     |> validate_inclusion(:status, @statuses)
     |> validate_inclusion(:payment_method, @payment_methods)
     |> validate_inclusion(:payment_status, @payment_statuses)
+    |> validate_paid_via()
     |> validate_inclusion(:source, @sources)
     |> validate_fulfillment_table()
     |> validate_number(:total, greater_than_or_equal_to: 0)
@@ -92,10 +97,18 @@ defmodule Espreso.Orders.Order do
 
   def payment_changeset(order, attrs) do
     order
-    |> cast(attrs, [:payment_status, :payment_method, :paymongo_checkout_session_id])
+    |> cast(attrs, [:payment_status, :payment_method, :paymongo_checkout_session_id, :paid_via])
     |> validate_inclusion(:payment_status, @payment_statuses)
     |> validate_inclusion(:payment_method, @payment_methods)
+    |> validate_paid_via()
     |> unique_constraint(:paymongo_checkout_session_id)
+  end
+
+  defp validate_paid_via(changeset) do
+    case get_change(changeset, :paid_via) do
+      nil -> changeset
+      _value -> validate_inclusion(changeset, :paid_via, @paid_vias)
+    end
   end
 
   defp validate_fulfillment_table(changeset) do
