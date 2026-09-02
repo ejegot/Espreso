@@ -1406,6 +1406,33 @@ defmodule Espreso.OrdersTest do
       assert {:ok, paid} = Orders.mark_paid(order, paid_via: "gcash")
       assert paid.payment_status == "paid"
       assert paid.paid_via == "gcash"
+      assert Orders.payment_label(paid) == "Paid via GCash"
+    end
+
+    test "payment_label reflects online wallet while awaiting QRPh payment" do
+      set_payments_mode!("qrph_manual")
+
+      lines = [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("100")}]
+
+      assert {:ok, gcash_order} =
+               Orders.create_order(lines, %{
+                 customer_name: "GCash Guest",
+                 fulfillment: :pickup,
+                 payment_method: :online,
+                 online_wallet: :gcash
+               })
+
+      assert Orders.payment_label(gcash_order) == "Awaiting GCash payment"
+
+      assert {:ok, maya_order} =
+               Orders.create_order(lines, %{
+                 customer_name: "Maya Guest",
+                 fulfillment: :pickup,
+                 payment_method: :online,
+                 online_wallet: :maya
+               })
+
+      assert Orders.payment_label(maya_order) == "Awaiting Maya payment"
     end
 
     test "online unpaid paymongo orders still block manual mark_paid" do

@@ -2,7 +2,7 @@
 
 **Approach:** Functionality & connections first. UI/UX polish after everything works end-to-end.  
 **Default payments mode:** `counter_only` (PayMongo disabled until owner QRPh ready → switch to `qrph_manual`).  
-**Status:** Layer 2 complete — Layer 3 next (wire existing LiveView UI).  
+**Status:** Layer 3 complete — wire existing LiveView UI done. Layer 4 next (UI/UX polish).  
 **Updated:** 2026-09-02
 
 ---

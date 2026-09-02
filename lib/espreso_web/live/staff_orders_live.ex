@@ -1,6 +1,7 @@
 defmodule EspresoWeb.StaffOrdersLive do
   use EspresoWeb, :live_view
 
+  alias Espreso.BusinessSettings
   alias Espreso.Orders
 
   @ready_lane_limit 100
@@ -64,14 +65,15 @@ defmodule EspresoWeb.StaffOrdersLive do
     end
   end
 
-  def handle_event("mark_paid", %{"id" => id}, socket) do
+  def handle_event("mark_paid", %{"id" => id} = params, socket) do
     order = Espreso.Repo.get!(Espreso.Orders.Order, id)
+    paid_via = Map.get(params, "paid_via", "counter")
 
-    case Orders.mark_paid(order) do
+    case Orders.mark_paid(order, paid_via: paid_via) do
       {:ok, paid} ->
         {:noreply,
          socket
-         |> assign(:flash_note, "#{paid.number} marked paid.")
+         |> assign(:flash_note, "#{paid.number} marked paid (#{paid_via_label(paid_via)}).")
          |> load_orders()}
 
       {:error, :cancelled} ->
@@ -82,7 +84,7 @@ defmodule EspresoWeb.StaffOrdersLive do
          assign(
            socket,
            :flash_note,
-           "Online orders are marked paid only after PayMongo verifies payment."
+           "This online order cannot be marked paid manually — wait for PayMongo or switch to QRPh mode."
          )}
 
       {:error, _} ->
@@ -329,16 +331,8 @@ defmodule EspresoWeb.StaffOrdersLive do
                   </span>
                 </p>
               </div>
-              <div :if={order.payment_method != "online"} class="staff-order-actions">
-                <button
-                  type="button"
-                  class="staff-action staff-action-primary"
-                  id={"unpaid-mark-paid-#{order.id}"}
-                  phx-click="mark_paid"
-                  phx-value-id={order.id}
-                >
-                  Mark paid
-                </button>
+              <div class="staff-order-actions">
+                {mark_paid_buttons(%{order: order, id_prefix: "unpaid"})}
               </div>
             </article>
           </div>
@@ -517,17 +511,8 @@ defmodule EspresoWeb.StaffOrdersLive do
           Picked up
         </button>
 
-        <div :if={@order.payment_status == "unpaid"} class="staff-order-secondary-actions">
-          <button
-            :if={@order.payment_method != "online"}
-            type="button"
-            class="staff-action staff-action-secondary"
-            id={if(@order.status == "ready", do: "ready-mark-paid-#{@order.id}")}
-            phx-click="mark_paid"
-            phx-value-id={@order.id}
-          >
-            Mark paid
-          </button>
+        <div :if={needs_payment_actions?(@order)} class="staff-order-secondary-actions">
+          {mark_paid_buttons(%{order: @order, id_prefix: "ticket"})}
           <button
             :if={
               @order.status in ["received", "preparing"] and not checkout_session_attached?(@order)
@@ -541,7 +526,7 @@ defmodule EspresoWeb.StaffOrdersLive do
             Cancel
           </button>
           <button
-            :if={@order.status in ["received", "preparing"] and checkout_session_attached?(@order)}
+            :if={show_abandon_payment?(@order)}
             type="button"
             class="staff-action staff-action-muted"
             id={"abandon-online-payment-#{@order.id}"}
@@ -569,6 +554,86 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   defp unpaid_online?(_order), do: false
 
+  defp needs_payment_actions?(%{payment_status: status})
+       when status in ["unpaid", "awaiting_payment"],
+       do: true
+
+  defp needs_payment_actions?(_), do: false
+
+  defp staff_mark_paid?(%{payment_method: "counter", payment_status: status})
+       when status in ["unpaid", "awaiting_payment"],
+       do: true
+
+  defp staff_mark_paid?(%{payment_method: "online", payment_status: "awaiting_payment"}),
+    do: BusinessSettings.qrph_manual?()
+
+  defp staff_mark_paid?(_), do: false
+
+  defp show_abandon_payment?(%{payment_method: "online", payment_status: "unpaid"} = order) do
+    checkout_session_attached?(order) and not BusinessSettings.qrph_manual?()
+  end
+
+  defp show_abandon_payment?(_), do: false
+
+  defp mark_paid_buttons(assigns) do
+    ~H"""
+    <div
+      :if={staff_mark_paid?(@order)}
+      class="staff-order-mark-paid"
+      id={"#{@id_prefix}-mark-paid-#{@order.id}"}
+    >
+      <button
+        type="button"
+        class="staff-action staff-action-secondary"
+        id={"#{@id_prefix}-mark-paid-cash-#{@order.id}"}
+        phx-click="mark_paid"
+        phx-value-id={@order.id}
+        phx-value-paid_via="cash"
+      >
+        Cash
+      </button>
+      <button
+        type="button"
+        class="staff-action staff-action-secondary"
+        id={"#{@id_prefix}-mark-paid-gcash-#{@order.id}"}
+        phx-click="mark_paid"
+        phx-value-id={@order.id}
+        phx-value-paid_via="gcash"
+      >
+        GCash
+      </button>
+      <button
+        type="button"
+        class="staff-action staff-action-secondary"
+        id={"#{@id_prefix}-mark-paid-maya-#{@order.id}"}
+        phx-click="mark_paid"
+        phx-value-id={@order.id}
+        phx-value-paid_via="maya"
+      >
+        Maya
+      </button>
+      <button
+        :if={@order.payment_method == "counter"}
+        type="button"
+        class="staff-action staff-action-secondary"
+        id={"#{@id_prefix}-mark-paid-counter-#{@order.id}"}
+        phx-click="mark_paid"
+        phx-value-id={@order.id}
+        phx-value-paid_via="counter"
+      >
+        Counter
+      </button>
+    </div>
+    """
+  end
+
+  defp paid_via_label("cash"), do: "cash"
+  defp paid_via_label("gcash"), do: "GCash"
+  defp paid_via_label("maya"), do: "Maya"
+  defp paid_via_label("counter"), do: "counter"
+  defp paid_via_label(other) when is_binary(other), do: other
+  defp paid_via_label(_), do: "paid"
+
   defp source_badge(%{source: "pos"}), do: %{label: "WALK-IN", class: "staff-order-source--pos"}
   defp source_badge(_), do: %{label: "QR", class: "staff-order-source--customer"}
 
@@ -588,6 +653,7 @@ defmodule EspresoWeb.StaffOrdersLive do
   defp freshly_received?(_), do: false
 
   defp payment_state_label(%{payment_status: "paid"}), do: "Paid"
+  defp payment_state_label(%{payment_status: "awaiting_payment"}), do: "Await QR"
   defp payment_state_label(_), do: "Unpaid"
 
   defp fulfillment_short(%{fulfillment: "dine_in", table_number: table})

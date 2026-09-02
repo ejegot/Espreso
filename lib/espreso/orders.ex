@@ -61,6 +61,16 @@ defmodule Espreso.Orders do
         BusinessSettings.payments_mode()
       )
 
+    paid_via =
+      if payment_status == "paid" do
+        normalize_paid_via_attr(Map.get(attrs, :paid_via) || Map.get(attrs, "paid_via"))
+      else
+        nil
+      end
+
+    online_wallet =
+      normalize_online_wallet(Map.get(attrs, :online_wallet) || Map.get(attrs, "online_wallet"))
+
     total =
       Enum.reduce(lines, Decimal.new(0), fn line, acc ->
         Decimal.add(acc, Decimal.mult(line.price, line.quantity))
@@ -74,6 +84,8 @@ defmodule Espreso.Orders do
       notes: blank_to_nil(Map.get(attrs, :notes) || Map.get(attrs, "notes")),
       payment_method: payment_method,
       payment_status: payment_status,
+      paid_via: paid_via,
+      online_wallet: online_wallet,
       source: source,
       status: "received",
       total: total
@@ -699,11 +711,30 @@ defmodule Espreso.Orders do
   def payment_label(%Order{payment_method: "counter", payment_status: "unpaid"}),
     do: "Pay at counter"
 
+  def payment_label(%Order{payment_method: "counter", payment_status: "paid", paid_via: paid_via})
+      when paid_via in ["gcash", "maya"] do
+    "Paid via #{wallet_brand_label(paid_via)}"
+  end
+
   def payment_label(%Order{payment_method: "counter", payment_status: "paid"}),
     do: "Paid at counter"
 
+  def payment_label(%Order{
+        payment_method: "online",
+        payment_status: "awaiting_payment",
+        online_wallet: wallet
+      })
+      when wallet in ["gcash", "maya"] do
+    "Awaiting #{wallet_brand_label(wallet)} payment"
+  end
+
   def payment_label(%Order{payment_method: "online", payment_status: "awaiting_payment"}),
     do: "Awaiting QR payment"
+
+  def payment_label(%Order{payment_method: "online", payment_status: "paid", paid_via: paid_via})
+      when paid_via in ["gcash", "maya"] do
+    "Paid via #{wallet_brand_label(paid_via)}"
+  end
 
   def payment_label(%Order{payment_method: "online", payment_status: "paid"}),
     do: "Paid online"
@@ -712,6 +743,10 @@ defmodule Espreso.Orders do
     do: "Awaiting online payment"
 
   def payment_label(_), do: "Payment"
+
+  def wallet_brand_label("gcash"), do: "GCash"
+  def wallet_brand_label("maya"), do: "Maya"
+  def wallet_brand_label(_), do: "Online"
 
   def order_number_pattern, do: ~r/^CS-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/
 
@@ -762,6 +797,21 @@ defmodule Espreso.Orders do
 
   defp normalize_paid_via_value(value) when value in @paid_vias, do: value
   defp normalize_paid_via_value(_), do: "counter"
+
+  defp normalize_paid_via_attr(value) when value in @paid_vias, do: value
+
+  defp normalize_paid_via_attr(value) when is_atom(value) do
+    value |> Atom.to_string() |> normalize_paid_via_attr()
+  end
+
+  defp normalize_paid_via_attr(_), do: "cash"
+
+  defp normalize_online_wallet(value) when value in ["gcash", "maya"], do: value
+
+  defp normalize_online_wallet(value) when value in [:gcash, :maya],
+    do: value |> Atom.to_string()
+
+  defp normalize_online_wallet(_), do: nil
 
   defp normalize_source(value) when value in [:pos, "pos"], do: "pos"
   defp normalize_source(_), do: "customer"

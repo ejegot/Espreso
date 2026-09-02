@@ -155,6 +155,7 @@ defmodule EspresoWeb.StaffPosLive do
           fulfillment: :pickup,
           payment_method: :counter,
           payment_status: socket.assigns.payment_choice,
+          paid_via: if(socket.assigns.payment_choice == :paid, do: "cash", else: nil),
           source: :pos
         }
 

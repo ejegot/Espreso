@@ -61,11 +61,43 @@ defmodule EspresoWeb.AdminSettingsLive do
             <.input field={@form[:instagram_url]} type="url" label="Instagram URL" required />
             <.input field={@form[:facebook_url]} type="url" label="Facebook URL" required />
             <.input field={@form[:tiktok_url]} type="url" label="TikTok URL" required />
+            <h3 class="staff-admin-heading">Payments</h3>
+            <p class="staff-auth-lede">
+              Counter-only hides online pay on the menu. QRPh manual shows GCash/Maya QR codes — upload images to
+              <code>priv/static</code>
+              and enter their public paths below.
+            </p>
+            <.input
+              field={@form[:payments_mode]}
+              type="select"
+              label="Payments mode"
+              options={payments_mode_options()}
+            />
+            <.input
+              field={@form[:gcash_qrph_path]}
+              type="text"
+              label="GCash QRPh image path"
+              placeholder="/images/gcash-qrph.png"
+            />
+            <.input
+              field={@form[:maya_qrph_path]}
+              type="text"
+              label="Maya QRPh image path"
+              placeholder="/images/maya-qrph.png"
+            />
             <button type="submit" class="menu-basket-checkout">Save settings</button>
           </.form>
         </section>
       </main>
     </.staff_shell>
     """
+  end
+
+  defp payments_mode_options do
+    [
+      {"Counter only (pay at counter)", "counter_only"},
+      {"QRPh manual (GCash / Maya QR)", "qrph_manual"},
+      {"PayMongo online checkout", "paymongo"}
+    ]
   end
 end

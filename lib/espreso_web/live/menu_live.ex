@@ -2617,13 +2617,25 @@ defmodule EspresoWeb.MenuLive do
   end
 
   defp order_attrs(socket, payment_method) do
-    %{
+    wallet =
+      case socket.assigns.payment_method do
+        channel when channel in [:gcash, :maya] -> channel
+        _ -> nil
+      end
+
+    attrs = %{
       customer_name: socket.assigns.customer_name,
       fulfillment: socket.assigns.fulfillment,
       table_number: socket.assigns.table_number,
       notes: socket.assigns.notes,
       payment_method: payment_method
     }
+
+    if payment_method == :online and wallet do
+      Map.put(attrs, :online_wallet, wallet)
+    else
+      attrs
+    end
   end
 
   defp checkout_return_urls(order) do

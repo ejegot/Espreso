@@ -404,4 +404,46 @@ defmodule EspresoWeb.OrderLiveTest do
     refute has_element?(view, "#order-hint", "Payment is due")
     refute render(view) =~ ~r/claim/i
   end
+
+  test "awaiting_payment order shows QRPh payment section", %{conn: conn} do
+    set_payments_mode!("qrph_manual")
+
+    setting = Espreso.BusinessSettings.get()
+
+    setting
+    |> Ecto.Changeset.change(%{
+      gcash_qrph_path: "/images/gcash-qrph.png",
+      maya_qrph_path: "/images/maya-qrph.png"
+    })
+    |> Espreso.Repo.update!()
+
+        {:ok, order} =
+          Orders.create_order(
+            [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("120")}],
+            %{
+              customer_name: "QR Customer",
+              fulfillment: :pickup,
+              payment_method: :online,
+              online_wallet: :gcash
+            }
+          )
+
+    {:ok, view, html} = live(conn, ~p"/order/#{order.number}")
+
+    assert has_element?(view, "#order-qrph-payment")
+    assert has_element?(view, "#order-qrph-payment-title", "Pay with GCash")
+    assert html =~ order.number
+    assert html =~ "₱120"
+    assert html =~ "/images/gcash-qrph.png"
+    refute html =~ "/images/maya-qrph.png"
+    assert has_element?(view, "#order-receipt .order-payment", "Awaiting GCash payment")
+  end
+
+  defp set_payments_mode!(mode) do
+    setting = Espreso.BusinessSettings.get()
+
+    setting
+    |> Ecto.Changeset.change(%{payments_mode: mode})
+    |> Espreso.Repo.update!()
+  end
 end

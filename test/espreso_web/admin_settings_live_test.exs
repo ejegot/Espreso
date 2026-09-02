@@ -89,6 +89,38 @@ defmodule EspresoWeb.AdminSettingsLiveTest do
     assert saved.hours_lines == ["Mon–Sun · 9:00 AM – 9:00 PM", "Holiday hours on Instagram"]
   end
 
+  test "owner can save payment mode and QR paths", %{conn: conn, owner: owner} do
+    {:ok, view, _html} = live(log_in(conn, owner), ~p"/admin/settings")
+
+    assert has_element?(view, "#admin-settings-form")
+    assert has_element?(view, "select[name='settings[payments_mode]']")
+
+    view
+    |> form("#admin-settings-form", %{
+      settings: %{
+        business_name: "CoffeeSpot",
+        address: "84 Lilac St., Concepcion Dos, Marikina City, Philippines, 1811",
+        phone: "+639566728906",
+        email: "elilaicorp.ph@gmail.com",
+        hours_text: "Sun–Wed · 11:00 AM – 11:00 PM",
+        instagram_url: "https://www.instagram.com/coffeespot_lilac.marikina/",
+        facebook_url: "https://www.facebook.com/profile.php?id=61572602608495",
+        tiktok_url: "https://www.tiktok.com/@coffeespotlilac_",
+        payments_mode: "qrph_manual",
+        gcash_qrph_path: "/images/gcash-qrph.png",
+        maya_qrph_path: "/images/maya-qrph.png"
+      }
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#settings-flash", "Business settings saved.")
+
+    saved = BusinessSettings.get()
+    assert saved.payments_mode == "qrph_manual"
+    assert saved.gcash_qrph_path == "/images/gcash-qrph.png"
+    assert saved.maya_qrph_path == "/images/maya-qrph.png"
+  end
+
   defp log_in(conn, user) do
     conn
     |> Phoenix.ConnTest.init_test_session(%{})
