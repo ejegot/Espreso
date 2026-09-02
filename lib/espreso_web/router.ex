@@ -95,6 +95,7 @@ defmodule EspresoWeb.Router do
     pipe_through :browser
 
     post "/session", UserSessionController, :create
+    post "/session/pin", UserSessionController, :create_pin
     delete "/logout", UserSessionController, :delete
   end
 

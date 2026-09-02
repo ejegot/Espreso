@@ -256,6 +256,39 @@ Hooks.OrderConfirm = {
   }
 }
 
+Hooks.StaffOrdersBoard = {
+  mounted() {
+    this.handleEvent("staff_new_order", () => this.playChime())
+  },
+
+  playChime() {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
+
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext
+      if (!AudioContext) return
+
+      const ctx = new AudioContext()
+      const oscillator = ctx.createOscillator()
+      const gain = ctx.createGain()
+
+      oscillator.type = "sine"
+      oscillator.frequency.setValueAtTime(880, ctx.currentTime)
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35)
+
+      oscillator.connect(gain)
+      gain.connect(ctx.destination)
+      oscillator.start()
+      oscillator.stop(ctx.currentTime + 0.36)
+      oscillator.onended = () => ctx.close()
+    } catch (_error) {
+      // Ignore autoplay / audio failures.
+    }
+  }
+}
+
 Hooks.LandingCarousel = {
   mounted() {
     this.carousel = this.el

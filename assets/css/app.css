@@ -2832,6 +2832,193 @@ body:has(.menu-page-locked) {
   text-underline-offset: 0.15em;
 }
 
+.staff-auth-mode-switch {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.staff-auth-mode-link {
+  border: 0;
+  background: transparent;
+  color: #c4783a;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  cursor: pointer;
+}
+
+/* Staff PIN login — tablet grid */
+.staff-pin-login {
+  display: grid;
+  gap: 1rem;
+}
+
+.staff-pin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+@media (min-width: 520px) {
+  .staff-pin-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.staff-pin-grid-card {
+  display: grid;
+  gap: 0.45rem;
+  justify-items: center;
+  min-height: 7.5rem;
+  padding: 0.9rem 0.65rem;
+  border: 1px solid #ece4dc;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(56, 32, 16, 0.05);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.staff-pin-grid-card:hover,
+.staff-pin-grid-card:focus-visible {
+  border-color: color-mix(in srgb, #c4783a 45%, #ece4dc);
+  box-shadow: 0 10px 24px rgba(196, 120, 58, 0.12);
+  transform: translateY(-1px);
+}
+
+.staff-pin-grid-avatar {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #f85020, #c4783a);
+  color: #fff;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.staff-pin-grid-avatar--large {
+  width: 3.5rem;
+  height: 3.5rem;
+  font-size: 1.05rem;
+}
+
+.staff-pin-grid-name {
+  color: #2d2018;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.staff-pin-grid-role {
+  color: #8a8a8a;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.staff-pin-empty {
+  margin: 0;
+  padding: 1rem;
+  border-radius: 0.85rem;
+  background: #faf7f4;
+  color: #6b6b6b;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.staff-pin-back {
+  margin-bottom: 0.75rem;
+  border: 0;
+  background: transparent;
+  color: #c4783a;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.staff-pin-selected {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.staff-pin-selected-name {
+  margin: 0;
+  color: #2d2018;
+  font-family: "DM Sans", sans-serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.staff-pin-selected-role {
+  margin: 0.15rem 0 0;
+  color: #8a8a8a;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.staff-pin-display {
+  display: flex;
+  justify-content: center;
+  gap: 0.55rem;
+  margin-bottom: 1rem;
+}
+
+.staff-pin-dot {
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 2px solid #d8ccc4;
+  border-radius: 999px;
+  background: #fff;
+}
+
+.staff-pin-dot.is-filled {
+  border-color: #c4783a;
+  background: #c4783a;
+}
+
+.staff-pin-pad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-bottom: 1rem;
+}
+
+.staff-pin-key {
+  min-height: 3.25rem;
+  border: 1px solid #ece4dc;
+  border-radius: 0.85rem;
+  background: #fff;
+  color: #2d2018;
+  font-family: "DM Sans", sans-serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.staff-pin-key--muted {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #6b6b6b;
+}
+
+.staff-pin-key:active {
+  transform: scale(0.98);
+  background: #faf7f4;
+}
+
 .staff-auth-field-error {
   margin: 0;
   color: #8a2b22;
@@ -2933,6 +3120,14 @@ body:has(.menu-page-locked) {
 .staff-home-grid {
   display: grid;
   gap: 0.85rem;
+}
+
+.staff-home-hub-grid {
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+.staff-home-hub-card {
+  min-height: 8.5rem;
 }
 
 @media (min-width: 640px) {
@@ -3846,12 +4041,12 @@ a.staff-home-card:focus-visible {
   grid-template-columns: 2.35rem minmax(0, 1fr);
   align-items: center;
   gap: 0.55rem;
-  min-height: 5.15rem;
+  min-height: 5.5rem;
   text-align: left;
   border: 1px solid var(--cs-line);
   border-radius: 0.7rem;
   background: #fff;
-  padding: 0.55rem 0.6rem;
+  padding: 0.85rem 0.75rem;
   cursor: pointer;
   touch-action: manipulation;
   box-shadow: 0 4px 14px rgba(56, 32, 16, 0.04);
@@ -5137,6 +5332,113 @@ a.staff-home-card:focus-visible {
   inset: 0;
   z-index: 40;
   background: rgba(56, 32, 16, 0.26);
+}
+
+/* Mark paid modal — KDS tablet */
+.staff-mark-paid-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.staff-mark-paid-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(24, 16, 12, 0.45);
+  cursor: pointer;
+}
+
+.staff-mark-paid-modal-panel {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 24rem);
+  padding: 1.15rem 1.1rem 1.25rem;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(24, 16, 12, 0.18);
+}
+
+.staff-mark-paid-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.staff-mark-paid-modal-eyebrow {
+  margin: 0 0 0.2rem;
+  color: #8a8a8a;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.staff-mark-paid-modal-title {
+  margin: 0;
+  color: #2d2018;
+  font-family: "DM Sans", sans-serif;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.staff-mark-paid-modal-sub {
+  margin: 0.25rem 0 0;
+  color: #6b6b6b;
+  font-size: 0.88rem;
+}
+
+.staff-mark-paid-modal-close {
+  border: 0;
+  background: transparent;
+  color: #8a8a8a;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.staff-mark-paid-modal-note {
+  margin: 0 0 1rem;
+  color: #6b6b6b;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.staff-mark-paid-modal-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.staff-mark-paid-option {
+  min-height: 3.5rem;
+  border: 1px solid #ece4dc;
+  border-radius: 0.85rem;
+  background: #fff;
+  color: #2d2018;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.staff-mark-paid-option.is-suggested {
+  border-color: color-mix(in srgb, #c4783a 50%, #ece4dc);
+  background: color-mix(in srgb, #c4783a 8%, #fff);
+  color: #9a4f1f;
+}
+
+.staff-mark-paid-option:active {
+  transform: scale(0.98);
+}
+
+.staff-action-mark-paid {
+  width: 100%;
 }
 
 .staff-orders-page .staff-orders-unpaid-drawer {
@@ -9571,6 +9873,43 @@ body:has(.home-page-landing) {
 
 .order-page .order-card--confirm .order-qrph-payment {
   margin-top: 0.5rem;
+}
+
+.order-page .order-qrph-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
+.order-page .order-qrph-head .order-qrph-title {
+  margin: 0;
+}
+
+.order-page .order-qrph-wallet {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.85rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.order-page .order-qrph-wallet--gcash {
+  border: 1px solid color-mix(in srgb, #007dfe 28%, transparent);
+  background: color-mix(in srgb, #007dfe 10%, #fff);
+  color: #007dfe;
+}
+
+.order-page .order-qrph-wallet--maya {
+  border: 1px solid color-mix(in srgb, #00b14f 28%, transparent);
+  background: color-mix(in srgb, #00b14f 10%, #fff);
+  color: #00b14f;
 }
 
 .order-page .order-qrph-title {

@@ -63,6 +63,7 @@ defmodule EspresoWeb.StaffComponents do
 
   defp nav_items(%User{} = user) do
     [
+      %{key: :home, label: "Home", path: ~p"/staff", show?: true},
       %{key: :orders, label: "Orders", path: ~p"/orders", show?: Authorization.can?(user, :orders)},
       %{key: :pos, label: "POS", path: ~p"/pos", show?: Authorization.can?(user, :orders)},
       %{

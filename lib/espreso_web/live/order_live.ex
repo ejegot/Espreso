@@ -299,9 +299,15 @@ defmodule EspresoWeb.OrderLive do
       |> assign_new(:id_prefix, fn -> "order" end)
       |> assign(:qr_title, qrph_title(assigns.order))
       |> assign(:qr_lede, qrph_lede(assigns.order))
+      |> assign(:wallet_brand, qrph_wallet_brand(assigns.order))
 
     ~H"""
-    <h2 id={"#{@id_prefix}-qrph-payment-title"} class="order-qrph-title">{@qr_title}</h2>
+    <div class="order-qrph-head">
+      <h2 id={"#{@id_prefix}-qrph-payment-title"} class="order-qrph-title">{@qr_title}</h2>
+      <span :if={@wallet_brand} class={"order-qrph-wallet order-qrph-wallet--#{@order.online_wallet}"}>
+        {@wallet_brand}
+      </span>
+    </div>
     <p class="order-qrph-lede">
       {@qr_lede}
       <strong>{Orders.format_total(@order)}</strong>.
@@ -337,6 +343,10 @@ defmodule EspresoWeb.OrderLive do
   defp qrph_lede(%{online_wallet: "gcash"}), do: "Scan the GCash QR code below to pay "
   defp qrph_lede(%{online_wallet: "maya"}), do: "Scan the Maya QR code below to pay "
   defp qrph_lede(_), do: "Scan with GCash or Maya to pay "
+
+  defp qrph_wallet_brand(%{online_wallet: "gcash"}), do: "GCash"
+  defp qrph_wallet_brand(%{online_wallet: "maya"}), do: "Maya"
+  defp qrph_wallet_brand(_), do: nil
 
   defp show_gcash_qr?(order, config) do
     is_binary(config.gcash_qrph_path) and wallet_selected?(order.online_wallet, "gcash")
