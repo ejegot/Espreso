@@ -1,6 +1,7 @@
 defmodule EspresoWeb.OrderLive do
   use EspresoWeb, :live_view
 
+  alias Espreso.BusinessSettings
   alias Espreso.Orders
   alias Espreso.Menu
 
@@ -12,15 +13,18 @@ defmodule EspresoWeb.OrderLive do
          socket
          |> assign(:page_title, "Order not found")
          |> assign(:order, nil)
+         |> assign(:payment_config, BusinessSettings.payment_config())
          |> assign(:confirming?, false), layout: false}
 
       order ->
         if connected?(socket), do: Orders.subscribe(order)
+        payment_config = BusinessSettings.payment_config()
 
         {:ok,
          socket
          |> assign(:page_title, "Order #{order.number}")
          |> assign(:order, order)
+         |> assign(:payment_config, payment_config)
          |> assign(:confirming?, false), layout: false}
     end
   end
@@ -88,6 +92,15 @@ defmodule EspresoWeb.OrderLive do
             </p>
           <% end %>
           <p class="order-number order-number--confirm" id="order-confirm-number">{@order.number}</p>
+
+          <section
+            :if={show_qrph_payment?(@order)}
+            id="order-confirm-qrph"
+            class="order-qrph-payment"
+            aria-labelledby="order-confirm-qrph-payment-title"
+          >
+            {qrph_payment_section(assign(assigns, :id_prefix, "order-confirm"))}
+          </section>
 
           <dl
             :if={not confirm_payment_processing?(@order)}
@@ -194,6 +207,15 @@ defmodule EspresoWeb.OrderLive do
             </p>
           </div>
 
+          <section
+            :if={show_qrph_payment?(@order)}
+            id="order-qrph-payment"
+            class="order-qrph-payment"
+            aria-labelledby="order-qrph-payment-title"
+          >
+            {qrph_payment_section(assign(assigns, :id_prefix, "order"))}
+          </section>
+
           <section id="order-receipt" class="order-receipt" aria-labelledby="order-receipt-title">
             <h2 id="order-receipt-title" class="order-receipt-title">Your order</h2>
 
@@ -258,12 +280,78 @@ defmodule EspresoWeb.OrderLive do
 
   defp page_title(order, _confirming?), do: "Order #{order.number}"
 
+  defp confirm_payment_processing?(%{payment_method: "online", payment_status: "awaiting_payment"}),
+    do: false
+
   defp confirm_payment_processing?(%{payment_method: "online", payment_status: status})
        when status != "paid" do
     true
   end
 
   defp confirm_payment_processing?(_order), do: false
+
+  defp show_qrph_payment?(%{payment_method: "online", payment_status: "awaiting_payment"}), do: true
+  defp show_qrph_payment?(_), do: false
+
+  defp qrph_payment_section(assigns) do
+    assigns =
+      assigns
+      |> assign_new(:id_prefix, fn -> "order" end)
+      |> assign(:qr_title, qrph_title(assigns.order))
+      |> assign(:qr_lede, qrph_lede(assigns.order))
+
+    ~H"""
+    <h2 id={"#{@id_prefix}-qrph-payment-title"} class="order-qrph-title">{@qr_title}</h2>
+    <p class="order-qrph-lede">
+      {@qr_lede}
+      <strong>{Orders.format_total(@order)}</strong>.
+      Include order <strong>{@order.number}</strong> in the reference if prompted.
+    </p>
+    <p class="order-qrph-note">
+      After paying, keep this screen open — staff will confirm payment and your order will update.
+    </p>
+    <div :if={qrph_code_configured?(@order, @payment_config)} class="order-qrph-codes">
+      <figure :if={show_gcash_qr?(@order, @payment_config)} class="order-qrph-code">
+        <figcaption>GCash</figcaption>
+        <img src={@payment_config.gcash_qrph_path} alt="GCash QRPh code" />
+      </figure>
+      <figure :if={show_maya_qr?(@order, @payment_config)} class="order-qrph-code">
+        <figcaption>Maya</figcaption>
+        <img src={@payment_config.maya_qrph_path} alt="Maya QRPh code" />
+      </figure>
+    </div>
+    <p
+      :if={not qrph_code_configured?(@order, @payment_config)}
+      class="order-qrph-placeholder"
+      id={"#{@id_prefix}-qrph-placeholder"}
+    >
+      QR codes are not configured yet — ask staff to confirm payment at the counter.
+    </p>
+    """
+  end
+
+  defp qrph_title(%{online_wallet: "gcash"}), do: "Pay with GCash"
+  defp qrph_title(%{online_wallet: "maya"}), do: "Pay with Maya"
+  defp qrph_title(_), do: "Pay with QRPh"
+
+  defp qrph_lede(%{online_wallet: "gcash"}), do: "Scan the GCash QR code below to pay "
+  defp qrph_lede(%{online_wallet: "maya"}), do: "Scan the Maya QR code below to pay "
+  defp qrph_lede(_), do: "Scan with GCash or Maya to pay "
+
+  defp show_gcash_qr?(order, config) do
+    is_binary(config.gcash_qrph_path) and wallet_selected?(order.online_wallet, "gcash")
+  end
+
+  defp show_maya_qr?(order, config) do
+    is_binary(config.maya_qrph_path) and wallet_selected?(order.online_wallet, "maya")
+  end
+
+  defp wallet_selected?(nil, _wallet), do: true
+  defp wallet_selected?(selected, wallet), do: selected == wallet
+
+  defp qrph_code_configured?(order, config) do
+    show_gcash_qr?(order, config) or show_maya_qr?(order, config)
+  end
 
   defp confirm_lede(%{fulfillment: "dine_in", table_number: table})
        when is_binary(table) and table != "" do
@@ -306,6 +394,15 @@ defmodule EspresoWeb.OrderLive do
 
   defp customer_status_hint(%{status: "received", payment_status: "paid"}),
     do: "Keep this screen open for live updates on your order."
+
+  defp customer_status_hint(%{status: "received", payment_method: "online", payment_status: "awaiting_payment", online_wallet: "gcash"}),
+    do: "Complete your GCash payment below — keep this screen open for updates."
+
+  defp customer_status_hint(%{status: "received", payment_method: "online", payment_status: "awaiting_payment", online_wallet: "maya"}),
+    do: "Complete your Maya payment below — keep this screen open for updates."
+
+  defp customer_status_hint(%{status: "received", payment_method: "online", payment_status: "awaiting_payment"}),
+    do: "Complete QRPh payment below — keep this screen open for updates."
 
   defp customer_status_hint(%{status: "received", payment_method: "counter"}),
     do:

@@ -98,7 +98,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert has_element?(view, "#{detail_id(order.id)} .staff-order-items", "Spanish Latte")
     assert has_element?(view, "#{detail_id(order.id)} .staff-order-pay", "Unpaid")
     assert has_element?(view, "#ready-complete-#{order.id}.staff-action-primary", "Picked up")
-    assert has_element?(view, "#ready-mark-paid-#{order.id}.staff-action-secondary", "Mark paid")
+    assert has_element?(view, "#ticket-mark-paid-cash-#{order.id}.staff-action-secondary", "Cash")
     refute has_element?(view, "#order-card-#{order.id}.staff-order-card-muted")
   end
 
@@ -268,14 +268,14 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     {:ok, view, _html} = live(conn, ~p"/orders")
 
     assert has_element?(view, "#order-prepare-#{order.id}", "Prepare")
-    refute has_element?(view, "#unpaid-mark-paid-#{order.id}")
-    refute has_element?(view, "#order-card-#{order.id} button", "Mark paid")
+    refute has_element?(view, "#unpaid-mark-paid-cash-#{order.id}")
+    refute has_element?(view, "#order-card-#{order.id} button", "Cash")
 
     view |> element("#order-prepare-#{order.id}") |> render_click()
 
     assert has_element?(view, "#{detail_id(order.id)} .staff-order-pay", "Unpaid")
     refute has_element?(view, "#order-ready-#{order.id}")
-    refute has_element?(view, "#order-card-#{order.id} button", "Mark paid")
+    refute has_element?(view, "#order-card-#{order.id} button", "Cash")
     assert has_element?(view, "#abandon-online-payment-#{order.id}", "Abandon payment")
 
     reloaded = Orders.get_order_by_number!(order.number)
@@ -301,7 +301,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     view |> element("#order-prepare-#{order.id}") |> render_click()
     assert has_element?(view, "#order-ready-#{order.id}", "Ready")
-    refute has_element?(view, "#order-card-#{order.id} button", "Mark paid")
+    refute has_element?(view, "#order-card-#{order.id} button", "Cash")
 
     view |> element("#order-ready-#{order.id}") |> render_click()
     assert has_element?(view, "#ready-complete-#{order.id}", "Picked up")
@@ -324,10 +324,10 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/orders")
     assert has_element?(view, "#cancel-order-#{order.id}")
-    assert has_element?(view, "#unpaid-mark-paid-#{order.id}")
+    assert has_element?(view, "#unpaid-mark-paid-cash-#{order.id}")
 
     view
-    |> element("#unpaid-mark-paid-#{order.id}")
+    |> element("#unpaid-mark-paid-cash-#{order.id}")
     |> render_click()
 
     refute has_element?(view, "#cancel-order-#{order.id}")
@@ -371,12 +371,12 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     view |> element("#order-prepare-#{order.id}") |> render_click()
     view |> element("#order-ready-#{order.id}") |> render_click()
 
-    assert has_element?(view, "#ready-mark-paid-#{order.id}", "Mark paid")
+    assert has_element?(view, "#ticket-mark-paid-cash-#{order.id}", "Cash")
 
-    view |> element("#ready-mark-paid-#{order.id}") |> render_click()
+    view |> element("#ticket-mark-paid-cash-#{order.id}") |> render_click()
 
-    assert has_element?(view, "#orders-flash", "#{order.number} marked paid.")
-    refute has_element?(view, "#ready-mark-paid-#{order.id}")
+    assert has_element?(view, "#orders-flash", "#{order.number} marked paid (cash).")
+    refute has_element?(view, "#ticket-mark-paid-cash-#{order.id}")
     assert has_element?(view, ".staff-order-number", order.number)
     assert has_element?(view, "#{detail_id(order.id)} .staff-order-pay", "Paid")
 
@@ -402,7 +402,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     {:ok, view, _html} = live(conn, ~p"/orders")
 
     assert has_element?(view, ".staff-order-number", order.number)
-    refute has_element?(view, "#ready-mark-paid-#{order.id}")
+    refute has_element?(view, "#ticket-mark-paid-cash-#{order.id}")
     assert has_element?(view, "#ready-complete-#{order.id}", "Picked up")
   end
 
@@ -422,7 +422,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     view |> element("#order-prepare-#{order.id}") |> render_click()
     view |> element("#order-ready-#{order.id}") |> render_click()
 
-    assert has_element?(view, "#ready-mark-paid-#{order.id}", "Mark paid")
+    assert has_element?(view, "#ticket-mark-paid-cash-#{order.id}", "Cash")
     assert has_element?(view, "#ready-complete-#{order.id}", "Picked up")
     refute has_element?(view, "#cancel-order-#{order.id}")
 
@@ -532,12 +532,12 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert has_element?(view, "#unpaid-order-#{order.id} .staff-badge--completed", "Picked up")
     assert has_element?(view, "#unpaid-order-#{order.id} .staff-badge--pay-unpaid", "Unpaid")
     assert has_element?(view, "#unpaid-order-#{order.id} .staff-order-pay", "₱75")
-    assert has_element?(view, "#unpaid-mark-paid-#{order.id}", "Mark paid")
+    assert has_element?(view, "#unpaid-mark-paid-cash-#{order.id}", "Cash")
     refute has_element?(view, "#unpaid-orders-empty")
 
-    view |> element("#unpaid-mark-paid-#{order.id}") |> render_click()
+    view |> element("#unpaid-mark-paid-cash-#{order.id}") |> render_click()
 
-    assert has_element?(view, "#orders-flash", "#{order.number} marked paid.")
+    assert has_element?(view, "#orders-flash", "#{order.number} marked paid (cash).")
     refute has_element?(view, "#unpaid-order-#{order.id}")
     assert has_element?(view, "#unpaid-orders-empty", "No unpaid orders today.")
   end
@@ -742,7 +742,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert has_element?(view, "#{detail_id(order.id)} .staff-order-pay", "Unpaid")
     assert has_element?(view, "#ready-complete-#{order.id}.staff-action-primary", "Picked up")
     assert has_element?(view, "#ready-complete-#{order.id}.staff-action-complete", "Picked up")
-    assert has_element?(view, "#ready-mark-paid-#{order.id}.staff-action-secondary", "Mark paid")
+    assert has_element?(view, "#ticket-mark-paid-cash-#{order.id}.staff-action-secondary", "Cash")
 
     view |> element("#ready-complete-#{order.id}") |> render_click()
 
@@ -804,6 +804,44 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     assert render(view) =~ "staff-orders-unpaid-drawer--open"
     assert has_element?(view, "#unpaid-order-#{order.id}")
+  end
+
+  test "qrph awaiting_payment order shows Await QR and staff can confirm with GCash", %{conn: conn} do
+    set_payments_mode!("qrph_manual")
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("120")}],
+        %{
+          customer_name: "QR Guest",
+          fulfillment: :pickup,
+          payment_method: :online
+        }
+      )
+
+    assert order.payment_status == "awaiting_payment"
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    assert has_element?(view, "#{detail_id(order.id)} .staff-order-pay", "Await QR")
+    assert has_element?(view, "#ticket-mark-paid-gcash-#{order.id}", "GCash")
+    refute has_element?(view, "#abandon-online-payment-#{order.id}")
+
+    view |> element("#ticket-mark-paid-gcash-#{order.id}") |> render_click()
+
+    assert has_element?(view, "#orders-flash", "#{order.number} marked paid (GCash).")
+
+    reloaded = Orders.get_order_by_number!(order.number)
+    assert reloaded.payment_status == "paid"
+    assert reloaded.paid_via == "gcash"
+  end
+
+  defp set_payments_mode!(mode) do
+    setting = Espreso.BusinessSettings.get()
+
+    setting
+    |> Ecto.Changeset.change(%{payments_mode: mode})
+    |> Espreso.Repo.update!()
   end
 
   defp detail_id(order_id), do: "#order-detail-#{order_id}"

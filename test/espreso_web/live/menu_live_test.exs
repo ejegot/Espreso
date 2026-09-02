@@ -1185,6 +1185,7 @@ defmodule EspresoWeb.MenuLiveTest do
     assert order.customer_name == "QR Guest"
     assert order.payment_method == "online"
     assert order.payment_status == "awaiting_payment"
+    assert order.online_wallet == "gcash"
     assert is_nil(order.paymongo_checkout_session_id)
   end
 

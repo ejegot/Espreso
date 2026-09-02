@@ -112,6 +112,49 @@ defmodule EspresoWeb.AdminUsersLive do
     end
   end
 
+  def handle_event("set_pin", %{"id" => id, "pin" => pin}, socket) do
+    actor = socket.assigns.current_user
+    target = Accounts.get_user!(id)
+
+    case Accounts.set_pin_as(actor, target, String.trim(pin)) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:users, Accounts.list_users())
+         |> assign(:editing, Accounts.get_user!(id))
+         |> assign(:flash_note, "PIN set for #{target.name}.")}
+
+      {:error, :unauthorized} ->
+        {:noreply, assign(socket, :flash_note, "You don’t have permission to manage users.")}
+
+      {:error, :invalid_pin_format} ->
+        {:noreply, assign(socket, :flash_note, "PIN must be 4–6 digits.")}
+
+      {:error, _} ->
+        {:noreply, assign(socket, :flash_note, "Could not set PIN.")}
+    end
+  end
+
+  def handle_event("clear_pin", %{"id" => id}, socket) do
+    actor = socket.assigns.current_user
+    target = Accounts.get_user!(id)
+
+    case Accounts.clear_pin_as(actor, target) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:users, Accounts.list_users())
+         |> assign(:editing, Accounts.get_user!(id))
+         |> assign(:flash_note, "PIN cleared for #{target.name}.")}
+
+      {:error, :unauthorized} ->
+        {:noreply, assign(socket, :flash_note, "You don’t have permission to manage users.")}
+
+      {:error, _} ->
+        {:noreply, assign(socket, :flash_note, "Could not clear PIN.")}
+    end
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -146,6 +189,13 @@ defmodule EspresoWeb.AdminUsersLive do
                 <span class={"staff-badge staff-badge--pay-#{if user.active, do: "paid", else: "unpaid"}"}>
                   {if user.active, do: "Active", else: "Disabled"}
                 </span>
+                <span
+                  :if={Accounts.pin_set?(user)}
+                  class="staff-badge staff-badge--pay-paid"
+                  id={"user-pin-set-#{user.id}"}
+                >
+                  PIN set
+                </span>
               </div>
             </header>
 
@@ -169,6 +219,43 @@ defmodule EspresoWeb.AdminUsersLive do
                 <div class="staff-order-actions">
                   <button type="submit" class="staff-action staff-action-primary">Save</button>
                   <button type="button" class="staff-action" phx-click="cancel_edit">Cancel</button>
+                </div>
+              </.form>
+
+              <.form
+                for={%{}}
+                id={"pin-form-#{user.id}"}
+                phx-submit="set_pin"
+                phx-value-id={user.id}
+                class="staff-auth-form staff-admin-pin-form"
+              >
+                <label class="staff-admin-pin-label" for={"pin-input-#{user.id}"}>
+                  Staff PIN (4–6 digits, for tablet login)
+                </label>
+                <input
+                  type="password"
+                  name="pin"
+                  id={"pin-input-#{user.id}"}
+                  inputmode="numeric"
+                  pattern="[0-9]{4,6}"
+                  autocomplete="off"
+                  class="staff-auth-input"
+                  placeholder={if(Accounts.pin_set?(user), do: "Enter new PIN", else: "Set PIN")}
+                />
+                <div class="staff-order-actions">
+                  <button type="submit" class="staff-action staff-action-primary" id={"set-pin-#{user.id}"}>
+                    {if(Accounts.pin_set?(user), do: "Update PIN", else: "Set PIN")}
+                  </button>
+                  <button
+                    :if={Accounts.pin_set?(user)}
+                    type="button"
+                    class="staff-action"
+                    id={"clear-pin-#{user.id}"}
+                    phx-click="clear_pin"
+                    phx-value-id={user.id}
+                  >
+                    Clear PIN
+                  </button>
                 </div>
               </.form>
             </div>

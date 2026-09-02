@@ -8,6 +8,7 @@ defmodule Espreso.Orders.Order do
   @payment_methods ~w(counter online)
   @payment_statuses ~w(unpaid awaiting_payment paid)
   @paid_vias ~w(cash gcash maya counter paymongo)
+  @online_wallets ~w(gcash maya)
   @fulfillments ~w(dine_in pickup)
   @sources ~w(customer pos)
 
@@ -21,6 +22,7 @@ defmodule Espreso.Orders.Order do
     field :payment_method, :string, default: "counter"
     field :payment_status, :string, default: "unpaid"
     field :paid_via, :string
+    field :online_wallet, :string
     field :source, :string, default: "customer"
     field :paymongo_checkout_session_id, :string
     field :total, :decimal
@@ -34,6 +36,7 @@ defmodule Espreso.Orders.Order do
   def payment_methods, do: @payment_methods
   def payment_statuses, do: @payment_statuses
   def paid_vias, do: @paid_vias
+  def online_wallets, do: @online_wallets
   def fulfillments, do: @fulfillments
   def sources, do: @sources
 
@@ -49,6 +52,7 @@ defmodule Espreso.Orders.Order do
       :payment_method,
       :payment_status,
       :paid_via,
+      :online_wallet,
       :source,
       :paymongo_checkout_session_id,
       :total
@@ -69,6 +73,7 @@ defmodule Espreso.Orders.Order do
     |> validate_inclusion(:payment_method, @payment_methods)
     |> validate_inclusion(:payment_status, @payment_statuses)
     |> validate_paid_via()
+    |> validate_online_wallet()
     |> validate_inclusion(:source, @sources)
     |> validate_fulfillment_table()
     |> validate_number(:total, greater_than_or_equal_to: 0)
@@ -108,6 +113,13 @@ defmodule Espreso.Orders.Order do
     case get_change(changeset, :paid_via) do
       nil -> changeset
       _value -> validate_inclusion(changeset, :paid_via, @paid_vias)
+    end
+  end
+
+  defp validate_online_wallet(changeset) do
+    case get_change(changeset, :online_wallet) do
+      nil -> changeset
+      _value -> validate_inclusion(changeset, :online_wallet, @online_wallets)
     end
   end
 
