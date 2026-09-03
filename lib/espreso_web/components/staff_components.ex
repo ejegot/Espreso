@@ -34,6 +34,10 @@ defmodule EspresoWeb.StaffComponents do
           </div>
 
           <div class="staff-shell-tools">
+            <.live_component
+              module={EspresoWeb.StaffNotificationsComponent}
+              id="staff-notifications"
+            />
             {render_slot(@tools)}
             <.link href={~p"/logout"} method="delete" class="staff-shell-logout">
               Log out

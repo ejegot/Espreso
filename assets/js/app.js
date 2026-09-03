@@ -258,10 +258,53 @@ Hooks.OrderConfirm = {
 
 Hooks.StaffOrdersBoard = {
   mounted() {
-    this.handleEvent("staff_new_order", () => this.playChime())
+    // Chime moved to StaffNotifications (shell bell + mute).
+  }
+}
+
+Hooks.StaffNotifications = {
+  mounted() {
+    this.muteKey = "coffeespot.staff.soundMuted"
+    this.el.addEventListener("click", (event) => {
+      const btn = event.target.closest("[data-staff-notif-mute]")
+      if (!btn || !this.el.contains(btn)) return
+
+      const next = !this.isMuted()
+      try {
+        localStorage.setItem(this.muteKey, next ? "1" : "0")
+      } catch (_error) {
+        // Ignore private-mode / storage failures.
+      }
+      this.syncMuteLabel()
+    })
+
+    this.handleEvent("staff_notify_chime", () => this.playChime())
+    this.syncMuteLabel()
+  },
+
+  updated() {
+    this.syncMuteLabel()
+  },
+
+  isMuted() {
+    try {
+      return localStorage.getItem(this.muteKey) === "1"
+    } catch (_error) {
+      return false
+    }
+  },
+
+  syncMuteLabel() {
+    const muteBtn = this.el.querySelector("[data-staff-notif-mute]")
+    if (!muteBtn) return
+    const muted = this.isMuted()
+    muteBtn.textContent = muted ? "Sound off" : "Sound on"
+    muteBtn.setAttribute("aria-pressed", muted ? "true" : "false")
+    muteBtn.classList.toggle("is-muted", muted)
   },
 
   playChime() {
+    if (this.isMuted()) return
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
 
     try {

@@ -3,6 +3,7 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   alias Espreso.BusinessSettings
   alias Espreso.Orders
+  alias EspresoWeb.StaffNotifications
 
   @ready_lane_limit 100
 
@@ -17,12 +18,12 @@ defmodule EspresoWeb.StaffOrdersLive do
      |> assign(:unpaid_drawer_open, false)
      |> assign(:reconciliation_drawer_open, false)
      |> assign(:mark_paid_order, nil)
-     |> assign(:last_received_count, 0)
      |> load_orders(), layout: false}
   end
 
   @impl true
-  def handle_info({:order_changed, _order}, socket) do
+  def handle_info({:order_changed, order}, socket) do
+    StaffNotifications.push_order_change(order)
     {:noreply, load_orders(socket)}
   end
 
@@ -758,23 +759,11 @@ defmodule EspresoWeb.StaffOrdersLive do
   defp order_age_class(_), do: ["staff-order-age"]
 
   defp load_orders(socket) do
-    active_orders = Orders.list_active_orders()
-    received_count = Enum.count(active_orders, &(&1.status == "received"))
-    prev_count = socket.assigns[:last_received_count] || 0
-
-    socket =
-      socket
-      |> assign(:active_orders, active_orders)
-      |> assign(:ready_orders, Orders.list_recent_ready(@ready_lane_limit))
-      |> assign(:unpaid_orders, Orders.list_todays_unpaid())
-      |> assign(:paymongo_reconciliations, Orders.list_open_paymongo_reconciliations())
-      |> assign(:last_received_count, received_count)
-
-    if connected?(socket) and received_count > prev_count do
-      push_event(socket, "staff_new_order", %{})
-    else
-      socket
-    end
+    socket
+    |> assign(:active_orders, Orders.list_active_orders())
+    |> assign(:ready_orders, Orders.list_recent_ready(@ready_lane_limit))
+    |> assign(:unpaid_orders, Orders.list_todays_unpaid())
+    |> assign(:paymongo_reconciliations, Orders.list_open_paymongo_reconciliations())
   end
 
   defp truncate_session_id(session_id) when is_binary(session_id) do
