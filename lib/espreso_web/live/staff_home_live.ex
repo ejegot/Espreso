@@ -4,9 +4,12 @@ defmodule EspresoWeb.StaffHomeLive do
   alias Espreso.Accounts.Authorization
   alias Espreso.Accounts.User
   alias Espreso.Orders
+  alias EspresoWeb.StaffNotifications
 
   @impl true
   def mount(_params, _session, socket) do
+    if connected?(socket), do: Orders.subscribe()
+
     user = socket.assigns.current_user
     overview = Orders.dashboard_overview()
 
@@ -15,6 +18,17 @@ defmodule EspresoWeb.StaffHomeLive do
      |> assign(:page_title, "Home")
      |> assign(:shortcuts, shortcuts_for(user, overview))
      |> assign(:overview, overview), layout: false}
+  end
+
+  @impl true
+  def handle_info({:order_changed, order}, socket) do
+    StaffNotifications.push_order_change(order)
+    overview = Orders.dashboard_overview()
+
+    {:noreply,
+     socket
+     |> assign(:overview, overview)
+     |> assign(:shortcuts, shortcuts_for(socket.assigns.current_user, overview))}
   end
 
   @impl true

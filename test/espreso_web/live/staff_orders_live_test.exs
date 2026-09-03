@@ -854,6 +854,37 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     |> render_click()
   end
 
+  test "notification bell shows new order and mark all read", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    assert has_element?(view, "#staff-notif-toggle")
+    refute has_element?(view, "#staff-notif-badge")
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Bell Test",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    _ = :sys.get_state(view.pid)
+    html = render(view)
+
+    assert html =~ "New order"
+    assert html =~ order.number
+    assert has_element?(view, "#staff-notif-badge")
+
+    view |> element("#staff-notif-toggle") |> render_click()
+    assert has_element?(view, "#staff-notif-panel")
+    assert has_element?(view, "#staff-notif-list", "New order")
+
+    view |> element("#staff-notif-mark-all") |> render_click()
+    refute has_element?(view, "#staff-notif-badge")
+  end
+
   defp backdate_order!(order, minutes_ago: minutes) when is_integer(minutes) and minutes >= 0 do
     at =
       DateTime.utc_now(:second)

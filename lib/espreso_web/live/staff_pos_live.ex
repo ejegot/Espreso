@@ -3,9 +3,12 @@ defmodule EspresoWeb.StaffPosLive do
 
   alias Espreso.Menu
   alias Espreso.Orders
+  alias EspresoWeb.StaffNotifications
 
   @impl true
   def mount(_params, _session, socket) do
+    if connected?(socket), do: Orders.subscribe()
+
     categories = Menu.list_menu()
     selected = categories |> List.first() |> then(&(&1 && &1.name))
 
@@ -14,6 +17,7 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:page_title, "POS")
      |> assign(:categories, categories)
      |> assign(:selected_category, selected)
+     |> assign(:search, "")
      |> assign(:cart, [])
      |> assign(:customer_name, "Walk-in")
      |> assign(:notes, "")
@@ -25,12 +29,26 @@ defmodule EspresoWeb.StaffPosLive do
   end
 
   @impl true
+  def handle_info({:order_changed, order}, socket) do
+    StaffNotifications.push_order_change(order)
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("select_category", %{"name" => name}, socket) do
     {:noreply,
      socket
      |> assign(:selected_category, name)
      |> assign(:size_picker, nil)
      |> assign(:error, nil)}
+  end
+
+  def handle_event("search", params, socket) do
+    {:noreply, assign(socket, :search, Map.get(params, "q", ""))}
+  end
+
+  def handle_event("clear_search", _params, socket) do
+    {:noreply, assign(socket, :search, "")}
   end
 
   def handle_event("add_product", %{"product-id" => product_id}, socket) do
@@ -225,25 +243,55 @@ defmodule EspresoWeb.StaffPosLive do
                 <div class="staff-pos-catalog-main">
                   <header class="staff-pos-catalog-head">
                     <div>
-                      <p class="staff-pos-catalog-eyebrow">Menu</p>
+                      <p class="staff-pos-catalog-eyebrow">Choose menu</p>
                       <h2 class="staff-pos-catalog-title">{@selected_category || "Products"}</h2>
                     </div>
                     <span class="staff-pos-catalog-count">
-                      {length(products_for(@categories, @selected_category))} items
+                      {length(visible_products(@categories, @selected_category, @search))} items
                     </span>
                   </header>
 
+                  <form class="staff-pos-search" id="pos-search" phx-change="search" phx-submit="search">
+                    <label class="staff-pos-search-label" for="pos-search-input">Search</label>
+                    <div class="staff-pos-search-row">
+                      <input
+                        type="search"
+                        class="staff-pos-search-input"
+                        id="pos-search-input"
+                        name="q"
+                        value={@search}
+                        placeholder="Search menu…"
+                        autocomplete="off"
+                        phx-debounce="200"
+                      />
+                      <button
+                        :if={String.trim(@search) != ""}
+                        type="button"
+                        class="staff-pos-search-clear"
+                        id="pos-search-clear"
+                        phx-click="clear_search"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </form>
+
                   <div class="staff-pos-products" id="pos-products">
                     <button
-                      :for={product <- products_for(@categories, @selected_category)}
+                      :for={product <- visible_products(@categories, @selected_category, @search)}
                       type="button"
                       class="staff-pos-product"
                       id={"pos-product-#{product.id}"}
                       phx-click="add_product"
                       phx-value-product-id={product.id}
                     >
-                      <span class="staff-pos-product-mark" aria-hidden="true">
-                        {product_mark(product.name)}
+                      <span class="staff-pos-product-media" aria-hidden="true">
+                        <img
+                          src={Menu.product_image(@selected_category || "", product.name)}
+                          alt=""
+                          class="staff-pos-product-img"
+                          loading="lazy"
+                        />
                       </span>
                       <span class="staff-pos-product-copy">
                         <span class="staff-pos-product-name">{product.name}</span>
@@ -253,10 +301,15 @@ defmodule EspresoWeb.StaffPosLive do
                       </span>
                     </button>
                     <p
-                      :if={products_for(@categories, @selected_category) == []}
+                      :if={visible_products(@categories, @selected_category, @search) == []}
                       class="staff-empty"
+                      id="pos-products-empty"
                     >
-                      No available products in this category.
+                      <%= if String.trim(@search) != "" do %>
+                        No products match “{@search}”.
+                      <% else %>
+                        No available products in this category.
+                      <% end %>
                     </p>
                   </div>
                 </div>
@@ -433,7 +486,7 @@ defmodule EspresoWeb.StaffPosLive do
                   phx-click="place_order"
                   disabled={@cart == [] or @placing_order?}
                 >
-                  Place Order
+                  Process Order
                 </button>
               </div>
             <% end %>
@@ -485,6 +538,15 @@ defmodule EspresoWeb.StaffPosLive do
       %{products: products} -> products
       _ -> []
     end
+  end
+
+  defp visible_products(categories, selected, search) do
+    query = search |> to_string() |> String.trim() |> String.downcase()
+
+    products_for(categories, selected)
+    |> Enum.filter(fn product ->
+      query == "" or String.contains?(String.downcase(product.name), query)
+    end)
   end
 
   defp find_product(categories, product_id) do
@@ -549,13 +611,6 @@ defmodule EspresoWeb.StaffPosLive do
 
   defp cart_item_count(cart) do
     Enum.reduce(cart, 0, fn line, acc -> acc + line.quantity end)
-  end
-
-  defp product_mark(name) when is_binary(name) do
-    case String.trim(name) |> String.first() do
-      nil -> "?"
-      char -> String.upcase(char)
-    end
   end
 
   defp unavailable_error([name]), do: "#{name} is no longer available. Remove it or choose something else."

@@ -415,11 +415,14 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert length(Orders.list_active_orders()) == 1
   end
 
-  test "staff home redirects barista to orders (POS reachable from shell)", %{
+  test "staff home hub links barista to Orders and POS", %{
     conn: conn,
     barista: barista
   } do
-    assert {:error, {:redirect, %{to: "/orders"}}} = live(log_in(conn, barista), ~p"/staff")
+    {:ok, home, _html} = live(log_in(conn, barista), ~p"/staff")
+    assert has_element?(home, "#staff-home-orders", "Orders")
+    assert has_element?(home, "#staff-home-pos", "POS")
+    assert has_element?(home, "#staff-notif-toggle")
 
     {:ok, view, html} = live(log_in(conn, barista), ~p"/orders")
     assert has_element?(view, "#staff-nav-pos", "POS")
@@ -471,5 +474,30 @@ defmodule EspresoWeb.StaffPosLiveTest do
       end)
 
     %{product | product_prices: prices}
+  end
+
+  test "POS search filters products and Process Order label is present", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso,
+    americano: americano
+  } do
+    {:ok, view, html} = live(log_in(conn, barista), ~p"/pos")
+
+    assert html =~ "Choose menu"
+    assert has_element?(view, "#pos-place-order", "Process Order")
+    assert has_element?(view, "#pos-search-input")
+    assert has_element?(view, "#pos-product-#{espresso.id}")
+    assert has_element?(view, "#pos-product-#{americano.id}")
+
+    view
+    |> form("#pos-search", %{q: "Amer"})
+    |> render_change()
+
+    assert has_element?(view, "#pos-product-#{americano.id}")
+    refute has_element?(view, "#pos-product-#{espresso.id}")
+
+    view |> element("#pos-search-clear") |> render_click()
+    assert has_element?(view, "#pos-product-#{espresso.id}")
   end
 end
