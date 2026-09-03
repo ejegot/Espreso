@@ -289,6 +289,32 @@ Hooks.StaffOrdersBoard = {
   }
 }
 
+Hooks.StaffAuthCarousel = {
+  mounted() {
+    this.slides = Array.from(this.el.querySelectorAll("[data-auth-slide]"))
+    this.index = 0
+    this.reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    this.show(0)
+
+    if (this.slides.length > 1 && !this.reduce) {
+      this.timer = window.setInterval(() => {
+        this.index = (this.index + 1) % this.slides.length
+        this.show(this.index)
+      }, 5000)
+    }
+  },
+
+  destroyed() {
+    if (this.timer) window.clearInterval(this.timer)
+  },
+
+  show(index) {
+    this.slides.forEach((slide, i) => {
+      slide.classList.toggle("is-active", i === index)
+    })
+  }
+}
+
 Hooks.LandingCarousel = {
   mounted() {
     this.carousel = this.el

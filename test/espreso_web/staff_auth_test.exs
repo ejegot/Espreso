@@ -91,7 +91,7 @@ defmodule EspresoWeb.StaffAuthTest do
       |> follow_redirect(conn, ~p"/login")
 
     html = html_response(conn, 200)
-    assert html =~ "Owner login"
+    assert html =~ "Employee login"
     assert html =~ "Account created"
 
     conn =
@@ -548,6 +548,18 @@ defmodule EspresoWeb.StaffAuthTest do
     assert redirected_to(conn) == ~p"/orders"
   end
 
+  test "pin login accepts string user_id from form", %{conn: conn, barista: barista} do
+    assert {:ok, _} = Accounts.set_pin(barista, "4321")
+
+    conn =
+      post(conn, ~p"/session/pin", %{
+        "user_id" => to_string(barista.id),
+        "pin" => "4321"
+      })
+
+    assert redirected_to(conn) == ~p"/orders"
+  end
+
   test "invalid pin login returns to login", %{conn: conn, barista: barista} do
     assert {:ok, _} = Accounts.set_pin(barista, "4321")
 
@@ -564,9 +576,51 @@ defmodule EspresoWeb.StaffAuthTest do
   test "login page shows staff pin grid when pins configured", %{conn: conn, barista: barista} do
     assert {:ok, _} = Accounts.set_pin(barista, "4321")
 
-    {:ok, view, _html} = live(conn, ~p"/login")
+    {:ok, view, html} = live(conn, ~p"/login")
+    assert html =~ "Employee login"
+    assert html =~ "Choose your account to start your shift"
     assert has_element?(view, "#staff-pin-login")
-    assert has_element?(view, "#staff-pin-user-#{barista.id}", barista.name)
+    assert has_element?(view, "#staff-roster-search")
+
+    view |> element("#staff-roster-search") |> render_change(%{"q" => ""})
+
+    assert has_element?(view, "#staff-roster-dropdown #staff-pin-user-#{barista.id}", barista.name)
+    assert has_element?(view, "#staff-pin-form button.staff-auth-submit--shift", "Start Shift")
+  end
+
+  test "staff login search filters roster", %{conn: conn, barista: barista, manager: manager} do
+    assert {:ok, _} = Accounts.set_pin(barista, "4321")
+    assert {:ok, _} = Accounts.set_pin(manager, "5678")
+
+    {:ok, view, _html} = live(conn, ~p"/login")
+
+    view |> element("#staff-roster-search") |> render_change(%{"q" => ""})
+
+    assert has_element?(view, "#staff-roster-dropdown #staff-pin-user-#{barista.id}")
+    assert has_element?(view, "#staff-roster-dropdown #staff-pin-user-#{manager.id}")
+
+    view
+    |> element("#staff-roster-search")
+    |> render_change(%{"q" => barista.name})
+
+    assert has_element?(view, "#staff-roster-dropdown #staff-pin-user-#{barista.id}")
+    refute has_element?(view, "#staff-roster-dropdown #staff-pin-user-#{manager.id}")
+  end
+
+  test "staff pin login selects user and submits start shift", %{conn: conn, barista: barista} do
+    assert {:ok, _} = Accounts.set_pin(barista, "4321")
+
+    {:ok, view, _html} = live(conn, ~p"/login")
+
+    view |> element("#staff-roster-search") |> render_change(%{"q" => ""})
+    view |> element("#staff-pin-user-#{barista.id}") |> render_click()
+
+    for digit <- ~w(4 3 2 1) do
+      view |> element("button[phx-value-digit=\"#{digit}\"]") |> render_click()
+    end
+
+    assert has_element?(view, ".staff-pin-dot.is-filled")
+    refute has_element?(view, "#staff-pin-form button[disabled]")
   end
 
   defp log_in(conn, user) do
