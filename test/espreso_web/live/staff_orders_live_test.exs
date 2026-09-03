@@ -246,10 +246,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
   test "reconciliation drawer is empty when there are no records", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/orders")
 
-    assert has_element?(view, ".staff-orders-reconciliation-toggle-count", "0")
-
-    view |> element("#reconciliation-drawer-toggle") |> render_click()
-    assert has_element?(view, "#paymongo-reconciliations-empty", "No PayMongo reconciliation items.")
+    refute has_element?(view, "#reconciliation-drawer-toggle")
   end
 
   test "unpaid online ticket can prepare but cannot mark paid or ready", %{conn: conn} do
@@ -663,7 +660,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
            )
 
     assert has_element?(view, "#order-card-new-#{qr_order.id} .staff-order-name", "QR Guest")
-    assert has_element?(view, "#order-card-new-#{pos_order.id} .staff-order-name", "Walk-in")
+    refute has_element?(view, "#order-card-new-#{pos_order.id} .staff-order-name")
   end
 
   test "order notes render in a prominent NOTE block before primary action", %{conn: conn} do
@@ -876,6 +873,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert html =~ "New order"
     assert html =~ order.number
     assert has_element?(view, "#staff-notif-badge")
+    assert has_element?(view, "#orders-alert-banner", order.number)
 
     view |> element("#staff-notif-toggle") |> render_click()
     assert has_element?(view, "#staff-notif-panel")
@@ -883,6 +881,25 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     view |> element("#staff-notif-mark-all") |> render_click()
     refute has_element?(view, "#staff-notif-badge")
+
+    view |> element("#orders-alert-dismiss") |> render_click()
+    refute has_element?(view, "#orders-alert-banner")
+  end
+
+  test "orders?unpaid=1 opens unpaid drawer", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Unpaid Deep",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/orders?unpaid=1")
+    assert has_element?(view, "#unpaid-orders.staff-orders-unpaid-drawer--open")
+    assert has_element?(view, "#unpaid-order-#{order.id}")
   end
 
   defp backdate_order!(order, minutes_ago: minutes) when is_integer(minutes) and minutes >= 0 do
