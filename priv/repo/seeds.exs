@@ -20,6 +20,19 @@ alias Espreso.Menu.{Category, Product, ProductPrice}
 settings = BusinessSettings.ensure_defaults!()
 IO.puts("Business settings ready: #{settings.business_name}")
 
+gcash_qr_path = "/images/coffeespot/gcash-qrph.png"
+
+settings =
+  settings
+  |> Ecto.Changeset.change(%{
+    payments_mode: "qrph_manual",
+    gcash_qrph_path: gcash_qr_path,
+    maya_qrph_path: nil
+  })
+  |> Repo.update!()
+
+IO.puts("Payments mode: #{settings.payments_mode}, GCash QR: #{settings.gcash_qrph_path}")
+
 find_or_create_category = fn name ->
   case Repo.get_by(Category, name: name) do
     nil ->
@@ -261,6 +274,27 @@ dashboard_seed_accounts = [
     password: "Dashboard123!",
     role: "barista",
     active: true
+  },
+  %{
+    name: "Ana Reyes",
+    email: "ana.barista@coffeespot.local",
+    password: "Dashboard123!",
+    role: "barista",
+    active: true
+  },
+  %{
+    name: "Marco Santos",
+    email: "marco.barista@coffeespot.local",
+    password: "Dashboard123!",
+    role: "barista",
+    active: true
+  },
+  %{
+    name: "Liza Cruz",
+    email: "liza.manager@coffeespot.local",
+    password: "Dashboard123!",
+    role: "manager",
+    active: true
   }
 ]
 
@@ -279,5 +313,26 @@ for attrs <- dashboard_seed_accounts do
             "Dashboard seed account failed for #{attrs.email}: #{inspect(changeset.errors)}"
           )
       end
+  end
+end
+
+dashboard_pin_seed = [
+  {"staff.dashboard@test.local", "4321"},
+  {"manager.dashboard@test.local", "5678"},
+  {"ana.barista@coffeespot.local", "1111"},
+  {"marco.barista@coffeespot.local", "2222"},
+  {"liza.manager@coffeespot.local", "3333"}
+]
+
+for {email, pin} <- dashboard_pin_seed do
+  case Accounts.get_user_by_email(email) do
+    %Accounts.User{} = user ->
+      case Accounts.set_pin(user, pin) do
+        {:ok, _} -> IO.puts("Dashboard seed PIN set: #{email}")
+        {:error, reason} -> IO.puts("Dashboard seed PIN failed for #{email}: #{inspect(reason)}")
+      end
+
+    nil ->
+      :ok
   end
 end

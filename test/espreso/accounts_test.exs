@@ -239,6 +239,8 @@ defmodule Espreso.AccountsTest do
     assert Accounts.pin_set?(with_pin)
     assert {:ok, verified} = Accounts.verify_pin(with_pin, "1234")
     assert verified.id == user.id
+    assert {:ok, verified_again} = Accounts.verify_pin(to_string(user.id), "1234")
+    assert verified_again.id == user.id
 
     assert {:error, :invalid_pin} = Accounts.verify_pin(with_pin, "9999")
     assert {:error, :invalid_pin_format} = Accounts.set_pin(with_pin, "12")

@@ -234,6 +234,13 @@ defmodule Espreso.Accounts do
   """
   def verify_pin(%User{id: id}, pin) when is_binary(pin), do: verify_pin(id, pin)
 
+  def verify_pin(user_id, pin) when is_binary(user_id) and is_binary(pin) do
+    case Integer.parse(user_id) do
+      {id, ""} -> verify_pin(id, pin)
+      _ -> {:error, :invalid_pin}
+    end
+  end
+
   def verify_pin(user_id, pin) when is_integer(user_id) and is_binary(pin) do
     case Repo.get(User, user_id) do
       nil ->
