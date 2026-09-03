@@ -278,7 +278,8 @@ defmodule EspresoWeb.StaffPosLive do
 
                   <div class="staff-pos-products" id="pos-products">
                     <button
-                      :for={product <- visible_products(@categories, @selected_category, @search)}
+                      :for={{product, img} <-
+                        product_cards(@categories, @selected_category, @search)}
                       type="button"
                       class="staff-pos-product"
                       id={"pos-product-#{product.id}"}
@@ -287,9 +288,9 @@ defmodule EspresoWeb.StaffPosLive do
                     >
                       <span class="staff-pos-product-media" aria-hidden="true">
                         <img
-                          src={Menu.product_image(@selected_category || "", product.name)}
+                          src={img.src}
                           alt=""
-                          class="staff-pos-product-img"
+                          class={["staff-pos-product-img", img.packshot? && "is-packshot"]}
                           loading="lazy"
                         />
                       </span>
@@ -377,7 +378,7 @@ defmodule EspresoWeb.StaffPosLive do
                         name="notes"
                         phx-change="set_notes"
                         phx-debounce="300"
-                        rows="2"
+                        rows="1"
                         placeholder="Less ice, oat milk, etc."
                       >{@notes}</textarea>
                     </label>
@@ -427,8 +428,9 @@ defmodule EspresoWeb.StaffPosLive do
                         phx-click="remove"
                         phx-value-key={line.key}
                         aria-label={"Remove #{line.name}"}
+                        title="Remove"
                       >
-                        Remove
+                        ×
                       </button>
                     </div>
                   </li>
@@ -546,6 +548,12 @@ defmodule EspresoWeb.StaffPosLive do
     products_for(categories, selected)
     |> Enum.filter(fn product ->
       query == "" or String.contains?(String.downcase(product.name), query)
+    end)
+  end
+
+  defp product_cards(categories, selected, search) do
+    Enum.map(visible_products(categories, selected, search), fn product ->
+      {product, Menu.product_image_meta(selected || "", product.name)}
     end)
   end
 

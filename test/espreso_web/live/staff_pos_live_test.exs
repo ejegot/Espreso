@@ -419,10 +419,13 @@ defmodule EspresoWeb.StaffPosLiveTest do
     conn: conn,
     barista: barista
   } do
-    {:ok, home, _html} = live(log_in(conn, barista), ~p"/staff")
+    {:ok, home, html} = live(log_in(conn, barista), ~p"/staff")
+    assert html =~ "Shift desk"
     assert has_element?(home, "#staff-home-orders", "Orders")
     assert has_element?(home, "#staff-home-pos", "POS")
+    assert has_element?(home, "#staff-home-unpaid", "Unpaid")
     assert has_element?(home, "#staff-notif-toggle")
+    assert has_element?(home, "#staff-home-today-barista")
 
     {:ok, view, html} = live(log_in(conn, barista), ~p"/orders")
     assert has_element?(view, "#staff-nav-pos", "POS")

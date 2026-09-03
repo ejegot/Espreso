@@ -18,18 +18,37 @@ defmodule EspresoWeb.StaffOrdersLive do
      |> assign(:unpaid_drawer_open, false)
      |> assign(:reconciliation_drawer_open, false)
      |> assign(:mark_paid_order, nil)
+     |> assign(:alert_banner, nil)
      |> load_orders(), layout: false}
+  end
+
+  @impl true
+  def handle_params(params, _uri, socket) do
+    unpaid_open? = Map.get(params, "unpaid") in ["1", "true"]
+
+    {:noreply,
+     assign(socket, :unpaid_drawer_open, unpaid_open? or socket.assigns.unpaid_drawer_open)}
   end
 
   @impl true
   def handle_info({:order_changed, order}, socket) do
     StaffNotifications.push_order_change(order)
-    {:noreply, load_orders(socket)}
+
+    socket =
+      socket
+      |> maybe_set_alert_banner(order)
+      |> load_orders()
+
+    {:noreply, socket}
   end
 
   @impl true
   def handle_event("refresh", _params, socket) do
     {:noreply, load_orders(socket)}
+  end
+
+  def handle_event("dismiss_alert", _params, socket) do
+    {:noreply, assign(socket, :alert_banner, nil)}
   end
 
   def handle_event("toggle_unpaid_drawer", _params, socket) do
@@ -224,6 +243,7 @@ defmodule EspresoWeb.StaffOrdersLive do
           Unpaid <span class="staff-orders-unpaid-toggle-count">{length(@unpaid_orders)}</span>
         </button>
         <button
+          :if={@paymongo_reconciliations != []}
           type="button"
           class="staff-shell-tool staff-orders-reconciliation-toggle"
           id="reconciliation-drawer-toggle"
@@ -241,6 +261,37 @@ defmodule EspresoWeb.StaffOrdersLive do
       <div class="staff-orders-page staff-orders-shell-root">
         <main class="staff-orders-main">
           <p :if={@flash_note} class="staff-admin-note" id="orders-flash">{@flash_note}</p>
+
+          <div
+            :if={@alert_banner}
+            class="staff-orders-alert"
+            id="orders-alert-banner"
+            role="status"
+          >
+            <div class="staff-orders-alert-copy">
+              <p class="staff-orders-alert-title">New order {@alert_banner.number}</p>
+              <p class="staff-orders-alert-body">
+                {@alert_banner.name} · Jump to New lane
+              </p>
+            </div>
+            <div class="staff-orders-alert-actions">
+              <a
+                href={"#order-card-new-#{@alert_banner.id}"}
+                class="staff-orders-alert-jump"
+                id="orders-alert-jump"
+              >
+                View
+              </a>
+              <button
+                type="button"
+                class="staff-orders-alert-dismiss"
+                id="orders-alert-dismiss"
+                phx-click="dismiss_alert"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
 
           <div class="staff-orders-board">
             <div
@@ -471,7 +522,7 @@ defmodule EspresoWeb.StaffOrdersLive do
         </div>
 
         <p :if={!@compact?} class="staff-order-number">{@order.number}</p>
-        <p class="staff-order-name">{@order.customer_name}</p>
+        <p :if={show_customer_name?(@order)} class="staff-order-name">{@order.customer_name}</p>
 
         <ul class="staff-order-items">
           <li :for={item <- @order.items} class="staff-order-item">
@@ -722,6 +773,13 @@ defmodule EspresoWeb.StaffOrdersLive do
   defp fulfillment_short(%{fulfillment: "pickup"}), do: "Pickup"
   defp fulfillment_short(_), do: "Order"
 
+  defp show_customer_name?(%{customer_name: name}) when is_binary(name) do
+    trimmed = String.trim(name)
+    trimmed != "" and String.downcase(trimmed) not in ["walk-in", "walk in"]
+  end
+
+  defp show_customer_name?(_), do: false
+
   defp format_order_age(%DateTime{} = inserted_at) do
     seconds =
       DateTime.utc_now(:second)
@@ -765,6 +823,26 @@ defmodule EspresoWeb.StaffOrdersLive do
     |> assign(:unpaid_orders, Orders.list_todays_unpaid())
     |> assign(:paymongo_reconciliations, Orders.list_open_paymongo_reconciliations())
   end
+
+  defp maybe_set_alert_banner(socket, %{status: "received"} = order) do
+    prev_received_ids =
+      socket.assigns
+      |> Map.get(:active_orders, [])
+      |> Enum.filter(&(&1.status == "received"))
+      |> MapSet.new(& &1.id)
+
+    if MapSet.member?(prev_received_ids, order.id) do
+      socket
+    else
+      assign(socket, :alert_banner, %{
+        id: order.id,
+        number: order.number,
+        name: order.customer_name || "Customer"
+      })
+    end
+  end
+
+  defp maybe_set_alert_banner(socket, _order), do: socket
 
   defp truncate_session_id(session_id) when is_binary(session_id) do
     if String.length(session_id) > 16 do
