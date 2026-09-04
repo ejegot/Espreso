@@ -8975,6 +8975,10 @@ body:has(.home-page-landing) {
   --cs-beige: #b0a098;
   --cs-cream: #faf7f4;
   --menu-sticky-top: 4.15rem;
+  --menu-motion-press: 0.14s cubic-bezier(0.22, 1, 0.36, 1);
+  --menu-motion-soft: 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  --menu-motion-chip: 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+  --menu-press-scale: 0.97;
 }
 
 .menu-live-root .menu-page-brune {
@@ -9069,12 +9073,21 @@ body:has(.home-page-landing) {
   background: transparent;
   color: color-mix(in srgb, var(--qr-chrome-ink) 78%, #b0a098);
   cursor: pointer;
+  transition:
+    color var(--menu-motion-press),
+    background var(--menu-motion-press),
+    transform var(--menu-motion-press);
 }
 
 .menu-qr-chrome-back:hover,
 .menu-qr-chrome-back:focus-visible {
   color: var(--qr-chrome-accent);
   outline: none;
+}
+
+.menu-qr-chrome-back:active {
+  transform: scale(0.94);
+  background: rgba(248, 80, 32, 0.08);
 }
 
 .menu-qr-chrome-icon {
@@ -9752,6 +9765,12 @@ body:has(.home-page-landing) {
   cursor: pointer;
   white-space: nowrap;
   scroll-snap-align: start;
+  transition:
+    background var(--menu-motion-chip),
+    border-color var(--menu-motion-chip),
+    color var(--menu-motion-chip),
+    box-shadow var(--menu-motion-chip),
+    transform var(--menu-motion-press);
 }
 
 .menu-live-root .menu-craving-chip:hover,
@@ -9895,7 +9914,7 @@ body:has(.home-page-landing) {
 }
 
 .menu-qr-landing-photo--visit {
-  object-position: 50% 40%;
+  object-position: 50% 32%;
 }
 
 .menu-qr-landing-scrim {
@@ -10036,6 +10055,10 @@ body:has(.home-page-landing) {
   font-weight: 700;
   letter-spacing: 0.01em;
   box-shadow: 0 10px 28px rgba(248, 80, 32, 0.28);
+  transition:
+    box-shadow var(--menu-motion-soft),
+    transform var(--menu-motion-press),
+    filter var(--menu-motion-press);
 }
 
 .menu-qr-landing-cta--primary:hover,
@@ -10044,6 +10067,11 @@ body:has(.home-page-landing) {
   box-shadow:
     0 12px 30px rgba(248, 80, 32, 0.32),
     0 0 0 3px rgba(248, 80, 32, 0.28);
+}
+
+.menu-qr-landing-cta--primary:active {
+  transform: scale(var(--menu-press-scale));
+  filter: brightness(0.96);
 }
 
 .menu-qr-landing-cta-label {
@@ -10442,7 +10470,7 @@ body:has(.home-page-landing) {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 50% 42%;
+  object-position: 50% 28%;
 }
 
 .menu-qr-visit-bridge-scrim {
@@ -10740,6 +10768,19 @@ body:has(.home-page-landing) {
   --brune-dew: #f85020;
   background: #faf7f4;
   color: #382010;
+}
+
+.order-page .order-chrome {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.order-page .order-chrome-title {
+  justify-self: center;
+  margin: 0;
+  text-align: center;
+  text-shadow: none;
 }
 
 /* C5a — status-first hierarchy on customer order page */
@@ -12754,17 +12795,20 @@ html:not(.page-is-loading) .brune-top {
 
 .menu-page-brune .brune-menu-item-thumb {
   position: relative;
-  height: 8.5rem;
+  height: 12.25rem;
+  margin: 0;
+  overflow: hidden;
   border-radius: 0;
   background: #f3ede6;
 }
 
 .menu-page-brune .brune-menu-item-photo {
+  display: block;
   width: 100%;
   height: 100%;
   aspect-ratio: auto;
   object-fit: cover;
-  object-position: center;
+  object-position: center 34%;
 }
 
 .menu-page-brune .brune-menu-item-body {
@@ -12824,7 +12868,11 @@ html:not(.page-is-loading) .brune-top {
   background: #f85020;
   color: #fff;
   cursor: pointer;
-  transition: filter 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  transition:
+    filter var(--menu-motion-press),
+    background var(--menu-motion-press),
+    border-color var(--menu-motion-press),
+    transform var(--menu-motion-press);
 }
 
 .menu-page-brune .brune-menu-add-icon {
@@ -12841,6 +12889,7 @@ html:not(.page-is-loading) .brune-top {
 
 .menu-page-brune .brune-menu-add:active {
   filter: brightness(0.92);
+  transform: scale(0.94);
 }
 
 @media (min-width: 640px) {
@@ -12850,7 +12899,7 @@ html:not(.page-is-loading) .brune-top {
   }
 
   .menu-page-brune .brune-menu-item-thumb {
-    height: 9rem;
+    height: 13.25rem;
   }
 }
 
@@ -12861,7 +12910,7 @@ html:not(.page-is-loading) .brune-top {
   }
 
   .menu-page-brune .brune-menu-item-thumb {
-    height: 9.5rem;
+    height: 14rem;
   }
 }
 
@@ -14193,6 +14242,261 @@ html:not(.page-is-loading) .brune-top {
 
   .menu-live-root:has(.menu-floating-bag) .brune-mega-footer--secondary {
     margin-bottom: 0;
+  }
+}
+
+/* Menu motion polish — subtle, scoped to /menu only */
+.menu-live-root .menu-craving-chip:active {
+  transform: scale(0.96);
+}
+
+.menu-live-root .menu-craving-chip.is-active:active {
+  transform: scale(0.97);
+}
+
+.menu-live-root .menu-craving-label,
+.menu-live-root .menu-craving-thumb {
+  transition: box-shadow var(--menu-motion-chip), opacity var(--menu-motion-chip);
+}
+
+.menu-live-root .brune-menu-item-card {
+  transition:
+    box-shadow var(--menu-motion-soft),
+    border-color var(--menu-motion-soft),
+    transform var(--menu-motion-press);
+}
+
+.menu-live-root .brune-menu-item-card:has(.brune-menu-add:active) {
+  transform: scale(0.992);
+}
+
+.menu-live-root .brune-menu-body {
+  animation-duration: 0.26s;
+}
+
+.menu-live-root .brune-menu-item-card {
+  animation-duration: 0.42s;
+}
+
+.menu-live-root .brune-menu-item:nth-child(n + 5) .brune-menu-item-card {
+  animation-delay: 0.2s;
+}
+
+.menu-live-root .menu-qr-landing-visit-link {
+  transition:
+    color var(--menu-motion-press),
+    opacity var(--menu-motion-press),
+    transform var(--menu-motion-press);
+}
+
+.menu-live-root .menu-qr-landing-visit-link:active {
+  transform: scale(0.98);
+  opacity: 0.88;
+}
+
+.menu-live-root .menu-qr-landing-dot:active {
+  transform: scale(0.9);
+}
+
+.menu-live-root .menu-qr-craving-back,
+.menu-live-root .menu-qr-visit-back {
+  transition:
+    color var(--menu-motion-press),
+    opacity var(--menu-motion-press),
+    transform var(--menu-motion-press);
+}
+
+.menu-live-root .menu-qr-craving-back:active,
+.menu-live-root .menu-qr-visit-back:active {
+  transform: translateX(-1px) scale(0.98);
+  opacity: 0.82;
+}
+
+.menu-live-root .menu-qr-craving-option:active {
+  transform: scale(0.99);
+  opacity: 0.9;
+}
+
+.menu-live-root .menu-qr-my-orders {
+  transition:
+    background var(--menu-motion-soft),
+    box-shadow var(--menu-motion-soft),
+    transform var(--menu-motion-press);
+}
+
+.menu-live-root .menu-qr-my-orders:active {
+  transform: scale(var(--menu-press-scale));
+}
+
+.menu-live-root .brune-icon-btn,
+.menu-live-root .brune-search-btn {
+  transition:
+    color var(--menu-motion-press),
+    background var(--menu-motion-press),
+    transform var(--menu-motion-press);
+}
+
+.menu-live-root .brune-icon-btn:active,
+.menu-live-root .brune-search-btn:active {
+  transform: scale(0.94);
+}
+
+.menu-live-root .menu-size-pill {
+  transition:
+    background var(--menu-motion-chip),
+    border-color var(--menu-motion-chip),
+    color var(--menu-motion-chip),
+    box-shadow var(--menu-motion-chip),
+    transform var(--menu-motion-press);
+}
+
+.menu-live-root .menu-size-pill:active {
+  transform: scale(0.96);
+}
+
+.menu-live-root .menu-qty button {
+  transition:
+    background var(--menu-motion-press),
+    color var(--menu-motion-press),
+    transform var(--menu-motion-press);
+}
+
+.menu-live-root .menu-qty button:active:not(:disabled) {
+  transform: scale(0.92);
+  background: color-mix(in srgb, #f85020 14%, #fff);
+  color: #f85020;
+}
+
+.menu-live-root .menu-buy-now,
+.menu-live-root .menu-basket-checkout,
+.menu-live-root .menu-basket-empty-cta,
+.menu-live-root .menu-toast-action {
+  transition:
+    background var(--menu-motion-soft),
+    border-color var(--menu-motion-soft),
+    color var(--menu-motion-soft),
+    box-shadow var(--menu-motion-soft),
+    filter var(--menu-motion-press),
+    transform var(--menu-motion-press);
+}
+
+.menu-live-root .menu-buy-now:active,
+.menu-live-root .menu-basket-checkout:active,
+.menu-live-root .menu-basket-empty-cta:active,
+.menu-live-root .menu-toast-action:active {
+  transform: scale(var(--menu-press-scale));
+  filter: brightness(0.96);
+}
+
+.menu-live-root .menu-buy-hero-back,
+.menu-live-root .menu-buy-close,
+.menu-live-root .menu-basket-close,
+.menu-live-root .menu-basket-remove {
+  transition:
+    background var(--menu-motion-press),
+    color var(--menu-motion-press),
+    transform var(--menu-motion-press);
+}
+
+.menu-live-root .menu-buy-hero-back:active,
+.menu-live-root .menu-buy-close:active,
+.menu-live-root .menu-basket-close:active,
+.menu-live-root .menu-basket-remove:active {
+  transform: scale(0.94);
+}
+
+.menu-live-root .menu-buy-basket-link:active {
+  opacity: 0.75;
+}
+
+.menu-live-root .menu-checkout-option {
+  transition:
+    background var(--menu-motion-chip),
+    border-color var(--menu-motion-chip),
+    color var(--menu-motion-chip),
+    transform var(--menu-motion-press);
+}
+
+.menu-live-root .menu-checkout-option:active {
+  transform: scale(0.98);
+}
+
+.menu-live-root .menu-floating-bag:active {
+  transform: scale(0.985);
+}
+
+.menu-live-root .menu-floating-bag-cta {
+  transition: filter var(--menu-motion-press), transform var(--menu-motion-press);
+}
+
+.menu-live-root .menu-my-orders-card {
+  transition:
+    border-color var(--menu-motion-soft),
+    box-shadow var(--menu-motion-soft),
+    transform var(--menu-motion-press);
+}
+
+.menu-live-root .menu-my-orders-card:active {
+  transform: scale(0.99);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .menu-live-root .brune-menu-item-card:hover {
+    box-shadow: 0 4px 14px rgba(56, 32, 16, 0.07);
+    border-color: rgba(56, 32, 16, 0.1);
+  }
+
+  .menu-live-root .brune-menu-item-card:hover .brune-menu-item-photo {
+    transform: scale(1.03);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-live-root {
+    --menu-motion-press: 0.01ms;
+    --menu-motion-soft: 0.01ms;
+    --menu-motion-chip: 0.01ms;
+  }
+
+  .menu-live-root .brune-menu-body,
+  .menu-live-root .brune-menu-item-card,
+  .menu-live-root .menu-qr-craving-option,
+  .menu-live-root .menu-qr-craving-bridge,
+  .menu-live-root .menu-qr-craving-hero,
+  .menu-live-root .menu-qr-craving-body,
+  .menu-live-root .menu-qr-landing-photo,
+  .menu-live-root .menu-qr-landing-copy {
+    animation: none !important;
+  }
+
+  .menu-live-root .menu-craving-chip:active,
+  .menu-live-root .menu-craving-chip.is-active:active,
+  .menu-live-root .brune-menu-item-card:has(.brune-menu-add:active),
+  .menu-live-root .brune-menu-add:active,
+  .menu-live-root .menu-qr-landing-cta--primary:active,
+  .menu-live-root .menu-qr-landing-visit-link:active,
+  .menu-live-root .menu-qr-craving-back:active,
+  .menu-live-root .menu-qr-visit-back:active,
+  .menu-live-root .menu-qr-craving-option:active,
+  .menu-live-root .menu-qr-chrome-back:active,
+  .menu-live-root .menu-qr-my-orders:active,
+  .menu-live-root .brune-icon-btn:active,
+  .menu-live-root .brune-search-btn:active,
+  .menu-live-root .menu-size-pill:active,
+  .menu-live-root .menu-qty button:active:not(:disabled),
+  .menu-live-root .menu-buy-now:active,
+  .menu-live-root .menu-basket-checkout:active,
+  .menu-live-root .menu-basket-empty-cta:active,
+  .menu-live-root .menu-toast-action:active,
+  .menu-live-root .menu-buy-hero-back:active,
+  .menu-live-root .menu-buy-close:active,
+  .menu-live-root .menu-basket-close:active,
+  .menu-live-root .menu-basket-remove:active,
+  .menu-live-root .menu-checkout-option:active,
+  .menu-live-root .menu-floating-bag:active,
+  .menu-live-root .menu-my-orders-card:active {
+    transform: none;
+    filter: none;
   }
 }
 

@@ -35,11 +35,13 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:basket_pulse?, false)
      |> assign(:bag_add_delta, nil)
      |> assign(:fulfillment, :dine_in)
+     |> assign(:fulfillment_touched?, false)
      |> assign(:table_number, "")
      |> assign(:customer_name, "")
      |> assign(:notes, "")
      |> assign(:checkout_errors, %{})
      |> assign(:payment_method, :counter)
+     |> assign(:payment_touched?, false)
      |> assign(:placing_order?, false)
      |> assign(:my_orders, [])
      |> assign(:my_orders_open?, false), layout: false}
@@ -265,6 +267,7 @@ defmodule EspresoWeb.MenuLive do
     socket =
       socket
       |> assign(:fulfillment, fulfillment)
+      |> assign(:fulfillment_touched?, true)
       |> assign(:checkout_errors, Map.delete(socket.assigns.checkout_errors, :table_number))
 
     socket =
@@ -301,7 +304,10 @@ defmodule EspresoWeb.MenuLive do
         socket.assigns.maya_pay_available?
       )
 
-    {:noreply, assign(socket, :payment_method, payment_method)}
+    {:noreply,
+     socket
+     |> assign(:payment_method, payment_method)
+     |> assign(:payment_touched?, true)}
   end
 
   def handle_event("place_order", _params, socket) do
@@ -438,7 +444,7 @@ defmodule EspresoWeb.MenuLive do
           >
             <div class="menu-qr-landing-media" aria-hidden="true">
               <img
-                src="/images/coffeespot/cold-signature-01.jpg"
+                src="/images/coffeespot/IMG_3497.jpg"
                 alt=""
                 class="menu-qr-landing-photo menu-qr-landing-photo--visit"
                 width="800"
@@ -550,7 +556,7 @@ defmodule EspresoWeb.MenuLive do
       <div :if={@menu_stage == :visit} id="menu-visit" class="menu-qr-visit">
         <div class="menu-qr-visit-bridge" aria-hidden="true">
           <img
-            src="/images/coffeespot/cold-signature-01.jpg"
+            src="/images/coffeespot/IMG_3497.jpg"
             alt=""
             class="menu-qr-visit-bridge-photo"
             width="800"
@@ -1191,21 +1197,27 @@ defmodule EspresoWeb.MenuLive do
                     <div class="menu-checkout-options" role="radiogroup" aria-label="Fulfillment">
                       <button
                         type="button"
-                        class={["menu-checkout-option", @fulfillment == :dine_in && "is-active"]}
+                        class={[
+                          "menu-checkout-option",
+                          @fulfillment_touched? && @fulfillment == :dine_in && "is-active"
+                        ]}
                         id="checkout-fulfillment-dine-in"
                         phx-click="set_fulfillment"
                         phx-value-type="dine_in"
-                        aria-pressed={to_string(@fulfillment == :dine_in)}
+                        aria-pressed={to_string(@fulfillment_touched? and @fulfillment == :dine_in)}
                       >
                         Dine-in
                       </button>
                       <button
                         type="button"
-                        class={["menu-checkout-option", @fulfillment == :pickup && "is-active"]}
+                        class={[
+                          "menu-checkout-option",
+                          @fulfillment_touched? && @fulfillment == :pickup && "is-active"
+                        ]}
                         id="checkout-fulfillment-pickup"
                         phx-click="set_fulfillment"
                         phx-value-type="pickup"
-                        aria-pressed={to_string(@fulfillment == :pickup)}
+                        aria-pressed={to_string(@fulfillment_touched? and @fulfillment == :pickup)}
                       >
                         Pickup
                       </button>
@@ -1275,33 +1287,42 @@ defmodule EspresoWeb.MenuLive do
                     >
                       <button
                         type="button"
-                        class={["menu-checkout-option", @payment_method == :counter && "is-active"]}
+                        class={[
+                          "menu-checkout-option",
+                          @payment_touched? && @payment_method == :counter && "is-active"
+                        ]}
                         id="checkout-pay-counter"
                         phx-click="set_payment_method"
                         phx-value-method="counter"
-                        aria-pressed={to_string(@payment_method == :counter)}
+                        aria-pressed={to_string(@payment_touched? and @payment_method == :counter)}
                       >
                         Cash at counter
                       </button>
                       <button
                         :if={@gcash_pay_available?}
                         type="button"
-                        class={["menu-checkout-option", @payment_method == :gcash && "is-active"]}
+                        class={[
+                          "menu-checkout-option",
+                          @payment_touched? && @payment_method == :gcash && "is-active"
+                        ]}
                         id="checkout-pay-gcash"
                         phx-click="set_payment_method"
                         phx-value-method="gcash"
-                        aria-pressed={to_string(@payment_method == :gcash)}
+                        aria-pressed={to_string(@payment_touched? and @payment_method == :gcash)}
                       >
                         GCash
                       </button>
                       <button
                         :if={@maya_pay_available?}
                         type="button"
-                        class={["menu-checkout-option", @payment_method == :maya && "is-active"]}
+                        class={[
+                          "menu-checkout-option",
+                          @payment_touched? && @payment_method == :maya && "is-active"
+                        ]}
                         id="checkout-pay-maya"
                         phx-click="set_payment_method"
                         phx-value-method="maya"
-                        aria-pressed={to_string(@payment_method == :maya)}
+                        aria-pressed={to_string(@payment_touched? and @payment_method == :maya)}
                       >
                         Maya
                       </button>
