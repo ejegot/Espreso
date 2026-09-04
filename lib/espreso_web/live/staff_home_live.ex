@@ -5,38 +5,24 @@ defmodule EspresoWeb.StaffHomeLive do
   alias Espreso.Accounts.User
   alias Espreso.Menu
   alias Espreso.Orders
+  alias Espreso.Shifts
   alias EspresoWeb.StaffNotifications
 
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket), do: Orders.subscribe()
 
-    user = socket.assigns.current_user
-    overview = Orders.dashboard_overview()
-    sales = if manager_or_owner?(user), do: Orders.sales_overview(), else: nil
-
     {:ok,
      socket
      |> assign(:page_title, "Home")
-     |> assign(:overview, overview)
-     |> assign(:sales, sales)
-     |> assign(:primary, primary_tiles(user, overview))
-     |> assign(:secondary, secondary_tiles(user)), layout: false}
+     |> assign_home_state(), layout: false}
   end
 
   @impl true
   def handle_info({:order_changed, order}, socket) do
     StaffNotifications.push_order_change(order)
-    user = socket.assigns.current_user
-    overview = Orders.dashboard_overview()
-    sales = if manager_or_owner?(user), do: Orders.sales_overview(), else: nil
 
-    {:noreply,
-     socket
-     |> assign(:overview, overview)
-     |> assign(:sales, sales)
-     |> assign(:primary, primary_tiles(user, overview))
-     |> assign(:secondary, secondary_tiles(user))}
+    {:noreply, assign_home_state(socket)}
   end
 
   @impl true
@@ -121,6 +107,29 @@ defmodule EspresoWeb.StaffHomeLive do
                 {@sales.todays_paid_count} paid orders · {@overview.active_count} active · {@overview.unpaid_active_count} unpaid in kitchen
               </p>
             </div>
+
+            <ul
+              :if={@breakdown}
+              class="staff-paid-breakdown"
+              id="staff-home-paid-breakdown"
+            >
+              <li :for={row <- @via_rows} class="staff-paid-breakdown-row">
+                <span class="staff-paid-breakdown-label">{row.label}</span>
+                <span class="staff-paid-breakdown-total">{Menu.format_price(row.total)}</span>
+                <span class="staff-paid-breakdown-count">{row.count}</span>
+              </li>
+            </ul>
+
+            <p
+              :if={@shift_close}
+              class="staff-home-today-closed"
+              id="staff-home-shift-closed"
+            >
+              Closed · {Shifts.format_closed_at(@shift_close.closed_at)}
+              <span :if={@shift_close.closed_by_user}>
+                by {@shift_close.closed_by_user.name}
+              </span>
+            </p>
           <% else %>
             <div class="staff-home-today-row staff-home-today-row--compact">
               <p class="staff-home-today-meta" id="staff-home-today-barista">
@@ -132,6 +141,25 @@ defmodule EspresoWeb.StaffHomeLive do
       </main>
     </.staff_shell>
     """
+  end
+
+  defp assign_home_state(socket) do
+    user = socket.assigns.current_user
+    overview = Orders.dashboard_overview()
+    money? = manager_or_owner?(user)
+
+    breakdown = if money?, do: Orders.todays_paid_breakdown(), else: nil
+    sales = if breakdown, do: Orders.sales_overview(), else: nil
+    shift_close = if money?, do: Shifts.get_todays_close(), else: nil
+
+    socket
+    |> assign(:overview, overview)
+    |> assign(:sales, sales)
+    |> assign(:breakdown, breakdown)
+    |> assign(:via_rows, if(breakdown, do: Orders.paid_via_rows(breakdown), else: []))
+    |> assign(:shift_close, shift_close)
+    |> assign(:primary, primary_tiles(user, overview))
+    |> assign(:secondary, secondary_tiles(user, shift_close))
   end
 
   defp primary_tiles(%User{} = user, overview) do
@@ -162,7 +190,7 @@ defmodule EspresoWeb.StaffHomeLive do
     |> Enum.filter(& &1.show?)
   end
 
-  defp secondary_tiles(%User{} = user) do
+  defp secondary_tiles(%User{} = user, shift_close) do
     unpaid_count = length(Orders.list_todays_unpaid())
 
     base = [
@@ -189,6 +217,21 @@ defmodule EspresoWeb.StaffHomeLive do
             path: ~p"/dashboard",
             count: nil,
             show?: true
+          },
+          %{
+            id: "close",
+            eyebrow: "End of day",
+            title: if(shift_close, do: "Shift closed", else: "Close shift"),
+            body:
+              if shift_close do
+                "View today’s close snapshot."
+              else
+                "Record system totals and counted cash."
+              end,
+            path: ~p"/staff/close",
+            count: nil,
+            show?: Authorization.can?(user, :reports),
+            class: "staff-home-card--close"
           },
           %{
             id: "availability",

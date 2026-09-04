@@ -6,12 +6,16 @@ defmodule EspresoWeb.DashboardLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    breakdown = Orders.todays_paid_breakdown()
+
     {:ok,
      socket
      |> assign(:page_title, "Dashboard")
      |> assign(:order_overview, Orders.dashboard_overview())
      |> assign(:todays_orders, Orders.list_todays_orders())
      |> assign(:sales_overview, Orders.sales_overview())
+     |> assign(:paid_breakdown, breakdown)
+     |> assign(:via_rows, Orders.paid_via_rows(breakdown))
      |> assign(:popular_products, Orders.popular_products())
      |> assign(:reports_overview, Orders.reports_overview()), layout: false}
   end
@@ -86,6 +90,29 @@ defmodule EspresoWeb.DashboardLive do
         </div>
 
         <section
+          :if={show_money?(@current_user.role)}
+          id="dashboard-paid-breakdown"
+          class="staff-home-card dashboard-paid-breakdown-panel"
+          aria-label="Today by payment"
+        >
+          <span class="staff-home-card-eyebrow">Today</span>
+          <span class="staff-home-card-title">Today by payment</span>
+          <p class="staff-home-card-body dashboard-card-metric">
+            {Menu.format_price(@paid_breakdown.total)} · {@paid_breakdown.count} paid orders
+          </p>
+          <ul class="staff-paid-breakdown">
+            <li :for={row <- @via_rows} class="staff-paid-breakdown-row">
+              <span class="staff-paid-breakdown-label">{row.label}</span>
+              <span class="staff-paid-breakdown-total">{Menu.format_price(row.total)}</span>
+              <span class="staff-paid-breakdown-count">{row.count}</span>
+            </li>
+          </ul>
+          <.link navigate={~p"/staff/close"} class="staff-shell-tool dashboard-close-link">
+            Close shift
+          </.link>
+        </section>
+
+        <section
           id="dashboard-todays-orders-preview"
           class="staff-orders-section dashboard-todays-preview"
         >
@@ -130,6 +157,9 @@ defmodule EspresoWeb.DashboardLive do
   defp dashboard_lede("owner"), do: "Shop overview — sales, team, and settings."
   defp dashboard_lede("manager"), do: "Day-to-day operations — orders, availability, and reports."
   defp dashboard_lede(_), do: "Your shift overview — today’s orders."
+
+  defp show_money?(role) when role in ["manager", "owner"], do: true
+  defp show_money?(_), do: false
 
   defp panels_for("owner", overview, sales, popular, reports) do
     [
