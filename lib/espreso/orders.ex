@@ -12,6 +12,9 @@ defmodule Espreso.Orders do
 
   @unpaid_payment_statuses ~w(unpaid awaiting_payment)
   @paid_vias ~w(cash gcash maya counter paymongo)
+  # CoffeeSpot shop calendar is Asia/Manila. Philippines Standard Time is UTC+8
+  # year-round (no DST). Timestamps stay UTC in the DB; we only shift the day window.
+  @shop_utc_offset_seconds 8 * 60 * 60
 
   @doc """
   Creates an order from cart lines and checkout attrs.
@@ -326,24 +329,78 @@ defmodule Espreso.Orders do
   end
 
   @doc """
+  Today's paid sales broken down by `paid_via` (current Asia/Manila shop day).
+
+  Only `payment_status == "paid"` orders are included. Cancelled orders that
+  somehow remain paid are still counted if paid (cancel is unpaid-only in practice).
+  Nil/`paid_via` values are rolled into `"counter"`.
+  """
+  def todays_paid_breakdown do
+    today_start = shop_day_start_utc()
+
+    rows =
+      from(o in Order,
+        where: o.payment_status == "paid" and o.inserted_at >= ^today_start,
+        group_by: o.paid_via,
+        select: {o.paid_via, count(o.id), sum(o.total)}
+      )
+      |> Repo.all()
+
+    empty = %{total: Decimal.new("0"), count: 0}
+
+    by_via =
+      Map.new(@paid_vias, fn via -> {via, empty} end)
+
+    by_via =
+      Enum.reduce(rows, by_via, fn {via, count, total}, acc ->
+        key = if via in @paid_vias, do: via, else: "counter"
+        current = Map.fetch!(acc, key)
+
+        Map.put(acc, key, %{
+          count: current.count + count,
+          total: Decimal.add(current.total, decimalize(total))
+        })
+      end)
+
+    total =
+      by_via
+      |> Map.values()
+      |> Enum.reduce(Decimal.new("0"), fn %{total: t}, acc -> Decimal.add(acc, t) end)
+
+    count =
+      by_via
+      |> Map.values()
+      |> Enum.reduce(0, fn %{count: c}, acc -> acc + c end)
+
+    %{
+      total: total,
+      count: count,
+      by_via: by_via,
+      shop_date: shop_date_today()
+    }
+  end
+
+  @doc """
+  Current shop calendar date in Asia/Manila.
+  """
+  def shop_date_today do
+    DateTime.utc_now()
+    |> DateTime.add(@shop_utc_offset_seconds, :second)
+    |> DateTime.to_date()
+  end
+
+  @doc """
   Today's paid sales for the dashboard (current Asia/Manila shop day).
 
   Only `payment_status == "paid"` orders are included. Uses `Order.total`
   aggregates — does not load items.
   """
   def sales_overview do
-    today_start = shop_day_start_utc()
-
-    paid_today =
-      Order
-      |> where([o], o.payment_status == "paid" and o.inserted_at >= ^today_start)
-
-    total = Repo.aggregate(paid_today, :sum, :total) || Decimal.new("0")
-    count = Repo.aggregate(paid_today, :count, :id)
+    breakdown = todays_paid_breakdown()
 
     %{
-      todays_paid_total: total,
-      todays_paid_count: count
+      todays_paid_total: breakdown.total,
+      todays_paid_count: breakdown.count
     }
   end
 
@@ -370,6 +427,11 @@ defmodule Espreso.Orders do
     }
   end
 
+  defp decimalize(%Decimal{} = value), do: value
+  defp decimalize(value) when is_integer(value), do: Decimal.new(value)
+  defp decimalize(value) when is_float(value), do: Decimal.from_float(value)
+  defp decimalize(_), do: Decimal.new("0")
+
   @doc """
   Today's most ordered products from paid orders (current Asia/Manila shop day).
 
@@ -389,9 +451,7 @@ defmodule Espreso.Orders do
     |> Repo.all()
   end
 
-  # CoffeeSpot shop calendar is Asia/Manila. Philippines Standard Time is UTC+8
-  # year-round (no DST). Timestamps stay UTC in the DB; we only shift the day window.
-  @shop_utc_offset_seconds 8 * 60 * 60
+  # CoffeeSpot shop calendar helpers live above; kept here for call-site clarity.
 
   @doc false
   def shop_day_start_utc do
@@ -747,6 +807,20 @@ defmodule Espreso.Orders do
   def wallet_brand_label("gcash"), do: "GCash"
   def wallet_brand_label("maya"), do: "Maya"
   def wallet_brand_label(_), do: "Online"
+
+  def paid_via_label("cash"), do: "Cash"
+  def paid_via_label("gcash"), do: "GCash"
+  def paid_via_label("maya"), do: "Maya"
+  def paid_via_label("counter"), do: "Counter"
+  def paid_via_label("paymongo"), do: "PayMongo"
+  def paid_via_label(_), do: "Other"
+
+  def paid_via_rows(%{by_via: by_via}) when is_map(by_via) do
+    Enum.map(~w(cash gcash maya counter paymongo), fn via ->
+      entry = Map.get(by_via, via, %{total: Decimal.new("0"), count: 0})
+      %{via: via, label: paid_via_label(via), total: entry.total, count: entry.count}
+    end)
+  end
 
   def order_number_pattern, do: ~r/^CS-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/
 
