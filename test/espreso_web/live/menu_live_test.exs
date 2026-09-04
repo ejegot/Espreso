@@ -57,7 +57,7 @@ defmodule EspresoWeb.MenuLiveTest do
            )
     assert has_element?(
              view,
-             ~s(.menu-qr-landing-photo--visit[src="/images/coffeespot/cold-signature-01.jpg"])
+             ~s(.menu-qr-landing-photo--visit[src="/images/coffeespot/IMG_3497.jpg"])
            )
     assert has_element?(view, ".menu-qr-landing-dots [data-landing-dot='0']")
     assert has_element?(view, ".menu-qr-landing-dots [data-landing-dot='1']")
@@ -451,6 +451,9 @@ defmodule EspresoWeb.MenuLiveTest do
     view |> element("button.brune-icon-bag") |> render_click()
 
     assert has_element?(view, "#checkout-table[value='12']")
+    refute has_element?(view, "button.menu-checkout-option.is-active", "Dine-in")
+
+    view |> element("#checkout-fulfillment-dine-in") |> render_click()
     assert has_element?(view, "button.menu-checkout-option.is-active", "Dine-in")
   end
 
@@ -1562,19 +1565,26 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#checkout-pay-counter")
     assert has_element?(view, "#checkout-pay-gcash")
     refute has_element?(view, "#checkout-pay-maya")
+    refute has_element?(view, "#menu-checkout-form button.menu-checkout-option.is-active")
 
     view |> element("#checkout-fulfillment-pickup") |> render_click()
     refute has_element?(view, "#checkout-table")
     assert has_element?(view, "#checkout-pickup-hint", "Pick up at counter")
+    assert has_element?(view, "#checkout-fulfillment-pickup.is-active", "Pickup")
+    refute has_element?(view, "#checkout-fulfillment-dine-in.is-active")
+    refute has_element?(view, "#checkout-pay-counter.is-active")
 
     view |> element("#checkout-fulfillment-dine-in") |> render_click()
     assert has_element?(view, "#checkout-table")
+    assert has_element?(view, "#checkout-fulfillment-dine-in.is-active", "Dine-in")
 
     view
     |> form("#menu-checkout-form", %{customer_name: "B1 Guest", table_number: "8"})
     |> render_change()
 
     view |> element("#checkout-pay-gcash") |> render_click()
+    assert has_element?(view, "#checkout-pay-gcash.is-active", "GCash")
+    refute has_element?(view, "#checkout-pay-counter.is-active")
     assert has_element?(view, "#checkout-payment-note", "Scan the QR at the counter")
     assert has_element?(view, "button.menu-basket-checkout", "Continue — scan at counter")
   end

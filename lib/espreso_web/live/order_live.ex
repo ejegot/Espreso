@@ -60,7 +60,22 @@ defmodule EspresoWeb.OrderLive do
   def render(assigns) do
     ~H"""
     <div class="menu-page-brune site-page order-page">
-      <.brune_header current="menu" />
+      <header class="order-chrome menu-qr-chrome menu-qr-top" id="order-chrome">
+        <.link
+          navigate={menu_browse_path()}
+          class="menu-qr-chrome-back"
+          id="order-chrome-back"
+          aria-label="Back to menu"
+        >
+          <.icon name="hero-arrow-left" class="menu-qr-chrome-icon" />
+        </.link>
+
+        <h1 id="order-chrome-title" class="order-chrome-title menu-qr-chrome-brand menu-qr-top-brand">
+          {order_chrome_title(@order, @confirming?)}
+        </h1>
+
+        <span class="menu-basket-header-spacer" aria-hidden="true"></span>
+      </header>
 
       <main class="order-main">
         <div :if={is_nil(@order)} class="order-card">
@@ -295,6 +310,18 @@ defmodule EspresoWeb.OrderLive do
   end
 
   defp menu_browse_path, do: ~p"/menu?stage=menu"
+
+  defp order_chrome_title(nil, _confirming?), do: "Order"
+
+  defp order_chrome_title(order, true) do
+    cond do
+      show_qrph_payment?(order) -> "Scan at counter"
+      confirm_payment_processing?(order) -> "Payment"
+      true -> "Confirmed"
+    end
+  end
+
+  defp order_chrome_title(_order, _confirming?), do: "Your order"
 
   defp page_title(nil, _confirming?), do: "Order not found"
 

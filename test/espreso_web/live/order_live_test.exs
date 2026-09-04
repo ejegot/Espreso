@@ -17,6 +17,12 @@ defmodule EspresoWeb.OrderLiveTest do
       )
 
     {:ok, view, html} = live(conn, ~p"/order/#{order.number}")
+    assert has_element?(view, "#order-chrome")
+    assert has_element?(view, "#order-chrome-title", "Your order")
+    assert has_element?(view, "#order-chrome-back[aria-label='Back to menu']")
+    refute has_element?(view, ".brune-top")
+    refute has_element?(view, ".brune-top-leading")
+    refute has_element?(view, ".brune-top-trailing")
     assert has_element?(view, "#order-status-message", "Received — kitchen has it")
     assert has_element?(view, "#order-hint", "Pay at counter · show this number.")
     assert html =~ "Pay at counter"
@@ -481,6 +487,8 @@ defmodule EspresoWeb.OrderLiveTest do
 
     {:ok, view, html} = live(conn, ~p"/order/#{order.number}?confirm=1")
 
+    assert has_element?(view, "#order-chrome-title", "Scan at counter")
+    refute has_element?(view, ".brune-top")
     assert has_element?(view, "#order-confirm")
     assert has_element?(view, "#order-confirm-title", "Scan at counter")
     assert has_element?(view, "#order-confirm-qrph")
