@@ -1171,7 +1171,7 @@ defmodule EspresoWeb.MenuLiveTest do
     |> render_change()
 
     view |> element("button.menu-checkout-option", "GCash") |> render_click()
-    assert has_element?(view, ".menu-checkout-payment-note", "GCash QR code on the next screen")
+    assert has_element?(view, ".menu-checkout-payment-note", "Scan QR on the next screen")
 
     {:ok, order_view, _html} =
       view
@@ -1526,7 +1526,7 @@ defmodule EspresoWeb.MenuLiveTest do
     })
     |> render_change()
 
-    view |> element("button.menu-checkout-option", "Pickup at counter") |> render_click()
+    view |> element("button.menu-checkout-option", "Pickup") |> render_click()
 
     {:ok, _order_view, _html} =
       view
@@ -1538,6 +1538,37 @@ defmodule EspresoWeb.MenuLiveTest do
     assert order.customer_name == "Ana Lee"
     assert order.notes == nil
     assert order.fulfillment == "pickup"
+  end
+
+  test "B1 checkout shows pickup hint, large table field, and hides Maya without QR", %{
+    conn: conn
+  } do
+    set_payments_mode!("qrph_manual")
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view = enter_menu_browse(view)
+
+    view = add_to_order(view, "Espresso")
+    view |> element("button.brune-icon-bag") |> render_click()
+
+    assert has_element?(view, "#checkout-table.menu-checkout-input--table")
+    assert has_element?(view, "#menu-checkout-payment")
+    assert has_element?(view, "#checkout-pay-counter")
+    assert has_element?(view, "#checkout-pay-gcash")
+    refute has_element?(view, "#checkout-pay-maya")
+
+    view |> element("#checkout-fulfillment-pickup") |> render_click()
+    refute has_element?(view, "#checkout-table")
+    assert has_element?(view, "#checkout-pickup-hint", "Pick up at counter")
+
+    view |> element("#checkout-fulfillment-dine-in") |> render_click()
+    assert has_element?(view, "#checkout-table")
+
+    view
+    |> form("#menu-checkout-form", %{customer_name: "B1 Guest", table_number: "8"})
+    |> render_change()
+
+    view |> element("#checkout-pay-gcash") |> render_click()
+    assert has_element?(view, "#checkout-payment-note", "Scan QR on the next screen")
   end
 
   test "/menu legacy restore_current_order still hydrates My Orders", %{conn: conn} do
@@ -1641,9 +1672,10 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, ".menu-basket-body button.menu-basket-checkout")
     refute has_element?(view, ".menu-basket-footer")
 
-    view |> element("button.menu-checkout-option", "Pickup at counter") |> render_click()
+    view |> element("button.menu-checkout-option", "Pickup") |> render_click()
     refute has_element?(view, "#checkout-table")
-    assert has_element?(view, "button.menu-checkout-option.is-active", "Pickup at counter")
+    assert has_element?(view, "button.menu-checkout-option.is-active", "Pickup")
+    assert has_element?(view, "#checkout-pickup-hint", "Pick up at counter")
 
     view |> element("button.menu-basket-checkout", "Enter your details") |> render_click()
     assert has_element?(view, "#menu-checkout-summary", "Please enter your name.")
@@ -2036,8 +2068,21 @@ defmodule EspresoWeb.MenuLiveTest do
   end
 
   defp set_payments_mode!(mode) do
+    attrs =
+      case mode do
+        "qrph_manual" ->
+          %{
+            payments_mode: mode,
+            gcash_qrph_path: "/images/coffeespot/gcash-qrph.png",
+            maya_qrph_path: nil
+          }
+
+        _ ->
+          %{payments_mode: mode}
+      end
+
     Espreso.BusinessSettings.get()
-    |> Ecto.Changeset.change(%{payments_mode: mode})
+    |> Ecto.Changeset.change(attrs)
     |> Repo.update!()
   end
 
