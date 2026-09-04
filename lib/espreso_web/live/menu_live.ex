@@ -1337,7 +1337,7 @@ defmodule EspresoWeb.MenuLive do
                 phx-click="place_order"
                 disabled={@placing_order?}
               >
-                {checkout_button_label(@payment_method, @placing_order?)}
+                {checkout_button_label(@payment_method, @placing_order?, @payments_mode)}
               </button>
             <% else %>
               <button type="button" class="menu-basket-checkout" phx-click="validate_checkout">
@@ -1399,10 +1399,16 @@ defmodule EspresoWeb.MenuLive do
                   id={"menu-my-order-#{order.number}"}
                   class="menu-my-orders-card"
                   data-status={order.status}
+                  data-payment-status={order.payment_status}
                 >
                   <div class="menu-my-orders-card-top">
                     <p class="menu-my-orders-number">{order.number}</p>
-                    <p class="menu-my-orders-status">{customer_my_order_status_label(order.status)}</p>
+                    <p class={[
+                      "menu-my-orders-status",
+                      my_order_status_class(order)
+                    ]}>
+                      {customer_my_order_status_label(order)}
+                    </p>
                   </div>
                   <p class="menu-my-orders-meta">
                     {order.item_count} {if order.item_count == 1, do: "item", else: "items"} · {Menu.format_price(
@@ -1436,7 +1442,12 @@ defmodule EspresoWeb.MenuLive do
                 >
                   <div class="menu-my-orders-card-top">
                     <p class="menu-my-orders-number">{order.number}</p>
-                    <p class="menu-my-orders-status">{customer_my_order_status_label(order.status)}</p>
+                    <p class={[
+                      "menu-my-orders-status",
+                      my_order_status_class(order)
+                    ]}>
+                      {customer_my_order_status_label(order)}
+                    </p>
                   </div>
                   <p class="menu-my-orders-meta">
                     {order.item_count} {if order.item_count == 1, do: "item", else: "items"} · {Menu.format_price(
@@ -1808,6 +1819,8 @@ defmodule EspresoWeb.MenuLive do
     summary = %{
       existing
       | status: order.status,
+        payment_status: order.payment_status || existing.payment_status,
+        payment_method: order.payment_method || existing.payment_method,
         total: order.total || existing.total,
         inserted_at: order.inserted_at || existing.inserted_at
     }
@@ -1846,6 +1859,8 @@ defmodule EspresoWeb.MenuLive do
       id: order.id,
       number: order.number,
       status: order.status,
+      payment_status: order.payment_status,
+      payment_method: order.payment_method,
       item_count: item_count,
       total: order.total,
       inserted_at: order.inserted_at
@@ -1881,6 +1896,9 @@ defmodule EspresoWeb.MenuLive do
       Enum.any?(active, &(&1.status == "preparing")) ->
         "#{my_orders_title(count)} · Preparing"
 
+      Enum.any?(active, &my_order_unpaid?/1) ->
+        "#{my_orders_title(count)} · Pay"
+
       active != [] ->
         if count == 1, do: "My Order", else: "My Orders · #{count} active"
 
@@ -1895,7 +1913,9 @@ defmodule EspresoWeb.MenuLive do
   defp my_orders_trigger_status?(orders) do
     active = active_my_orders(orders)
 
-    Enum.any?(active, &(&1.status in ["ready", "preparing"])) or length(active) > 1
+    Enum.any?(active, &(&1.status in ["ready", "preparing"])) or
+      Enum.any?(active, &my_order_unpaid?/1) or
+      length(active) > 1
   end
 
   defp my_orders_trigger_aria(orders) do
@@ -1911,9 +1931,34 @@ defmodule EspresoWeb.MenuLive do
   end
 
   # Customer-facing My Orders labels only — DB status remains unchanged.
-  defp customer_my_order_status_label("completed"), do: "Picked Up ✓"
-  defp customer_my_order_status_label(status), do: Orders.status_label(status)
+  defp customer_my_order_status_label(%{status: "ready"}), do: "Ready — come to counter"
+  defp customer_my_order_status_label(%{status: "completed"}), do: "Picked up ✓"
+  defp customer_my_order_status_label(%{status: "preparing"}), do: "Preparing"
 
+  defp customer_my_order_status_label(%{payment_status: "awaiting_payment"}),
+    do: "Waiting for payment"
+
+  defp customer_my_order_status_label(%{payment_status: "unpaid", payment_method: "counter"}),
+    do: "Pay at counter"
+
+  defp customer_my_order_status_label(%{payment_status: "unpaid"}), do: "Unpaid"
+  defp customer_my_order_status_label(%{status: "received"}), do: "Received"
+  defp customer_my_order_status_label(%{status: status}), do: Orders.status_label(status)
+
+  defp my_order_status_class(%{status: "ready"}), do: "menu-my-orders-status--ready"
+  defp my_order_status_class(%{status: "completed"}), do: "menu-my-orders-status--done"
+  defp my_order_status_class(%{status: "preparing"}), do: "menu-my-orders-status--preparing"
+
+  defp my_order_status_class(%{payment_status: status})
+       when status in ["awaiting_payment", "unpaid"],
+       do: "menu-my-orders-status--unpaid"
+
+  defp my_order_status_class(_), do: "menu-my-orders-status--received"
+
+  defp my_order_unpaid?(%{payment_status: status}) when status in ["awaiting_payment", "unpaid"],
+    do: true
+
+  defp my_order_unpaid?(_), do: false
   defp sanitize_restored_cart(%{"cart" => lines}, categories) when is_list(lines) do
     lines
     |> Enum.flat_map(&sanitize_restored_line(&1, categories))
@@ -2672,12 +2717,16 @@ defmodule EspresoWeb.MenuLive do
     }
   end
 
-  defp checkout_button_label(:counter, true), do: "Placing order…"
-  defp checkout_button_label(:gcash, true), do: "Starting GCash…"
-  defp checkout_button_label(:maya, true), do: "Starting Maya…"
-  defp checkout_button_label(:counter, false), do: "Place order"
-  defp checkout_button_label(:gcash, false), do: "Continue to GCash"
-  defp checkout_button_label(:maya, false), do: "Continue to Maya"
+  defp checkout_button_label(:counter, true, _mode), do: "Placing order…"
+  defp checkout_button_label(:gcash, true, "qrph_manual"), do: "Starting…"
+  defp checkout_button_label(:maya, true, "qrph_manual"), do: "Starting…"
+  defp checkout_button_label(:gcash, true, _mode), do: "Starting GCash…"
+  defp checkout_button_label(:maya, true, _mode), do: "Starting Maya…"
+  defp checkout_button_label(:counter, false, _mode), do: "Place order"
+  defp checkout_button_label(:gcash, false, "qrph_manual"), do: "Continue — scan at counter"
+  defp checkout_button_label(:maya, false, "qrph_manual"), do: "Continue — scan at counter"
+  defp checkout_button_label(:gcash, false, _mode), do: "Continue to GCash"
+  defp checkout_button_label(:maya, false, _mode), do: "Continue to Maya"
 
   defp resolve_payment_method("gcash", mode, true, _maya) when mode in ["paymongo", "qrph_manual"],
     do: :gcash
@@ -2713,10 +2762,10 @@ defmodule EspresoWeb.MenuLive do
     do: "Continue to PayMongo to complete payment."
 
   defp payment_checkout_note(:gcash, "qrph_manual"),
-    do: "Scan QR on the next screen — staff will confirm."
+    do: "Scan the QR at the counter — staff will confirm."
 
   defp payment_checkout_note(:maya, "qrph_manual"),
-    do: "Scan QR on the next screen — staff will confirm."
+    do: "Scan the QR at the counter — staff will confirm."
 
   defp payment_checkout_note(_, _), do: "Pay at the counter when your order is ready."
 end

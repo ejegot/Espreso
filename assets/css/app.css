@@ -9186,10 +9186,48 @@ body:has(.home-page-landing) {
 
 .menu-my-orders-status {
   margin: 0;
-  color: #f85020;
-  font-size: 0.78rem;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 1.55rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.72rem;
+  font-weight: 800;
   letter-spacing: 0.02em;
+  line-height: 1.2;
+  text-align: right;
+}
+
+.menu-my-orders-status--unpaid {
+  border-color: color-mix(in srgb, #f85020 32%, transparent);
+  background: color-mix(in srgb, #f85020 10%, #fff);
+  color: #f85020;
+}
+
+.menu-my-orders-status--ready {
+  border-color: color-mix(in srgb, #2f7a33 28%, transparent);
+  background: color-mix(in srgb, #2f7a33 10%, #fff);
+  color: #2f7a33;
+}
+
+.menu-my-orders-status--preparing {
+  border-color: color-mix(in srgb, #c45c16 28%, transparent);
+  background: color-mix(in srgb, #c45c16 10%, #fff);
+  color: #c45c16;
+}
+
+.menu-my-orders-status--received {
+  border-color: rgba(56, 32, 16, 0.12);
+  background: color-mix(in srgb, #faf7f4 70%, #fff);
+  color: #7a5a48;
+}
+
+.menu-my-orders-status--done {
+  border-color: color-mix(in srgb, #2f7a33 28%, transparent);
+  background: color-mix(in srgb, #2f7a33 10%, #fff);
+  color: #2f7a33;
 }
 
 .menu-my-orders-card--history .menu-my-orders-status {
@@ -10716,6 +10754,23 @@ body:has(.home-page-landing) {
   text-transform: uppercase;
 }
 
+.order-page .order-paid-badge {
+  margin: 0.15rem 0 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.75rem;
+  padding: 0.2rem 0.7rem;
+  border: 1px solid color-mix(in srgb, #2f7a33 28%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, #2f7a33 10%, #fff);
+  color: #2f7a33;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
 .order-page .order-status-block--complete .order-status-message {
   color: #382010;
 }
@@ -10765,7 +10820,7 @@ body:has(.home-page-landing) {
   letter-spacing: 0.04em;
 }
 
-/* QRPh payment — customer checkout */
+/* QRPh payment — customer checkout (B2 pay screen) */
 .order-page .order-qrph-payment {
   margin: 0 0 1.35rem;
   padding: 1.15rem 1rem 1.25rem;
@@ -10779,8 +10834,70 @@ body:has(.home-page-landing) {
   box-shadow: 0 10px 28px rgba(56, 32, 16, 0.06);
 }
 
+.order-page .order-qrph-payment--hero {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 1.15rem;
+  padding: 1.25rem 1rem 1.35rem;
+  border-color: color-mix(in srgb, #f85020 22%, rgba(56, 32, 16, 0.12));
+}
+
 .order-page .order-card--confirm .order-qrph-payment {
-  margin-top: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.order-page .order-card--pay .order-title--pay {
+  margin-bottom: 0.35rem;
+}
+
+.order-page .order-qrph-hero {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+  text-align: center;
+}
+
+.order-page .order-qrph-order-number {
+  margin: 0;
+  color: #382010;
+  font-family: "DM Sans", sans-serif;
+  font-size: clamp(1.65rem, 7vw, 2.15rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.order-page .order-qrph-awaiting {
+  margin: 0;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  color: #7a5a48;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.order-page .order-qrph-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: 0.2rem 0.65rem;
+  border: 1px solid color-mix(in srgb, #f85020 32%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, #f85020 10%, #fff);
+  color: #f85020;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.order-page .order-qrph-awaiting-wallet {
+  color: #5c4a40;
+  font-weight: 700;
 }
 
 .order-page .order-qrph-head {
@@ -10821,12 +10938,19 @@ body:has(.home-page-landing) {
 }
 
 .order-page .order-qrph-title {
-  margin: 0 0 0.55rem;
+  margin: 0;
   color: #382010;
   font-family: "DM Sans", sans-serif;
   font-size: 1.05rem;
   font-weight: 700;
   letter-spacing: -0.01em;
+  text-align: center;
+}
+
+.order-page .order-qrph-payment--hero .order-qrph-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #7a5a48;
 }
 
 .order-page .order-qrph-lede {
@@ -10867,6 +10991,10 @@ body:has(.home-page-landing) {
   width: min(100%, 15rem);
 }
 
+.order-page .order-qrph-code--hero {
+  width: min(100%, 17.5rem);
+}
+
 .order-page .order-qrph-code figcaption {
   margin: 0;
   color: #b0a098;
@@ -10888,6 +11016,140 @@ body:has(.home-page-landing) {
   box-shadow: 0 8px 22px rgba(56, 32, 16, 0.08);
 }
 
+.order-page .order-qrph-code--hero img {
+  width: min(100%, 16.5rem);
+  padding: 0.75rem;
+  border-radius: 1rem;
+  box-shadow: 0 12px 28px rgba(56, 32, 16, 0.1);
+}
+
+.order-page .order-qrph-amount-block {
+  display: grid;
+  gap: 0.25rem;
+  justify-items: center;
+  text-align: center;
+}
+
+.order-page .order-qrph-amount {
+  margin: 0;
+  display: grid;
+  gap: 0.1rem;
+  justify-items: center;
+}
+
+.order-page .order-qrph-amount-label {
+  color: #b0a098;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.order-page .order-qrph-amount strong {
+  color: #382010;
+  font-family: "DM Sans", sans-serif;
+  font-size: clamp(1.55rem, 6.5vw, 1.95rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.order-page .order-qrph-scan-hint {
+  margin: 0;
+  color: #5c4a40;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.order-page .order-qrph-open-actions {
+  display: grid;
+  gap: 0.55rem;
+  justify-items: stretch;
+  width: 100%;
+}
+
+.order-page .order-qrph-open-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.85rem;
+  font-family: "DM Sans", sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.order-page .order-qrph-open-btn:active {
+  transform: scale(0.98);
+}
+
+.order-page .order-qrph-open-btn--gcash {
+  background: #007dfe;
+  color: #fff;
+}
+
+.order-page .order-qrph-open-btn--maya {
+  background: #00b14f;
+  color: #fff;
+}
+
+.order-page .order-qrph-open-fallback {
+  margin: 0;
+  color: #7a5a48;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.order-page .order-qrph-steps {
+  margin: 0;
+  padding: 0.75rem 0.85rem 0.75rem 1.85rem;
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, #faf7f4 75%, #fff);
+  color: #5c4a40;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.order-page .order-qrph-steps li + li {
+  margin-top: 0.35rem;
+}
+
+.order-page .order-qrph-waiting {
+  margin: 0;
+  padding: 0.85rem 0.9rem;
+  border: 1px dashed color-mix(in srgb, #f85020 34%, transparent);
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, #f85020 7%, #fff);
+  text-align: center;
+}
+
+.order-page .order-qrph-waiting-label {
+  margin: 0;
+  color: #f85020;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.order-page .order-qrph-waiting-note {
+  margin: 0.25rem 0 0;
+  color: #7a5a48;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
 .order-page .order-qrph-placeholder {
   margin: 0;
   padding: 0.85rem 0.9rem;
@@ -10904,6 +11166,16 @@ body:has(.home-page-landing) {
   .order-page .order-qrph-codes:has(.order-qrph-code + .order-qrph-code) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
+  }
+
+  .order-page .order-qrph-open-actions:has(.order-qrph-open-btn + .order-qrph-open-btn) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .order-page
+    .order-qrph-open-actions:has(.order-qrph-open-btn + .order-qrph-open-btn)
+    .order-qrph-open-fallback {
+    grid-column: 1 / -1;
   }
 }
 
