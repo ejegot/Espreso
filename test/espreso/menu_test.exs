@@ -235,62 +235,62 @@ defmodule Espreso.MenuTest do
 
     test "studio product photos map to the correct menu items" do
       assert Menu.product_image("SODA", "Green Apple Campagna") ==
-               "/images/coffeespot/drink-green-apple-campagna.png"
+               "/images/coffeespot/gen-soda-green-apple.png"
 
       assert Menu.product_image("FRAPPE", "Double Chocolate") ==
-               "/images/coffeespot/drink-double-chocolate.png"
+               "/images/coffeespot/gen-frappe-double-chocolate.png"
 
       assert Menu.product_image("FRAPPE", "Biscoff") ==
-               "/images/coffeespot/drink-biscoff-frappe.png"
+               "/images/coffeespot/gen-frappe-biscoff.png"
 
       assert Menu.product_image("SODA", "Scarlet Berry") ==
-               "/images/coffeespot/drink-scarlet-berry.png"
+               "/images/coffeespot/gen-soda-scarlet-berry.png"
 
       assert Menu.product_image("COLD", "Iced Bellagio Choco") ==
-               "/images/coffeespot/drink-iced-bellagio-choco.png"
+               "/images/coffeespot/gen-cold-bellagio-choco.png"
 
       assert Menu.product_image("FOOD", "Spam Musubi") ==
-               "/images/coffeespot/food-spam-musubi.png"
+               "/images/coffeespot/gen-food-spam-musubi.png"
 
       assert Menu.product_image("FOOD", "Belgian Waffles") ==
-               "/images/coffeespot/food-belgian-waffles.png"
+               "/images/coffeespot/gen-food-belgian-waffles.png"
 
       assert Menu.product_image("FOOD", "Chocolate Almond Waffles") ==
-               "/images/coffeespot/food-chocolate-almond-waffles.png"
+               "/images/coffeespot/gen-food-choco-almond-waffles.png"
     end
   end
 
   describe "product_image/2" do
     test "returns a named CoffeeSpot photo for known items" do
       assert Menu.product_image("HOT", "Espresso") ==
-               "/images/coffeespot/coffee-espresso-01.jpg"
+               "/images/coffeespot/gen-hot-espresso.png"
 
       assert Menu.product_image("HOT", "Double Espresso") ==
-               "/images/coffeespot/coffee-detail-01.jpg"
+               "/images/coffeespot/gen-hot-double-espresso.png"
 
       assert Menu.product_image("HOT", "Americano") ==
-               "/images/coffeespot/coffee-table-01.jpg"
+               "/images/coffeespot/gen-hot-americano.png"
 
       assert Menu.product_image("SODA", "Tropical Passion Fruit") ==
-               "/images/coffeespot/soda-signature-01.jpg"
+               "/images/coffeespot/gen-soda-tropical-passion.png"
 
       assert Menu.product_image("FOOD", "Nugget") ==
-               "/images/coffeespot/IMG_3474.JPG"
+               "/images/coffeespot/gen-food-nugget.png"
 
       assert Menu.product_image("FOOD", "Beef Tapa") ==
-               "/images/coffeespot/IMG_3464.JPG"
+               "/images/coffeespot/gen-food-beef-tapa.png"
 
       assert Menu.product_image("COLD", "Strawberry Matcha") ==
-               "/images/coffeespot/IMG_3467.JPG"
+               "/images/coffeespot/gen-cold-strawberry-matcha.png"
     end
 
     test "returns a category fallback for unknown item names" do
       src = Menu.product_image("SODA", "Mystery Fizz")
 
       assert src in [
-               "/images/coffeespot/soda-signature-01.jpg",
-               "/images/coffeespot/IMG_3477.JPG",
-               "/images/coffeespot/IMG_3457.JPG"
+               "/images/coffeespot/gen-soda-tropical-passion.png",
+               "/images/coffeespot/gen-soda-hummingbird.png",
+               "/images/coffeespot/gen-soda-minty-peach.png"
              ]
     end
   end

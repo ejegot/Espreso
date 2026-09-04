@@ -12753,6 +12753,7 @@ html:not(.page-is-loading) .brune-top {
 }
 
 .menu-page-brune .brune-menu-item-thumb {
+  position: relative;
   height: 8.5rem;
   border-radius: 0;
   background: #f3ede6;
@@ -13093,6 +13094,7 @@ html:not(.page-is-loading) .brune-top {
 .brune-menu-item:nth-child(4) .brune-menu-item-card { animation-delay: 0.18s; }
 
 .brune-menu-item-thumb {
+  position: relative;
   overflow: hidden;
   border-radius: 0.85rem;
   background: #f3ede6;
@@ -13105,6 +13107,43 @@ html:not(.page-is-loading) .brune-top {
   object-fit: cover;
   object-position: center;
   transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.menu-temp-badge {
+  position: absolute;
+  top: 0.45rem;
+  left: 0.45rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.45rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.menu-temp-badge--hot {
+  background: color-mix(in srgb, #f85020 92%, #fff);
+  color: #fff;
+}
+
+.menu-temp-badge--iced {
+  background: color-mix(in srgb, #1f6f8b 92%, #fff);
+  color: #fff;
+}
+
+.menu-temp-badge--detail {
+  top: auto;
+  bottom: 1.1rem;
+  left: 1rem;
+  min-height: 1.65rem;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.72rem;
 }
 
 .brune-menu-item-body {
