@@ -2204,6 +2204,14 @@ body:has(.menu-page-locked) {
   text-transform: uppercase;
 }
 
+.menu-checkout-hint {
+  margin: 0.45rem 0 0;
+  color: var(--brune-muted, #6b6b6b);
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
 .menu-checkout-optional {
   font-weight: 500;
   letter-spacing: 0;
@@ -2218,34 +2226,67 @@ body:has(.menu-page-locked) {
 }
 
 .menu-checkout-option {
-  min-height: 2.5rem;
-  padding: 0.45rem 0.65rem;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.7rem;
   border: 1.5px solid var(--brune-line, #e0e0e0);
   border-radius: 0.75rem;
   background: #fff;
   color: var(--brune-ink, #111112);
   font: inherit;
-  font-size: 0.86rem;
-  font-weight: 600;
+  font-size: 0.9rem;
+  font-weight: 700;
   cursor: pointer;
+  touch-action: manipulation;
   transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
 
 .menu-checkout-option.is-active {
-  border-color: #3a8a3e;
-  background: #d8efd9;
-  color: #246628;
+  border-color: color-mix(in srgb, #f85020 55%, transparent);
+  background: color-mix(in srgb, #f85020 10%, #fff);
+  color: #f85020;
+}
+
+.menu-checkout-options--pay {
+  grid-template-columns: 1fr;
+}
+
+.menu-checkout-options--pay.is-three {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 420px) {
+  .menu-checkout-options--pay.is-three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .menu-checkout-options--pay:not(.is-three) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .menu-checkout-payment .menu-checkout-options {
   grid-template-columns: 1fr;
 }
 
+.menu-checkout-payment .menu-checkout-options--pay.is-three {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 420px) {
+  .menu-checkout-payment .menu-checkout-options--pay.is-three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .menu-checkout-payment .menu-checkout-options--pay:not(.is-three) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .menu-checkout-payment .menu-checkout-option {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  cursor: default;
+  cursor: pointer;
 }
 
 .menu-checkout-field {
@@ -2256,21 +2297,29 @@ body:has(.menu-page-locked) {
 .menu-checkout-input {
   width: 100%;
   box-sizing: border-box;
-  min-height: 2.55rem;
-  padding: 0.55rem 0.8rem;
+  min-height: 2.75rem;
+  padding: 0.6rem 0.85rem;
   border: 1px solid var(--brune-line, #e0e0e0);
   border-radius: 0.75rem;
   background: #fff;
   color: var(--brune-ink, #111112);
   font: inherit;
-  font-size: 0.95rem;
+  font-size: 1rem;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.menu-checkout-input--table {
+  min-height: 3.15rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
 .menu-checkout-input:focus {
-  border-color: var(--brune-sage, #3a8a3e);
-  box-shadow: 0 0 0 3px rgba(58, 138, 62, 0.12);
+  border-color: color-mix(in srgb, #f85020 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, #f85020 14%, transparent);
 }
 
 .menu-checkout-input.is-error {

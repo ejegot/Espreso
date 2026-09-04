@@ -18,6 +18,8 @@ defmodule EspresoWeb.MenuLive do
      socket
      |> assign(:page_title, "Menu")
      |> assign(:payments_mode, payment_config.payments_mode)
+     |> assign(:gcash_pay_available?, wallet_pay_available?(payment_config, :gcash))
+     |> assign(:maya_pay_available?, wallet_pay_available?(payment_config, :maya))
      |> assign(:menu_stage, :landing)
      |> assign(:menu_filter, nil)
      |> assign(:categories, categories)
@@ -291,7 +293,14 @@ defmodule EspresoWeb.MenuLive do
   end
 
   def handle_event("set_payment_method", %{"method" => method}, socket) do
-    payment_method = resolve_payment_method(method, socket.assigns.payments_mode)
+    payment_method =
+      resolve_payment_method(
+        method,
+        socket.assigns.payments_mode,
+        socket.assigns.gcash_pay_available?,
+        socket.assigns.maya_pay_available?
+      )
+
     {:noreply, assign(socket, :payment_method, payment_method)}
   end
 
@@ -1165,118 +1174,136 @@ defmodule EspresoWeb.MenuLive do
               >
                 <div class="menu-basket-checkout-card">
                   <fieldset class="menu-checkout-fulfillment">
-                    <legend class="menu-checkout-label">How will you get it?</legend>
-                  <div class="menu-checkout-options" role="radiogroup" aria-label="Fulfillment">
-                    <button
-                      type="button"
-                      class={["menu-checkout-option", @fulfillment == :dine_in && "is-active"]}
-                      phx-click="set_fulfillment"
-                      phx-value-type="dine_in"
-                      aria-pressed={to_string(@fulfillment == :dine_in)}
-                    >
-                      Dine-in
-                    </button>
-                    <button
-                      type="button"
-                      class={["menu-checkout-option", @fulfillment == :pickup && "is-active"]}
-                      phx-click="set_fulfillment"
-                      phx-value-type="pickup"
-                      aria-pressed={to_string(@fulfillment == :pickup)}
-                    >
-                      Pickup at counter
-                    </button>
+                    <legend class="menu-checkout-label">Fulfillment</legend>
+                    <div class="menu-checkout-options" role="radiogroup" aria-label="Fulfillment">
+                      <button
+                        type="button"
+                        class={["menu-checkout-option", @fulfillment == :dine_in && "is-active"]}
+                        id="checkout-fulfillment-dine-in"
+                        phx-click="set_fulfillment"
+                        phx-value-type="dine_in"
+                        aria-pressed={to_string(@fulfillment == :dine_in)}
+                      >
+                        Dine-in
+                      </button>
+                      <button
+                        type="button"
+                        class={["menu-checkout-option", @fulfillment == :pickup && "is-active"]}
+                        id="checkout-fulfillment-pickup"
+                        phx-click="set_fulfillment"
+                        phx-value-type="pickup"
+                        aria-pressed={to_string(@fulfillment == :pickup)}
+                      >
+                        Pickup
+                      </button>
+                    </div>
+                    <p :if={@fulfillment == :pickup} class="menu-checkout-hint" id="checkout-pickup-hint">
+                      Pick up at counter when ready.
+                    </p>
+                  </fieldset>
+
+                  <div :if={@fulfillment == :dine_in} class="menu-checkout-field">
+                    <label class="menu-checkout-label" for="checkout-table">Table number</label>
+                    <input
+                      id="checkout-table"
+                      type="number"
+                      name="table_number"
+                      inputmode="numeric"
+                      pattern="[0-9]*"
+                      min="1"
+                      max="99"
+                      value={@table_number}
+                      placeholder="e.g. 7"
+                      class={[
+                        "menu-checkout-input",
+                        "menu-checkout-input--table",
+                        @checkout_errors[:table_number] && "is-error"
+                      ]}
+                      phx-debounce="200"
+                    />
+                    <p :if={@checkout_errors[:table_number]} class="menu-checkout-error">
+                      {@checkout_errors[:table_number]}
+                    </p>
                   </div>
-                </fieldset>
 
-                <div :if={@fulfillment == :dine_in} class="menu-checkout-field">
-                  <label class="menu-checkout-label" for="checkout-table">Table number</label>
-                  <input
-                    id="checkout-table"
-                    type="number"
-                    name="table_number"
-                    inputmode="numeric"
-                    min="1"
-                    max="99"
-                    value={@table_number}
-                    placeholder="e.g. 7"
-                    class={["menu-checkout-input", @checkout_errors[:table_number] && "is-error"]}
-                    phx-debounce="200"
-                  />
-                  <p :if={@checkout_errors[:table_number]} class="menu-checkout-error">
-                    {@checkout_errors[:table_number]}
-                  </p>
-                </div>
-
-                <div class="menu-checkout-field">
-                  <label class="menu-checkout-label" for="checkout-name">Your name</label>
-                  <input
-                    id="checkout-name"
-                    type="text"
-                    name="customer_name"
-                    value={@customer_name}
-                    placeholder="Name for your order"
-                    autocomplete="name"
-                    maxlength="60"
-                    class={["menu-checkout-input", @checkout_errors[:customer_name] && "is-error"]}
-                    phx-debounce="200"
-                  />
-                  <p :if={@checkout_errors[:customer_name]} class="menu-checkout-error">
-                    {@checkout_errors[:customer_name]}
-                  </p>
-                </div>
-
-                <fieldset
-                  :if={
-                    checkout_valid?(@fulfillment, @customer_name, @table_number) &&
-                      @payments_mode != "counter_only"
-                  }
-                  class="menu-checkout-payment"
-                >
-                  <legend class="menu-checkout-label">How will you pay?</legend>
-                  <div class="menu-checkout-options" role="radiogroup" aria-label="Payment">
-                    <button
-                      :if={@payments_mode in ["paymongo", "qrph_manual"]}
-                      type="button"
-                      class={["menu-checkout-option", @payment_method == :gcash && "is-active"]}
-                      phx-click="set_payment_method"
-                      phx-value-method="gcash"
-                      aria-pressed={to_string(@payment_method == :gcash)}
-                    >
-                      GCash
-                    </button>
-                    <button
-                      :if={@payments_mode in ["paymongo", "qrph_manual"]}
-                      type="button"
-                      class={["menu-checkout-option", @payment_method == :maya && "is-active"]}
-                      phx-click="set_payment_method"
-                      phx-value-method="maya"
-                      aria-pressed={to_string(@payment_method == :maya)}
-                    >
-                      Maya
-                    </button>
-                    <button
-                      type="button"
-                      class={["menu-checkout-option", @payment_method == :counter && "is-active"]}
-                      phx-click="set_payment_method"
-                      phx-value-method="counter"
-                      aria-pressed={to_string(@payment_method == :counter)}
-                    >
-                      Cash at counter
-                    </button>
+                  <div class="menu-checkout-field">
+                    <label class="menu-checkout-label" for="checkout-name">Your name</label>
+                    <input
+                      id="checkout-name"
+                      type="text"
+                      name="customer_name"
+                      value={@customer_name}
+                      placeholder="Name for your order"
+                      autocomplete="name"
+                      maxlength="60"
+                      class={["menu-checkout-input", @checkout_errors[:customer_name] && "is-error"]}
+                      phx-debounce="200"
+                    />
+                    <p :if={@checkout_errors[:customer_name]} class="menu-checkout-error">
+                      {@checkout_errors[:customer_name]}
+                    </p>
                   </div>
-                  <p class="menu-checkout-payment-note menu-basket-note">
-                    {payment_checkout_note(@payment_method, @payments_mode)}
+
+                  <fieldset
+                    :if={@payments_mode != "counter_only"}
+                    class="menu-checkout-payment"
+                    id="menu-checkout-payment"
+                  >
+                    <legend class="menu-checkout-label">Pay with</legend>
+                    <div
+                      class={[
+                        "menu-checkout-options",
+                        "menu-checkout-options--pay",
+                        pay_option_count(@gcash_pay_available?, @maya_pay_available?) == 3 &&
+                          "is-three"
+                      ]}
+                      role="radiogroup"
+                      aria-label="Payment"
+                    >
+                      <button
+                        type="button"
+                        class={["menu-checkout-option", @payment_method == :counter && "is-active"]}
+                        id="checkout-pay-counter"
+                        phx-click="set_payment_method"
+                        phx-value-method="counter"
+                        aria-pressed={to_string(@payment_method == :counter)}
+                      >
+                        Cash at counter
+                      </button>
+                      <button
+                        :if={@gcash_pay_available?}
+                        type="button"
+                        class={["menu-checkout-option", @payment_method == :gcash && "is-active"]}
+                        id="checkout-pay-gcash"
+                        phx-click="set_payment_method"
+                        phx-value-method="gcash"
+                        aria-pressed={to_string(@payment_method == :gcash)}
+                      >
+                        GCash
+                      </button>
+                      <button
+                        :if={@maya_pay_available?}
+                        type="button"
+                        class={["menu-checkout-option", @payment_method == :maya && "is-active"]}
+                        id="checkout-pay-maya"
+                        phx-click="set_payment_method"
+                        phx-value-method="maya"
+                        aria-pressed={to_string(@payment_method == :maya)}
+                      >
+                        Maya
+                      </button>
+                    </div>
+                    <p class="menu-checkout-payment-note menu-basket-note" id="checkout-payment-note">
+                      {payment_checkout_note(@payment_method, @payments_mode)}
+                    </p>
+                  </fieldset>
+                  <p
+                    :if={@payments_mode == "counter_only"}
+                    class="menu-checkout-payment-note menu-basket-note"
+                    id="checkout-payment-note"
+                  >
+                    Pay at the counter when your order is ready.
                   </p>
-                </fieldset>
-                <p
-                  :if={
-                    checkout_valid?(@fulfillment, @customer_name, @table_number) &&
-                      @payments_mode == "counter_only"
-                  }
-                  class="menu-checkout-payment-note menu-basket-note"
-                >
-                  Pay at the counter when your order is ready.
-                </p>
                 </div>
               </form>
             </div>
@@ -2652,9 +2679,30 @@ defmodule EspresoWeb.MenuLive do
   defp checkout_button_label(:gcash, false), do: "Continue to GCash"
   defp checkout_button_label(:maya, false), do: "Continue to Maya"
 
-  defp resolve_payment_method("gcash", mode) when mode in ["paymongo", "qrph_manual"], do: :gcash
-  defp resolve_payment_method("maya", mode) when mode in ["paymongo", "qrph_manual"], do: :maya
-  defp resolve_payment_method(_, _), do: :counter
+  defp resolve_payment_method("gcash", mode, true, _maya) when mode in ["paymongo", "qrph_manual"],
+    do: :gcash
+
+  defp resolve_payment_method("maya", mode, _gcash, true) when mode in ["paymongo", "qrph_manual"],
+    do: :maya
+
+  defp resolve_payment_method(_, _, _, _), do: :counter
+
+  defp wallet_pay_available?(%{payments_mode: "paymongo"}, :gcash), do: true
+  defp wallet_pay_available?(%{payments_mode: "paymongo"}, :maya), do: true
+
+  defp wallet_pay_available?(%{payments_mode: "qrph_manual", gcash_qrph_path: path}, :gcash)
+       when is_binary(path) and path != "",
+       do: true
+
+  defp wallet_pay_available?(%{payments_mode: "qrph_manual", maya_qrph_path: path}, :maya)
+       when is_binary(path) and path != "",
+       do: true
+
+  defp wallet_pay_available?(_, _), do: false
+
+  defp pay_option_count(gcash?, maya?) do
+    1 + if(gcash?, do: 1, else: 0) + if(maya?, do: 1, else: 0)
+  end
 
   defp payment_checkout_note(:counter, _), do: "Pay at the counter when your order is ready."
 
@@ -2665,10 +2713,10 @@ defmodule EspresoWeb.MenuLive do
     do: "Continue to PayMongo to complete payment."
 
   defp payment_checkout_note(:gcash, "qrph_manual"),
-    do: "You'll get a GCash QR code on the next screen."
+    do: "Scan QR on the next screen — staff will confirm."
 
   defp payment_checkout_note(:maya, "qrph_manual"),
-    do: "You'll get a Maya QR code on the next screen."
+    do: "Scan QR on the next screen — staff will confirm."
 
   defp payment_checkout_note(_, _), do: "Pay at the counter when your order is ready."
 end
