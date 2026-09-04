@@ -842,6 +842,12 @@ defmodule EspresoWeb.MenuLive do
                           class="brune-menu-item-photo"
                           loading="lazy"
                         />
+                        <span
+                          :if={badge = temperature_badge(category.name)}
+                          class={"menu-temp-badge menu-temp-badge--#{badge.tone}"}
+                        >
+                          {badge.label}
+                        </span>
                       </div>
                       <div class="brune-menu-item-body">
                         <h3 class="brune-menu-item-name">{product.name}</h3>
@@ -925,6 +931,13 @@ defmodule EspresoWeb.MenuLive do
               alt={@detail.product.name}
               class="menu-buy-photo"
             />
+
+            <span
+              :if={badge = temperature_badge(@detail.category_name)}
+              class={"menu-temp-badge menu-temp-badge--detail menu-temp-badge--#{badge.tone}"}
+            >
+              {badge.label}
+            </span>
 
             <div class="menu-buy-hero-scrim" aria-hidden="true"></div>
 
@@ -1574,52 +1587,52 @@ defmodule EspresoWeb.MenuLive do
     [
       %{
         id: "coffee",
-        label: "Coffee",
+        label: "Hot coffee",
         category: "HOT",
         filter: nil,
-        image: "/images/coffeespot/coffee-espresso-01.jpg"
+        image: "/images/coffeespot/gen-hot-espresso.png"
       },
       %{
         id: "iced",
-        label: "Iced",
+        label: "Iced coffee",
         category: "COLD",
         filter: nil,
-        image: "/images/coffeespot/cold-signature-01.jpg"
+        image: "/images/coffeespot/gen-cold-cafe-latte.png"
       },
       %{
         id: "frappe",
         label: "Frappe",
         category: "FRAPPE",
         filter: nil,
-        image: "/images/coffeespot/IMG_3458.JPG"
+        image: "/images/coffeespot/gen-frappe-salted-caramel.png"
       },
       %{
         id: "soda",
         label: "Soda",
         category: "SODA",
         filter: nil,
-        image: "/images/coffeespot/soda-signature-01.jpg"
+        image: "/images/coffeespot/gen-soda-tropical-passion.png"
       },
       %{
         id: "food",
         label: "Food",
         category: "FOOD",
         filter: nil,
-        image: "/images/coffeespot/food-savory-01.jpg"
+        image: "/images/coffeespot/gen-food-beef-tapa.png"
       },
       %{
         id: "matcha",
         label: "Matcha",
         category: nil,
         filter: :matcha,
-        image: "/images/coffeespot/IMG_3471.JPG"
+        image: "/images/coffeespot/gen-hot-matcha-latte.png"
       },
       %{
         id: "sweets",
         label: "Sweets",
         category: "FOOD",
         filter: :sweets,
-        image: "/images/coffeespot/pastry-signature-01.jpg"
+        image: "/images/coffeespot/gen-food-belgian-waffles.png"
       }
     ]
   end
@@ -2145,8 +2158,8 @@ defmodule EspresoWeb.MenuLive do
   defp section_tone("FOOD"), do: "food"
   defp section_tone(_name), do: "default"
 
-  defp category_nav_label("HOT"), do: "Hot"
-  defp category_nav_label("COLD"), do: "Cold"
+  defp category_nav_label("HOT"), do: "Hot coffee"
+  defp category_nav_label("COLD"), do: "Iced coffee"
   defp category_nav_label("FRAPPE"), do: "Frappe"
   defp category_nav_label("SODA"), do: "Soda"
   defp category_nav_label("FOOD"), do: "Food"
@@ -2156,12 +2169,16 @@ defmodule EspresoWeb.MenuLive do
   defp menu_section_title(:sweets, _category_name), do: "Sweets"
   defp menu_section_title(_, category_name), do: category_nav_label(category_name)
 
-  defp craving_label("HOT"), do: "Coffee"
-  defp craving_label("COLD"), do: "Iced"
+  defp craving_label("HOT"), do: "Hot coffee"
+  defp craving_label("COLD"), do: "Iced coffee"
   defp craving_label("FRAPPE"), do: "Frappe"
   defp craving_label("SODA"), do: "Soda"
   defp craving_label("FOOD"), do: "Food"
   defp craving_label(name), do: category_nav_label(name)
+
+  defp temperature_badge("HOT"), do: %{label: "Hot", tone: "hot"}
+  defp temperature_badge("COLD"), do: %{label: "Iced", tone: "iced"}
+  defp temperature_badge(_), do: nil
 
   defp menu_craving_chips(categories) do
     all_chip = %{
