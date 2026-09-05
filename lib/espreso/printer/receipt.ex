@@ -10,6 +10,7 @@ defmodule Espreso.Printer.Receipt do
 
   Options:
   - `:staff_name` — logged-in cashier name
+  - `:cash_tendered` / `:change` — optional Decimals for cash lines
   """
   def build(%Order{} = order, opts \\ []) do
     items = List.wrap(Map.get(order, :items) || [])
@@ -57,7 +58,10 @@ defmodule Espreso.Printer.Receipt do
           EscPos.size_double_height(),
           EscPos.columns("TOTAL", money(order.total)),
           EscPos.size_normal(),
-          EscPos.columns(Orders.paid_via_label(paid_via), money(order.total)),
+          EscPos.columns(Orders.paid_via_label(paid_via), money(order.total))
+        ] ++
+        cash_change_lines(opts) ++
+        [
           EscPos.bold_off(),
           EscPos.feed(1),
           EscPos.separator(),
@@ -74,6 +78,96 @@ defmodule Espreso.Printer.Receipt do
         ]
     )
   end
+
+  @doc """
+  Compact kitchen ticket — items + notes, no prices / Wi‑Fi.
+  """
+  def build_kitchen(%Order{} = order, opts \\ []) do
+    items = List.wrap(Map.get(order, :items) || [])
+    staff_name = opts |> Keyword.get(:staff_name) |> blank_to_nil()
+
+    EscPos.join(
+      [
+        EscPos.init(),
+        EscPos.align_center(),
+        EscPos.bold_on(),
+        EscPos.size_double_height(),
+        EscPos.text_line("KITCHEN"),
+        EscPos.size_normal(),
+        EscPos.text_line(shop_name()),
+        EscPos.bold_off(),
+        EscPos.feed(1),
+        EscPos.align_left(),
+        EscPos.bold_on(),
+        EscPos.size_double_height(),
+        EscPos.text_line(order.number),
+        EscPos.size_normal(),
+        EscPos.text_line(fulfillment_line(order)),
+        EscPos.text_line(customer_line(order)),
+        EscPos.bold_off()
+      ] ++
+        if(staff_name, do: [EscPos.text_line("Cashier: #{staff_name}")], else: []) ++
+        [
+          EscPos.separator(),
+          EscPos.feed(1)
+        ] ++
+        Enum.flat_map(items, &kitchen_item_lines/1) ++
+        kitchen_notes(order) ++
+        [
+          EscPos.separator(),
+          EscPos.feed(3),
+          EscPos.cut()
+        ]
+    )
+  end
+
+  defp cash_change_lines(opts) do
+    tendered = Keyword.get(opts, :cash_tendered)
+    change = Keyword.get(opts, :change)
+
+    if match?(%Decimal{}, tendered) and match?(%Decimal{}, change) do
+      [
+        EscPos.columns("Cash", money(tendered)),
+        EscPos.columns("Change", money(change))
+      ]
+    else
+      []
+    end
+  end
+
+  defp kitchen_item_lines(item) do
+    size = if item.size in [nil, ""], do: "", else: " #{item.size}"
+    qty = item.quantity || 1
+    name = "#{item.name}#{size}"
+
+    [
+      EscPos.bold_on(),
+      EscPos.size_double_height(),
+      EscPos.text_line("#{qty}x #{name}"),
+      EscPos.size_normal(),
+      EscPos.bold_off(),
+      EscPos.feed(1)
+    ]
+  end
+
+  defp kitchen_notes(%{notes: notes}) when is_binary(notes) do
+    trimmed = String.trim(notes)
+
+    if trimmed == "" do
+      []
+    else
+      [
+        EscPos.separator(),
+        EscPos.bold_on(),
+        EscPos.text_line("NOTE"),
+        EscPos.bold_off(),
+        EscPos.text_line(trimmed),
+        EscPos.feed(1)
+      ]
+    end
+  end
+
+  defp kitchen_notes(_), do: []
 
   defp receipt_config do
     conf = Application.get_env(:espreso, Espreso.Printer, [])

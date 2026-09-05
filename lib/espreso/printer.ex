@@ -67,6 +67,10 @@ defmodule Espreso.Printer do
     send_bytes(Receipt.build(order, opts), "receipt #{order.number}")
   end
 
+  def print_kitchen(%Order{} = order, opts \\ []) do
+    send_bytes(Receipt.build_kitchen(order, opts), "kitchen #{order.number}")
+  end
+
   def open_drawer(pin \\ :pin2) do
     bytes =
       case pin do

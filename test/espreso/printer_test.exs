@@ -61,4 +61,30 @@ defmodule Espreso.PrinterTest do
     refute receipt =~ "₱"
     refute receipt =~ "?"
   end
+
+  test "kitchen ticket is compact with items and notes" do
+    order = %Order{
+      number: "CS-KIT001",
+      customer_name: "Jay",
+      fulfillment: "dine_in",
+      table_number: "5",
+      notes: "Less ice",
+      items: [
+        %OrderItem{name: "Scarlet Berry", size: "16oz", quantity: 2}
+      ]
+    }
+
+    ticket = Receipt.build_kitchen(order, staff_name: "Ana")
+
+    assert ticket =~ "KITCHEN"
+    assert ticket =~ "CS-KIT001"
+    assert ticket =~ "Dine in - Table 5"
+    assert ticket =~ "2x Scarlet Berry 16oz"
+    assert ticket =~ "NOTE"
+    assert ticket =~ "Less ice"
+    assert ticket =~ "Cashier: Ana"
+    refute ticket =~ "TOTAL"
+    refute ticket =~ "P120"
+    refute ticket =~ "Wi-Fi"
+  end
 end

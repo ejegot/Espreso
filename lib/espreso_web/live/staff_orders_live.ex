@@ -89,17 +89,41 @@ defmodule EspresoWeb.StaffOrdersLive do
     end
   end
 
+  def handle_event("print_kitchen", %{"id" => id}, socket) do
+    order = Repo.get!(Espreso.Orders.Order, id) |> Repo.preload(:items)
+
+    note =
+      case Printer.print_kitchen(order, staff_name: socket.assigns.current_user.name) do
+        :ok -> "#{order.number} kitchen ticket printed."
+        :disabled -> "Printer is not enabled on this server."
+        {:error, reason} -> "#{order.number} kitchen print failed (#{inspect(reason)})."
+      end
+
+    {:noreply, assign(socket, :flash_note, note)}
+  end
+
   def handle_event("reprint_receipt", %{"id" => id}, socket) do
     order = Repo.get!(Espreso.Orders.Order, id) |> Repo.preload(:items)
 
     result =
-      Printer.print_receipt(order, staff_name: socket.assigns.current_user.name)
+      Printer.after_paid(order, order.paid_via || "cash",
+        staff_name: socket.assigns.current_user.name
+      )
 
     note =
       case result do
-        :ok -> "#{order.number} receipt reprinted."
-        :disabled -> "Printer is not enabled on this server."
-        {:error, reason} -> "#{order.number} reprint failed (#{inspect(reason)})."
+        :ok ->
+          if Printer.cash_like?(order.paid_via || "cash") do
+            "#{order.number} receipt reprinted · kaha opened."
+          else
+            "#{order.number} receipt reprinted."
+          end
+
+        :disabled ->
+          "Printer is not enabled on this server."
+
+        {:error, reason} ->
+          "#{order.number} reprint failed (#{inspect(reason)})."
       end
 
     {:noreply, assign(socket, :flash_note, note)}
@@ -647,6 +671,21 @@ defmodule EspresoWeb.StaffOrdersLive do
             phx-click="abandon_online_payment"
           >
             Abandon payment
+          </button>
+        </div>
+
+        <div
+          :if={Printer.enabled?() and @order.status in ["received", "preparing", "ready"]}
+          class="staff-order-secondary-actions"
+        >
+          <button
+            type="button"
+            class="staff-action staff-action-muted"
+            id={"kitchen-#{@order.id}"}
+            phx-click="print_kitchen"
+            phx-value-id={@order.id}
+          >
+            Kitchen
           </button>
         </div>
 
