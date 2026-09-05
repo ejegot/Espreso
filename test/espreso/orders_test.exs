@@ -158,6 +158,23 @@ defmodule Espreso.OrdersTest do
     assert number == order.number
   end
 
+  test "mark_paid from received advances to preparing" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, order} =
+      Orders.create_order(lines, %{
+        customer_name: "Auto Prep",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    assert order.status == "received"
+    assert {:ok, paid} = Orders.mark_paid(order, paid_via: "maya")
+    assert paid.payment_status == "paid"
+    assert paid.status == "preparing"
+    assert paid.paid_via == "maya"
+  end
+
   test "mark_paid is idempotent when already paid" do
     lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
 
@@ -542,7 +559,7 @@ defmodule Espreso.OrdersTest do
     assert paid.payment_method == "counter"
     assert paid.payment_status == "paid"
     assert paid.source == "pos"
-    assert paid.status == "received"
+    assert paid.status == "preparing"
 
     assert {:ok, online} =
              Orders.create_order(lines, %{
@@ -643,7 +660,7 @@ defmodule Espreso.OrdersTest do
     assert Repo.aggregate(Espreso.Orders.OrderItem, :count, :id) == before_items
   end
 
-  test "complete_order marks ready orders picked up without changing payment" do
+  test "complete_order marks ready orders picked up; unpaid cannot become ready" do
     lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
 
     {:ok, unpaid} =
@@ -653,12 +670,8 @@ defmodule Espreso.OrdersTest do
         payment_method: :counter
       })
 
-    {:ok, unpaid_ready} = Orders.update_status(unpaid, "ready")
-    assert {:ok, completed_unpaid} = Orders.complete_order(unpaid_ready)
-    assert completed_unpaid.status == "completed"
-    assert completed_unpaid.payment_status == "unpaid"
-    assert Orders.status_label(completed_unpaid.status) == "Picked up"
-    refute Enum.any?(Orders.list_recent_ready(), &(&1.id == completed_unpaid.id))
+    {:ok, preparing} = Orders.update_status(unpaid, "preparing")
+    assert {:error, :payment_required} = Orders.update_status(preparing, "ready")
 
     {:ok, paid} =
       Orders.create_order(lines, %{
@@ -706,6 +719,7 @@ defmodule Espreso.OrdersTest do
         payment_method: :counter
       })
 
+    {:ok, _} = Orders.mark_paid(ready)
     {:ok, ready} = Orders.update_status(ready, "ready")
     assert {:ok, completed} = Orders.complete_order(ready)
     assert {:ok, again} = Orders.complete_order(completed)
@@ -769,8 +783,9 @@ defmodule Espreso.OrdersTest do
         payment_method: :counter
       })
 
+    {:ok, _} = Orders.mark_paid(ready)
     {:ok, ready} = Orders.update_status(ready, "ready")
-    assert {:error, :invalid_status} = Orders.cancel_order(ready)
+    assert {:error, :paid} = Orders.cancel_order(ready)
     assert Enum.any?(Orders.list_recent_ready(), &(&1.id == ready.id))
 
     {:ok, to_cancel} =
@@ -857,6 +872,7 @@ defmodule Espreso.OrdersTest do
         payment_method: :counter
       })
 
+    {:ok, _} = Orders.mark_paid(ready)
     {:ok, ready} = Orders.update_status(ready, "ready")
 
     yesterday = DateTime.add(DateTime.utc_now(), -86_400, :second)
@@ -870,8 +886,8 @@ defmodule Espreso.OrdersTest do
     overview = Orders.dashboard_overview()
 
     assert overview.active_count == 3
-    assert overview.received_count == 2
-    assert overview.preparing_count == 1
+    assert overview.received_count == 1
+    assert overview.preparing_count == 2
     assert overview.unpaid_active_count == 2
     assert overview.todays_count == 3
     assert received.status == "received"
@@ -1258,7 +1274,13 @@ defmodule Espreso.OrdersTest do
         payment_method: :counter
       })
 
-    {:ok, ready} = Orders.update_status(ready, "ready")
+    # Seed unpaid ready/completed via Repo — staff flow now blocks unpaid → ready.
+    {1, _} =
+      Espreso.Repo.update_all(from(o in Espreso.Orders.Order, where: o.id == ^ready.id),
+        set: [status: "ready"]
+      )
+
+    ready = Orders.get_order_by_number!(ready.number)
 
     {:ok, completed} =
       Orders.create_order(lines, %{
@@ -1267,8 +1289,12 @@ defmodule Espreso.OrdersTest do
         payment_method: :counter
       })
 
-    {:ok, completed} = Orders.update_status(completed, "ready")
-    {:ok, completed} = Orders.complete_order(completed)
+    {1, _} =
+      Espreso.Repo.update_all(from(o in Espreso.Orders.Order, where: o.id == ^completed.id),
+        set: [status: "completed"]
+      )
+
+    completed = Orders.get_order_by_number!(completed.number)
 
     {:ok, paid} =
       Orders.create_order(lines, %{

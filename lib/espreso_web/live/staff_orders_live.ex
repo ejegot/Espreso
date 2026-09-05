@@ -81,12 +81,39 @@ defmodule EspresoWeb.StaffOrdersLive do
          assign(
            socket,
            :flash_note,
-           "Online payment must be verified before this order can be marked ready."
+           "Confirm payment before marking this order ready."
          )}
 
       {:error, _} ->
         {:noreply, assign(socket, :flash_note, "Could not update order status.")}
     end
+  end
+
+  def handle_event("reprint_receipt", %{"id" => id}, socket) do
+    order = Repo.get!(Espreso.Orders.Order, id) |> Repo.preload(:items)
+
+    result =
+      Printer.print_receipt(order, staff_name: socket.assigns.current_user.name)
+
+    note =
+      case result do
+        :ok -> "#{order.number} receipt reprinted."
+        :disabled -> "Printer is not enabled on this server."
+        {:error, reason} -> "#{order.number} reprint failed (#{inspect(reason)})."
+      end
+
+    {:noreply, assign(socket, :flash_note, note)}
+  end
+
+  def handle_event("open_drawer", _params, socket) do
+    note =
+      case Printer.open_drawer() do
+        :ok -> "Kaha opened."
+        :disabled -> "Printer is not enabled on this server."
+        {:error, reason} -> "Could not open kaha (#{inspect(reason)})."
+      end
+
+    {:noreply, assign(socket, :flash_note, note)}
   end
 
   def handle_event("open_mark_paid", %{"id" => id}, socket) do
@@ -120,7 +147,7 @@ defmodule EspresoWeb.StaffOrdersLive do
          |> assign(:mark_paid_order, nil)
          |> assign(
            :flash_note,
-           mark_paid_flash(paid.number, paid_via, print_result)
+           mark_paid_flash(paid, paid_via, print_result)
          )
          |> load_orders()}
 
@@ -218,7 +245,7 @@ defmodule EspresoWeb.StaffOrdersLive do
          assign(
            socket,
            :flash_note,
-           "Online payment must be verified before this order can be picked up."
+           "Confirm payment before marking this order picked up."
          )}
 
       {:error, _} ->
@@ -576,7 +603,7 @@ defmodule EspresoWeb.StaffOrdersLive do
           Prepare
         </button>
         <button
-          :if={@order.status == "preparing" and not unpaid_online?(@order)}
+          :if={@order.status == "preparing" and not Orders.unpaid?(@order)}
           type="button"
           class="staff-action staff-action-primary"
           id={"order-ready-#{@order.id}"}
@@ -587,7 +614,7 @@ defmodule EspresoWeb.StaffOrdersLive do
           Ready
         </button>
         <button
-          :if={@order.status == "ready" and not unpaid_online?(@order)}
+          :if={@order.status == "ready" and not Orders.unpaid?(@order)}
           type="button"
           class="staff-action staff-action-primary staff-action-complete"
           id={"ready-complete-#{@order.id}"}
@@ -622,6 +649,30 @@ defmodule EspresoWeb.StaffOrdersLive do
             Abandon payment
           </button>
         </div>
+
+        <div
+          :if={@order.payment_status == "paid" and Printer.enabled?()}
+          class="staff-order-secondary-actions"
+        >
+          <button
+            type="button"
+            class="staff-action staff-action-muted"
+            id={"reprint-#{@order.id}"}
+            phx-click="reprint_receipt"
+            phx-value-id={@order.id}
+          >
+            Reprint
+          </button>
+          <button
+            :if={Printer.cash_like?(@order.paid_via || "counter")}
+            type="button"
+            class="staff-action staff-action-muted"
+            id={"open-drawer-#{@order.id}"}
+            phx-click="open_drawer"
+          >
+            Open kaha
+          </button>
+        </div>
       </div>
     </article>
     """
@@ -633,12 +684,6 @@ defmodule EspresoWeb.StaffOrdersLive do
   end
 
   defp checkout_session_attached?(_order), do: false
-
-  defp unpaid_online?(%{payment_method: "online", payment_status: status})
-       when status != "paid",
-       do: true
-
-  defp unpaid_online?(_order), do: false
 
   defp needs_payment_actions?(%{payment_status: status})
        when status in ["unpaid", "awaiting_payment"],
@@ -754,22 +799,30 @@ defmodule EspresoWeb.StaffOrdersLive do
   defp paid_via_label(other) when is_binary(other), do: other
   defp paid_via_label(_), do: "paid"
 
-  defp mark_paid_flash(number, paid_via, :ok) do
+  defp mark_paid_flash(%{number: number, status: status}, paid_via, result) do
     base = "#{number} marked paid (#{paid_via_label(paid_via)})."
 
-    if Printer.cash_like?(paid_via) do
-      base <> " Receipt printed · kaha opened."
-    else
-      base <> " Receipt printed."
+    base =
+      if status == "preparing" do
+        String.trim_trailing(base, ".") <> " · Preparing."
+      else
+        base
+      end
+
+    case result do
+      :ok ->
+        if Printer.cash_like?(paid_via) do
+          base <> " Receipt printed · kaha opened."
+        else
+          base <> " Receipt printed."
+        end
+
+      :disabled ->
+        base
+
+      {:error, reason} ->
+        base <> " Print failed (#{inspect(reason)})."
     end
-  end
-
-  defp mark_paid_flash(number, paid_via, :disabled) do
-    "#{number} marked paid (#{paid_via_label(paid_via)})."
-  end
-
-  defp mark_paid_flash(number, paid_via, {:error, reason}) do
-    "#{number} marked paid (#{paid_via_label(paid_via)}). Print failed (#{inspect(reason)})."
   end
 
   defp source_badge(%{source: "pos"}), do: %{label: "WALK-IN", class: "staff-order-source--pos"}

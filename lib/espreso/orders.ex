@@ -90,7 +90,7 @@ defmodule Espreso.Orders do
       paid_via: paid_via,
       online_wallet: online_wallet,
       source: source,
-      status: "received",
+      status: if(payment_status == "paid", do: "preparing", else: "received"),
       total: total
     }
 
@@ -503,7 +503,7 @@ defmodule Espreso.Orders do
         {:error, :not_found}
 
       %Order{} = current ->
-        if status == "ready" and online_unpaid?(current) do
+        if status == "ready" and unpaid?(current) do
           {:error, :payment_required}
         else
           current
@@ -517,6 +517,12 @@ defmodule Espreso.Orders do
   def update_status(%Order{} = order, status) when status in ["received", "preparing", "ready"] do
     update_status(%Order{id: order.id}, status)
   end
+
+  @doc """
+  True when payment is still unpaid or awaiting payment.
+  """
+  def unpaid?(%Order{payment_status: status}) when status in @unpaid_payment_statuses, do: true
+  def unpaid?(_order), do: false
 
   @doc """
   Cancels an unpaid order that is still `received` or `preparing`.
@@ -684,7 +690,7 @@ defmodule Espreso.Orders do
   Marks a ready order as picked up / completed.
 
   Reloads from the database first. Does not change payment_status.
-  Unpaid online orders cannot be completed (`{:error, :payment_required}`).
+  Unpaid orders cannot be completed (`{:error, :payment_required}`).
   Already-completed orders return idempotent success without broadcasting.
   """
   def complete_order(%Order{id: id}) when is_integer(id) do
@@ -699,7 +705,7 @@ defmodule Espreso.Orders do
         {:ok, current}
 
       %Order{status: "ready"} = current ->
-        if online_unpaid?(current) do
+        if unpaid?(current) do
           {:error, :payment_required}
         else
           current
@@ -909,10 +915,20 @@ defmodule Espreso.Orders do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
     paid_via = normalize_paid_via_value(paid_via)
 
+    # Confirm payment advances New → Preparing so staff skip an extra tap.
+    # Do not regress preparing / ready / completed.
     {count, _} =
       from(o in Order,
         where: o.id == ^order_id and o.status != "cancelled" and o.payment_status != "paid",
-        update: [set: [payment_status: "paid", paid_via: ^paid_via, updated_at: ^now]]
+        update: [
+          set: [
+            payment_status: "paid",
+            paid_via: ^paid_via,
+            status:
+              fragment("CASE WHEN status = 'received' THEN 'preparing' ELSE status END"),
+            updated_at: ^now
+          ]
+        ]
       )
       |> Repo.update_all([])
 
@@ -1034,12 +1050,6 @@ defmodule Espreso.Orders do
       _ -> :ok
     end
   end
-
-  defp online_unpaid?(%Order{payment_method: "online", payment_status: status})
-       when status != "paid",
-       do: true
-
-  defp online_unpaid?(_order), do: false
 
   defp blank_to_nil(nil), do: nil
   defp blank_to_nil(""), do: nil
