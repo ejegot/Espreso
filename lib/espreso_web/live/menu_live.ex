@@ -2761,8 +2761,8 @@ defmodule EspresoWeb.MenuLive do
   defp checkout_button_label(:gcash, true, _mode), do: "Starting GCash…"
   defp checkout_button_label(:maya, true, _mode), do: "Starting Maya…"
   defp checkout_button_label(:counter, false, _mode), do: "Place order"
-  defp checkout_button_label(:gcash, false, "qrph_manual"), do: "Continue — scan at counter"
-  defp checkout_button_label(:maya, false, "qrph_manual"), do: "Continue — scan at counter"
+  defp checkout_button_label(:gcash, false, "qrph_manual"), do: "Place order"
+  defp checkout_button_label(:maya, false, "qrph_manual"), do: "Place order"
   defp checkout_button_label(:gcash, false, _mode), do: "Continue to GCash"
   defp checkout_button_label(:maya, false, _mode), do: "Continue to Maya"
 
@@ -2800,10 +2800,10 @@ defmodule EspresoWeb.MenuLive do
     do: "Continue to PayMongo to complete payment."
 
   defp payment_checkout_note(:gcash, "qrph_manual"),
-    do: "Scan the QR at the counter — staff will confirm."
+    do: "Scan QR at counter after this."
 
   defp payment_checkout_note(:maya, "qrph_manual"),
-    do: "Scan the QR at the counter — staff will confirm."
+    do: "Scan QR at counter after this."
 
   defp payment_checkout_note(_, _), do: "Pay at the counter when your order is ready."
 end

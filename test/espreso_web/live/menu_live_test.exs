@@ -575,6 +575,7 @@ defmodule EspresoWeb.MenuLiveTest do
       )
 
     assert {:ok, preparing} = Orders.update_status(preparing, "preparing")
+    assert {:ok, _} = Orders.mark_paid(ready)
     assert {:ok, ready} = Orders.update_status(ready, "ready")
 
     render_hook(view, "restore_my_orders", %{"numbers" => [received.number]})
@@ -1177,17 +1178,18 @@ defmodule EspresoWeb.MenuLiveTest do
     |> render_change()
 
     view |> element("button.menu-checkout-option", "GCash") |> render_click()
-    assert has_element?(view, ".menu-checkout-payment-note", "Scan the QR at the counter")
+    assert has_element?(view, ".menu-checkout-payment-note", "Scan QR at counter after this.")
 
     {:ok, order_view, _html} =
       view
-      |> element("button.menu-basket-checkout", "Continue — scan at counter")
+      |> element("button.menu-basket-checkout", "Place order")
       |> render_click()
       |> follow_redirect(conn)
 
     assert has_element?(order_view, "#order-confirm")
-    assert has_element?(order_view, "#order-confirm-title", "Scan at counter")
+    assert has_element?(order_view, "#order-chrome-title", "Pay at counter")
     assert has_element?(order_view, ~s(#order-confirm-qrph-open-gcash[href="gcash://"]))
+    refute has_element?(order_view, "#order-confirm-title")
     refute render(order_view) =~ "/images/coffeespot/gcash-qrph.png"
     [order] = Orders.list_active_orders()
     assert order.customer_name == "QR Guest"
@@ -1458,7 +1460,9 @@ defmodule EspresoWeb.MenuLiveTest do
       )
 
     assert {:ok, preparing} = Orders.update_status(preparing, "preparing")
+    assert {:ok, _} = Orders.mark_paid(ready)
     assert {:ok, ready} = Orders.update_status(ready, "ready")
+    assert {:ok, _} = Orders.mark_paid(completed)
     assert {:ok, completed_ready} = Orders.update_status(completed, "ready")
     assert {:ok, completed} = Orders.complete_order(completed_ready)
     assert {:ok, _} = Orders.cancel_order(cancelled)
@@ -1491,6 +1495,7 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, "#menu-my-order-#{cancelled.number}")
     refute has_element?(view, "#menu-qr-my-orders")
 
+    assert {:ok, _} = Orders.mark_paid(ready)
     assert {:ok, completed_ready_again} = Orders.complete_order(ready)
     assert completed_ready_again.status == "completed"
     refute has_element?(view, ~s(#menu-my-order-#{ready.number}[data-status="ready"]))
@@ -1585,8 +1590,8 @@ defmodule EspresoWeb.MenuLiveTest do
     view |> element("#checkout-pay-gcash") |> render_click()
     assert has_element?(view, "#checkout-pay-gcash.is-active", "GCash")
     refute has_element?(view, "#checkout-pay-counter.is-active")
-    assert has_element?(view, "#checkout-payment-note", "Scan the QR at the counter")
-    assert has_element?(view, "button.menu-basket-checkout", "Continue — scan at counter")
+    assert has_element?(view, "#checkout-payment-note", "Scan QR at counter after this.")
+    assert has_element?(view, "button.menu-basket-checkout", "Place order")
   end
 
   test "/menu legacy restore_current_order still hydrates My Orders", %{conn: conn} do
