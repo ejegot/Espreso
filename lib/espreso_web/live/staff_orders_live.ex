@@ -365,10 +365,9 @@ defmodule EspresoWeb.StaffOrdersLive do
             >
               <section class="staff-orders-kds-new" id="orders-new">
                 <header class="staff-orders-kds-head staff-orders-kds-head--new">
-                  <div class="staff-orders-kds-head-main">
-                    <h2>New Orders</h2>
-                    <p class="staff-orders-workflow-hint">Prepare → Ready → Picked up</p>
-                  </div>
+                    <div class="staff-orders-kds-head-main">
+                      <h2>New Orders</h2>
+                    </div>
                   <span class="staff-orders-count">{length(@received_orders)}</span>
                 </header>
                 <div class="staff-orders-new-grid">
@@ -648,73 +647,92 @@ defmodule EspresoWeb.StaffOrdersLive do
           Picked up
         </button>
 
-        <div :if={needs_payment_actions?(@order)} class="staff-order-secondary-actions">
+        <div :if={needs_payment_actions?(@order)} class="staff-order-pay-actions">
           {mark_paid_buttons(%{order: @order, id_prefix: "ticket", lane: @lane})}
-          <button
-            :if={
-              @order.status in ["received", "preparing"] and not checkout_session_attached?(@order)
-            }
-            type="button"
-            class="staff-action staff-action-muted"
-            id={"cancel-order-#{@order.id}"}
-            phx-value-id={@order.id}
-            phx-click="cancel_order"
-          >
-            Cancel
-          </button>
-          <button
-            :if={show_abandon_payment?(@order)}
-            type="button"
-            class="staff-action staff-action-muted"
-            id={"abandon-online-payment-#{@order.id}"}
-            phx-value-id={@order.id}
-            phx-click="abandon_online_payment"
-          >
-            Abandon payment
-          </button>
         </div>
 
-        <div
-          :if={Printer.enabled?() and @order.status in ["received", "preparing", "ready"]}
-          class="staff-order-secondary-actions"
+        <details
+          :if={ticket_more_actions?(@order)}
+          class="staff-order-more"
+          id={"order-more-#{@order.id}"}
         >
-          <button
-            type="button"
-            class="staff-action staff-action-muted"
-            id={"kitchen-#{@order.id}"}
-            phx-click="print_kitchen"
-            phx-value-id={@order.id}
-          >
-            Kitchen
-          </button>
-        </div>
-
-        <div
-          :if={@order.payment_status == "paid" and Printer.enabled?()}
-          class="staff-order-secondary-actions"
-        >
-          <button
-            type="button"
-            class="staff-action staff-action-muted"
-            id={"reprint-#{@order.id}"}
-            phx-click="reprint_receipt"
-            phx-value-id={@order.id}
-          >
-            Reprint
-          </button>
-          <button
-            :if={Printer.cash_like?(@order.paid_via || "counter")}
-            type="button"
-            class="staff-action staff-action-muted"
-            id={"open-drawer-#{@order.id}"}
-            phx-click="open_drawer"
-          >
-            Open kaha
-          </button>
-        </div>
+          <summary class="staff-order-more-summary">More</summary>
+          <div class="staff-order-more-panel">
+            <button
+              :if={
+                @order.status in ["received", "preparing"] and not checkout_session_attached?(@order) and
+                  needs_payment_actions?(@order)
+              }
+              type="button"
+              class="staff-action staff-action-muted"
+              id={"cancel-order-#{@order.id}"}
+              phx-value-id={@order.id}
+              phx-click="cancel_order"
+            >
+              Cancel
+            </button>
+            <button
+              :if={show_abandon_payment?(@order)}
+              type="button"
+              class="staff-action staff-action-muted"
+              id={"abandon-online-payment-#{@order.id}"}
+              phx-value-id={@order.id}
+              phx-click="abandon_online_payment"
+            >
+              Abandon
+            </button>
+            <button
+              :if={Printer.enabled?() and @order.status in ["received", "preparing", "ready"]}
+              type="button"
+              class="staff-action staff-action-muted"
+              id={"kitchen-#{@order.id}"}
+              phx-click="print_kitchen"
+              phx-value-id={@order.id}
+            >
+              Kitchen
+            </button>
+            <button
+              :if={@order.payment_status == "paid" and Printer.enabled?()}
+              type="button"
+              class="staff-action staff-action-muted"
+              id={"reprint-#{@order.id}"}
+              phx-click="reprint_receipt"
+              phx-value-id={@order.id}
+            >
+              Reprint
+            </button>
+            <button
+              :if={
+                @order.payment_status == "paid" and Printer.enabled?() and
+                  Printer.cash_like?(@order.paid_via || "counter")
+              }
+              type="button"
+              class="staff-action staff-action-muted"
+              id={"open-drawer-#{@order.id}"}
+              phx-click="open_drawer"
+            >
+              Kaha
+            </button>
+          </div>
+        </details>
       </div>
     </article>
     """
+  end
+
+  defp ticket_more_actions?(order) do
+    cancel? =
+      order.status in ["received", "preparing"] and not checkout_session_attached?(order) and
+        needs_payment_actions?(order)
+
+    abandon? = show_abandon_payment?(order)
+
+    kitchen? =
+      Printer.enabled?() and order.status in ["received", "preparing", "ready"]
+
+    paid_print? = order.payment_status == "paid" and Printer.enabled?()
+
+    cancel? or abandon? or kitchen? or paid_print?
   end
 
   defp checkout_session_attached?(%{paymongo_checkout_session_id: session_id})
