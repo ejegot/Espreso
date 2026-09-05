@@ -263,6 +263,38 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert order.status == "preparing"
   end
 
+  test "POS cash tendered shows change and blocks short cash", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-payment-paid") |> render_click()
+    assert has_element?(view, "#pos-cash-helper")
+
+    view |> element("#pos-cash-exact") |> render_click()
+    assert has_element?(view, "#pos-cash-change", "Exact")
+
+    view
+    |> element("#pos-cash-tendered")
+    |> render_change(%{"cash_tendered" => "50"})
+
+    assert has_element?(view, "#pos-cash-change.is-short", "Short")
+    view |> element("#pos-place-order") |> render_click()
+    assert has_element?(view, "#pos-error", "Cash tendered is less than the total.")
+
+    view
+    |> element("#pos-cash-tendered")
+    |> render_change(%{"cash_tendered" => "100"})
+
+    assert has_element?(view, "#pos-cash-change", "Change")
+    view |> element("#pos-place-order") |> render_click()
+    assert has_element?(view, "#pos-confirmation")
+    assert has_element?(view, "#pos-change-note", "Change")
+  end
+
   test "Place Order creates exactly one order; repeated place_order while placing is ignored", %{
     conn: conn,
     barista: barista,
@@ -485,6 +517,9 @@ defmodule EspresoWeb.StaffPosLiveTest do
           fulfillment: :pickup,
           table_number: "",
           paid_via: "cash",
+          cash_tendered: "",
+          last_cash_change: nil,
+          print_failed?: false,
           payment_choice: :unpaid,
           placing_order?: false,
           customer_name: "Walk-in",

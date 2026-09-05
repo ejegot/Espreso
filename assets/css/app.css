@@ -5097,6 +5097,45 @@ a.staff-home-card:focus-visible {
   font-weight: 700;
 }
 
+.staff-pos-page .staff-pos-success-note.is-error {
+  border-left-color: #b42318;
+  background: color-mix(in srgb, #b42318 10%, #fff);
+  color: #7a1f16;
+}
+
+.staff-pos-page .staff-pos-cash-helper {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.staff-pos-page .staff-pos-cash-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.35rem;
+}
+
+.staff-pos-page .staff-pos-cash-exact {
+  min-height: 2.45rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--cs-line);
+  border-radius: 0.2rem;
+  background: #fff;
+  color: var(--cs-brown);
+  font-weight: 700;
+}
+
+.staff-pos-page .staff-pos-change {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--cs-brown);
+}
+
+.staff-pos-page .staff-pos-change.is-short {
+  color: #b42318;
+}
+
 .staff-pos-page .staff-pos-success-actions {
   margin-top: 0.5rem;
   gap: 0.35rem;

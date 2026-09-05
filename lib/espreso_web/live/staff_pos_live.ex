@@ -26,6 +26,9 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:table_number, "")
      |> assign(:payment_choice, :unpaid)
      |> assign(:paid_via, "cash")
+     |> assign(:cash_tendered, "")
+     |> assign(:last_cash_change, nil)
+     |> assign(:print_failed?, false)
      |> assign(:placing_order?, false)
      |> assign(:size_picker, nil)
      |> assign(:last_order, nil)
@@ -123,9 +126,12 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:size_picker, nil)
      |> assign(:last_order, nil)
      |> assign(:print_note, nil)
+     |> assign(:print_failed?, false)
+     |> assign(:last_cash_change, nil)
      |> assign(:error, nil)
      |> assign(:payment_choice, :unpaid)
      |> assign(:paid_via, "cash")
+     |> assign(:cash_tendered, "")
      |> assign(:fulfillment, :pickup)
      |> assign(:table_number, "")
      |> assign(:placing_order?, false)
@@ -169,15 +175,38 @@ defmodule EspresoWeb.StaffPosLive do
         _ -> :unpaid
       end
 
-    {:noreply, assign(socket, :payment_choice, choice)}
+    socket =
+      socket
+      |> assign(:payment_choice, choice)
+      |> then(fn s ->
+        if choice == :unpaid, do: assign(s, :cash_tendered, ""), else: s
+      end)
+
+    {:noreply, socket}
   end
 
   def handle_event("set_paid_via", %{"paid_via" => paid_via}, socket)
       when paid_via in ["cash", "gcash", "maya"] do
-    {:noreply, assign(socket, :paid_via, paid_via)}
+    socket =
+      socket
+      |> assign(:paid_via, paid_via)
+      |> then(fn s ->
+        if paid_via != "cash", do: assign(s, :cash_tendered, ""), else: s
+      end)
+
+    {:noreply, socket}
   end
 
   def handle_event("set_paid_via", _params, socket), do: {:noreply, socket}
+
+  def handle_event("set_cash_tendered", %{"cash_tendered" => amount}, socket) do
+    {:noreply, assign(socket, :cash_tendered, String.trim(amount))}
+  end
+
+  def handle_event("cash_exact", _params, socket) do
+    total = cart_total(socket.assigns.cart) |> Decimal.round(2) |> Decimal.to_string(:normal)
+    {:noreply, assign(socket, :cash_tendered, total)}
+  end
 
   def handle_event("reprint_receipt", _params, socket) do
     case socket.assigns.last_order do
@@ -186,12 +215,44 @@ defmodule EspresoWeb.StaffPosLive do
 
       order ->
         order = Espreso.Repo.preload(order, :items)
+        opts = print_opts(socket, order)
+
+        {note, failed?} =
+          case Printer.after_paid(order, order.paid_via || "cash", opts) do
+            :ok ->
+              if Printer.cash_like?(order.paid_via || "cash") do
+                {"Receipt printed · kaha opened.", false}
+              else
+                {"Receipt printed.", false}
+              end
+
+            :disabled ->
+              {"Printer is not enabled on this server.", false}
+
+            {:error, reason} ->
+              {"Print failed (#{inspect(reason)}). Tap Retry.", true}
+          end
+
+        {:noreply,
+         socket
+         |> assign(:print_note, note)
+         |> assign(:print_failed?, failed?)}
+    end
+  end
+
+  def handle_event("print_kitchen", _params, socket) do
+    case socket.assigns.last_order do
+      nil ->
+        {:noreply, socket}
+
+      order ->
+        order = Espreso.Repo.preload(order, :items)
 
         note =
-          case Printer.print_receipt(order, staff_name: socket.assigns.current_user.name) do
-            :ok -> "Receipt reprinted."
+          case Printer.print_kitchen(order, staff_name: socket.assigns.current_user.name) do
+            :ok -> "Kitchen ticket printed."
             :disabled -> "Printer is not enabled on this server."
-            {:error, reason} -> "Reprint failed (#{inspect(reason)})."
+            {:error, reason} -> "Kitchen print failed (#{inspect(reason)})."
           end
 
         {:noreply, assign(socket, :print_note, note)}
@@ -225,10 +286,14 @@ defmodule EspresoWeb.StaffPosLive do
       socket.assigns.fulfillment == :dine_in and not valid_table?(socket.assigns.table_number) ->
         {:noreply, assign(socket, :error, "Enter a table number from 1 to 99.")}
 
+      cash_short?(socket) ->
+        {:noreply, assign(socket, :error, "Cash tendered is less than the total.")}
+
       true ->
         customer_name = String.trim(socket.assigns.customer_name)
         paid? = socket.assigns.payment_choice == :paid
         paid_via = if paid?, do: socket.assigns.paid_via, else: nil
+        {tendered, change} = cash_amounts(socket)
 
         lines =
           Enum.map(socket.assigns.cart, fn line ->
@@ -262,12 +327,16 @@ defmodule EspresoWeb.StaffPosLive do
           {:ok, order} ->
             print_result =
               if paid? do
-                Printer.after_paid(order, order.paid_via || paid_via || "cash",
-                  staff_name: socket.assigns.current_user.name
-                )
+                opts =
+                  [staff_name: socket.assigns.current_user.name] ++
+                    if(tendered, do: [cash_tendered: tendered, change: change], else: [])
+
+                Printer.after_paid(order, order.paid_via || paid_via || "cash", opts)
               else
                 :disabled
               end
+
+            {note, failed?} = print_note_result(print_result, order.paid_via || paid_via)
 
             {:noreply,
              socket
@@ -275,9 +344,12 @@ defmodule EspresoWeb.StaffPosLive do
              |> assign(:size_picker, nil)
              |> assign(:error, nil)
              |> assign(:last_order, order)
-             |> assign(:print_note, print_note(print_result, order.paid_via || paid_via))
+             |> assign(:print_note, note)
+             |> assign(:print_failed?, failed?)
+             |> assign(:last_cash_change, if(change, do: %{tendered: tendered, change: change}))
              |> assign(:payment_choice, :unpaid)
              |> assign(:paid_via, "cash")
+             |> assign(:cash_tendered, "")
              |> assign(:fulfillment, :pickup)
              |> assign(:table_number, "")
              |> assign(:placing_order?, false)
@@ -419,21 +491,51 @@ defmodule EspresoWeb.StaffPosLive do
                     Status: {Orders.status_label(@last_order.status)} · {@last_order.customer_name}
                     · {Orders.payment_label(@last_order)}
                   </p>
-                  <p :if={@print_note} class="staff-pos-success-note" id="pos-print-note">
+                  <p
+                    :if={@print_note}
+                    class={[
+                      "staff-pos-success-note",
+                      @print_failed? && "is-error"
+                    ]}
+                    id="pos-print-note"
+                  >
                     {@print_note}
+                  </p>
+                  <p :if={@last_cash_change} class="staff-pos-success-note" id="pos-change-note">
+                    Cash {Menu.format_price(@last_cash_change.tendered)} · Change {Menu.format_price(
+                      @last_cash_change.change
+                    )}
                   </p>
                   <p :if={order_note(@last_order)} class="staff-pos-success-note">
                     Note: {order_note(@last_order)}
                   </p>
                   <div class="staff-pos-success-actions">
                     <button
-                      :if={Printer.enabled?() and @last_order.payment_status == "paid"}
+                      :if={Printer.enabled?() and @print_failed?}
+                      type="button"
+                      class="staff-pos-place"
+                      id="pos-retry-print"
+                      phx-click="reprint_receipt"
+                    >
+                      Retry print
+                    </button>
+                    <button
+                      :if={Printer.enabled?() and @last_order.payment_status == "paid" and not @print_failed?}
                       type="button"
                       class="staff-pos-place staff-pos-place--secondary"
                       id="pos-reprint"
                       phx-click="reprint_receipt"
                     >
                       Reprint
+                    </button>
+                    <button
+                      :if={Printer.enabled?()}
+                      type="button"
+                      class="staff-pos-place staff-pos-place--secondary"
+                      id="pos-print-kitchen"
+                      phx-click="print_kitchen"
+                    >
+                      Kitchen
                     </button>
                     <button
                       :if={
@@ -664,6 +766,48 @@ defmodule EspresoWeb.StaffPosLive do
                   </button>
                 </div>
 
+                <div
+                  :if={@payment_choice == :paid and @paid_via == "cash"}
+                  class="staff-pos-cash-helper"
+                  id="pos-cash-helper"
+                >
+                  <label class="staff-pos-field" for="pos-cash-tendered">
+                    <span class="staff-pos-field-label">Cash tendered</span>
+                    <div class="staff-pos-cash-row">
+                      <input
+                        type="text"
+                        inputmode="decimal"
+                        class="staff-pos-field-input"
+                        id="pos-cash-tendered"
+                        name="cash_tendered"
+                        value={@cash_tendered}
+                        phx-change="set_cash_tendered"
+                        phx-debounce="150"
+                        autocomplete="off"
+                        placeholder="0.00"
+                      />
+                      <button
+                        type="button"
+                        class="staff-pos-cash-exact"
+                        id="pos-cash-exact"
+                        phx-click="cash_exact"
+                      >
+                        Exact
+                      </button>
+                    </div>
+                  </label>
+                  <p
+                    :if={cash_change_label(@cash_tendered, cart_total(@cart))}
+                    class={[
+                      "staff-pos-change",
+                      cash_short_amount?(@cash_tendered, cart_total(@cart)) && "is-short"
+                    ]}
+                    id="pos-cash-change"
+                  >
+                    {cash_change_label(@cash_tendered, cart_total(@cart))}
+                  </p>
+                </div>
+
                 <button
                   type="button"
                   class={[
@@ -829,22 +973,109 @@ defmodule EspresoWeb.StaffPosLive do
 
   defp valid_table?(_), do: false
 
+  defp parse_money(amount) when is_binary(amount) do
+    cleaned =
+      amount
+      |> String.trim()
+      |> String.replace(",", "")
+
+    case Decimal.parse(cleaned) do
+      {decimal, ""} -> {:ok, Decimal.round(decimal, 2)}
+      _ -> :error
+    end
+  end
+
+  defp parse_money(_), do: :error
+
+  defp cash_short?(socket) do
+    socket.assigns.payment_choice == :paid and socket.assigns.paid_via == "cash" and
+      cash_short_amount?(socket.assigns.cash_tendered, cart_total(socket.assigns.cart))
+  end
+
+  defp cash_short_amount?(tendered, total) do
+    case parse_money(tendered) do
+      {:ok, amount} -> Decimal.compare(amount, total) == :lt
+      :error -> String.trim(to_string(tendered)) != ""
+    end
+  end
+
+  defp cash_amounts(socket) do
+    if socket.assigns.payment_choice == :paid and socket.assigns.paid_via == "cash" do
+      case parse_money(socket.assigns.cash_tendered) do
+        {:ok, tendered} ->
+          change = Decimal.sub(tendered, cart_total(socket.assigns.cart)) |> Decimal.round(2)
+          {tendered, change}
+
+        :error ->
+          {nil, nil}
+      end
+    else
+      {nil, nil}
+    end
+  end
+
+  defp cash_change_label(tendered, total) do
+    case parse_money(tendered) do
+      {:ok, amount} ->
+        change = Decimal.sub(amount, total) |> Decimal.round(2)
+
+        cond do
+          Decimal.compare(change, 0) == :lt ->
+            "Short #{Menu.format_price(Decimal.abs(change))}"
+
+          Decimal.compare(change, 0) == :eq ->
+            "Exact · no change"
+
+          true ->
+            "Change #{Menu.format_price(change)}"
+        end
+
+      :error ->
+        if String.trim(to_string(tendered)) == "", do: nil, else: "Enter a valid amount"
+    end
+  end
+
+  defp print_opts(socket, order) do
+    base = [staff_name: socket.assigns.current_user.name]
+    paid_via = order.paid_via || "cash"
+
+    case socket.assigns.last_cash_change do
+      %{tendered: tendered, change: change}
+      when not is_nil(tendered) and not is_nil(change) ->
+        if Printer.cash_like?(paid_via) do
+          base ++ [cash_tendered: tendered, change: change]
+        else
+          base
+        end
+
+      _ ->
+        base
+    end
+  end
+
+  defp print_note_result(:ok, paid_via) do
+    note =
+      if Printer.cash_like?(paid_via || "cash") do
+        "Receipt printed · kaha opened"
+      else
+        "Receipt printed"
+      end
+
+    {note, false}
+  end
+
+  defp print_note_result(:disabled, _), do: {nil, false}
+
+  defp print_note_result({:error, reason}, _) do
+    {"Order saved · print failed (#{inspect(reason)}). Tap Retry.", true}
+  end
+
+  defp print_note_result(_, _), do: {nil, false}
+
   defp order_note(%{notes: notes}) when is_binary(notes) do
     trimmed = String.trim(notes)
     if trimmed == "", do: nil, else: trimmed
   end
 
   defp order_note(_), do: nil
-
-  defp print_note(:ok, paid_via) do
-    if Printer.cash_like?(paid_via || "cash") do
-      "Receipt printed · kaha opened"
-    else
-      "Receipt printed"
-    end
-  end
-
-  defp print_note(:disabled, _), do: nil
-  defp print_note({:error, reason}, _), do: "Order saved · print failed (#{inspect(reason)})"
-  defp print_note(_, _), do: nil
 end
