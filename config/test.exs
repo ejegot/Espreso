@@ -43,3 +43,9 @@ config :espreso, :paymongo,
   client: Espreso.PayMongo.StubClient,
   secret_key: "sk_test_placeholder",
   webhook_secret: "whsk_test_placeholder"
+
+config :espreso, Espreso.Printer,
+  enabled: false,
+  host: nil,
+  port: 9100,
+  timeout_ms: 1_000

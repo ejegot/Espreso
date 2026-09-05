@@ -5,6 +5,7 @@ defmodule EspresoWeb.StaffHomeLive do
   alias Espreso.Accounts.User
   alias Espreso.Menu
   alias Espreso.Orders
+  alias Espreso.Printer
   alias Espreso.Shifts
   alias EspresoWeb.StaffNotifications
 
@@ -15,7 +16,18 @@ defmodule EspresoWeb.StaffHomeLive do
     {:ok,
      socket
      |> assign(:page_title, "Home")
+     |> assign(:printer_note, nil)
      |> assign_home_state(), layout: false}
+  end
+
+  @impl true
+  def handle_event("printer_test_print", _params, socket) do
+    {:noreply, assign(socket, :printer_note, printer_action_note(Printer.test_print(), "Test print"))}
+  end
+
+  def handle_event("printer_open_drawer", _params, socket) do
+    {:noreply,
+     assign(socket, :printer_note, printer_action_note(Printer.open_drawer(), "Open kaha"))}
   end
 
   @impl true
@@ -138,6 +150,39 @@ defmodule EspresoWeb.StaffHomeLive do
             </div>
           <% end %>
         </section>
+
+        <section
+          :if={@printer_enabled?}
+          class="staff-home-printer"
+          id="staff-home-printer"
+          aria-label="Printer"
+        >
+          <p class="staff-home-today-eyebrow">Printer</p>
+          <p class="staff-home-today-meta">
+            LAN · {Printer.host()}:{Printer.port()}
+          </p>
+          <div class="staff-home-printer-actions">
+            <button
+              type="button"
+              id="staff-printer-test"
+              class="staff-home-printer-btn"
+              phx-click="printer_test_print"
+            >
+              Test print
+            </button>
+            <button
+              type="button"
+              id="staff-printer-drawer"
+              class="staff-home-printer-btn"
+              phx-click="printer_open_drawer"
+            >
+              Open kaha
+            </button>
+          </div>
+          <p :if={@printer_note} class="staff-home-today-meta" id="staff-printer-note">
+            {@printer_note}
+          </p>
+        </section>
       </main>
     </.staff_shell>
     """
@@ -158,6 +203,7 @@ defmodule EspresoWeb.StaffHomeLive do
     |> assign(:breakdown, breakdown)
     |> assign(:via_rows, if(breakdown, do: Orders.paid_via_rows(breakdown), else: []))
     |> assign(:shift_close, shift_close)
+    |> assign(:printer_enabled?, Printer.enabled?())
     |> assign(:primary, primary_tiles(user, overview))
     |> assign(:secondary, secondary_tiles(user, shift_close))
   end
@@ -285,4 +331,8 @@ defmodule EspresoWeb.StaffHomeLive do
   defp orders_body(overview) do
     "#{overview.received_count} new · #{overview.preparing_count} preparing · #{overview.unpaid_active_count} unpaid"
   end
+
+  defp printer_action_note(:ok, label), do: "#{label} OK"
+  defp printer_action_note(:disabled, label), do: "#{label} skipped (printer disabled)"
+  defp printer_action_note({:error, reason}, label), do: "#{label} failed (#{inspect(reason)})"
 end

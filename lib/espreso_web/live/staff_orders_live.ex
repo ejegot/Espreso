@@ -3,6 +3,8 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   alias Espreso.BusinessSettings
   alias Espreso.Orders
+  alias Espreso.Printer
+  alias Espreso.Repo
   alias EspresoWeb.StaffNotifications
 
   @ready_lane_limit 100
@@ -102,15 +104,24 @@ defmodule EspresoWeb.StaffOrdersLive do
   end
 
   def handle_event("mark_paid", %{"id" => id} = params, socket) do
-    order = Espreso.Repo.get!(Espreso.Orders.Order, id)
+    order = Repo.get!(Espreso.Orders.Order, id)
     paid_via = Map.get(params, "paid_via", "counter")
 
     case Orders.mark_paid(order, paid_via: paid_via) do
       {:ok, paid} ->
+        paid = Repo.preload(paid, :items)
+        print_result =
+          Printer.after_paid(paid, paid.paid_via || paid_via,
+            staff_name: socket.assigns.current_user.name
+          )
+
         {:noreply,
          socket
          |> assign(:mark_paid_order, nil)
-         |> assign(:flash_note, "#{paid.number} marked paid (#{paid_via_label(paid_via)}).")
+         |> assign(
+           :flash_note,
+           mark_paid_flash(paid.number, paid_via, print_result)
+         )
          |> load_orders()}
 
       {:error, :cancelled} ->
@@ -742,6 +753,24 @@ defmodule EspresoWeb.StaffOrdersLive do
   defp paid_via_label("counter"), do: "counter"
   defp paid_via_label(other) when is_binary(other), do: other
   defp paid_via_label(_), do: "paid"
+
+  defp mark_paid_flash(number, paid_via, :ok) do
+    base = "#{number} marked paid (#{paid_via_label(paid_via)})."
+
+    if Printer.cash_like?(paid_via) do
+      base <> " Receipt printed · kaha opened."
+    else
+      base <> " Receipt printed."
+    end
+  end
+
+  defp mark_paid_flash(number, paid_via, :disabled) do
+    "#{number} marked paid (#{paid_via_label(paid_via)})."
+  end
+
+  defp mark_paid_flash(number, paid_via, {:error, reason}) do
+    "#{number} marked paid (#{paid_via_label(paid_via)}). Print failed (#{inspect(reason)})."
+  end
 
   defp source_badge(%{source: "pos"}), do: %{label: "WALK-IN", class: "staff-order-source--pos"}
   defp source_badge(_), do: %{label: "QR", class: "staff-order-source--customer"}

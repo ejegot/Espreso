@@ -3,6 +3,7 @@ defmodule EspresoWeb.StaffPosLive do
 
   alias Espreso.Menu
   alias Espreso.Orders
+  alias Espreso.Printer
   alias EspresoWeb.StaffNotifications
 
   @impl true
@@ -25,6 +26,7 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:placing_order?, false)
      |> assign(:size_picker, nil)
      |> assign(:last_order, nil)
+     |> assign(:print_note, nil)
      |> assign(:error, nil), layout: false}
   end
 
@@ -61,7 +63,8 @@ defmodule EspresoWeb.StaffPosLive do
          |> assign(:cart, add_line(socket.assigns.cart, product, price))
          |> assign(:size_picker, nil)
          |> assign(:error, nil)
-         |> assign(:last_order, nil)}
+         |> assign(:last_order, nil)
+         |> assign(:print_note, nil)}
 
       %{product_prices: prices} = product when length(prices) > 1 ->
         {:noreply,
@@ -86,7 +89,8 @@ defmodule EspresoWeb.StaffPosLive do
        |> assign(:cart, add_line(socket.assigns.cart, product, price))
        |> assign(:size_picker, nil)
        |> assign(:error, nil)
-       |> assign(:last_order, nil)}
+       |> assign(:last_order, nil)
+       |> assign(:print_note, nil)}
     else
       _ ->
         {:noreply, assign(socket, :error, "Selected size is unavailable.")}
@@ -115,6 +119,7 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:cart, [])
      |> assign(:size_picker, nil)
      |> assign(:last_order, nil)
+     |> assign(:print_note, nil)
      |> assign(:error, nil)
      |> assign(:payment_choice, :unpaid)
      |> assign(:placing_order?, false)
@@ -181,12 +186,22 @@ defmodule EspresoWeb.StaffPosLive do
 
         case Orders.create_order(lines, attrs) do
           {:ok, order} ->
+            print_result =
+              if socket.assigns.payment_choice == :paid do
+                Printer.after_paid(order, order.paid_via || "cash",
+                  staff_name: socket.assigns.current_user.name
+                )
+              else
+                :disabled
+              end
+
             {:noreply,
              socket
              |> assign(:cart, [])
              |> assign(:size_picker, nil)
              |> assign(:error, nil)
              |> assign(:last_order, order)
+             |> assign(:print_note, print_note(print_result))
              |> assign(:payment_choice, :unpaid)
              |> assign(:placing_order?, false)
              |> assign(:notes, "")
@@ -326,6 +341,9 @@ defmodule EspresoWeb.StaffPosLive do
                   <p class="staff-order-meta">
                     Status: {Orders.status_label(@last_order.status)} · {@last_order.customer_name}
                     · {Orders.payment_label(@last_order)}
+                  </p>
+                  <p :if={@print_note} class="staff-pos-success-note" id="pos-print-note">
+                    {@print_note}
                   </p>
                   <p :if={order_note(@last_order)} class="staff-pos-success-note">
                     Note: {order_note(@last_order)}
@@ -640,4 +658,9 @@ defmodule EspresoWeb.StaffPosLive do
   end
 
   defp order_note(_), do: nil
+
+  defp print_note(:ok), do: "Receipt printed · kaha opened"
+  defp print_note(:disabled), do: nil
+  defp print_note({:error, reason}), do: "Order saved · print failed (#{inspect(reason)})"
+  defp print_note(_), do: nil
 end
