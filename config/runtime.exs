@@ -30,6 +30,28 @@ case System.get_env("PUBLIC_MENU_URL") do
     :ok
 end
 
+# LAN ESC/POS printer (HS-802UL). Phoenix host must reach the printer IP.
+printer_host = System.get_env("PRINTER_HOST")
+printer_enabled? =
+  System.get_env("PRINTER_ENABLED") in ~w(true 1) or
+    (is_binary(printer_host) and String.trim(printer_host) != "")
+
+if printer_enabled? and is_binary(printer_host) and String.trim(printer_host) != "" do
+  config :espreso, Espreso.Printer,
+    enabled: true,
+    host: String.trim(printer_host),
+    port: String.to_integer(System.get_env("PRINTER_PORT") || "9100"),
+    timeout_ms: String.to_integer(System.get_env("PRINTER_TIMEOUT_MS") || "4000"),
+    receipt_address: System.get_env("PRINTER_RECEIPT_ADDRESS") || "84 Lilac St., Marikina City",
+    wifi_title: System.get_env("PRINTER_WIFI_TITLE") || "COFFEESPOT LILAC WI-FI",
+    wifi_ssid: System.get_env("PRINTER_WIFI_SSID") || "CoffeeSpot_Guest",
+    wifi_password: System.get_env("PRINTER_WIFI_PASSWORD") || "SPOT3333",
+    wifi_note:
+      System.get_env("PRINTER_WIFI_NOTE") || "Access is valid for 2 Hours per purchase.",
+    wifi_thanks:
+      System.get_env("PRINTER_WIFI_THANKS") || "Thank you for fueling your hustle with us!"
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

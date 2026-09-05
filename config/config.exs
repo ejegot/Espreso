@@ -20,6 +20,19 @@ config :espreso, Espreso.Accounts.Token,
   access_ttl: 15 * 60,
   refresh_ttl: 7 * 24 * 60 * 60
 
+# Shop ESC/POS printer (LAN only). Enable via PRINTER_ENABLED=true + PRINTER_HOST.
+config :espreso, Espreso.Printer,
+  enabled: false,
+  host: nil,
+  port: 9100,
+  timeout_ms: 4_000,
+  receipt_address: "84 Lilac St., Marikina City",
+  wifi_title: "COFFEESPOT LILAC WI-FI",
+  wifi_ssid: "CoffeeSpot_Guest",
+  wifi_password: "SPOT3333",
+  wifi_note: "Access is valid for 2 Hours per purchase.",
+  wifi_thanks: "Thank you for fueling your hustle with us!"
+
 # Configures the endpoint
 config :espreso, EspresoWeb.Endpoint,
   url: [host: "localhost"],
