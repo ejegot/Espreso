@@ -29,6 +29,8 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:cash_tendered, "")
      |> assign(:last_cash_change, nil)
      |> assign(:print_failed?, false)
+     |> assign(:place_flash, nil)
+     |> assign(:notes_open?, false)
      |> assign(:placing_order?, false)
      |> assign(:size_picker, nil)
      |> assign(:last_order, nil)
@@ -40,6 +42,10 @@ defmodule EspresoWeb.StaffPosLive do
   def handle_info({:order_changed, order}, socket) do
     StaffNotifications.push_order_change(order)
     {:noreply, socket}
+  end
+
+  def handle_info(:clear_place_flash, socket) do
+    {:noreply, assign(socket, :place_flash, nil)}
   end
 
   @impl true
@@ -70,13 +76,15 @@ defmodule EspresoWeb.StaffPosLive do
          |> assign(:size_picker, nil)
          |> assign(:error, nil)
          |> assign(:last_order, nil)
-         |> assign(:print_note, nil)}
+         |> assign(:print_note, nil)
+         |> assign(:place_flash, nil)}
 
       %{product_prices: prices} = product when length(prices) > 1 ->
         {:noreply,
          socket
          |> assign(:size_picker, product)
-         |> assign(:error, nil)}
+         |> assign(:error, nil)
+         |> assign(:place_flash, nil)}
 
       _ ->
         {:noreply, assign(socket, :error, "Product is unavailable.")}
@@ -96,7 +104,8 @@ defmodule EspresoWeb.StaffPosLive do
        |> assign(:size_picker, nil)
        |> assign(:error, nil)
        |> assign(:last_order, nil)
-       |> assign(:print_note, nil)}
+       |> assign(:print_note, nil)
+       |> assign(:place_flash, nil)}
     else
       _ ->
         {:noreply, assign(socket, :error, "Selected size is unavailable.")}
@@ -120,23 +129,15 @@ defmodule EspresoWeb.StaffPosLive do
   end
 
   def handle_event("new_order", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:cart, [])
-     |> assign(:size_picker, nil)
-     |> assign(:last_order, nil)
-     |> assign(:print_note, nil)
-     |> assign(:print_failed?, false)
-     |> assign(:last_cash_change, nil)
-     |> assign(:error, nil)
-     |> assign(:payment_choice, :unpaid)
-     |> assign(:paid_via, "cash")
-     |> assign(:cash_tendered, "")
-     |> assign(:fulfillment, :pickup)
-     |> assign(:table_number, "")
-     |> assign(:placing_order?, false)
-     |> assign(:customer_name, "Walk-in")
-     |> assign(:notes, "")}
+    {:noreply, reset_ticket(socket)}
+  end
+
+  def handle_event("dismiss_place_flash", _params, socket) do
+    {:noreply, assign(socket, :place_flash, nil)}
+  end
+
+  def handle_event("toggle_notes", _params, socket) do
+    {:noreply, assign(socket, :notes_open?, !socket.assigns[:notes_open?])}
   end
 
   def handle_event("set_customer_name", %{"customer_name" => name}, socket) do
@@ -206,6 +207,23 @@ defmodule EspresoWeb.StaffPosLive do
   def handle_event("cash_exact", _params, socket) do
     total = cart_total(socket.assigns.cart) |> Decimal.round(2) |> Decimal.to_string(:normal)
     {:noreply, assign(socket, :cash_tendered, total)}
+  end
+
+  def handle_event("cash_chip", %{"amount" => amount}, socket) do
+    case parse_money(amount) do
+      {:ok, chip} ->
+        current =
+          case parse_money(socket.assigns.cash_tendered) do
+            {:ok, value} -> value
+            :error -> Decimal.new(0)
+          end
+
+        next = Decimal.add(current, chip) |> Decimal.round(2) |> Decimal.to_string(:normal)
+        {:noreply, assign(socket, :cash_tendered, next)}
+
+      :error ->
+        {:noreply, socket}
+    end
   end
 
   def handle_event("reprint_receipt", _params, socket) do
@@ -338,23 +356,41 @@ defmodule EspresoWeb.StaffPosLive do
 
             {note, failed?} = print_note_result(print_result, order.paid_via || paid_via)
 
-            {:noreply,
-             socket
-             |> assign(:cart, [])
-             |> assign(:size_picker, nil)
-             |> assign(:error, nil)
-             |> assign(:last_order, order)
-             |> assign(:print_note, note)
-             |> assign(:print_failed?, failed?)
-             |> assign(:last_cash_change, if(change, do: %{tendered: tendered, change: change}))
-             |> assign(:payment_choice, :unpaid)
-             |> assign(:paid_via, "cash")
-             |> assign(:cash_tendered, "")
-             |> assign(:fulfillment, :pickup)
-             |> assign(:table_number, "")
-             |> assign(:placing_order?, false)
-             |> assign(:notes, "")
-             |> assign(:categories, Menu.list_menu())}
+            cash_change = if(change, do: %{tendered: tendered, change: change})
+
+            socket =
+              socket
+              |> assign(:cart, [])
+              |> assign(:size_picker, nil)
+              |> assign(:error, nil)
+              |> assign(:payment_choice, :unpaid)
+              |> assign(:paid_via, "cash")
+              |> assign(:cash_tendered, "")
+              |> assign(:fulfillment, :pickup)
+              |> assign(:table_number, "")
+              |> assign(:placing_order?, false)
+              |> assign(:notes, "")
+              |> assign(:notes_open?, false)
+              |> assign(:categories, Menu.list_menu())
+              |> assign(:last_cash_change, cash_change)
+              |> assign(:print_note, note)
+              |> assign(:print_failed?, failed?)
+
+            socket =
+              if failed? do
+                assign(socket, :last_order, order)
+                |> assign(:place_flash, nil)
+              else
+                flash = place_flash_message(order, note, cash_change)
+
+                if connected?(socket), do: Process.send_after(self(), :clear_place_flash, 4_000)
+
+                socket
+                |> assign(:last_order, nil)
+                |> assign(:place_flash, flash)
+              end
+
+            {:noreply, socket}
 
           {:error, :empty_cart} ->
             {:noreply,
@@ -384,6 +420,18 @@ defmodule EspresoWeb.StaffPosLive do
       <div class="staff-pos-page staff-pos-shell-root">
         <main class="staff-pos-main">
           <p :if={@error} class="staff-pos-flash" id="pos-error">{@error}</p>
+          <p :if={@place_flash} class="staff-pos-place-flash" id="pos-place-flash">
+            <span>{@place_flash}</span>
+            <button
+              type="button"
+              class="staff-pos-place-flash-dismiss"
+              id="pos-place-flash-dismiss"
+              phx-click="dismiss_place_flash"
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </p>
 
           <div class="staff-pos-layout">
             <section class="staff-pos-catalog" id="pos-catalog">
@@ -407,11 +455,10 @@ defmodule EspresoWeb.StaffPosLive do
                 <div class="staff-pos-catalog-main">
                   <header class="staff-pos-catalog-head">
                     <div>
-                      <p class="staff-pos-catalog-eyebrow">Choose menu</p>
                       <h2 class="staff-pos-catalog-title">{@selected_category || "Products"}</h2>
                     </div>
                     <span class="staff-pos-catalog-count">
-                      {length(visible_products(@categories, @selected_category, @search))} items
+                      {length(visible_products(@categories, @selected_category, @search))}
                     </span>
                   </header>
 
@@ -484,34 +531,23 @@ defmodule EspresoWeb.StaffPosLive do
             <aside class="staff-pos-ticket" id="pos-ticket">
               <%= if @last_order do %>
                 <div class="staff-pos-success" id="pos-confirmation">
-                  <div class="staff-pos-success-badge" aria-hidden="true">✓</div>
-                  <p class="staff-pos-success-eyebrow">Order placed</p>
+                  <div class="staff-pos-success-badge" aria-hidden="true">!</div>
+                  <p class="staff-pos-success-eyebrow">Print failed · order saved</p>
                   <p class="staff-order-number">{@last_order.number}</p>
                   <p class="staff-order-meta">
-                    Status: {Orders.status_label(@last_order.status)} · {@last_order.customer_name}
+                    {Orders.status_label(@last_order.status)} · {@last_order.customer_name}
                     · {Orders.payment_label(@last_order)}
                   </p>
                   <p
                     :if={@print_note}
-                    class={[
-                      "staff-pos-success-note",
-                      @print_failed? && "is-error"
-                    ]}
+                    class="staff-pos-success-note is-error"
                     id="pos-print-note"
                   >
                     {@print_note}
                   </p>
-                  <p :if={@last_cash_change} class="staff-pos-success-note" id="pos-change-note">
-                    Cash {Menu.format_price(@last_cash_change.tendered)} · Change {Menu.format_price(
-                      @last_cash_change.change
-                    )}
-                  </p>
-                  <p :if={order_note(@last_order)} class="staff-pos-success-note">
-                    Note: {order_note(@last_order)}
-                  </p>
                   <div class="staff-pos-success-actions">
                     <button
-                      :if={Printer.enabled?() and @print_failed?}
+                      :if={Printer.enabled?()}
                       type="button"
                       class="staff-pos-place"
                       id="pos-retry-print"
@@ -519,39 +555,32 @@ defmodule EspresoWeb.StaffPosLive do
                     >
                       Retry print
                     </button>
-                    <button
-                      :if={Printer.enabled?() and @last_order.payment_status == "paid" and not @print_failed?}
-                      type="button"
-                      class="staff-pos-place staff-pos-place--secondary"
-                      id="pos-reprint"
-                      phx-click="reprint_receipt"
-                    >
-                      Reprint
-                    </button>
-                    <button
-                      :if={Printer.enabled?()}
-                      type="button"
-                      class="staff-pos-place staff-pos-place--secondary"
-                      id="pos-print-kitchen"
-                      phx-click="print_kitchen"
-                    >
-                      Kitchen
-                    </button>
-                    <button
-                      :if={
-                        Printer.enabled?() and @last_order.payment_status == "paid" and
-                          Printer.cash_like?(@last_order.paid_via || "cash")
-                      }
-                      type="button"
-                      class="staff-pos-place staff-pos-place--secondary"
-                      id="pos-open-kaha"
-                      phx-click="open_drawer"
-                    >
-                      Open kaha
-                    </button>
+                    <div class="staff-pos-success-secondary">
+                      <button
+                        :if={Printer.enabled?()}
+                        type="button"
+                        class="staff-pos-mini"
+                        id="pos-print-kitchen"
+                        phx-click="print_kitchen"
+                      >
+                        Kitchen
+                      </button>
+                      <button
+                        :if={
+                          Printer.enabled?() and
+                            Printer.cash_like?(@last_order.paid_via || "cash")
+                        }
+                        type="button"
+                        class="staff-pos-mini"
+                        id="pos-open-kaha"
+                        phx-click="open_drawer"
+                      >
+                        Kaha
+                      </button>
+                    </div>
                     <button
                       type="button"
-                      class="staff-pos-place staff-pos-place--secondary"
+                      class="staff-pos-place"
                       id="pos-new-order"
                       phx-click="new_order"
                     >
@@ -565,14 +594,13 @@ defmodule EspresoWeb.StaffPosLive do
               <% else %>
                 <div class="staff-pos-ticket-head">
                   <div class="staff-pos-ticket-title-row">
-                    <h2>Current Order</h2>
+                    <h2>Ticket</h2>
                     <span :if={cart_item_count(@cart) > 0} class="staff-pos-cart-count">
                       {cart_item_count(@cart)}
                     </span>
                   </div>
 
-                  <div class="staff-pos-panel-section">
-                    <p class="staff-pos-section-label">Customer</p>
+                  <div class="staff-pos-panel-section staff-pos-panel-section--compact">
                     <label class="staff-pos-field" for="pos-customer-name">
                       <span class="staff-pos-field-label">Name</span>
                       <input
@@ -585,13 +613,12 @@ defmodule EspresoWeb.StaffPosLive do
                         phx-debounce="300"
                         autocomplete="off"
                         maxlength="60"
-                        placeholder="Walk-in or customer name"
+                        placeholder="Walk-in"
                       />
                     </label>
 
-                    <p class="staff-pos-section-label">Fulfillment</p>
                     <div
-                      class="menu-checkout-options staff-pos-payment"
+                      class="menu-checkout-options staff-pos-payment staff-pos-fulfillment"
                       id="pos-fulfillment"
                       role="radiogroup"
                       aria-label="Fulfillment"
@@ -638,16 +665,30 @@ defmodule EspresoWeb.StaffPosLive do
                       />
                     </label>
 
-                    <label class="staff-pos-field staff-pos-field--notes" for="pos-notes">
-                      <span class="staff-pos-field-label">Notes</span>
+                    <button
+                      type="button"
+                      class="staff-pos-notes-toggle"
+                      id="pos-notes-toggle"
+                      phx-click="toggle_notes"
+                      aria-expanded={to_string(@notes_open? or order_note(%{notes: @notes}) != nil)}
+                    >
+                      {if @notes_open? or order_note(%{notes: @notes}),
+                        do: "Notes ▴",
+                        else: "Notes ▾"}
+                    </button>
+                    <label
+                      :if={@notes_open? or order_note(%{notes: @notes}) != nil}
+                      class="staff-pos-field staff-pos-field--notes"
+                      for="pos-notes"
+                    >
                       <textarea
                         class="staff-pos-field-textarea"
                         id="pos-notes"
                         name="notes"
                         phx-change="set_notes"
                         phx-debounce="300"
-                        rows="1"
-                        placeholder="Less ice, oat milk, etc."
+                        rows="2"
+                        placeholder="Less ice, oat milk…"
                       >{@notes}</textarea>
                     </label>
                   </div>
@@ -706,12 +747,7 @@ defmodule EspresoWeb.StaffPosLive do
               </div>
 
               <div class="staff-pos-ticket-footer">
-                <p class="staff-pos-section-label">Payment</p>
                 <div class="staff-pos-totals">
-                  <div class="staff-pos-total-row">
-                    <span>Subtotal</span>
-                    <span id="pos-subtotal">{Menu.format_price(cart_total(@cart))}</span>
-                  </div>
                   <div class="staff-pos-total-row staff-pos-total-row--grand">
                     <span>Total</span>
                     <span id="pos-total">{Menu.format_price(cart_total(@cart))}</span>
@@ -772,7 +808,7 @@ defmodule EspresoWeb.StaffPosLive do
                   id="pos-cash-helper"
                 >
                   <label class="staff-pos-field" for="pos-cash-tendered">
-                    <span class="staff-pos-field-label">Cash tendered</span>
+                    <span class="staff-pos-field-label">Cash</span>
                     <div class="staff-pos-cash-row">
                       <input
                         type="text"
@@ -796,6 +832,18 @@ defmodule EspresoWeb.StaffPosLive do
                       </button>
                     </div>
                   </label>
+                  <div class="staff-pos-cash-chips" id="pos-cash-chips">
+                    <button
+                      :for={amount <- ["50", "100", "500"]}
+                      type="button"
+                      class="staff-pos-cash-chip"
+                      id={"pos-cash-chip-#{amount}"}
+                      phx-click="cash_chip"
+                      phx-value-amount={amount}
+                    >
+                      +{amount}
+                    </button>
+                  </div>
                   <p
                     :if={cash_change_label(@cash_tendered, cart_total(@cart))}
                     class={[
@@ -955,6 +1003,47 @@ defmodule EspresoWeb.StaffPosLive do
 
   defp unavailable_error(names) when is_list(names) do
     "#{Enum.join(names, ", ")} are no longer available. Remove them or choose something else."
+  end
+
+  defp reset_ticket(socket) do
+    socket
+    |> assign(:cart, [])
+    |> assign(:size_picker, nil)
+    |> assign(:last_order, nil)
+    |> assign(:print_note, nil)
+    |> assign(:print_failed?, false)
+    |> assign(:last_cash_change, nil)
+    |> assign(:place_flash, nil)
+    |> assign(:error, nil)
+    |> assign(:payment_choice, :unpaid)
+    |> assign(:paid_via, "cash")
+    |> assign(:cash_tendered, "")
+    |> assign(:fulfillment, :pickup)
+    |> assign(:table_number, "")
+    |> assign(:placing_order?, false)
+    |> assign(:customer_name, "Walk-in")
+    |> assign(:notes, "")
+    |> assign(:notes_open?, false)
+  end
+
+  defp place_flash_message(order, print_note, cash_change) do
+    base =
+      "#{order.number} · #{order.customer_name} · #{Orders.status_label(order.status)} · #{Orders.payment_label(order)}"
+
+    extras =
+      [
+        print_note,
+        if(cash_change,
+          do: "Change #{Menu.format_price(cash_change.change)}",
+          else: nil
+        )
+      ]
+      |> Enum.reject(&is_nil/1)
+
+    case extras do
+      [] -> base
+      list -> Enum.join([base | list], " · ")
+    end
   end
 
   defp blank_notes(notes) when is_binary(notes) do

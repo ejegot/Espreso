@@ -172,7 +172,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/orders")
     refute has_element?(view, "#cancel-order-#{order.id}")
-    assert has_element?(view, "#abandon-online-payment-#{order.id}", "Abandon payment")
+    assert has_element?(view, "#abandon-online-payment-#{order.id}", "Abandon")
 
     assert {:error, :checkout_in_progress} = Orders.cancel_order(order)
 
@@ -196,7 +196,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     {:ok, order} = Orders.attach_paymongo_session(order, "cs_staff_abandon")
 
     {:ok, view, _html} = live(conn, ~p"/orders")
-    assert has_element?(view, "#abandon-online-payment-#{order.id}", "Abandon payment")
+    assert has_element?(view, "#abandon-online-payment-#{order.id}", "Abandon")
 
     view |> element("#abandon-online-payment-#{order.id}") |> render_click()
 
@@ -280,7 +280,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert has_element?(view, "#{detail_id(order.id, "preparing")} .staff-order-pay", "Unpaid")
     refute has_element?(view, "#order-ready-#{order.id}")
     refute has_element?(view, "#order-card-new-#{order.id} button", "Cash")
-    assert has_element?(view, "#abandon-online-payment-#{order.id}", "Abandon payment")
+    assert has_element?(view, "#abandon-online-payment-#{order.id}", "Abandon")
 
     reloaded = Orders.get_order_by_number!(order.number)
     assert reloaded.status == "preparing"
