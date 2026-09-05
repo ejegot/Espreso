@@ -97,12 +97,9 @@ defmodule EspresoWeb.OrderLive do
           phx-hook="OrderConfirm"
           data-order-number={@order.number}
         >
-          <p class="order-eyebrow">CoffeeSpot</p>
+          <p :if={not show_qrph_payment?(@order)} class="order-eyebrow">CoffeeSpot</p>
           <%= if show_qrph_payment?(@order) do %>
-            <h1 class="order-title order-title--pay" id="order-confirm-title">Scan at counter</h1>
-            <p class="order-lede" id="order-confirm-lede">
-              {qrph_confirm_lede(@order)}
-            </p>
+            <%!-- Pay screen content is the QRPh section below (header already says Pay at counter). --%>
           <% else %>
             <%= if confirm_payment_processing?(@order) do %>
               <h1 class="order-title" id="order-confirm-title">Payment processing</h1>
@@ -315,7 +312,7 @@ defmodule EspresoWeb.OrderLive do
 
   defp order_chrome_title(order, true) do
     cond do
-      show_qrph_payment?(order) -> "Scan at counter"
+      show_qrph_payment?(order) -> "Pay at counter"
       confirm_payment_processing?(order) -> "Payment"
       true -> "Confirmed"
     end
@@ -327,7 +324,7 @@ defmodule EspresoWeb.OrderLive do
 
   defp page_title(order, true) do
     cond do
-      show_qrph_payment?(order) -> qrph_title(order)
+      show_qrph_payment?(order) -> "Pay at counter"
       confirm_payment_processing?(order) -> "Payment processing"
       true -> "Order confirmed"
     end
@@ -352,8 +349,6 @@ defmodule EspresoWeb.OrderLive do
     assigns =
       assigns
       |> assign_new(:id_prefix, fn -> "order" end)
-      |> assign(:qr_title, qrph_title(assigns.order))
-      |> assign(:scan_hint, qrph_scan_hint(assigns.order))
       |> assign(:wallet_brand, qrph_wallet_brand(assigns.order))
       |> assign(:open_actions, qrph_open_actions(assigns.order))
 
@@ -361,10 +356,12 @@ defmodule EspresoWeb.OrderLive do
     <div class="order-qrph-hero">
       <p class="order-qrph-order-number" id={"#{@id_prefix}-qrph-number"}>{@order.number}</p>
       <p class="order-qrph-awaiting" id={"#{@id_prefix}-qrph-awaiting"}>
-        <span class="order-qrph-chip">Waiting for payment</span>
+        <span class="order-qrph-chip">Waiting</span>
         <span :if={@wallet_brand} class="order-qrph-awaiting-wallet">· {@wallet_brand}</span>
       </p>
-      <h2 id={"#{@id_prefix}-qrph-payment-title"} class="order-qrph-title">{@qr_title}</h2>
+      <h2 id={"#{@id_prefix}-qrph-payment-title"} class="sr-only">
+        {qrph_title(@order)}
+      </h2>
     </div>
 
     <div class="order-qrph-amount-block">
@@ -372,7 +369,6 @@ defmodule EspresoWeb.OrderLive do
         <span class="order-qrph-amount-label">Amount</span>
         <strong>{Orders.format_total(@order)}</strong>
       </p>
-      <p class="order-qrph-scan-hint">{@scan_hint}</p>
     </div>
 
     <div :if={@open_actions != []} class="order-qrph-open-actions">
@@ -384,70 +380,17 @@ defmodule EspresoWeb.OrderLive do
       >
         {action.label}
       </a>
-      <p class="order-qrph-open-fallback">
-        If the app doesn’t open, launch it manually, then use Scan.
-      </p>
     </div>
 
-    <ol class="order-qrph-steps">
-      <li :for={step <- qrph_steps(@order)}>{step}</li>
-    </ol>
-
-    <div class="order-qrph-waiting" id={"#{@id_prefix}-qrph-waiting"} role="status">
-      <p class="order-qrph-waiting-label">I’ve paid — waiting for staff</p>
-      <p class="order-qrph-waiting-note">This screen updates when staff confirms.</p>
-    </div>
+    <p class="order-qrph-waiting" id={"#{@id_prefix}-qrph-waiting"} role="status">
+      Waiting for staff to confirm.
+    </p>
     """
   end
 
   defp qrph_title(%{online_wallet: "gcash"}), do: "Pay with GCash"
   defp qrph_title(%{online_wallet: "maya"}), do: "Pay with Maya"
   defp qrph_title(_), do: "Pay with QRPh"
-
-  defp qrph_confirm_lede(%{online_wallet: "gcash"}),
-    do: "Open GCash and scan the QR at the counter. Staff will confirm after you pay."
-
-  defp qrph_confirm_lede(%{online_wallet: "maya"}),
-    do: "Open Maya and scan the QR at the counter. Staff will confirm after you pay."
-
-  defp qrph_confirm_lede(_),
-    do: "Open your wallet and scan the QR at the counter. Staff will confirm after you pay."
-
-  defp qrph_scan_hint(%{online_wallet: "gcash"}),
-    do: "Scan the GCash QR at the counter"
-
-  defp qrph_scan_hint(%{online_wallet: "maya"}),
-    do: "Scan the Maya QR at the counter"
-
-  defp qrph_scan_hint(_),
-    do: "Scan the QRPh code at the counter"
-
-  defp qrph_steps(%{online_wallet: "gcash"}) do
-    [
-      "Open GCash on this phone",
-      "Scan the QR at the counter",
-      "Pay exact amount",
-      "Keep this screen open for staff"
-    ]
-  end
-
-  defp qrph_steps(%{online_wallet: "maya"}) do
-    [
-      "Open Maya on this phone",
-      "Scan the QR at the counter",
-      "Pay exact amount",
-      "Keep this screen open for staff"
-    ]
-  end
-
-  defp qrph_steps(_order) do
-    [
-      "Open GCash or Maya on this phone",
-      "Scan the QR at the counter",
-      "Pay exact amount",
-      "Keep this screen open for staff"
-    ]
-  end
 
   defp qrph_wallet_brand(%{online_wallet: "gcash"}), do: "GCash"
   defp qrph_wallet_brand(%{online_wallet: "maya"}), do: "Maya"
@@ -472,6 +415,7 @@ defmodule EspresoWeb.OrderLive do
   defp wallet_open_href("gcash"), do: "gcash://"
   defp wallet_open_href("maya"), do: "maya://"
   defp wallet_open_href(_), do: "#"
+
   defp confirm_lede(%{fulfillment: "dine_in", table_number: table})
        when is_binary(table) and table != "" do
     "Your order is in. Show your order number at the counter — we'll bring it to table #{table}."

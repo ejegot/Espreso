@@ -11545,29 +11545,28 @@ body:has(.home-page-landing) {
 }
 
 .order-page .order-qrph-waiting {
-  margin: 0;
-  padding: 0.85rem 0.9rem;
-  border: 1px dashed color-mix(in srgb, #f85020 34%, transparent);
-  border-radius: 0.85rem;
-  background: color-mix(in srgb, #f85020 7%, #fff);
+  margin: 0.75rem 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
   text-align: center;
-}
-
-.order-page .order-qrph-waiting-label {
-  margin: 0;
-  color: #f85020;
-  font-family: "DM Sans", sans-serif;
-  font-size: 0.95rem;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-}
-
-.order-page .order-qrph-waiting-note {
-  margin: 0.25rem 0 0;
   color: #7a5a48;
   font-family: "DM Sans", sans-serif;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 600;
   line-height: 1.4;
+}
+
+.order-page .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .order-page .order-qrph-placeholder {
