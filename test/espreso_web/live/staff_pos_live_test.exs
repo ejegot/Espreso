@@ -228,7 +228,39 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert order.source == "pos"
     assert order.payment_method == "counter"
     assert order.payment_status == "paid"
-    assert order.status == "received"
+    assert order.status == "preparing"
+  end
+
+  test "POS paid tender can be GCash; dine-in requires table", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-fulfillment-dine-in") |> render_click()
+    assert has_element?(view, "#pos-table-number")
+
+    view |> element("#pos-place-order") |> render_click()
+    assert has_element?(view, "#pos-error", "table number")
+
+    view
+    |> element("#pos-table-number")
+    |> render_change(%{"table_number" => "5"})
+
+    view |> element("#pos-payment-paid") |> render_click()
+    view |> element("#pos-paid-via-gcash") |> render_click()
+    view |> element("#pos-place-order") |> render_click()
+
+    assert has_element?(view, "#pos-confirmation")
+
+    [order] = Orders.list_active_orders()
+    assert order.fulfillment == "dine_in"
+    assert order.table_number == "5"
+    assert order.payment_status == "paid"
+    assert order.paid_via == "gcash"
+    assert order.status == "preparing"
   end
 
   test "Place Order creates exactly one order; repeated place_order while placing is ignored", %{
@@ -447,8 +479,17 @@ defmodule EspresoWeb.StaffPosLiveTest do
           selected_category: nil,
           size_picker: nil,
           last_order: nil,
+          print_note: nil,
           error: nil,
-          notes: ""
+          notes: "",
+          fulfillment: :pickup,
+          table_number: "",
+          paid_via: "cash",
+          payment_choice: :unpaid,
+          placing_order?: false,
+          customer_name: "Walk-in",
+          cart: [],
+          current_user: %{name: "Staff"}
         },
         assigns
       )

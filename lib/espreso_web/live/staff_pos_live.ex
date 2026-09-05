@@ -22,7 +22,10 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:cart, [])
      |> assign(:customer_name, "Walk-in")
      |> assign(:notes, "")
+     |> assign(:fulfillment, :pickup)
+     |> assign(:table_number, "")
      |> assign(:payment_choice, :unpaid)
+     |> assign(:paid_via, "cash")
      |> assign(:placing_order?, false)
      |> assign(:size_picker, nil)
      |> assign(:last_order, nil)
@@ -122,6 +125,9 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:print_note, nil)
      |> assign(:error, nil)
      |> assign(:payment_choice, :unpaid)
+     |> assign(:paid_via, "cash")
+     |> assign(:fulfillment, :pickup)
+     |> assign(:table_number, "")
      |> assign(:placing_order?, false)
      |> assign(:customer_name, "Walk-in")
      |> assign(:notes, "")}
@@ -135,6 +141,27 @@ defmodule EspresoWeb.StaffPosLive do
     {:noreply, assign(socket, :notes, notes)}
   end
 
+  def handle_event("set_fulfillment", %{"fulfillment" => fulfillment}, socket) do
+    fulfillment =
+      case fulfillment do
+        "dine_in" -> :dine_in
+        _ -> :pickup
+      end
+
+    socket =
+      socket
+      |> assign(:fulfillment, fulfillment)
+      |> then(fn s ->
+        if fulfillment == :pickup, do: assign(s, :table_number, ""), else: s
+      end)
+
+    {:noreply, socket}
+  end
+
+  def handle_event("set_table_number", %{"table_number" => table}, socket) do
+    {:noreply, assign(socket, :table_number, String.trim(table))}
+  end
+
   def handle_event("set_payment_choice", %{"choice" => choice}, socket) do
     choice =
       case choice do
@@ -143,6 +170,43 @@ defmodule EspresoWeb.StaffPosLive do
       end
 
     {:noreply, assign(socket, :payment_choice, choice)}
+  end
+
+  def handle_event("set_paid_via", %{"paid_via" => paid_via}, socket)
+      when paid_via in ["cash", "gcash", "maya"] do
+    {:noreply, assign(socket, :paid_via, paid_via)}
+  end
+
+  def handle_event("set_paid_via", _params, socket), do: {:noreply, socket}
+
+  def handle_event("reprint_receipt", _params, socket) do
+    case socket.assigns.last_order do
+      nil ->
+        {:noreply, socket}
+
+      order ->
+        order = Espreso.Repo.preload(order, :items)
+
+        note =
+          case Printer.print_receipt(order, staff_name: socket.assigns.current_user.name) do
+            :ok -> "Receipt reprinted."
+            :disabled -> "Printer is not enabled on this server."
+            {:error, reason} -> "Reprint failed (#{inspect(reason)})."
+          end
+
+        {:noreply, assign(socket, :print_note, note)}
+    end
+  end
+
+  def handle_event("open_drawer", _params, socket) do
+    note =
+      case Printer.open_drawer() do
+        :ok -> "Kaha opened."
+        :disabled -> "Printer is not enabled on this server."
+        {:error, reason} -> "Could not open kaha (#{inspect(reason)})."
+      end
+
+    {:noreply, assign(socket, :print_note, note)}
   end
 
   def handle_event("place_order", _params, socket) do
@@ -158,8 +222,13 @@ defmodule EspresoWeb.StaffPosLive do
         {:noreply,
          assign(socket, :error, "Enter a customer name (at least 2 characters).")}
 
+      socket.assigns.fulfillment == :dine_in and not valid_table?(socket.assigns.table_number) ->
+        {:noreply, assign(socket, :error, "Enter a table number from 1 to 99.")}
+
       true ->
         customer_name = String.trim(socket.assigns.customer_name)
+        paid? = socket.assigns.payment_choice == :paid
+        paid_via = if paid?, do: socket.assigns.paid_via, else: nil
 
         lines =
           Enum.map(socket.assigns.cart, fn line ->
@@ -175,10 +244,15 @@ defmodule EspresoWeb.StaffPosLive do
         attrs = %{
           customer_name: customer_name,
           notes: blank_notes(socket.assigns.notes),
-          fulfillment: :pickup,
+          fulfillment: socket.assigns.fulfillment,
+          table_number:
+            if(socket.assigns.fulfillment == :dine_in,
+              do: socket.assigns.table_number,
+              else: nil
+            ),
           payment_method: :counter,
           payment_status: socket.assigns.payment_choice,
-          paid_via: if(socket.assigns.payment_choice == :paid, do: "cash", else: nil),
+          paid_via: paid_via,
           source: :pos
         }
 
@@ -187,8 +261,8 @@ defmodule EspresoWeb.StaffPosLive do
         case Orders.create_order(lines, attrs) do
           {:ok, order} ->
             print_result =
-              if socket.assigns.payment_choice == :paid do
-                Printer.after_paid(order, order.paid_via || "cash",
+              if paid? do
+                Printer.after_paid(order, order.paid_via || paid_via || "cash",
                   staff_name: socket.assigns.current_user.name
                 )
               else
@@ -201,8 +275,11 @@ defmodule EspresoWeb.StaffPosLive do
              |> assign(:size_picker, nil)
              |> assign(:error, nil)
              |> assign(:last_order, order)
-             |> assign(:print_note, print_note(print_result))
+             |> assign(:print_note, print_note(print_result, order.paid_via || paid_via))
              |> assign(:payment_choice, :unpaid)
+             |> assign(:paid_via, "cash")
+             |> assign(:fulfillment, :pickup)
+             |> assign(:table_number, "")
              |> assign(:placing_order?, false)
              |> assign(:notes, "")
              |> assign(:categories, Menu.list_menu())}
@@ -350,6 +427,27 @@ defmodule EspresoWeb.StaffPosLive do
                   </p>
                   <div class="staff-pos-success-actions">
                     <button
+                      :if={Printer.enabled?() and @last_order.payment_status == "paid"}
+                      type="button"
+                      class="staff-pos-place staff-pos-place--secondary"
+                      id="pos-reprint"
+                      phx-click="reprint_receipt"
+                    >
+                      Reprint
+                    </button>
+                    <button
+                      :if={
+                        Printer.enabled?() and @last_order.payment_status == "paid" and
+                          Printer.cash_like?(@last_order.paid_via || "cash")
+                      }
+                      type="button"
+                      class="staff-pos-place staff-pos-place--secondary"
+                      id="pos-open-kaha"
+                      phx-click="open_drawer"
+                    >
+                      Open kaha
+                    </button>
+                    <button
                       type="button"
                       class="staff-pos-place staff-pos-place--secondary"
                       id="pos-new-order"
@@ -388,6 +486,56 @@ defmodule EspresoWeb.StaffPosLive do
                         placeholder="Walk-in or customer name"
                       />
                     </label>
+
+                    <p class="staff-pos-section-label">Fulfillment</p>
+                    <div
+                      class="menu-checkout-options staff-pos-payment"
+                      id="pos-fulfillment"
+                      role="radiogroup"
+                      aria-label="Fulfillment"
+                    >
+                      <button
+                        type="button"
+                        class={["menu-checkout-option", @fulfillment == :pickup && "is-active"]}
+                        id="pos-fulfillment-pickup"
+                        phx-click="set_fulfillment"
+                        phx-value-fulfillment="pickup"
+                        aria-pressed={to_string(@fulfillment == :pickup)}
+                      >
+                        Pickup
+                      </button>
+                      <button
+                        type="button"
+                        class={["menu-checkout-option", @fulfillment == :dine_in && "is-active"]}
+                        id="pos-fulfillment-dine-in"
+                        phx-click="set_fulfillment"
+                        phx-value-fulfillment="dine_in"
+                        aria-pressed={to_string(@fulfillment == :dine_in)}
+                      >
+                        Dine-in
+                      </button>
+                    </div>
+                    <label
+                      :if={@fulfillment == :dine_in}
+                      class="staff-pos-field"
+                      for="pos-table-number"
+                    >
+                      <span class="staff-pos-field-label">Table</span>
+                      <input
+                        type="text"
+                        inputmode="numeric"
+                        class="staff-pos-field-input"
+                        id="pos-table-number"
+                        name="table_number"
+                        value={@table_number}
+                        phx-change="set_table_number"
+                        phx-debounce="200"
+                        autocomplete="off"
+                        maxlength="2"
+                        placeholder="1–99"
+                      />
+                    </label>
+
                     <label class="staff-pos-field staff-pos-field--notes" for="pos-notes">
                       <span class="staff-pos-field-label">Notes</span>
                       <textarea
@@ -493,6 +641,26 @@ defmodule EspresoWeb.StaffPosLive do
                     aria-pressed={to_string(@payment_choice == :paid)}
                   >
                     Paid
+                  </button>
+                </div>
+
+                <div
+                  :if={@payment_choice == :paid}
+                  class="menu-checkout-options staff-pos-payment staff-pos-tender"
+                  id="pos-paid-via"
+                  role="radiogroup"
+                  aria-label="Tender"
+                >
+                  <button
+                    :for={{via, label} <- [{"cash", "Cash"}, {"gcash", "GCash"}, {"maya", "Maya"}]}
+                    type="button"
+                    class={["menu-checkout-option", @paid_via == via && "is-active"]}
+                    id={"pos-paid-via-#{via}"}
+                    phx-click="set_paid_via"
+                    phx-value-paid_via={via}
+                    aria-pressed={to_string(@paid_via == via)}
+                  >
+                    {label}
                   </button>
                 </div>
 
@@ -652,6 +820,15 @@ defmodule EspresoWeb.StaffPosLive do
 
   defp blank_notes(_), do: nil
 
+  defp valid_table?(table) when is_binary(table) do
+    case Integer.parse(String.trim(table)) do
+      {n, ""} when n in 1..99 -> true
+      _ -> false
+    end
+  end
+
+  defp valid_table?(_), do: false
+
   defp order_note(%{notes: notes}) when is_binary(notes) do
     trimmed = String.trim(notes)
     if trimmed == "", do: nil, else: trimmed
@@ -659,8 +836,15 @@ defmodule EspresoWeb.StaffPosLive do
 
   defp order_note(_), do: nil
 
-  defp print_note(:ok), do: "Receipt printed · kaha opened"
-  defp print_note(:disabled), do: nil
-  defp print_note({:error, reason}), do: "Order saved · print failed (#{inspect(reason)})"
-  defp print_note(_), do: nil
+  defp print_note(:ok, paid_via) do
+    if Printer.cash_like?(paid_via || "cash") do
+      "Receipt printed · kaha opened"
+    else
+      "Receipt printed"
+    end
+  end
+
+  defp print_note(:disabled, _), do: nil
+  defp print_note({:error, reason}, _), do: "Order saved · print failed (#{inspect(reason)})"
+  defp print_note(_, _), do: nil
 end
