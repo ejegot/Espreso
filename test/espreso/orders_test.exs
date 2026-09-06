@@ -123,10 +123,10 @@ defmodule Espreso.OrdersTest do
     assert order.status == "received"
   end
 
-  test "create_order requires table for dine-in" do
+  test "create_order allows dine-in without table" do
     lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
 
-    assert {:error, changeset} =
+    assert {:ok, order} =
              Orders.create_order(lines, %{
                customer_name: "Juan",
                fulfillment: :dine_in,
@@ -134,7 +134,8 @@ defmodule Espreso.OrdersTest do
                payment_method: :counter
              })
 
-    assert %{table_number: _} = errors_on(changeset)
+    assert order.fulfillment == "dine_in"
+    assert order.table_number in [nil, ""]
   end
 
   test "update_status and mark_paid" do
@@ -147,12 +148,12 @@ defmodule Espreso.OrdersTest do
         payment_method: :counter
       })
 
-    assert {:ok, preparing} = Orders.update_status(order, "preparing")
-    assert preparing.status == "preparing"
+    assert {:error, :payment_required} = Orders.update_status(order, "preparing")
 
-    assert {:ok, paid} = Orders.mark_paid(preparing)
+    assert {:ok, paid} = Orders.mark_paid(order)
     assert paid.payment_status == "paid"
     assert paid.payment_method == "counter"
+    assert paid.status == "preparing"
 
     assert [%{number: number}] = Orders.list_active_orders()
     assert number == order.number
@@ -235,7 +236,7 @@ defmodule Espreso.OrdersTest do
     assert again.payment_status == "paid"
   end
 
-  test "online unpaid can prepare but not become ready or completed" do
+  test "unpaid cannot prepare, ready, or complete until paid" do
     lines = [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("100")}]
 
     {:ok, order} =
@@ -247,18 +248,14 @@ defmodule Espreso.OrdersTest do
 
     {:ok, order} = Orders.attach_paymongo_session(order, "cs_esp87_fulfill")
 
-    assert {:ok, preparing} = Orders.update_status(order, "preparing")
-    assert preparing.status == "preparing"
-    assert preparing.payment_status == "unpaid"
-
-    assert {:error, :payment_required} = Orders.update_status(preparing, "ready")
-    still_preparing = Orders.get_order_by_number!(order.number)
-    assert still_preparing.status == "preparing"
-    assert still_preparing.payment_status == "unpaid"
+    assert {:error, :payment_required} = Orders.update_status(order, "preparing")
+    still = Orders.get_order_by_number!(order.number)
+    assert still.status == "received"
+    assert still.payment_status == "unpaid"
 
     # Defense-in-depth: legacy ready + unpaid online cannot complete.
     {:ok, legacy_ready} =
-      still_preparing
+      still
       |> Ecto.Changeset.change(%{status: "ready"})
       |> Espreso.Repo.update()
 
@@ -393,7 +390,11 @@ defmodule Espreso.OrdersTest do
         payment_method: :online
       })
 
-    {:ok, preparing} = Orders.update_status(preparing, "preparing")
+    {:ok, preparing} =
+      preparing
+      |> Ecto.Changeset.change(%{status: "preparing"})
+      |> Repo.update()
+
     {:ok, preparing} = Orders.attach_paymongo_session(preparing, "cs_cancel_prep")
 
     assert {:error, :checkout_in_progress} = Orders.cancel_order(preparing)
@@ -477,7 +478,6 @@ defmodule Espreso.OrdersTest do
       })
 
     {:ok, ready} = Orders.attach_paymongo_session(ready, "cs_abandon_ready")
-    {:ok, ready} = Orders.update_status(ready, "preparing")
 
     {:ok, ready} =
       ready
@@ -670,8 +670,8 @@ defmodule Espreso.OrdersTest do
         payment_method: :counter
       })
 
-    {:ok, preparing} = Orders.update_status(unpaid, "preparing")
-    assert {:error, :payment_required} = Orders.update_status(preparing, "ready")
+    assert {:error, :payment_required} = Orders.update_status(unpaid, "preparing")
+    assert {:error, :payment_required} = Orders.update_status(unpaid, "ready")
 
     {:ok, paid} =
       Orders.create_order(lines, %{
@@ -699,6 +699,7 @@ defmodule Espreso.OrdersTest do
 
     assert {:error, :invalid_status} = Orders.complete_order(received)
 
+    {:ok, _} = Orders.mark_paid(received)
     {:ok, preparing} = Orders.update_status(received, "preparing")
     assert {:error, :invalid_status} = Orders.complete_order(preparing)
 
@@ -744,7 +745,10 @@ defmodule Espreso.OrdersTest do
         payment_method: :counter
       })
 
-    {:ok, preparing} = Orders.update_status(preparing, "preparing")
+    {:ok, preparing} =
+      preparing
+      |> Ecto.Changeset.change(%{status: "preparing"})
+      |> Repo.update()
 
     assert {:ok, cancelled_received} = Orders.cancel_order(received)
     assert cancelled_received.status == "cancelled"
@@ -854,7 +858,10 @@ defmodule Espreso.OrdersTest do
         payment_method: :counter
       })
 
-    {:ok, preparing} = Orders.update_status(preparing, "preparing")
+    {:ok, preparing} =
+      preparing
+      |> Ecto.Changeset.change(%{status: "preparing"})
+      |> Repo.update()
 
     {:ok, paid_active} =
       Orders.create_order(lines, %{
@@ -1265,7 +1272,10 @@ defmodule Espreso.OrdersTest do
         payment_method: :counter
       })
 
-    {:ok, preparing} = Orders.update_status(preparing, "preparing")
+    {:ok, preparing} =
+      preparing
+      |> Ecto.Changeset.change(%{status: "preparing"})
+      |> Repo.update()
 
     {:ok, ready} =
       Orders.create_order(lines, %{

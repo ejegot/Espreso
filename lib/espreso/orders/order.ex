@@ -128,12 +128,17 @@ defmodule Espreso.Orders.Order do
       "dine_in" ->
         table = changeset |> get_field(:table_number) |> to_string() |> String.trim()
 
-        case Integer.parse(table) do
-          {n, ""} when n in 1..99 ->
+        cond do
+          table == "" ->
+            put_change(changeset, :table_number, nil)
+
+          match?({n, ""} when n in 1..99, Integer.parse(table)) ->
+            {n, ""} = Integer.parse(table)
             put_change(changeset, :table_number, Integer.to_string(n))
 
-          _ ->
-            add_error(changeset, :table_number, "must be between 1 and 99")
+          true ->
+            # Table UI is retired for now — ignore invalid leftovers.
+            put_change(changeset, :table_number, nil)
         end
 
       "pickup" ->

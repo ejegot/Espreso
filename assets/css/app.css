@@ -3395,29 +3395,38 @@ body:has(.menu-page-locked) {
 }
 
 .staff-home-hub-card {
-  min-height: 8.5rem;
+  min-height: 6.5rem;
 }
 
-/* —— Option A: Shift desk (Staff Home) —— */
+/* —— Staff Home: operational launchpad —— */
 .staff-home-desk {
-  width: min(calc(100% - 2rem), 56rem) !important;
+  width: min(calc(100% - 1.5rem), 52rem) !important;
   display: grid;
-  gap: 0.95rem;
-  padding-bottom: 2rem !important;
+  gap: 0.55rem;
+  padding: 0.55rem 0 1.25rem !important;
 }
 
 .staff-home-desk-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 0.85rem 1.25rem;
+  gap: 0.5rem 0.85rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--cs-line, rgba(56, 32, 16, 0.12));
+  border-radius: var(--cs-radius-panel, 0.65rem);
+  background: var(--cs-panel, #fffdfa);
+  box-shadow: var(--cs-shadow, 0 10px 28px rgba(56, 32, 16, 0.06));
+}
+
+.staff-home-desk-copy {
+  min-width: 0;
 }
 
 .staff-home-desk-eyebrow {
-  margin: 0 0 0.2rem;
+  margin: 0 0 0.1rem;
   color: var(--cs-beige, #b0a098);
-  font-size: 0.68rem;
+  font-size: 0.58rem;
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -3425,35 +3434,46 @@ body:has(.menu-page-locked) {
 
 .staff-home-desk-title {
   margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.55rem;
   color: var(--cs-brown, #382010);
   font-family: "DM Sans", system-ui, sans-serif;
-  font-size: clamp(1.45rem, 2.4vw, 1.85rem);
+  font-size: 1.05rem;
   font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.staff-home-desk-role {
+  color: var(--cs-beige, #b0a098);
+  font-size: 0.74rem;
+  font-weight: 700;
 }
 
 .staff-home-desk-lede {
-  margin: 0.35rem 0 0 !important;
+  margin: 0.25rem 0 0 !important;
+  font-size: 0.88rem;
 }
 
 .staff-home-desk-status {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  min-height: 2.4rem;
-  padding: 0.35rem 0.75rem;
+  gap: 0.35rem;
+  min-height: 1.85rem;
+  padding: 0.2rem 0.55rem;
   border: 1px solid var(--cs-line, rgba(56, 32, 16, 0.12));
-  border-radius: 999px;
+  border-radius: var(--cs-radius-control, 0.3rem);
   background: #fff;
   color: var(--cs-brown, #382010);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
 }
 
 .staff-home-status-dot {
-  width: 0.5rem;
-  height: 0.5rem;
+  width: 0.45rem;
+  height: 0.45rem;
   border-radius: 999px;
   background: #22a06b;
   box-shadow: 0 0 0 3px color-mix(in srgb, #22a06b 18%, transparent);
@@ -3461,10 +3481,10 @@ body:has(.menu-page-locked) {
 
 .staff-home-primary {
   display: grid;
-  gap: 0.85rem;
+  gap: 0.45rem;
 }
 
-@media (min-width: 720px) {
+@media (min-width: 640px) {
   .staff-home-primary {
     grid-template-columns: 1fr 1fr;
   }
@@ -3472,30 +3492,34 @@ body:has(.menu-page-locked) {
 
 .staff-home-hero-tile {
   display: grid;
-  gap: 0.4rem;
+  gap: 0.22rem;
   align-content: start;
-  min-height: 10.25rem;
-  padding: 1.15rem 1.1rem 1.05rem;
+  min-height: 7.25rem;
+  padding: 0.75rem 0.8rem 0.7rem;
   border: 1px solid var(--cs-line, rgba(56, 32, 16, 0.12));
-  border-radius: 1.1rem;
-  background: #fff;
+  border-radius: var(--cs-radius-panel, 0.65rem);
+  background: var(--cs-panel, #fffdfa);
   color: inherit;
   text-decoration: none;
-  box-shadow: 0 12px 28px rgba(56, 32, 16, 0.06);
-  transition: transform 0.14s ease, border-color 0.14s ease;
+  box-shadow: var(--cs-shadow, 0 10px 28px rgba(56, 32, 16, 0.06));
+  transition: border-color 0.12s ease, transform 0.08s ease;
 }
 
 .staff-home-hero-tile:hover,
 .staff-home-hero-tile:focus-visible {
   border-color: color-mix(in srgb, var(--cs-orange, #f85020) 40%, transparent);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   outline: none;
+}
+
+.staff-home-hero-tile:active {
+  transform: scale(0.99);
 }
 
 .staff-home-hero-tile--orders {
   border-top: 3px solid var(--cs-orange, #f85020);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--cs-orange, #f85020) 6%, #fff), #fff 42%);
+    linear-gradient(180deg, color-mix(in srgb, var(--cs-orange, #f85020) 7%, #fff), var(--cs-panel, #fffdfa) 42%);
 }
 
 .staff-home-hero-tile--pos {
@@ -3506,71 +3530,160 @@ body:has(.menu-page-locked) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.55rem;
 }
 
 .staff-home-hero-count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 2rem;
-  min-height: 2rem;
-  padding: 0 0.45rem;
-  border-radius: 999px;
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  padding: 0 0.35rem;
+  border-radius: var(--cs-radius-control, 0.3rem);
   background: var(--cs-orange, #f85020);
   color: #fff;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   font-weight: 800;
+}
+
+.staff-home-desk .staff-home-card-eyebrow {
+  margin: 0;
+  color: var(--cs-beige, #b0a098);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.staff-home-desk .staff-home-card-title {
+  margin: 0;
+  color: var(--cs-brown, #382010);
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.staff-home-desk .staff-home-card-body {
+  margin: 0;
+  color: color-mix(in srgb, var(--cs-brown, #382010) 68%, var(--cs-beige, #b0a098));
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 .staff-home-hero-cta {
   margin-top: auto;
-  padding-top: 0.65rem;
+  padding-top: 0.45rem;
   color: var(--cs-orange, #f85020);
-  font-size: 0.88rem;
+  font-size: 0.8rem;
   font-weight: 800;
 }
 
 .staff-home-secondary {
   display: grid;
-  gap: 0.75rem;
-  grid-template-columns: repeat(auto-fit, minmax(12.5rem, 16rem));
-  justify-content: start;
+  gap: 0.35rem;
+  grid-template-columns: 1fr;
 }
 
-.staff-home-card--attention {
-  border-color: color-mix(in srgb, var(--cs-orange, #f85020) 28%, transparent);
-  background: color-mix(in srgb, var(--cs-orange, #f85020) 5%, #fff);
+@media (min-width: 640px) {
+  .staff-home-secondary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 900px) {
+  .staff-home-secondary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.staff-home-tool-link {
+  display: grid;
+  gap: 0.12rem;
+  align-content: start;
+  min-height: 3.4rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--cs-line, rgba(56, 32, 16, 0.12));
+  border-radius: var(--cs-radius-control, 0.3rem);
+  background: #fff;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.staff-home-tool-link:hover,
+.staff-home-tool-link:focus-visible {
+  border-color: color-mix(in srgb, var(--cs-orange, #f85020) 35%, transparent);
+  background: color-mix(in srgb, var(--cs-orange, #f85020) 4%, #fff);
+  outline: none;
+}
+
+.staff-home-tool-link--attention {
+  border-color: color-mix(in srgb, var(--cs-orange, #f85020) 30%, transparent);
+  background: color-mix(in srgb, var(--cs-orange, #f85020) 6%, #fff);
+}
+
+.staff-home-tool-link--close {
+  border-color: color-mix(in srgb, #f85020 22%, rgba(56, 32, 16, 0.12));
+}
+
+.staff-home-tool-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--cs-brown, #382010);
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.staff-home-tool-body {
+  color: color-mix(in srgb, var(--cs-brown, #382010) 62%, var(--cs-beige, #b0a098));
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.25;
 }
 
 .staff-home-inline-count {
   display: inline-flex;
-  margin-left: 0.35rem;
-  min-width: 1.35rem;
-  padding: 0.05rem 0.4rem;
-  border-radius: 999px;
+  margin-left: 0.15rem;
+  min-width: 1.2rem;
+  padding: 0.02rem 0.32rem;
+  border-radius: var(--cs-radius-control, 0.3rem);
   background: var(--cs-orange, #f85020);
   color: #fff;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 800;
   vertical-align: middle;
 }
 
 .staff-home-today {
-  padding: 0.85rem 1rem;
+  padding: 0.55rem 0.7rem;
   border: 1px solid var(--cs-line, rgba(56, 32, 16, 0.12));
-  border-radius: 1rem;
-  background: #fff;
+  border-radius: var(--cs-radius-panel, 0.65rem);
+  background: var(--cs-panel, #fffdfa);
+  box-shadow: var(--cs-shadow, 0 10px 28px rgba(56, 32, 16, 0.06));
+}
+
+.staff-home-today-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  margin-bottom: 0.35rem;
 }
 
 .staff-home-today-row--compact .staff-home-today-meta {
-  font-size: 0.92rem;
+  font-size: 0.84rem;
 }
 
 .staff-home-today-eyebrow {
-  margin: 0 0 0.35rem;
+  margin: 0;
   color: var(--cs-beige, #b0a098);
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -3604,36 +3717,55 @@ body:has(.menu-page-locked) {
 }
 
 .staff-home-printer {
-  margin-top: 1.25rem;
-  padding: 1rem 1.1rem;
-  border: 1px solid rgba(56, 32, 16, 0.1);
-  border-radius: 1rem;
-  background: #fff;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem 0.75rem;
+  margin-top: 0;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--cs-line, rgba(56, 32, 16, 0.12));
+  border-radius: var(--cs-radius-panel, 0.65rem);
+  background: var(--cs-panel, #fffdfa);
+  box-shadow: var(--cs-shadow, 0 10px 28px rgba(56, 32, 16, 0.06));
+}
+
+.staff-home-printer-copy {
+  min-width: 0;
+}
+
+.staff-home-printer-copy .staff-home-today-eyebrow {
+  margin-bottom: 0.1rem;
 }
 
 .staff-home-printer-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.55rem;
-  margin-top: 0.75rem;
+  gap: 0.35rem;
+  margin-top: 0;
 }
 
 .staff-home-printer-btn {
-  min-height: 2.75rem;
-  padding: 0.55rem 1rem;
-  border: 1.5px solid #f85020;
-  border-radius: 999px;
-  background: #f85020;
+  min-height: 2rem;
+  padding: 0.26rem 0.7rem;
+  border: 1px solid var(--cs-orange, #f85020);
+  border-radius: var(--cs-radius-control, 0.3rem);
+  background: var(--cs-orange, #f85020);
   color: #fff;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.76rem;
   font-weight: 700;
   cursor: pointer;
 }
 
 .staff-home-printer-btn:last-child {
   background: #fff;
-  color: #f85020;
+  color: var(--cs-orange, #f85020);
+}
+
+.staff-home-printer-note {
+  flex: 1 0 100%;
+  margin: 0;
 }
 
 .staff-paid-breakdown {
@@ -3675,17 +3807,13 @@ body:has(.menu-page-locked) {
 }
 
 .staff-home-today-closed {
-  margin: 0.85rem 0 0;
-  padding: 0.55rem 0.7rem;
-  border-radius: 0.75rem;
+  margin: 0;
+  padding: 0.18rem 0.45rem;
+  border-radius: var(--cs-radius-control, 0.3rem);
   background: color-mix(in srgb, #2f7a33 8%, #fff);
   color: #2f7a33;
-  font-size: 0.86rem;
+  font-size: 0.72rem;
   font-weight: 700;
-}
-
-.staff-home-card--close {
-  border-color: color-mix(in srgb, #f85020 22%, rgba(56, 32, 16, 0.12));
 }
 
 .dashboard-paid-breakdown-panel {
@@ -3834,14 +3962,14 @@ body:has(.menu-page-locked) {
 .staff-home-card {
   position: relative;
   display: grid;
-  gap: 0.35rem;
-  padding: 1.35rem 1.25rem;
-  border: 1px solid rgba(17, 17, 18, 0.08);
-  border-radius: 1.15rem;
-  background: #fff;
+  gap: 0.3rem;
+  padding: 0.9rem 0.95rem;
+  border: 1px solid var(--cs-line, rgba(56, 32, 16, 0.12));
+  border-radius: var(--cs-radius-panel, 0.65rem);
+  background: var(--cs-panel, #fffdfa);
   color: inherit;
   text-decoration: none;
-  box-shadow: 0 10px 28px rgba(17, 17, 18, 0.05);
+  box-shadow: var(--cs-shadow, 0 10px 28px rgba(56, 32, 16, 0.06));
   transition: transform 0.15s ease, border-color 0.15s ease;
 }
 
@@ -4367,43 +4495,272 @@ a.staff-home-card:focus-visible {
   flex-direction: column;
 }
 
-.staff-app:has(.staff-pos-shell-root) .staff-shell {
-  flex: 0 0 auto;
-  backdrop-filter: none;
-  background: var(--cs-surface);
+.staff-app.staff-app--rail:has(.staff-pos-shell-root) {
+  flex-direction: row;
 }
 
-.staff-app:has(.staff-pos-shell-root) .staff-shell-body {
+.staff-app:has(.staff-pos-shell-root) .staff-shell {
+  flex: 0 0 auto;
+}
+
+.staff-app:has(.staff-pos-shell-root) .staff-shell-body,
+.staff-app:has(.staff-pos-shell-root) .staff-shell-body--rail {
   flex: 1 1 auto;
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
-.staff-app:has(.staff-pos-shell-root) .staff-shell-bar {
-  gap: 0.35rem 0.55rem;
-  padding: 0.38rem 0.7rem 0.22rem;
+.staff-pos-rail {
+  flex: 0 0 11.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem 0.75rem;
+  border-right: 1px solid rgba(56, 32, 16, 0.1);
+  background: #fff;
+  overflow-y: auto;
 }
 
-.staff-app:has(.staff-pos-shell-root) .staff-shell-nav {
-  padding: 0 0.7rem 0.35rem;
+.staff-pos-rail.staff-pos-rail--icons {
+  flex: 0 0 4.35rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 0.55rem;
 }
 
-.staff-app:has(.staff-pos-shell-root) .staff-shell-nav-link {
-  min-height: 1.95rem;
-  padding: 0.26rem 0.7rem;
-  border-radius: 0.3rem;
-  font-size: 0.8rem;
+.staff-pos-rail-brand-name {
+  margin: 0;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #382010;
 }
 
-.staff-app:has(.staff-pos-shell-root) .staff-shell-tool,
-.staff-app:has(.staff-pos-shell-root) .staff-shell-logout {
-  min-height: 2rem;
-  padding: 0.26rem 0.6rem;
-  border-radius: 0.3rem;
-  font-size: 0.78rem;
+.staff-pos-rail-page {
+  margin: 0.15rem 0 0;
+  color: #b0a098;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
+
+.staff-pos-rail--icons .staff-pos-rail-brand {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.staff-pos-rail-mark {
+  display: inline-flex;
+  width: 2.35rem;
+  height: 2.35rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, #f85020 14%, #fff);
+  color: #f85020;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.staff-pos-rail-nav,
+.staff-pos-rail-more {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.staff-pos-rail--icons .staff-pos-rail-nav,
+.staff-pos-rail--icons .staff-pos-rail-more {
+  width: 100%;
+  justify-items: center;
+  gap: 0.35rem;
+}
+
+.staff-pos-rail-more {
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(56, 32, 16, 0.1);
+}
+
+.staff-pos-rail--icons .staff-pos-rail-more {
+  width: 100%;
+  border-top: 1px solid rgba(56, 32, 16, 0.1);
+}
+
+.staff-pos-rail-more-label {
+  margin: 0 0 0.35rem;
+  color: #b0a098;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.staff-pos-rail-link {
+  display: flex;
+  align-items: center;
+  min-height: 2.55rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.75rem;
+  border: 1px solid transparent;
+  color: color-mix(in srgb, #382010 72%, #b0a098);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.staff-pos-rail--icons .staff-pos-rail-link {
+  position: relative;
+  justify-content: center;
+  width: 2.55rem;
+  height: 2.55rem;
+  min-height: 2.55rem;
+  padding: 0;
+  border-radius: 0.85rem;
+}
+
+.staff-pos-rail-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+}
+
+.staff-pos-rail-link.is-active {
+  border-color: color-mix(in srgb, #f85020 35%, transparent);
+  background: color-mix(in srgb, #f85020 10%, #fff);
+  color: #f85020;
+}
+
+.staff-pos-rail--icons .staff-pos-rail-link.is-active::before {
+  content: "";
+  position: absolute;
+  left: -0.55rem;
+  top: 0.55rem;
+  bottom: 0.55rem;
+  width: 0.22rem;
+  border-radius: 999px;
+  background: #f85020;
+}
+
+.staff-pos-rail-link--more {
+  min-height: 2.2rem;
+  font-size: 0.82rem;
+}
+
+.staff-pos-rail--icons .staff-pos-rail-link--more {
+  width: 2.35rem;
+  height: 2.35rem;
+  min-height: 2.35rem;
+}
+
+.staff-pos-rail-footer {
+  display: grid;
+  gap: 0.25rem;
+  padding-top: 0.5rem;
+}
+
+.staff-pos-rail--icons .staff-pos-rail-footer {
+  width: 100%;
+  justify-items: center;
+  gap: 0.45rem;
+  padding-top: 0.35rem;
+}
+
+.staff-pos-rail--icons .staff-notif {
+  display: flex;
+  justify-content: center;
+}
+
+.staff-pos-rail--icons .staff-notif-bell {
+  width: 2.2rem;
+  height: 2.2rem;
+  min-height: 2.2rem;
+  padding: 0;
+}
+
+.staff-pos-rail-avatar {
+  display: inline-flex;
+  width: 2.2rem;
+  height: 2.2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, #f85020 12%, #fff);
+  color: #f85020;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.staff-pos-rail-user {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #382010;
+}
+
+.staff-pos-rail-role {
+  margin: 0;
+  font-size: 0.7rem;
+  color: #b0a098;
+  font-weight: 600;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 900px) {
+  .staff-app.staff-app--rail:has(.staff-pos-shell-root) {
+    flex-direction: column;
+  }
+
+  .staff-pos-rail,
+  .staff-pos-rail.staff-pos-rail--icons {
+    flex: 0 0 auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.45rem;
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid rgba(56, 32, 16, 0.1);
+    padding: 0.55rem 0.65rem;
+  }
+
+  .staff-pos-rail-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  .staff-pos-rail--icons .staff-pos-rail-link.is-active::before {
+    display: none;
+  }
+
+  .staff-pos-rail-more,
+  .staff-pos-rail-footer {
+    display: none;
+  }
+}
+
+/* Cafe POS weak layout/card duplicates removed — authoritative rules live in
+   .staff-pos-page.staff-pos-page--cafe block below. Category pill styles are
+   also defined there. */
 
 .staff-pos-page .staff-pos-main {
   flex: 1 1 auto;
@@ -4415,6 +4772,10 @@ a.staff-home-card:focus-visible {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-main {
+  padding: 0.75rem 0.9rem 0.85rem;
 }
 
 .staff-pos-page .staff-pos-flash {
@@ -4439,8 +4800,8 @@ a.staff-home-card:focus-visible {
 
 @media (min-width: 768px) {
   .staff-pos-page .staff-pos-layout {
-    grid-template-columns: minmax(0, 1.62fr) minmax(17rem, 22rem);
-    gap: 0.45rem;
+    grid-template-columns: minmax(0, 1.75fr) minmax(20rem, 24rem);
+    gap: 0.65rem;
   }
 }
 
@@ -4448,10 +4809,10 @@ a.staff-home-card:focus-visible {
 .staff-pos-page .staff-pos-ticket {
   min-height: 0;
   border: 1px solid var(--cs-line);
-  border-radius: 0.65rem;
+  border-radius: 1rem;
   background: var(--cs-panel);
   box-shadow: var(--cs-shadow);
-  padding: 0.55rem;
+  padding: 0.75rem;
 }
 
 .staff-pos-page .staff-pos-catalog {
@@ -4465,16 +4826,8 @@ a.staff-home-card:focus-visible {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.55rem;
   overflow: hidden;
-}
-
-@media (min-width: 768px) {
-  .staff-pos-page .staff-pos-catalog-layout {
-    display: grid;
-    grid-template-columns: 5.75rem minmax(0, 1fr);
-    gap: 0.45rem;
-  }
 }
 
 .staff-pos-page .staff-pos-catalog-main {
@@ -4482,6 +4835,7 @@ a.staff-home-card:focus-visible {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  gap: 0.45rem;
 }
 
 .staff-pos-page .staff-pos-catalog-head {
@@ -4490,15 +4844,15 @@ a.staff-home-card:focus-visible {
   align-items: flex-end;
   justify-content: space-between;
   gap: 0.5rem;
-  margin-bottom: 0.45rem;
-  padding: 0.15rem 0.2rem 0.35rem;
-  border-bottom: 1px solid var(--cs-line);
+  margin: 0;
+  padding: 0.1rem 0.15rem 0;
+  border-bottom: none;
 }
 
 .staff-pos-page .staff-pos-catalog-eyebrow {
-  margin: 0 0 0.08rem;
+  margin: 0 0 0.12rem;
   color: var(--cs-beige);
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -4507,7 +4861,7 @@ a.staff-home-card:focus-visible {
 .staff-pos-page .staff-pos-catalog-title {
   margin: 0;
   font-family: "DM Sans", system-ui, sans-serif;
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.1;
@@ -4516,20 +4870,20 @@ a.staff-home-card:focus-visible {
 .staff-pos-page .staff-pos-catalog-count {
   display: inline-flex;
   align-items: center;
-  min-height: 1.55rem;
-  padding: 0 0.45rem;
+  min-height: 1.7rem;
+  padding: 0 0.55rem;
   border-radius: 999px;
   background: color-mix(in srgb, var(--cs-beige) 18%, #fff);
   color: color-mix(in srgb, var(--cs-brown) 55%, var(--cs-beige));
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   font-weight: 700;
   white-space: nowrap;
 }
 
 .staff-pos-page .staff-pos-search {
   flex: 0 0 auto;
-  margin: 0 0 0.5rem;
-  padding: 0 0.1rem;
+  margin: 0;
+  padding: 0;
 }
 
 .staff-pos-page .staff-pos-search-label {
@@ -4552,14 +4906,14 @@ a.staff-home-card:focus-visible {
 
 .staff-pos-page .staff-pos-search-input {
   flex: 1 1 auto;
-  min-height: 2.6rem;
+  min-height: 2.85rem;
   width: 100%;
   border: 1px solid var(--cs-line);
-  border-radius: 0.7rem;
+  border-radius: 0.9rem;
   background: #fff;
-  padding: 0.55rem 0.85rem;
+  padding: 0.65rem 1rem;
   color: var(--cs-brown);
-  font-size: 0.92rem;
+  font-size: 0.98rem;
   font-weight: 600;
 }
 
@@ -4571,15 +4925,996 @@ a.staff-home-card:focus-visible {
 
 .staff-pos-page .staff-pos-search-clear {
   flex: 0 0 auto;
-  min-height: 2.6rem;
+  min-height: 2.85rem;
   border: 1px solid var(--cs-line);
-  border-radius: 0.7rem;
+  border-radius: 0.9rem;
   background: #fff;
-  padding: 0 0.75rem;
+  padding: 0 0.85rem;
   color: var(--cs-beige);
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
+}
+
+.staff-pos-page .staff-pos-categories {
+  flex: 0 0 auto;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(6.5rem, 8.5rem);
+  gap: 0.45rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.1rem 0.05rem 0.35rem;
+  scrollbar-width: thin;
+}
+
+.staff-pos-page .staff-pos-category {
+  display: grid;
+  gap: 0.15rem;
+  align-content: center;
+  justify-items: start;
+  min-height: 4.1rem;
+  width: 100%;
+  border: 1px solid var(--cs-line);
+  border-radius: 0.85rem;
+  background: #fff;
+  padding: 0.55rem 0.65rem;
+  cursor: pointer;
+  touch-action: manipulation;
+  color: color-mix(in srgb, var(--cs-brown) 72%, var(--cs-beige));
+  text-align: left;
+}
+
+.staff-pos-page .staff-pos-category-label {
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  text-transform: none;
+}
+
+.staff-pos-page .staff-pos-category-count {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--cs-beige);
+}
+
+.staff-pos-page .staff-pos-category.is-active {
+  border-color: color-mix(in srgb, var(--cs-orange) 55%, transparent);
+  background: color-mix(in srgb, var(--cs-orange) 10%, #fff);
+  color: var(--cs-brown);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-orange) 18%, transparent);
+}
+
+.staff-pos-page .staff-pos-category.is-active .staff-pos-category-count {
+  color: color-mix(in srgb, var(--cs-orange) 70%, var(--cs-beige));
+}
+
+.staff-pos-page .staff-pos-products {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+  align-content: flex-start;
+  padding: 0.15rem 0.05rem 0.35rem 0;
+}
+
+@media (min-width: 1024px) {
+  .staff-pos-page .staff-pos-products {
+    grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
+    gap: 0.75rem;
+  }
+}
+
+/* Cafe POS: menu-first catalog + readable cards (must win over auto-fill above) */
+.staff-pos-page.staff-pos-page--cafe {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-layout.staff-pos-layout--cafe {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  grid-template-columns: 1fr;
+  gap: 0.85rem;
+  overflow: hidden;
+  align-items: stretch;
+}
+
+@media (min-width: 960px) {
+  .staff-pos-page.staff-pos-page--cafe .staff-pos-layout.staff-pos-layout--cafe {
+    /* Target 17.5rem cart; allow up to 18rem so ticket controls stay comfortable */
+    grid-template-columns: minmax(0, 1fr) minmax(17.5rem, 18rem);
+    gap: 0.65rem;
+  }
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-catalog,
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket {
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-catalog {
+  gap: 0;
+  padding: 0.7rem 0.85rem 0;
+  background: #f4f2f0;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-catalog-toolbar {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 0.4rem;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding: 0 0 0.45rem;
+  background: #f4f2f0;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-catalog-toolbar .staff-pos-search-input {
+  min-height: 2.55rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 0.85rem;
+  font-size: 0.92rem;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-catalog-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0.05rem 0 0;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-catalog-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #382010;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-catalog-count {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #b0a098;
+}
+
+/* Only the product grid scrolls; header stays put */
+.staff-pos-page.staff-pos-page--cafe .staff-pos-products.staff-pos-products--rows {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.85rem;
+  align-content: start;
+  align-items: stretch;
+  grid-auto-rows: max-content;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.1rem 0 0.85rem;
+  scrollbar-gutter: stable;
+}
+
+@media (min-width: 760px) and (max-width: 1099px) {
+  .staff-pos-page.staff-pos-page--cafe .staff-pos-products.staff-pos-products--rows {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.9rem;
+  }
+}
+
+/* Tablet / desktop: 3 cards × ~3 rows before scroll */
+@media (min-width: 1100px) {
+  .staff-pos-page.staff-pos-page--cafe .staff-pos-products.staff-pos-products--rows {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.95rem;
+  }
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-product-card {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  width: 100%;
+  height: auto;
+  min-height: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(56, 32, 16, 0.1);
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(56, 32, 16, 0.04);
+  overflow: hidden;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease,
+    transform 0.12s ease;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-product-card:hover {
+  border-color: color-mix(in srgb, #f85020 28%, transparent);
+  box-shadow: 0 8px 18px rgba(248, 80, 32, 0.08);
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-product-card:active {
+  transform: scale(0.985);
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-product-card.is-added {
+  border-color: color-mix(in srgb, #f85020 50%, transparent);
+  background: color-mix(in srgb, #f85020 7%, #fff);
+  box-shadow: 0 8px 18px rgba(248, 80, 32, 0.12);
+  animation: staff-pos-card-added 0.35s ease;
+}
+
+@keyframes staff-pos-card-added {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(0.97);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-product-card-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  min-height: 6.5rem;
+  overflow: hidden;
+  background: #ebe8e6;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-product-card-media .staff-pos-product-img,
+.staff-pos-page.staff-pos-page--cafe .staff-pos-product-card .staff-pos-product-img,
+.staff-pos-page.staff-pos-page--cafe .staff-pos-product-card-media .staff-pos-product-img.is-packshot,
+.staff-pos-page.staff-pos-page--cafe .staff-pos-product-card .staff-pos-product-img.is-packshot {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  padding: 0;
+  background: transparent;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-product-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 0.55rem 0.65rem 0.65rem;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-product-card-body .staff-pos-product-name,
+.staff-pos-page.staff-pos-page--cafe .staff-pos-product-card .staff-pos-product-name {
+  margin: 0;
+  padding: 0;
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #382010;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  min-height: 2.1rem;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-product-sizes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 1.7rem;
+  flex: 0 0 auto;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-size-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-size-chip {
+  min-height: 1.6rem;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 32, 16, 0.14);
+  background: #fff;
+  color: #382010;
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-size-chip.is-active {
+  border-color: #382010;
+  background: #382010;
+  color: #fff;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-product-card-body .staff-pos-product-price,
+.staff-pos-page.staff-pos-page--cafe .staff-pos-product-card .staff-pos-product-price {
+  margin: 0;
+  margin-top: auto;
+  padding: 0.1rem 0 0;
+  border-radius: 0;
+  background: transparent;
+  color: #f85020;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  display: block;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket {
+  padding: 1rem 1.05rem;
+  background: #fff;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-head {
+  flex: 0 0 auto;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-staff {
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr);
+  gap: 0.7rem;
+  align-items: center;
+  margin-bottom: 0.95rem;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-staff-avatar {
+  display: inline-flex;
+  width: 2.6rem;
+  height: 2.6rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, #f85020 14%, #fff);
+  color: #f85020;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-staff-name {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #382010;
+  line-height: 1.2;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-staff-meta {
+  margin: 0.12rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #b0a098;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-title-row {
+  margin-bottom: 0.7rem;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-head h2 {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #382010;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-count {
+  min-height: auto;
+  min-width: auto;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #b0a098;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-fulfillment--pills {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-fulfill-chip {
+  min-height: 2.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 32, 16, 0.12);
+  background: #fff;
+  color: #382010;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-fulfill-chip.is-active {
+  background: #382010;
+  border-color: #382010;
+  color: #fff;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart {
+  gap: 0;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-line {
+  display: grid;
+  grid-template-columns: 3.4rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.85rem 0;
+  border: none;
+  border-bottom: 1px solid rgba(56, 32, 16, 0.08);
+  border-radius: 0;
+  background: transparent;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-line:last-child {
+  border-bottom: none;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-thumb {
+  width: 3.4rem;
+  height: 3.4rem;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, #faf7f4 80%, #fff);
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: end;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-copy {
+  min-width: 0;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-name {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #382010;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-size {
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #b0a098;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-amount {
+  margin: 0.35rem 0 0;
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #382010;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-qty-btn {
+  width: 1.85rem;
+  height: 1.85rem;
+  min-width: 1.85rem;
+  min-height: 1.85rem;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 32, 16, 0.14);
+  background: #fff;
+  color: #382010;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-qty-btn--plus {
+  background: #fff;
+  border-color: rgba(56, 32, 16, 0.14);
+  color: #382010;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-remove {
+  width: 1.85rem;
+  height: 1.85rem;
+  min-width: 1.85rem;
+  min-height: 1.85rem;
+  border-radius: 999px;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-footer {
+  flex: 0 0 auto;
+  margin-left: -1.05rem;
+  margin-right: -1.05rem;
+  margin-bottom: -1rem;
+  padding: 0.85rem 1.05rem 1.05rem;
+  border-radius: 0 0 1rem 1rem;
+  background: #fff;
+  border-top: 1px solid rgba(56, 32, 16, 0.08);
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket.is-empty .staff-pos-ticket-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 4.5rem;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket.is-empty #pos-cart-empty {
+  margin: 0;
+  color: #c4b6ab;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket.is-empty .staff-pos-totals {
+  opacity: 0.42;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket.is-empty .staff-pos-total-row--grand span:last-child,
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket.is-empty #pos-total {
+  font-size: 1.05rem;
+  color: #b0a098;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket.is-empty .staff-pos-section-label {
+  display: none;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket.is-empty .staff-pos-pay-chip {
+  min-height: 2.45rem;
+  border-color: rgba(56, 32, 16, 0.08);
+  color: #b0a098;
+  font-weight: 700;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket.is-empty .staff-pos-pay-chip.is-active {
+  border-color: color-mix(in srgb, #f85020 28%, transparent);
+  background: color-mix(in srgb, #f85020 5%, #fff);
+  color: color-mix(in srgb, #f85020 70%, #b0a098);
+  box-shadow: none;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket.is-empty .staff-pos-place {
+  min-height: 2.95rem;
+  opacity: 0.38;
+  font-size: 0.95rem;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-total-row--grand span:last-child,
+.staff-pos-page.staff-pos-page--cafe #pos-total {
+  color: #f85020;
+  font-size: 1.35rem;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-tender--methods {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-pay-chip {
+  min-height: 2.75rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(56, 32, 16, 0.12);
+  background: #fff;
+  color: color-mix(in srgb, #382010 70%, #b0a098);
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-pay-chip.is-active {
+  border-color: #f85020;
+  background: color-mix(in srgb, #f85020 10%, #fff);
+  color: #f85020;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #f85020 20%, transparent);
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-place {
+  min-height: 3.35rem;
+  border-radius: 999px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 1rem;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-categories--pills {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.4rem;
+  overflow-x: auto;
+  grid-auto-flow: unset;
+  grid-auto-columns: unset;
+  padding: 0.05rem 0 0.15rem;
+  scrollbar-width: thin;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-categories--pills .staff-pos-category {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: auto;
+  min-height: 2.35rem;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 32, 16, 0.1);
+  background: #fff;
+  white-space: nowrap;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-categories--pills .staff-pos-category-label {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: inherit;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-categories--pills .staff-pos-category.is-active {
+  background: #f85020;
+  border-color: #f85020;
+  color: #fff;
+  box-shadow: none;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-categories--pills .staff-pos-category.is-active .staff-pos-category-label {
+  color: #fff;
+}
+
+.staff-pos-page .staff-pos-product {
+  display: grid;
+  grid-template-rows: 7.5rem minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0.45rem;
+  min-height: 11.5rem;
+  text-align: left;
+  border: 1px solid var(--cs-line);
+  border-radius: 0.95rem;
+  background: #fff;
+  padding: 0.45rem;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 8px 20px rgba(56, 32, 16, 0.04);
+}
+
+.staff-pos-page .staff-pos-product:active,
+.staff-pos-page .staff-pos-product:focus-visible {
+  border-color: color-mix(in srgb, var(--cs-orange) 40%, transparent);
+  background: color-mix(in srgb, var(--cs-orange) 4%, #fff);
+  outline: none;
+  transform: scale(0.985);
+}
+
+.staff-pos-page .staff-pos-product-media {
+  display: block;
+  width: 100%;
+  height: 7.5rem;
+  overflow: hidden;
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, var(--cs-cream, #f7f1ea) 80%, #fff);
+}
+
+.staff-pos-page .staff-pos-product-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.staff-pos-page .staff-pos-product-img.is-packshot {
+  object-fit: contain;
+  padding: 0.35rem;
+  background: color-mix(in srgb, var(--cs-cream) 55%, #fff);
+}
+
+.staff-pos-page .staff-pos-product-copy {
+  display: grid;
+  gap: 0.2rem;
+  align-content: start;
+  min-width: 0;
+  padding: 0 0.15rem 0.15rem;
+}
+
+.staff-pos-page .staff-pos-product-name {
+  font-size: 0.92rem;
+  font-weight: 800;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.staff-pos-page .staff-pos-product-price {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 0.12rem 0.4rem;
+  border-radius: 0.45rem;
+  background: color-mix(in srgb, var(--cs-cream) 75%, #fff);
+  color: color-mix(in srgb, var(--cs-brown) 70%, var(--cs-beige));
+  font-size: 0.78rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.staff-pos-page .staff-pos-ticket {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+}
+
+.staff-pos-page .staff-pos-ticket-head {
+  flex: 0 0 auto;
+}
+
+.staff-pos-page .staff-pos-ticket-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  margin-bottom: 0.45rem;
+}
+
+.staff-pos-page .staff-pos-ticket-head h2 {
+  margin: 0;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.staff-pos-page .staff-pos-cart-count {
+  display: inline-flex;
+  min-width: 1.55rem;
+  height: 1.55rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--cs-orange);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.staff-pos-page .staff-pos-cart {
+  gap: 0.45rem;
+}
+
+.staff-pos-page .staff-pos-cart-line {
+  display: grid;
+  grid-template-columns: 3.1rem minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: start;
+  padding: 0.5rem;
+  border: 1px solid var(--cs-line);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--cs-cream) 35%, #fff);
+}
+
+.staff-pos-page .staff-pos-cart-thumb {
+  width: 3.1rem;
+  height: 3.1rem;
+  border-radius: 0.55rem;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--cs-cream) 70%, #fff);
+}
+
+.staff-pos-page .staff-pos-cart-thumb-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.staff-pos-page .staff-pos-cart-main {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.staff-pos-page .staff-pos-cart-info {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.staff-pos-page .staff-pos-cart-name {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.staff-pos-page .staff-pos-cart-amount {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.staff-pos-page .staff-pos-qty-btn--plus {
+  background: var(--cs-orange);
+  border-color: var(--cs-orange);
+  color: #fff;
+}
+
+.staff-pos-page .staff-pos-payment.staff-pos-tender--methods {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 900px) {
+  .staff-pos-page .staff-pos-payment.staff-pos-tender--methods {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.staff-pos-page .staff-pos-payment.staff-pos-tender--methods .menu-checkout-option {
+  min-height: 3rem;
+  font-size: 0.84rem;
+}
+
+.staff-pos-page .staff-pos-place {
+  width: 100%;
+  min-height: 3.25rem;
+  border-radius: 0.85rem;
+  background: var(--cs-orange);
+  border: 1px solid var(--cs-orange);
+  color: #fff;
+  font-size: 0.98rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.staff-pos-page .staff-pos-modal-panel {
+  width: min(28rem, calc(100vw - 2rem));
+  border-radius: 1.1rem;
+  padding: 1rem;
+}
+
+.staff-pos-page .staff-pos-size-picker-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.staff-pos-page .staff-pos-size-picker-eyebrow {
+  margin: 0 0 0.15rem;
+  color: var(--cs-beige);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.staff-pos-page .staff-pos-size-picker-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.staff-pos-page .staff-pos-size-cancel {
+  min-height: 2.4rem;
+  padding: 0 0.85rem;
+  border: 1px solid var(--cs-line);
+  border-radius: 0.65rem;
+  background: #fff;
+  color: var(--cs-brown);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.staff-pos-page .staff-pos-size-options {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.staff-pos-page .staff-pos-size-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 3.6rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--cs-line);
+  border-radius: 0.85rem;
+  background: #fff;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.staff-pos-page .staff-pos-size-option:hover,
+.staff-pos-page .staff-pos-size-option:focus-visible {
+  border-color: color-mix(in srgb, var(--cs-orange) 40%, transparent);
+  background: color-mix(in srgb, var(--cs-orange) 6%, #fff);
+  outline: none;
+}
+
+.staff-pos-page .staff-pos-size-option-name {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.staff-pos-page .staff-pos-size-option-price {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--cs-orange);
+  font-variant-numeric: tabular-nums;
 }
 
 .staff-pos-page .staff-pos-ticket {
@@ -4712,197 +6047,13 @@ a.staff-home-card:focus-visible {
   padding-top: 0.45rem;
   margin-top: 0.35rem;
   background: color-mix(in srgb, var(--cs-cream) 55%, #fff);
-  border-radius: 0 0 0.55rem 0.55rem;
-  margin-left: -0.55rem;
-  margin-right: -0.55rem;
-  margin-bottom: -0.55rem;
-  padding-left: 0.55rem;
-  padding-right: 0.55rem;
-  padding-bottom: 0.55rem;
-}
-
-.staff-pos-page .staff-pos-categories {
-  flex: 0 0 auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.28rem;
-}
-
-@media (min-width: 768px) {
-  .staff-pos-page .staff-pos-categories {
-    flex-direction: column;
-    flex-wrap: nowrap;
-    gap: 0.32rem;
-    padding: 0.15rem 0.05rem 0.15rem 0;
-    border-right: 1px solid var(--cs-line);
-    margin-right: 0.05rem;
-  }
-}
-
-.staff-pos-page .staff-pos-category {
-  min-height: 2.45rem;
-  border: 1px solid transparent;
-  border-radius: 0.55rem;
-  background: transparent;
-  padding: 0.35rem 0.55rem;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  cursor: pointer;
-  touch-action: manipulation;
-  color: color-mix(in srgb, var(--cs-brown) 70%, var(--cs-beige));
-  text-align: center;
-}
-
-@media (min-width: 768px) {
-  .staff-pos-page .staff-pos-category {
-    width: 100%;
-    min-height: 2.65rem;
-    padding-inline: 0.35rem;
-    line-height: 1.1;
-  }
-}
-
-.staff-pos-page .staff-pos-category.is-active {
-  border-color: color-mix(in srgb, var(--cs-orange) 18%, transparent);
-  background: color-mix(in srgb, var(--cs-orange) 10%, #fff);
-  color: var(--cs-orange);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-orange) 12%, transparent);
-}
-
-.staff-pos-page .staff-pos-products {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  display: grid;
-  gap: 0.55rem;
-  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
-  align-content: flex-start;
-  padding: 0.05rem 0.1rem 0.15rem 0;
-}
-
-.staff-pos-page .staff-pos-product {
-  display: grid;
-  grid-template-rows: 5.5rem minmax(0, 1fr);
-  grid-template-columns: minmax(0, 1fr);
-  align-items: stretch;
-  gap: 0.45rem;
-  min-height: 9.25rem;
-  text-align: left;
-  border: 1px solid var(--cs-line);
-  border-radius: 0.75rem;
-  background: #fff;
-  padding: 0.45rem;
-  cursor: pointer;
-  touch-action: manipulation;
-  box-shadow: 0 4px 14px rgba(56, 32, 16, 0.04);
-}
-
-.staff-pos-page .staff-pos-product:active,
-.staff-pos-page .staff-pos-product:focus-visible {
-  border-color: color-mix(in srgb, var(--cs-orange) 35%, transparent);
-  background: color-mix(in srgb, var(--cs-orange) 4%, #fff);
-  outline: none;
-  transform: translateY(1px);
-}
-
-.staff-pos-page .staff-pos-product-media {
-  display: block;
-  width: 100%;
-  height: 5.5rem;
-  overflow: hidden;
-  border-radius: 0.55rem;
-  background: color-mix(in srgb, var(--cs-cream, #f7f1ea) 80%, #fff);
-}
-
-.staff-pos-page .staff-pos-product-img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.staff-pos-page .staff-pos-product-img.is-packshot {
-  object-fit: contain;
-  padding: 0.35rem;
-  background: color-mix(in srgb, var(--cs-cream) 55%, #fff);
-}
-
-.staff-pos-page .staff-pos-product-mark {
-  display: inline-flex;
-  width: 2.35rem;
-  height: 2.35rem;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.55rem;
-  background: color-mix(in srgb, var(--cs-orange) 10%, #fff);
-  color: var(--cs-orange);
-  font-size: 0.95rem;
-  font-weight: 800;
-}
-
-.staff-pos-page .staff-pos-product-copy {
-  display: grid;
-  gap: 0.22rem;
-  align-content: start;
-  min-width: 0;
-  padding: 0 0.15rem 0.15rem;
-}
-
-.staff-pos-page .staff-pos-product-name {
-  font-size: 0.88rem;
-  font-weight: 800;
-  line-height: 1.18;
-}
-
-.staff-pos-page .staff-pos-product-price {
-  display: inline-flex;
-  align-self: flex-start;
-  padding: 0.12rem 0.38rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--cs-cream) 75%, #fff);
-  color: color-mix(in srgb, var(--cs-brown) 62%, var(--cs-beige));
-  font-size: 0.74rem;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-
-.staff-pos-page .staff-pos-cart {
-  gap: 0.35rem;
-}
-
-.staff-pos-page .staff-pos-cart-line {
-  display: grid;
-  gap: 0.28rem;
-  padding: 0.4rem 0.45rem;
-  border: 1px solid var(--cs-line);
-  border-radius: 0.55rem;
-  background: color-mix(in srgb, var(--cs-cream) 40%, #fff);
-}
-
-.staff-pos-page .staff-pos-cart-info {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-  align-items: baseline;
-}
-
-.staff-pos-page .staff-pos-cart-name {
-  margin: 0;
-  font-size: 0.84rem;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.staff-pos-page .staff-pos-cart-amount {
-  margin: 0;
-  font-size: 0.84rem;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  border-radius: 0 0 0.85rem 0.85rem;
+  margin-left: -0.75rem;
+  margin-right: -0.75rem;
+  margin-bottom: -0.75rem;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  padding-bottom: 0.75rem;
 }
 
 .staff-pos-page .staff-pos-cart-actions {
@@ -5019,12 +6170,12 @@ a.staff-home-card:focus-visible {
 
 .staff-pos-page .staff-pos-place {
   width: 100%;
-  min-height: 3rem;
-  border-radius: 0.65rem;
+  min-height: 3.25rem;
+  border-radius: 0.85rem;
   background: var(--cs-orange);
   border: 1px solid var(--cs-orange);
   color: #fff;
-  font-size: 0.94rem;
+  font-size: 0.98rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -5493,7 +6644,11 @@ a.staff-home-card:focus-visible {
   --cs-beige: #b0a098;
   --cs-cream: #faf7f4;
   --cs-surface: #ffffff;
+  --cs-panel: #fffdfa;
   --cs-line: rgba(56, 32, 16, 0.12);
+  --cs-shadow: 0 10px 28px rgba(56, 32, 16, 0.06);
+  --cs-radius-panel: 0.65rem;
+  --cs-radius-control: 0.3rem;
   min-height: 100vh;
   background: var(--cs-cream);
   color: var(--cs-brown);
@@ -5504,8 +6659,8 @@ a.staff-home-card:focus-visible {
   top: 0;
   z-index: 30;
   border-bottom: 1px solid var(--cs-line);
-  background: color-mix(in srgb, var(--cs-surface) 94%, transparent);
-  backdrop-filter: blur(10px);
+  background: var(--cs-surface);
+  backdrop-filter: none;
 }
 
 .staff-shell-bar {
@@ -5513,39 +6668,39 @@ a.staff-home-card:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.85rem 1rem;
-  padding: 0.85rem 1.15rem 0.55rem;
+  gap: 0.35rem 0.55rem;
+  padding: 0.38rem 0.7rem 0.22rem;
 }
 
 .staff-shell-brand {
   margin: 0;
   color: var(--cs-beige);
-  font-size: 0.72rem;
+  font-size: 0.6rem;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
 }
 
 .staff-shell-title {
-  margin: 0.15rem 0 0;
+  margin: 0;
   color: var(--cs-brown);
   font-family: "DM Sans", system-ui, sans-serif;
-  font-size: 1.35rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 
 .staff-shell-user {
-  margin: 0.2rem 0 0;
+  margin: 0.03rem 0 0;
   color: var(--cs-beige);
-  font-size: 0.84rem;
+  font-size: 0.7rem;
 }
 
 .staff-shell-tools {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.35rem;
 }
 
 .staff-notif {
@@ -5558,12 +6713,12 @@ a.staff-home-card:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.65rem;
-  height: 2.65rem;
-  min-width: 2.65rem;
-  min-height: 2.65rem;
+  width: 2rem;
+  height: 2rem;
+  min-width: 2rem;
+  min-height: 2rem;
   border: 1px solid var(--cs-line, rgba(17, 17, 18, 0.1));
-  border-radius: 0.75rem;
+  border-radius: var(--cs-radius-control, 0.3rem);
   background: #fff;
   color: var(--cs-brown, #382010);
   cursor: pointer;
@@ -5765,14 +6920,14 @@ a.staff-home-card:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.5rem;
-  padding: 0.45rem 0.9rem;
+  min-height: 2rem;
+  padding: 0.26rem 0.6rem;
   border: 1px solid var(--cs-line);
-  border-radius: 0.75rem;
+  border-radius: var(--cs-radius-control);
   background: var(--cs-surface);
   color: var(--cs-brown);
   font: inherit;
-  font-size: 0.88rem;
+  font-size: 0.78rem;
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
@@ -5788,9 +6943,10 @@ a.staff-home-card:focus-visible {
 
 .staff-shell-nav {
   display: flex;
-  gap: 0.35rem;
+  align-items: center;
+  gap: 0.25rem;
   overflow-x: auto;
-  padding: 0 1.15rem 0.85rem;
+  padding: 0 0.7rem 0.35rem;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
 }
@@ -5800,11 +6956,11 @@ a.staff-home-card:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.5rem;
-  padding: 0.45rem 0.95rem;
-  border-radius: 999px;
+  min-height: 1.95rem;
+  padding: 0.26rem 0.7rem;
+  border-radius: var(--cs-radius-control);
   color: var(--cs-brown);
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
@@ -5821,6 +6977,89 @@ a.staff-home-card:focus-visible {
   color: #fff;
 }
 
+.staff-shell-more {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.staff-shell-more-summary {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.95rem;
+  padding: 0.26rem 0.7rem;
+  border-radius: var(--cs-radius-control);
+  color: var(--cs-brown);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.staff-shell-more-summary::-webkit-details-marker {
+  display: none;
+}
+
+.staff-shell-more-summary:hover,
+.staff-shell-more-summary:focus-visible {
+  background: color-mix(in srgb, var(--cs-beige) 22%, #fff);
+  outline: none;
+}
+
+.staff-shell-more.is-active > .staff-shell-more-summary,
+.staff-shell-more[open] > .staff-shell-more-summary {
+  background: color-mix(in srgb, var(--cs-orange) 12%, #fff);
+  color: var(--cs-orange);
+}
+
+.staff-shell-more-panel {
+  position: absolute;
+  top: calc(100% + 0.28rem);
+  right: 0;
+  z-index: 40;
+  min-width: 10.5rem;
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.35rem;
+  border: 1px solid var(--cs-line);
+  border-radius: var(--cs-radius-panel);
+  background: var(--cs-surface);
+  box-shadow: var(--cs-shadow);
+}
+
+.staff-shell-more-link {
+  display: flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--cs-radius-control);
+  color: var(--cs-brown);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 0;
+  background: transparent;
+}
+
+.staff-shell-more-link:hover,
+.staff-shell-more-link:focus-visible {
+  background: color-mix(in srgb, var(--cs-beige) 18%, #fff);
+  outline: none;
+}
+
+.staff-shell-more-link.is-active {
+  background: color-mix(in srgb, var(--cs-orange) 12%, #fff);
+  color: var(--cs-orange);
+}
+
+.staff-shell-more-link.staff-shell-logout {
+  margin-top: 0.15rem;
+  border-top: 1px solid var(--cs-line);
+  border-radius: 0 0 var(--cs-radius-control) var(--cs-radius-control);
+  color: color-mix(in srgb, var(--cs-brown) 75%, var(--cs-beige));
+}
+
 .staff-shell-body {
   width: 100%;
 }
@@ -5828,9 +7067,22 @@ a.staff-home-card:focus-visible {
 .staff-app .staff-home-main,
 .staff-app .staff-admin-main,
 .staff-app .staff-pos-main {
-  width: min(calc(100% - 2rem), 72rem);
+  width: min(calc(100% - 1.5rem), 72rem);
   margin: 0 auto;
-  padding: 1.25rem 0 3rem;
+  padding: 0.85rem 0 2rem;
+}
+
+/* POS fullscreen: don't constrain main width/height or scroll breaks */
+.staff-app:has(.staff-pos-shell-root) .staff-pos-main {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0.65rem 0.75rem 0.75rem;
+  display: flex;
+  flex-direction: column;
 }
 
 .staff-app .staff-home-lede,
@@ -5845,7 +7097,11 @@ a.staff-home-card:focus-visible {
   --cs-beige: #b0a098;
   --cs-cream: #faf7f4;
   --cs-surface: #ffffff;
+  --cs-panel: #fffdfa;
   --cs-line: rgba(56, 32, 16, 0.14);
+  --cs-shadow: 0 10px 28px rgba(56, 32, 16, 0.06);
+  --cs-radius-panel: 0.65rem;
+  --cs-radius-control: 0.3rem;
   color: var(--cs-brown);
 }
 
@@ -5858,8 +7114,6 @@ a.staff-home-card:focus-visible {
 
 .staff-app:has(.staff-orders-shell-root) .staff-shell {
   flex: 0 0 auto;
-  backdrop-filter: none;
-  background: var(--cs-surface);
 }
 
 .staff-app:has(.staff-orders-shell-root) .staff-shell-body {
@@ -5868,46 +7122,6 @@ a.staff-home-card:focus-visible {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-}
-
-.staff-app:has(.staff-orders-shell-root) .staff-shell-bar {
-  gap: 0.35rem 0.55rem;
-  padding: 0.38rem 0.7rem 0.22rem;
-}
-
-.staff-app:has(.staff-orders-shell-root) .staff-shell-brand {
-  font-size: 0.6rem;
-  letter-spacing: 0.11em;
-}
-
-.staff-app:has(.staff-orders-shell-root) .staff-shell-title {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.staff-app:has(.staff-orders-shell-root) .staff-shell-user {
-  margin: 0.03rem 0 0;
-  font-size: 0.7rem;
-}
-
-.staff-app:has(.staff-orders-shell-root) .staff-shell-tool,
-.staff-app:has(.staff-orders-shell-root) .staff-shell-logout {
-  min-height: 2rem;
-  padding: 0.26rem 0.6rem;
-  border-radius: 0.3rem;
-  font-size: 0.78rem;
-}
-
-.staff-app:has(.staff-orders-shell-root) .staff-shell-nav {
-  padding: 0 0.7rem 0.35rem;
-  gap: 0.25rem;
-}
-
-.staff-app:has(.staff-orders-shell-root) .staff-shell-nav-link {
-  min-height: 1.95rem;
-  padding: 0.26rem 0.7rem;
-  border-radius: 0.3rem;
-  font-size: 0.8rem;
 }
 
 .staff-orders-page .staff-orders-kds-pill {
@@ -6028,26 +7242,39 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-orders-page .staff-orders-workboard {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.4rem;
   height: 100%;
   min-height: 0;
   overflow: hidden;
 }
 
-.staff-orders-page .staff-orders-kds-new {
-  flex: 1 1 auto;
-  min-height: 0;
+.staff-orders-page .staff-orders-kds-lane {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  border: 1px solid color-mix(in srgb, var(--cs-orange) 38%, var(--cs-line));
-  border-top: 4px solid var(--cs-orange);
-  border-radius: 0.35rem;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--cs-orange) 7%, #fff), #fff 28%);
-  box-shadow: 0 10px 24px rgba(248, 80, 32, 0.06);
+  min-height: 0;
+  border: 1px solid var(--cs-line);
+  border-radius: var(--cs-radius-panel, 0.65rem);
+  background: var(--cs-panel, #fffdfa);
+  box-shadow: var(--cs-shadow, 0 10px 28px rgba(56, 32, 16, 0.06));
   overflow: hidden;
+}
+
+.staff-orders-page .staff-orders-kds-lane--new {
+  border-color: color-mix(in srgb, var(--cs-orange) 38%, var(--cs-line));
+  border-top: 3px solid var(--cs-orange);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--cs-orange) 7%, #fff), var(--cs-panel, #fffdfa) 28%);
+}
+
+.staff-orders-page .staff-orders-kds-lane--preparing {
+  border-top: 3px solid #8a7468;
+}
+
+.staff-orders-page .staff-orders-kds-lane--ready {
+  border-top: 3px solid var(--cs-brown);
 }
 
 .staff-orders-page .staff-orders-kds-head {
@@ -6055,8 +7282,9 @@ a.staff-home-card:focus-visible {
   align-items: center;
   gap: 0.4rem;
   flex: 0 0 auto;
-  padding: 0.28rem 0.45rem;
+  padding: 0.32rem 0.5rem;
   border-bottom: 1px solid var(--cs-line);
+  background: color-mix(in srgb, var(--cs-surface) 88%, transparent);
 }
 
 .staff-orders-page .staff-orders-kds-head-main {
@@ -6111,59 +7339,16 @@ a.staff-home-card:focus-visible {
   color: var(--cs-orange);
 }
 
-.staff-orders-page .staff-orders-new-grid {
+.staff-orders-page .staff-orders-lane-grid {
   flex: 1 1 auto;
   min-height: 0;
-  display: flex;
-  flex-wrap: nowrap;
-  align-content: stretch;
-  align-items: stretch;
-  gap: 0.45rem;
-  padding: 0.4rem;
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-}
-
-.staff-orders-page .staff-orders-kds-queues {
-  flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.35rem;
-  min-height: 0;
-  margin-top: 0.32rem;
-  padding-top: 0;
-  border-top: 2px solid var(--cs-line);
-}
-
-.staff-orders-page .staff-orders-kds-strip {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  min-width: 0;
-  border: 1px solid var(--cs-line);
-  border-radius: 0.22rem;
-  background: var(--cs-surface);
-}
-
-.staff-orders-page .staff-orders-kds-strip#orders-preparing {
-  border-top: 2px solid #8a7468;
-}
-
-.staff-orders-page .staff-orders-kds-strip#orders-ready {
-  border-top: 2px solid var(--cs-brown);
-}
-
-.staff-orders-page .staff-orders-strip-grid {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: stretch;
   align-content: flex-start;
-  gap: 0.32rem;
-  padding: 0.32rem;
+  gap: 0.35rem;
+  padding: 0.4rem;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
@@ -6180,19 +7365,17 @@ a.staff-home-card:focus-visible {
 .staff-orders-page .staff-order-ticket {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: none;
+  flex: 0 0 auto;
   height: auto;
   margin: 0;
   border: 1px solid var(--cs-line);
-  border-radius: 0.2rem;
+  border-radius: var(--cs-radius-control, 0.3rem);
   background: #fff;
 }
 
 .staff-orders-page .staff-order-ticket--received {
-  flex: 0 0 14.5rem;
-  width: 14.5rem;
-  max-width: 14.5rem;
-  min-height: 100%;
-  flex-shrink: 0;
   border-left: 3px solid var(--cs-orange);
   overflow: visible;
 }
@@ -6469,20 +7652,6 @@ a.staff-home-card:focus-visible {
   background: color-mix(in srgb, var(--cs-cream) 40%, #fff);
 }
 
-.staff-orders-page .staff-order-ticket--compact {
-  flex: 0 0 12.5rem;
-  width: 12.5rem;
-  max-width: 12.5rem;
-  flex-shrink: 0;
-}
-
-.staff-orders-page .staff-order-ticket--handoff {
-  flex: 0 0 13rem;
-  width: 13rem;
-  max-width: 13rem;
-  flex-shrink: 0;
-}
-
 .staff-orders-page .staff-order-ticket--compact .staff-order-actions {
   padding: 0.26rem 0.3rem 0.3rem;
 }
@@ -6690,25 +7859,39 @@ a.staff-home-card:focus-visible {
 .staff-mark-paid-modal-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.65rem;
+  gap: 0.5rem;
 }
 
 .staff-mark-paid-option {
-  min-height: 3.5rem;
-  border: 1px solid #ece4dc;
-  border-radius: 0.85rem;
+  min-height: 3.15rem;
+  border: 1px solid var(--cs-line, #ece4dc);
+  border-radius: var(--cs-radius-control, 0.3rem);
   background: #fff;
-  color: #2d2018;
+  color: var(--cs-brown, #2d2018);
   font-family: "DM Sans", sans-serif;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 700;
   cursor: pointer;
 }
 
 .staff-mark-paid-option.is-suggested {
-  border-color: color-mix(in srgb, #c4783a 50%, #ece4dc);
-  background: color-mix(in srgb, #c4783a 8%, #fff);
-  color: #9a4f1f;
+  border-color: color-mix(in srgb, var(--cs-orange, #f85020) 45%, transparent);
+  background: color-mix(in srgb, var(--cs-orange, #f85020) 9%, #fff);
+  color: var(--cs-orange, #f85020);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-orange, #f85020) 12%, transparent);
+}
+
+.staff-mark-paid-option--escape {
+  grid-column: 1 / -1;
+  min-height: 2.45rem;
+  border-style: dashed;
+  color: color-mix(in srgb, var(--cs-brown, #2d2018) 65%, var(--cs-beige, #b0a098));
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.staff-mark-paid-option--escape.is-suggested {
+  border-style: solid;
 }
 
 .staff-mark-paid-option:active {
@@ -6841,50 +8024,32 @@ a.staff-home-card:focus-visible {
   .staff-orders-page .staff-orders-workboard {
     overflow-y: auto;
     overscroll-behavior: contain;
+    align-content: start;
   }
 
-  .staff-orders-page .staff-orders-kds-queues {
-    grid-template-columns: 1fr;
+  .staff-orders-page .staff-orders-kds-lane {
+    min-height: 12rem;
+    max-height: min(42vh, 22rem);
   }
 
-  .staff-orders-page .staff-orders-new-grid {
-    overflow-x: auto;
-    overflow-y: hidden;
-  }
-
-  .staff-orders-page .staff-orders-kds-strip {
-    min-height: 8.5rem;
+  .staff-orders-page .staff-orders-kds-lane--new {
+    max-height: min(48vh, 26rem);
   }
 }
 
 @media (min-width: 900px) {
   .staff-orders-page .staff-orders-workboard {
-    display: grid;
-    grid-template-rows: minmax(0, 1.65fr) minmax(7.5rem, 34vh);
-    gap: 0.4rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.45rem;
     overflow: hidden;
   }
 
-  .staff-orders-page .staff-orders-kds-new {
-    min-height: 0;
+  .staff-orders-page .staff-orders-kds-lane {
+    height: 100%;
+    max-height: none;
   }
 
-  .staff-orders-page .staff-orders-kds-queues {
-    margin-top: 0;
-    border-top: none;
-    min-height: 0;
-    max-height: 34vh;
-    align-self: stretch;
-    overflow: hidden;
-  }
-
-  .staff-orders-page .staff-orders-kds-strip {
-    min-height: 0;
-    max-height: 100%;
-    overflow: hidden;
-  }
-
-  .staff-orders-page .staff-orders-strip-grid {
+  .staff-orders-page .staff-orders-lane-grid {
     overflow-y: auto;
     overscroll-behavior: contain;
   }

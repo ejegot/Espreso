@@ -21,7 +21,8 @@ defmodule Espreso.CoffeeSpotTest do
 
     assert message =~ "Hi CoffeeSpot! New order"
     assert message =~ "Name: Juan"
-    assert message =~ "Type: Dine-in · Table 7"
+    assert message =~ "Type: Dine-in"
+    refute message =~ "Table 7"
     assert message =~ "• 1x Espresso — ₱75"
     assert message =~ "• 2x Americano (12oz) — ₱240"
     assert message =~ "Total: ₱315"
@@ -40,7 +41,7 @@ defmodule Espreso.CoffeeSpotTest do
       })
 
     assert message =~ "Name: Ana"
-    assert message =~ "Type: Pickup at counter"
+    assert message =~ "Type: Takeout"
     refute message =~ "Notes:"
   end
 
@@ -59,7 +60,8 @@ defmodule Espreso.CoffeeSpotTest do
     assert String.starts_with?(url, "https://wa.me/639566728906?text=")
     assert url =~ URI.encode_www_form("Espresso")
     assert url =~ URI.encode_www_form("₱75")
-    assert url =~ URI.encode_www_form("Table 3")
+    assert url =~ URI.encode_www_form("Dine-in")
+    refute url =~ URI.encode_www_form("Table 3")
   end
 
   test "contact helpers resolve from default business settings" do
