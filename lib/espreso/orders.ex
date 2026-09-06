@@ -503,7 +503,7 @@ defmodule Espreso.Orders do
         {:error, :not_found}
 
       %Order{} = current ->
-        if status == "ready" and unpaid?(current) do
+        if status in ["preparing", "ready"] and unpaid?(current) do
           {:error, :payment_required}
         else
           current
@@ -764,7 +764,7 @@ defmodule Espreso.Orders do
   def format_total(%Order{total: total}), do: Menu.format_price(total)
 
   def fulfillment_label("dine_in"), do: "Dine-in"
-  def fulfillment_label("pickup"), do: "Pickup at counter"
+  def fulfillment_label("pickup"), do: "Takeout"
   def fulfillment_label(_), do: "Order"
 
   def status_label("received"), do: "Received"

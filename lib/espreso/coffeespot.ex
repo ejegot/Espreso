@@ -177,12 +177,9 @@ defmodule Espreso.CoffeeSpot do
 
     type_line =
       case fulfillment do
-        :dine_in ->
-          table = checkout |> Map.get(:table_number, "") |> to_string() |> String.trim()
-          "Type: Dine-in · Table #{table}"
-
-        _ ->
-          "Type: Pickup at counter"
+        :dine_in -> "Type: Dine-in"
+        "dine_in" -> "Type: Dine-in"
+        _ -> "Type: Takeout"
       end
 
     name_line = if name != "", do: "Name: #{name}\n", else: ""

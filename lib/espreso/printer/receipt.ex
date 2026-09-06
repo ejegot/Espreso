@@ -197,12 +197,8 @@ defmodule Espreso.Printer.Receipt do
 
   defp customer_line(_), do: "Name: Walk-in"
 
-  defp fulfillment_line(%{fulfillment: "dine_in", table_number: table})
-       when is_binary(table) and table != "",
-       do: "Dine in - Table #{table}"
-
-  defp fulfillment_line(%{fulfillment: "dine_in"}), do: "Dine in"
-  defp fulfillment_line(_), do: "Pickup"
+  defp fulfillment_line(%{fulfillment: "dine_in"}), do: "Dine-in"
+  defp fulfillment_line(_), do: "Takeout"
 
   defp timestamp_line(%{inserted_at: %NaiveDateTime{} = at}) do
     hour12 = rem(at.hour + 11, 12) + 1

@@ -192,9 +192,10 @@ defmodule EspresoWeb.StaffAuthTest do
         payment_method: :counter
       })
 
+    assert {:ok, _} = Orders.mark_paid(preparing)
     {:ok, _} = Orders.update_status(preparing, "preparing")
 
-    expected_orders_body = "2 active · 1 received · 1 preparing · 2 unpaid"
+    expected_orders_body = "2 active · 1 received · 1 preparing · 1 unpaid"
 
     {:ok, owner_view, _html} = live(log_in(conn, owner), ~p"/dashboard")
 
@@ -422,6 +423,7 @@ defmodule EspresoWeb.StaffAuthTest do
         }
       )
 
+    assert {:ok, _} = Orders.mark_paid(order)
     {:ok, preparing} = Orders.update_status(order, "preparing")
 
     for user <- [owner, manager, barista] do
@@ -483,6 +485,9 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(view, ".staff-shell-title", "Orders")
     assert has_element?(view, "#staff-nav-orders.is-active", "Orders")
     assert has_element?(view, "#staff-nav-pos", "POS")
+    assert has_element?(view, "#staff-nav-home", "Home")
+    assert has_element?(view, "#staff-shell-more")
+    assert has_element?(view, "#staff-nav-logout", "Log out")
     refute has_element?(view, "#staff-nav-dashboard")
     refute has_element?(view, "#staff-nav-staff")
   end
@@ -508,6 +513,7 @@ defmodule EspresoWeb.StaffAuthTest do
     {:ok, admin, _html} = live(conn, ~p"/admin/users")
     assert has_element?(admin, ".staff-shell-title", "Staff")
     assert has_element?(admin, "#staff-nav-staff.is-active", "Staff")
+    assert has_element?(admin, "#staff-shell-more.is-active")
   end
 
   test "staff cannot open admin users", %{conn: conn, barista: barista} do

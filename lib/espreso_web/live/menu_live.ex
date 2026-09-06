@@ -1219,37 +1219,13 @@ defmodule EspresoWeb.MenuLive do
                         phx-value-type="pickup"
                         aria-pressed={to_string(@fulfillment_touched? and @fulfillment == :pickup)}
                       >
-                        Pickup
+                        Takeout
                       </button>
                     </div>
                     <p :if={@fulfillment == :pickup} class="menu-checkout-hint" id="checkout-pickup-hint">
-                      Pick up at counter when ready.
+                      Takeout — pick up at the counter when ready.
                     </p>
                   </fieldset>
-
-                  <div :if={@fulfillment == :dine_in} class="menu-checkout-field">
-                    <label class="menu-checkout-label" for="checkout-table">Table number</label>
-                    <input
-                      id="checkout-table"
-                      type="number"
-                      name="table_number"
-                      inputmode="numeric"
-                      pattern="[0-9]*"
-                      min="1"
-                      max="99"
-                      value={@table_number}
-                      placeholder="e.g. 7"
-                      class={[
-                        "menu-checkout-input",
-                        "menu-checkout-input--table",
-                        @checkout_errors[:table_number] && "is-error"
-                      ]}
-                      phx-debounce="200"
-                    />
-                    <p :if={@checkout_errors[:table_number]} class="menu-checkout-error">
-                      {@checkout_errors[:table_number]}
-                    </p>
-                  </div>
 
                   <div class="menu-checkout-field">
                     <label class="menu-checkout-label" for="checkout-name">Your name</label>
@@ -2296,6 +2272,7 @@ defmodule EspresoWeb.MenuLive do
       {n, ""} when n in 1..99 ->
         socket
         |> assign(:fulfillment, :dine_in)
+        |> assign(:fulfillment_touched?, true)
         |> assign(:table_number, Integer.to_string(n))
 
       _ ->
@@ -2531,13 +2508,8 @@ defmodule EspresoWeb.MenuLive do
   defp checkout_summary_error(errors) when errors == %{}, do: nil
 
   defp checkout_summary_error(errors) when is_map(errors) do
-    has_name? = Map.has_key?(errors, :customer_name)
-    has_table? = Map.has_key?(errors, :table_number)
-
     cond do
-      has_name? and has_table? -> "Enter your name and table number."
-      has_name? -> "Please enter your name."
-      has_table? -> "Enter your table number."
+      Map.has_key?(errors, :customer_name) -> "Please enter your name."
       true -> errors |> Map.values() |> List.first()
     end
   end
@@ -2554,19 +2526,7 @@ defmodule EspresoWeb.MenuLive do
         Map.put(errors, :customer_name, "Please enter your name")
       end
 
-    case assigns.fulfillment do
-      :dine_in ->
-        case Integer.parse(String.trim(to_string(assigns.table_number))) do
-          {n, ""} when n in 1..99 ->
-            errors
-
-          _ ->
-            Map.put(errors, :table_number, "Enter your table number (1–99)")
-        end
-
-      _ ->
-        errors
-    end
+    errors
   end
 
   defp checkout_errors_from_changeset(changeset) do
@@ -2736,7 +2696,7 @@ defmodule EspresoWeb.MenuLive do
     attrs = %{
       customer_name: socket.assigns.customer_name,
       fulfillment: socket.assigns.fulfillment,
-      table_number: socket.assigns.table_number,
+      table_number: nil,
       notes: socket.assigns.notes,
       payment_method: payment_method
     }

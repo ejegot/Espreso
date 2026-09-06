@@ -80,8 +80,13 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-product-#{espresso.id}", "Espresso")
     assert html =~ "Espresso"
     refute html =~ "Hidden Mocha"
-    assert has_element?(view, "#pos-category-HOT")
-    assert has_element?(view, "#pos-category-COLD")
+    assert has_element?(view, "#pos-category-HOT", "Hot coffee")
+    assert has_element?(view, "#pos-category-COLD", "Iced coffee")
+    assert has_element?(view, "#pos-catalog-title", "Categories")
+    refute has_element?(view, "#pos-category-ALL")
+    refute render(view) =~ ">All</span>"
+    refute has_element?(view, "#pos-notes-toggle")
+    assert has_element?(view, "#pos-ticket.is-empty")
   end
 
   test "category selection switches product list", %{
@@ -108,8 +113,17 @@ defmodule EspresoWeb.StaffPosLiveTest do
   } do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
+    assert has_element?(view, "#pos-product-#{espresso.id}", "Regular")
+    assert has_element?(view, "#pos-product-#{espresso.id} .staff-pos-size-chips", "Regular")
+    refute has_element?(view, "#pos-product-#{espresso.id} .staff-pos-product-sizes--empty")
+    refute has_element?(view, "#pos-product-#{espresso.id} .staff-pos-product-desc")
+    refute has_element?(view, "#pos-card-qty-#{espresso.id}")
+    assert has_element?(view, "#pos-product-#{espresso.id}[aria-label='Add Espresso']")
+
     view |> element("#pos-product-#{espresso.id}") |> render_click()
 
+    assert has_element?(view, "#pos-product-#{espresso.id}[aria-label='Added Espresso']")
+    assert has_element?(view, "#pos-product-#{espresso.id}.is-added")
     assert has_element?(view, "#pos-cart-lines", "Espresso")
     assert has_element?(view, "#pos-total", "₱75")
 
@@ -126,18 +140,20 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-cart-empty")
   end
 
-  test "multi-price product requires size selection", %{
+  test "multi-price product selects size on card then add to cart", %{
     conn: conn,
     barista: barista,
     americano: americano
   } do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
-    view |> element("#pos-product-#{americano.id}") |> render_click()
-    assert has_element?(view, "#pos-size-picker", "Americano")
+    assert has_element?(view, "#pos-product-#{americano.id}", "Americano")
+    assert has_element?(view, "#pos-product-#{americano.id} .staff-pos-size-chips")
+    refute has_element?(view, "#pos-size-picker")
 
     price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
     view |> element("#pos-size-#{price_12.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
 
     assert has_element?(view, "#pos-cart-lines", "Americano")
     assert has_element?(view, "#pos-cart-lines", "12oz")
@@ -160,10 +176,10 @@ defmodule EspresoWeb.StaffPosLiveTest do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
     view |> element("#pos-product-#{espresso.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
 
     price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
     view |> element("#pos-size-#{price_12.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
 
     espresso_key = "#{espresso.id}-#{hd(espresso.product_prices).id}"
 
@@ -174,8 +190,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> element("#pos-place-order") |> render_click()
 
     assert has_element?(view, "#pos-place-flash")
-    assert has_element?(view, "#pos-place-flash", "Received")
-    assert has_element?(view, "#pos-place-flash", "Pay at counter")
+    assert has_element?(view, "#pos-place-flash", "Paid at counter")
     assert has_element?(view, "#pos-cart-empty")
     assert has_element?(view, "#pos-place-order[disabled]")
     refute has_element?(view, "#pos-confirmation")
@@ -189,8 +204,9 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert order.customer_name == "Walk-in"
     assert order.fulfillment == "pickup"
     assert order.payment_method == "counter"
-    assert order.payment_status == "unpaid"
-    assert order.status == "received"
+    assert order.payment_status == "paid"
+    assert order.paid_via == "cash"
+    assert order.status == "preparing"
     assert Decimal.equal?(order.total, Decimal.new("270"))
     assert length(order.items) == 2
 
@@ -200,25 +216,24 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> element("#pos-place-flash-dismiss") |> render_click()
 
     assert has_element?(view, "#pos-cart-empty")
-    assert has_element?(view, "#pos-payment-unpaid.is-active", "Unpaid")
+    assert has_element?(view, "#pos-pay-cash.is-active", "Cash")
     refute has_element?(view, "#pos-place-flash")
   end
 
-  test "POS defaults to unpaid and can place paid counter order", %{
+  test "POS defaults to paid and can place paid counter order", %{
     conn: conn,
     barista: barista,
     espresso: espresso
   } do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
-    assert has_element?(view, "#pos-payment-unpaid.is-active", "Unpaid")
-    refute has_element?(view, "#pos-payment-paid.is-active")
+    assert has_element?(view, "#pos-staff", "Staff")
+    assert has_element?(view, "#pos-pay-cash.is-active", "Cash")
+    refute has_element?(view, "#pos-pay-later")
+    refute has_element?(view, "#pos-pay-maya")
+    refute has_element?(view, "#pos-cash-helper")
 
     view |> element("#pos-product-#{espresso.id}") |> render_click()
-    view |> element("#pos-payment-paid") |> render_click()
-
-    assert has_element?(view, "#pos-payment-paid.is-active", "Paid")
-
     view |> element("#pos-place-order") |> render_click()
 
     assert has_element?(view, "#pos-place-flash", "Paid at counter")
@@ -231,7 +246,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert order.status == "preparing"
   end
 
-  test "POS paid tender can be GCash; dine-in requires table", %{
+  test "POS paid tender can be GCash; dine-in needs no table", %{
     conn: conn,
     barista: barista,
     espresso: espresso
@@ -240,30 +255,23 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     view |> element("#pos-product-#{espresso.id}") |> render_click()
     view |> element("#pos-fulfillment-dine-in") |> render_click()
-    assert has_element?(view, "#pos-table-number")
+    refute has_element?(view, "#pos-table-number")
+    assert has_element?(view, "#pos-fulfillment-pickup", "Takeout")
 
-    view |> element("#pos-place-order") |> render_click()
-    assert has_element?(view, "#pos-error", "table number")
-
-    view
-    |> element("#pos-table-number")
-    |> render_change(%{"table_number" => "5"})
-
-    view |> element("#pos-payment-paid") |> render_click()
-    view |> element("#pos-paid-via-gcash") |> render_click()
+    view |> element("#pos-pay-gcash") |> render_click()
     view |> element("#pos-place-order") |> render_click()
 
     assert has_element?(view, "#pos-place-flash")
 
     [order] = Orders.list_active_orders()
     assert order.fulfillment == "dine_in"
-    assert order.table_number == "5"
+    assert order.table_number in [nil, ""]
     assert order.payment_status == "paid"
     assert order.paid_via == "gcash"
     assert order.status == "preparing"
   end
 
-  test "POS cash tendered shows change and blocks short cash", %{
+  test "POS cash payment has no cash-received helper and places paid order", %{
     conn: conn,
     barista: barista,
     espresso: espresso
@@ -271,29 +279,18 @@ defmodule EspresoWeb.StaffPosLiveTest do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
     view |> element("#pos-product-#{espresso.id}") |> render_click()
-    view |> element("#pos-payment-paid") |> render_click()
-    assert has_element?(view, "#pos-cash-helper")
-    assert has_element?(view, "#pos-cash-chips")
+    assert has_element?(view, "#pos-pay-cash.is-active", "Cash")
+    refute has_element?(view, "#pos-cash-helper")
+    refute has_element?(view, "#pos-cash-chips")
+    refute has_element?(view, "#pos-cash-tendered")
 
-    view |> element("#pos-cash-exact") |> render_click()
-    assert has_element?(view, "#pos-cash-change", "Exact")
-
-    view
-    |> element("#pos-cash-tendered")
-    |> render_change(%{"cash_tendered" => "50"})
-
-    assert has_element?(view, "#pos-cash-change.is-short", "Short")
     view |> element("#pos-place-order") |> render_click()
-    assert has_element?(view, "#pos-error", "Cash tendered is less than the total.")
+    assert has_element?(view, "#pos-place-flash", "Paid at counter")
 
-    view
-    |> element("#pos-cash-tendered")
-    |> render_change(%{"cash_tendered" => "100"})
-
-    assert has_element?(view, "#pos-cash-change", "Change")
-    view |> element("#pos-place-order") |> render_click()
-    assert has_element?(view, "#pos-place-flash", "Change")
-    assert has_element?(view, "#pos-cart-empty")
+    [order] = Orders.list_active_orders()
+    assert order.payment_status == "paid"
+    assert order.paid_via == "cash"
+    assert order.status == "preparing"
   end
 
   test "Place Order creates exactly one order; repeated place_order while placing is ignored", %{
@@ -404,13 +401,16 @@ defmodule EspresoWeb.StaffPosLiveTest do
     |> element("#pos-customer-name")
     |> render_change(%{"customer_name" => "Maria"})
 
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    refute has_element?(view, "#pos-ticket.is-empty")
+    assert has_element?(view, "#pos-notes-toggle")
+
     view |> element("#pos-notes-toggle") |> render_click()
 
     view
     |> element("#pos-notes")
     |> render_change(%{"notes" => "Less ice"})
 
-    view |> element("#pos-product-#{espresso.id}") |> render_click()
     view |> element("#pos-place-order") |> render_click()
 
     assert has_element?(view, "#pos-place-flash", "Maria")
@@ -566,9 +566,10 @@ defmodule EspresoWeb.StaffPosLiveTest do
     espresso: espresso,
     americano: americano
   } do
-    {:ok, view, html} = live(log_in(conn, barista), ~p"/pos")
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
-    assert has_element?(view, "#pos-category-HOT.is-active", "HOT")
+    assert has_element?(view, "#pos-category-HOT.is-active", "Hot coffee")
+    assert has_element?(view, "#pos-catalog-title", "Categories")
     assert has_element?(view, "#pos-place-order", "Process Order")
     assert has_element?(view, "#pos-search-input")
     assert has_element?(view, "#pos-product-#{espresso.id}")
