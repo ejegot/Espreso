@@ -10798,6 +10798,18 @@ body:has(.home-page-landing) {
   font-weight: 500;
 }
 
+.menu-my-orders-when {
+  margin: 0.05rem 0 0;
+  color: color-mix(in srgb, #382010 48%, #b0a098);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.menu-my-orders-card--history .menu-my-orders-when {
+  color: color-mix(in srgb, #382010 55%, #b0a098);
+}
+
 .menu-my-orders-view {
   display: inline-flex;
   align-items: center;
