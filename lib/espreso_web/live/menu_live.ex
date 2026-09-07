@@ -1452,6 +1452,7 @@ defmodule EspresoWeb.MenuLive do
                       {customer_my_order_status_label(order)}
                     </p>
                   </div>
+                  <p class="menu-my-orders-when">{my_order_history_when(order)}</p>
                   <p class="menu-my-orders-meta">
                     {order.item_count} {if order.item_count == 1, do: "item", else: "items"} · {Menu.format_price(
                       order.total
@@ -1886,6 +1887,38 @@ defmodule EspresoWeb.MenuLive do
     orders
     |> Enum.filter(&(&1.status == "completed"))
     |> Enum.sort_by(& &1.inserted_at, {:desc, DateTime})
+  end
+
+  defp my_order_history_when(%{inserted_at: %DateTime{} = at}) do
+    manila = DateTime.add(at, 8 * 60 * 60, :second)
+    shop_today = Orders.shop_date_today()
+    order_date = DateTime.to_date(manila)
+
+    cond do
+      Date.compare(order_date, shop_today) == :eq ->
+        "Today · #{format_shop_time(manila)}"
+
+      Date.compare(order_date, Date.add(shop_today, -1)) == :eq ->
+        "Yesterday"
+
+      true ->
+        format_shop_date(manila)
+    end
+  end
+
+  defp my_order_history_when(_), do: ""
+
+  defp format_shop_time(%DateTime{} = manila) do
+    manila
+    |> Calendar.strftime("%I:%M %p")
+    |> String.trim_leading("0")
+  end
+
+  defp format_shop_date(%DateTime{} = manila) do
+    month = Calendar.strftime(manila, "%b")
+    day = manila.day
+    year = manila.year
+    "#{month} #{day}, #{year}"
   end
 
   defp my_orders_trigger_label(orders) do

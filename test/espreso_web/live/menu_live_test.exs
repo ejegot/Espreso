@@ -1498,6 +1498,7 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#menu-my-order-#{ready.number} .menu-my-orders-status--ready")
     assert has_element?(view, "#menu-my-order-#{completed.number}", "Picked up ✓")
     assert has_element?(view, "#menu-my-order-#{completed.number}", "3 items")
+    assert has_element?(view, "#menu-my-order-#{completed.number} .menu-my-orders-when", "Today")
     refute has_element?(view, "#menu-my-order-#{cancelled.number}")
     refute has_element?(view, "#menu-qr-my-orders")
 
