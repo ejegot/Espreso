@@ -3,23 +3,10 @@ defmodule EspresoWeb.HomeLive do
 
   alias Espreso.CoffeeSpot
 
-  @hero_images [
-    %{
-      src: "/images/coffeespot/cafe-atmosphere-01.jpg",
-      alt: "Outdoor seating at CoffeeSpot Lilac",
-      tilt: "left"
-    },
-    %{
-      src: "/images/coffeespot/visit-interior-01.jpg",
-      alt: "Coffee bar inside CoffeeSpot",
-      tilt: "center"
-    },
-    %{
-      src: "/images/coffeespot/cold-signature-01.jpg",
-      alt: "Cold drink at CoffeeSpot",
-      tilt: "right"
-    }
-  ]
+  @signature_image %{
+    src: "/images/coffeespot/signature-pure-tableya-portrait.jpg",
+    alt: "CoffeeSpot signature drink Pure Tableya"
+  }
 
   @instagram_images [
     "/images/coffeespot/IMG_3478.JPG",
@@ -34,7 +21,7 @@ defmodule EspresoWeb.HomeLive do
     {:ok,
      socket
      |> assign(:page_title, "CoffeeSpot")
-     |> assign(:hero_images, @hero_images)
+     |> assign(:signature_image, @signature_image)
      |> assign(:instagram_images, @instagram_images), layout: false}
   end
 
@@ -51,14 +38,20 @@ defmodule EspresoWeb.HomeLive do
           <p class="brune-hero-lede">{CoffeeSpot.tagline()}</p>
         </div>
 
-        <ul class="brune-hero-gallery" aria-hidden="true">
-          <li
-            :for={image <- @hero_images}
-            class={["brune-hero-shot", "brune-hero-shot--#{image.tilt}"]}
-          >
-            <img src={image.src} alt={image.alt} loading="eager" />
-          </li>
-        </ul>
+        <figure class="brune-hero-signature">
+          <img
+            src={@signature_image.src}
+            alt={@signature_image.alt}
+            width="1024"
+            height="1536"
+            loading="eager"
+          />
+          <p class="brune-hero-tradition">
+            <span class="brune-hero-tradition-line">More than a drink,</span>
+            <span class="brune-hero-tradition-line">A Filipino tradition.</span>
+            <span class="brune-hero-tradition-mark" aria-hidden="true"></span>
+          </p>
+        </figure>
 
         <div class="brune-hero-actions">
           <.link navigate={~p"/menu"} class="brune-primary-btn">View our menu</.link>
