@@ -401,6 +401,11 @@ Hooks.LandingCarousel = {
       dot.classList.toggle("is-active", active)
       dot.setAttribute("aria-selected", active ? "true" : "false")
     })
+
+    if (this.root) {
+      this.root.classList.toggle("menu-qr-landing--signature", index === 0)
+      this.root.classList.toggle("menu-qr-landing--visit", index === 1)
+    }
   }
 }
 

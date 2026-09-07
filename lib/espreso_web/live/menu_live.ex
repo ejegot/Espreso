@@ -405,8 +405,12 @@ defmodule EspresoWeb.MenuLive do
         (@detail || @basket_open? || @my_orders_open?) && "menu-page-locked"
       ]}
     >
-      <div :if={@menu_stage == :landing} id="menu-landing" class="menu-qr-landing">
-        <header class="menu-qr-landing-top menu-qr-top">
+      <div
+        :if={@menu_stage == :landing}
+        id="menu-landing"
+        class="menu-qr-landing menu-qr-landing--signature"
+      >
+        <header class="menu-qr-landing-top menu-qr-top" id="menu-landing-top">
           <p class="menu-qr-landing-top-brand menu-qr-top-brand">CoffeeSpot</p>
         </header>
 
@@ -418,23 +422,25 @@ defmodule EspresoWeb.MenuLive do
         >
           <section
             id="menu-landing-slide-welcome"
-            class="menu-qr-landing-slide"
-            aria-label="Welcome"
+            class="menu-qr-landing-slide menu-qr-landing-slide--signature"
+            aria-label="Pure Tableya, CoffeeSpot signature drink"
           >
             <div class="menu-qr-landing-media" aria-hidden="true">
               <img
-                src="/images/coffeespot/IMG_3498.png"
+                src="/images/coffeespot/signature-pure-tableya-portrait.jpg"
                 alt=""
-                class="menu-qr-landing-photo"
-                width="817"
-                height="1024"
+                class="menu-qr-landing-photo menu-qr-landing-photo--signature"
+                width="1024"
+                height="1536"
               />
             </div>
-            <div class="menu-qr-landing-scrim" aria-hidden="true"></div>
-            <div class="menu-qr-landing-copy">
-              <h1 class="menu-qr-landing-headline">Your coffee moment starts here.</h1>
-              <p class="menu-qr-landing-lede">Browse the menu. Order from your table.</p>
+            <div class="menu-qr-landing-scrim menu-qr-landing-scrim--signature" aria-hidden="true">
             </div>
+            <p class="menu-qr-landing-tradition">
+              <span class="menu-qr-landing-tradition-line">More than a drink,</span>
+              <span class="menu-qr-landing-tradition-line">A Filipino tradition.</span>
+              <span class="menu-qr-landing-tradition-mark" aria-hidden="true"></span>
+            </p>
           </section>
 
           <section

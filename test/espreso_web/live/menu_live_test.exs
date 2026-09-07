@@ -42,19 +42,23 @@ defmodule EspresoWeb.MenuLiveTest do
 
     assert html =~ "CoffeeSpot"
     assert has_element?(view, "#menu-landing")
+    assert has_element?(view, "#menu-landing.menu-qr-landing--signature")
     assert has_element?(view, ".menu-qr-landing-top-brand", "CoffeeSpot")
     assert has_element?(view, "#menu-landing-carousel[phx-hook='LandingCarousel']")
     assert has_element?(view, "#menu-landing-slide-welcome")
     assert has_element?(view, "#menu-landing-slide-visit")
-    assert has_element?(view, ".menu-qr-landing-headline", "Your coffee moment starts here.")
+    refute has_element?(view, ".menu-qr-landing-headline", "Your coffee moment starts here.")
     assert has_element?(view, ".menu-qr-landing-headline", "Visit CoffeeSpot")
-    assert has_element?(view, ".menu-qr-landing-lede", "Browse the menu. Order from your table.")
+    refute has_element?(view, ".menu-qr-landing-lede", "Browse the menu. Order from your table.")
     assert has_element?(view, "#menu-cta-view-menu", "Get Started")
     assert has_element?(view, "#menu-cta-visit-coffeespot", "See hours & directions")
     assert has_element?(
              view,
-             ~s(.menu-qr-landing-photo[src="/images/coffeespot/IMG_3498.png"])
+             ~s(.menu-qr-landing-photo--signature[src="/images/coffeespot/signature-pure-tableya-portrait.jpg"])
            )
+    assert has_element?(view, ".menu-qr-landing-tradition", "More than a drink,")
+    assert has_element?(view, ".menu-qr-landing-tradition", "A Filipino tradition.")
+    assert has_element?(view, ".menu-qr-landing-tradition-mark")
     assert has_element?(
              view,
              ~s(.menu-qr-landing-photo--visit[src="/images/coffeespot/IMG_3497.jpg"])
