@@ -50,6 +50,7 @@ defmodule EspresoWeb.OrderLiveTest do
 
     assert more_href == "/menu?stage=menu"
 
+    assert {:ok, _} = Orders.mark_paid(order)
     assert {:ok, preparing} = Orders.update_status(order, "preparing")
     assert has_element?(view, "#order-status-message", "Preparing your order")
     assert has_element?(view, "#order-hint", "We're preparing it — keep this screen for updates.")
@@ -62,7 +63,6 @@ defmodule EspresoWeb.OrderLiveTest do
 
     refute render(view) =~ "Received — kitchen has it"
 
-    assert {:ok, _} = Orders.mark_paid(preparing)
     assert {:ok, _} = Orders.update_status(preparing, "ready")
     assert has_element?(view, "#order-status-message", "Ready — please come to counter")
     assert has_element?(view, "#order-hint", "Show #{order.number} at the counter")
@@ -150,10 +150,10 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(
              view,
              "#order-confirm-lede",
-             "Your order is in. Pick it up at the counter when it's ready."
+             "Your order is in. Takeout — pick it up at the counter when it's ready."
            )
 
-    assert has_element?(view, "#order-confirm-recap", "Pickup at counter")
+    assert has_element?(view, "#order-confirm-recap", "Takeout")
     refute has_element?(view, "#order-confirm-recap", "Table")
     assert has_element?(view, "#order-view-my-order", "View My Order")
     assert has_element?(view, "#order-order-more", "Order More")
@@ -236,7 +236,7 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(
              view,
              "#order-confirm-lede",
-             "Your order is in. Pick it up at the counter when it's ready."
+             "Your order is in. Takeout — pick it up at the counter when it's ready."
            )
 
     assert has_element?(view, "#order-confirm-recap .order-confirm-recap-total", "₱100")
@@ -244,14 +244,13 @@ defmodule EspresoWeb.OrderLiveTest do
     refute has_element?(view, "#order-confirm-title", "Payment processing")
   end
 
-  test "dine-in order confirmation shows table-aware lede and recap", %{conn: conn} do
+  test "dine-in order confirmation shows dine-in lede without table", %{conn: conn} do
     {:ok, order} =
       Orders.create_order(
         [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
         %{
           customer_name: "Dine In",
           fulfillment: :dine_in,
-          table_number: "12",
           payment_method: :counter
         }
       )
@@ -263,12 +262,11 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(
              view,
              "#order-confirm-lede",
-             "Your order is in. Show your order number at the counter — we'll bring it to table 12."
+             "Your order is in. Show your order number at the counter for your dine-in order."
            )
 
     assert has_element?(view, "#order-confirm-recap", "Dine-in")
-    assert has_element?(view, "#order-confirm-recap", "Table")
-    assert has_element?(view, "#order-confirm-recap", "12")
+    refute has_element?(view, "#order-confirm-recap", "Table")
     assert has_element?(view, "#order-confirm-recap .order-confirm-recap-total", "₱75")
     refute has_element?(view, "#order-receipt")
   end
@@ -368,12 +366,12 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, ~s(#order-progress [data-step="ready"][data-state="upcoming"]))
     assert has_element?(view, ~s(#order-progress [data-step="completed"][data-state="upcoming"]))
 
+    assert {:ok, _} = Orders.mark_paid(order)
     assert {:ok, preparing} = Orders.update_status(order, "preparing")
     assert has_element?(view, "#order-status-message", "Preparing your order")
     assert has_element?(view, "#order-hint", "We're preparing it — keep this screen for updates.")
     assert has_element?(view, ~s(#order-progress [data-step="preparing"][aria-current="step"]))
 
-    assert {:ok, _} = Orders.mark_paid(preparing)
     assert {:ok, ready} = Orders.update_status(preparing, "ready")
     assert has_element?(view, "#order-status-message", "Ready — please come to counter")
 

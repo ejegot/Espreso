@@ -43,16 +43,16 @@ defmodule EspresoWeb.StaffHomeLive do
     <.staff_shell current={:home} current_user={@current_user} page_title="Home">
       <main class="staff-home-main staff-home-hub staff-home-desk" id="staff-home-desk">
         <header class="staff-home-desk-head">
-          <div>
+          <div class="staff-home-desk-copy">
             <p class="staff-home-desk-eyebrow">Shift desk</p>
-            <h2 class="staff-home-desk-title">Good shift, {@current_user.name}.</h2>
-            <p class="staff-home-lede staff-home-desk-lede">
-              {User.role_label(@current_user.role)} · Choose where to work.
-            </p>
+            <h2 class="staff-home-desk-title">
+              {@current_user.name}
+              <span class="staff-home-desk-role">{User.role_label(@current_user.role)}</span>
+            </h2>
           </div>
           <div class="staff-home-desk-status" id="staff-home-shop-status">
             <span class="staff-home-status-dot" aria-hidden="true"></span>
-            <span>Shop · Live</span>
+            <span>Live</span>
           </div>
         </header>
 
@@ -79,36 +79,24 @@ defmodule EspresoWeb.StaffHomeLive do
         </section>
 
         <section
-          :if={@secondary != []}
-          class="staff-home-secondary"
-          aria-label="More tools"
-        >
-          <.link
-            :for={item <- @secondary}
-            navigate={item.path}
-            class={["staff-home-card", "staff-home-hub-card", item[:class]]}
-            id={"staff-home-#{item.id}"}
-          >
-            <span class="staff-home-card-eyebrow">{item.eyebrow}</span>
-            <span class="staff-home-card-title">
-              {item.title}
-              <span
-                :if={is_integer(item[:count]) and item.count > 0}
-                class="staff-home-inline-count"
-              >
-                {item.count}
-              </span>
-            </span>
-            <span class="staff-home-card-body">{item.body}</span>
-          </.link>
-        </section>
-
-        <section
           class="staff-home-today"
           id="staff-home-today"
           aria-label="Today"
         >
-          <p class="staff-home-today-eyebrow">Today</p>
+          <div class="staff-home-today-head">
+            <p class="staff-home-today-eyebrow">Today</p>
+            <p
+              :if={@shift_close}
+              class="staff-home-today-closed"
+              id="staff-home-shift-closed"
+            >
+              Closed · {Shifts.format_closed_at(@shift_close.closed_at)}
+              <span :if={@shift_close.closed_by_user}>
+                by {@shift_close.closed_by_user.name}
+              </span>
+            </p>
+          </div>
+
           <%= if @sales do %>
             <div class="staff-home-today-row">
               <p class="staff-home-today-total">
@@ -116,7 +104,7 @@ defmodule EspresoWeb.StaffHomeLive do
                 <span>paid</span>
               </p>
               <p class="staff-home-today-meta">
-                {@sales.todays_paid_count} paid orders · {@overview.active_count} active · {@overview.unpaid_active_count} unpaid in kitchen
+                {@sales.todays_paid_count} paid · {@overview.active_count} active · {@overview.unpaid_active_count} unpaid
               </p>
             </div>
 
@@ -131,17 +119,6 @@ defmodule EspresoWeb.StaffHomeLive do
                 <span class="staff-paid-breakdown-count">{row.count}</span>
               </li>
             </ul>
-
-            <p
-              :if={@shift_close}
-              class="staff-home-today-closed"
-              id="staff-home-shift-closed"
-            >
-              Closed · {Shifts.format_closed_at(@shift_close.closed_at)}
-              <span :if={@shift_close.closed_by_user}>
-                by {@shift_close.closed_by_user.name}
-              </span>
-            </p>
           <% else %>
             <div class="staff-home-today-row staff-home-today-row--compact">
               <p class="staff-home-today-meta" id="staff-home-today-barista">
@@ -152,15 +129,41 @@ defmodule EspresoWeb.StaffHomeLive do
         </section>
 
         <section
+          :if={@secondary != []}
+          class="staff-home-secondary"
+          aria-label="More tools"
+        >
+          <.link
+            :for={item <- @secondary}
+            navigate={item.path}
+            class={["staff-home-tool-link", item[:class]]}
+            id={"staff-home-#{item.id}"}
+          >
+            <span class="staff-home-tool-label">
+              {item.title}
+              <span
+                :if={is_integer(item[:count]) and item.count > 0}
+                class="staff-home-inline-count"
+              >
+                {item.count}
+              </span>
+            </span>
+            <span class="staff-home-tool-body">{item.body}</span>
+          </.link>
+        </section>
+
+        <section
           :if={@printer_enabled?}
           class="staff-home-printer"
           id="staff-home-printer"
           aria-label="Printer"
         >
-          <p class="staff-home-today-eyebrow">Printer</p>
-          <p class="staff-home-today-meta">
-            LAN · {Printer.host()}:{Printer.port()}
-          </p>
+          <div class="staff-home-printer-copy">
+            <p class="staff-home-today-eyebrow">Printer</p>
+            <p class="staff-home-today-meta">
+              LAN · {Printer.host()}:{Printer.port()}
+            </p>
+          </div>
           <div class="staff-home-printer-actions">
             <button
               type="button"
@@ -179,7 +182,7 @@ defmodule EspresoWeb.StaffHomeLive do
               Open kaha
             </button>
           </div>
-          <p :if={@printer_note} class="staff-home-today-meta" id="staff-printer-note">
+          <p :if={@printer_note} class="staff-home-today-meta staff-home-printer-note" id="staff-printer-note">
             {@printer_note}
           </p>
         </section>
@@ -225,7 +228,7 @@ defmodule EspresoWeb.StaffHomeLive do
         id: "pos",
         eyebrow: "Counter",
         title: "POS",
-        body: "Walk-in orders and pay-at-create.",
+        body: "Walk-in · pay at create",
         path: ~p"/pos",
         count: nil,
         cta: "New order →",
@@ -242,13 +245,12 @@ defmodule EspresoWeb.StaffHomeLive do
     base = [
       %{
         id: "unpaid",
-        eyebrow: "Attention",
         title: "Unpaid",
-        body: "Confirm counter and QR payments.",
+        body: "Confirm counter & QR",
         path: ~p"/orders?unpaid=1",
         count: unpaid_count,
         show?: Authorization.can?(user, :orders),
-        class: "staff-home-card--attention"
+        class: "staff-home-tool-link--attention"
       }
     ]
 
@@ -257,33 +259,25 @@ defmodule EspresoWeb.StaffHomeLive do
         [
           %{
             id: "dashboard",
-            eyebrow: "Overview",
             title: "Dashboard",
-            body: "Sales, reports, and today’s activity.",
+            body: "Sales & activity",
             path: ~p"/dashboard",
             count: nil,
             show?: true
           },
           %{
             id: "close",
-            eyebrow: "End of day",
             title: if(shift_close, do: "Shift closed", else: "Close shift"),
-            body:
-              if shift_close do
-                "View today’s close snapshot."
-              else
-                "Record system totals and counted cash."
-              end,
+            body: if(shift_close, do: "View close snapshot", else: "Totals & counted cash"),
             path: ~p"/staff/close",
             count: nil,
             show?: Authorization.can?(user, :reports),
-            class: "staff-home-card--close"
+            class: "staff-home-tool-link--close"
           },
           %{
             id: "availability",
-            eyebrow: "Menu",
             title: "Availability",
-            body: "Mark items sold out or back in stock.",
+            body: "Sold out / in stock",
             path: ~p"/admin/availability",
             count: nil,
             show?: Authorization.can?(user, :product_availability)
@@ -298,23 +292,21 @@ defmodule EspresoWeb.StaffHomeLive do
         [
           %{
             id: "staff",
-            eyebrow: "Team",
             title: "Staff",
-            body: "Accounts, roles, and PINs.",
+            body: "Accounts & PINs",
             path: ~p"/admin/users",
             count: nil,
             show?: true,
-            class: "staff-home-card-owner"
+            class: "staff-home-tool-link--owner"
           },
           %{
             id: "settings",
-            eyebrow: "Shop",
             title: "Settings",
-            body: "Payments mode, QR codes, and contact info.",
+            body: "Payments & shop",
             path: ~p"/admin/settings",
             count: nil,
             show?: true,
-            class: "staff-home-card-owner"
+            class: "staff-home-tool-link--owner"
           }
         ]
       else

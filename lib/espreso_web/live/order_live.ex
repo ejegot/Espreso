@@ -133,13 +133,6 @@ defmodule EspresoWeb.OrderLive do
               <dt>Type</dt>
               <dd>{Orders.fulfillment_label(@order.fulfillment)}</dd>
             </div>
-            <div
-              :if={@order.fulfillment == "dine_in" && @order.table_number not in [nil, ""]}
-              class="order-confirm-recap-row"
-            >
-              <dt>Table</dt>
-              <dd>{@order.table_number}</dd>
-            </div>
             <div class="order-confirm-recap-row order-confirm-recap-total">
               <dt>Total</dt>
               <dd>{Orders.format_total(@order)}</dd>
@@ -264,7 +257,6 @@ defmodule EspresoWeb.OrderLive do
                 <dt>Type</dt>
                 <dd>
                   {Orders.fulfillment_label(@order.fulfillment)}
-                  <span :if={@order.table_number}>· Table {@order.table_number}</span>
                 </dd>
               </div>
               <div :if={@order.notes} class="order-meta-notes">
@@ -416,17 +408,12 @@ defmodule EspresoWeb.OrderLive do
   defp wallet_open_href("maya"), do: "maya://"
   defp wallet_open_href(_), do: "#"
 
-  defp confirm_lede(%{fulfillment: "dine_in", table_number: table})
-       when is_binary(table) and table != "" do
-    "Your order is in. Show your order number at the counter — we'll bring it to table #{table}."
-  end
-
   defp confirm_lede(%{fulfillment: "dine_in"}) do
     "Your order is in. Show your order number at the counter for your dine-in order."
   end
 
   defp confirm_lede(%{fulfillment: "pickup"}) do
-    "Your order is in. Pick it up at the counter when it's ready."
+    "Your order is in. Takeout — pick it up at the counter when it's ready."
   end
 
   defp confirm_lede(_order) do

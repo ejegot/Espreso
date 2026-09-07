@@ -363,42 +363,53 @@ defmodule EspresoWeb.StaffOrdersLive do
               role="region"
               aria-label="Kitchen"
             >
-              <section class="staff-orders-kds-new" id="orders-new">
+              <section
+                class="staff-orders-kds-lane staff-orders-kds-lane--new"
+                id="orders-new"
+              >
                 <header class="staff-orders-kds-head staff-orders-kds-head--new">
-                    <div class="staff-orders-kds-head-main">
-                      <h2>New Orders</h2>
-                    </div>
+                  <div class="staff-orders-kds-head-main">
+                    <h2>New</h2>
+                  </div>
                   <span class="staff-orders-count">{length(@received_orders)}</span>
                 </header>
-                <div class="staff-orders-new-grid">
+                <div class="staff-orders-lane-grid">
                   <p :if={@received_orders == []} class="staff-empty">No new orders.</p>
                   <.kds_ticket :for={order <- @received_orders} order={order} lane="new" />
                 </div>
               </section>
 
-              <div class="staff-orders-kds-queues">
-                <section class="staff-orders-kds-strip" id="orders-preparing">
-                  <header class="staff-orders-kds-head staff-orders-kds-head--preparing">
+              <section
+                class="staff-orders-kds-lane staff-orders-kds-lane--preparing"
+                id="orders-preparing"
+              >
+                <header class="staff-orders-kds-head staff-orders-kds-head--preparing">
+                  <div class="staff-orders-kds-head-main">
                     <h2>Preparing</h2>
-                    <span class="staff-orders-count">{length(@preparing_orders)}</span>
-                  </header>
-                  <div class="staff-orders-strip-grid">
-                    <p :if={@preparing_orders == []} class="staff-empty">Nothing preparing.</p>
-                    <.kds_ticket :for={order <- @preparing_orders} order={order} lane="preparing" />
                   </div>
-                </section>
+                  <span class="staff-orders-count">{length(@preparing_orders)}</span>
+                </header>
+                <div class="staff-orders-lane-grid">
+                  <p :if={@preparing_orders == []} class="staff-empty">Nothing preparing.</p>
+                  <.kds_ticket :for={order <- @preparing_orders} order={order} lane="preparing" />
+                </div>
+              </section>
 
-                <section class="staff-orders-kds-strip" id="orders-ready">
-                  <header class="staff-orders-kds-head staff-orders-kds-head--ready">
+              <section
+                class="staff-orders-kds-lane staff-orders-kds-lane--ready"
+                id="orders-ready"
+              >
+                <header class="staff-orders-kds-head staff-orders-kds-head--ready">
+                  <div class="staff-orders-kds-head-main">
                     <h2>Ready</h2>
-                    <span class="staff-orders-count">{length(@ready_orders)}</span>
-                  </header>
-                  <div class="staff-orders-strip-grid">
-                    <p :if={@ready_orders == []} class="staff-empty">None yet.</p>
-                    <.kds_ticket :for={order <- @ready_orders} order={order} lane="ready" />
                   </div>
-                </section>
-              </div>
+                  <span class="staff-orders-count">{length(@ready_orders)}</span>
+                </header>
+                <div class="staff-orders-lane-grid">
+                  <p :if={@ready_orders == []} class="staff-empty">None yet.</p>
+                  <.kds_ticket :for={order <- @ready_orders} order={order} lane="ready" />
+                </div>
+              </section>
             </div>
           </div>
         </main>
@@ -463,7 +474,12 @@ defmodule EspresoWeb.StaffOrdersLive do
                 </p>
               </div>
               <div class="staff-order-actions">
-                {mark_paid_buttons(%{order: order, id_prefix: "unpaid", lane: "drawer"})}
+                {mark_paid_buttons(%{
+                  order: order,
+                  id_prefix: "unpaid",
+                  lane: "drawer",
+                  primary?: true
+                })}
               </div>
             </article>
           </div>
@@ -614,8 +630,17 @@ defmodule EspresoWeb.StaffOrdersLive do
       </div>
 
       <div class="staff-order-actions">
+        <div :if={needs_payment_actions?(@order)} class="staff-order-pay-actions">
+          {mark_paid_buttons(%{
+            order: @order,
+            id_prefix: "ticket",
+            lane: @lane,
+            primary?: true
+          })}
+        </div>
+
         <button
-          :if={@order.status == "received"}
+          :if={@order.status == "received" and not Orders.unpaid?(@order)}
           type="button"
           class="staff-action staff-action-primary"
           id={"order-prepare-#{@order.id}"}
@@ -646,10 +671,6 @@ defmodule EspresoWeb.StaffOrdersLive do
         >
           Picked up
         </button>
-
-        <div :if={needs_payment_actions?(@order)} class="staff-order-pay-actions">
-          {mark_paid_buttons(%{order: @order, id_prefix: "ticket", lane: @lane})}
-        </div>
 
         <details
           :if={ticket_more_actions?(@order)}
@@ -764,11 +785,18 @@ defmodule EspresoWeb.StaffOrdersLive do
   defp show_abandon_payment?(_), do: false
 
   defp mark_paid_buttons(assigns) do
+    assigns = Map.put_new(assigns, :primary?, false)
+
     ~H"""
     <button
       :if={staff_mark_paid?(@order)}
       type="button"
-      class="staff-action staff-action-secondary staff-action-mark-paid"
+      class={[
+        "staff-action",
+        "staff-action-mark-paid",
+        @primary? && "staff-action-primary",
+        !@primary? && "staff-action-secondary"
+      ]}
       id={"#{@id_prefix}-#{@lane}-mark-paid-#{@order.id}"}
       phx-click="open_mark_paid"
       phx-value-id={@order.id}
@@ -782,11 +810,14 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   defp mark_paid_modal(assigns) do
     order = assigns.mark_paid_order
+    options = mark_paid_options(order)
 
     assigns =
       assigns
       |> assign(:order, order)
       |> assign(:suggested_paid_via, suggested_paid_via(order))
+      |> assign(:mark_paid_options, options)
+      |> assign(:mark_paid_note, mark_paid_note(order))
 
     ~H"""
     <div class="staff-mark-paid-modal" id="mark-paid-modal" role="dialog" aria-modal="true">
@@ -810,16 +841,15 @@ defmodule EspresoWeb.StaffOrdersLive do
           </button>
         </header>
 
-        <p class="staff-mark-paid-modal-note">
-          How did the customer pay? This updates the order and clears it from unpaid.
-        </p>
+        <p class="staff-mark-paid-modal-note">{@mark_paid_note}</p>
 
         <div class="staff-mark-paid-modal-options">
           <button
-            :for={{paid_via, label} <- mark_paid_options(@order)}
+            :for={{paid_via, label, kind} <- @mark_paid_options}
             type="button"
             class={[
               "staff-mark-paid-option",
+              kind == :escape && "staff-mark-paid-option--escape",
               @suggested_paid_via == paid_via && "is-suggested"
             ]}
             id={"mark-paid-modal-#{paid_via}"}
@@ -835,19 +865,48 @@ defmodule EspresoWeb.StaffOrdersLive do
     """
   end
 
+  # Unpaid counter / POS pay-later: cash + wallets (no vague "Counter").
   defp mark_paid_options(%{payment_method: "counter"}) do
-    [{"cash", "Cash"}, {"gcash", "GCash"}, {"maya", "Maya"}, {"counter", "Counter"}]
+    [
+      {"cash", "Cash", :primary},
+      {"gcash", "GCash", :primary},
+      {"maya", "Maya", :primary}
+    ]
   end
 
+  # Online / QR awaiting: wallets first; cash as quiet escape if they paid at counter instead.
   defp mark_paid_options(_order) do
-    [{"gcash", "GCash"}, {"maya", "Maya"}, {"cash", "Cash"}]
+    [
+      {"gcash", "GCash", :primary},
+      {"maya", "Maya", :primary},
+      {"cash", "Paid cash instead", :escape}
+    ]
+  end
+
+  defp mark_paid_note(%{payment_method: "online", online_wallet: wallet})
+       when wallet in ["gcash", "maya"] do
+    "Expected #{wallet_label(wallet)}. Confirm the wallet they used, or cash if they paid at the counter."
+  end
+
+  defp mark_paid_note(%{payment_method: "online"}) do
+    "Confirm GCash or Maya. Use cash only if they paid at the counter instead."
+  end
+
+  defp mark_paid_note(_order) do
+    "How did they pay? This clears unpaid and updates today’s totals."
   end
 
   defp suggested_paid_via(%{payment_method: "online", online_wallet: wallet})
        when wallet in ["gcash", "maya"],
        do: wallet
 
+  defp suggested_paid_via(%{payment_method: "online"}), do: "gcash"
+
   defp suggested_paid_via(_), do: "cash"
+
+  defp wallet_label("gcash"), do: "GCash"
+  defp wallet_label("maya"), do: "Maya"
+  defp wallet_label(_), do: "QR"
 
   defp paid_via_label("cash"), do: "cash"
   defp paid_via_label("gcash"), do: "GCash"
@@ -904,12 +963,8 @@ defmodule EspresoWeb.StaffOrdersLive do
   defp payment_state_label(%{payment_status: "awaiting_payment"}), do: "Await QR"
   defp payment_state_label(_), do: "Unpaid"
 
-  defp fulfillment_short(%{fulfillment: "dine_in", table_number: table})
-       when is_binary(table) and table != "",
-       do: "Table #{table}"
-
   defp fulfillment_short(%{fulfillment: "dine_in"}), do: "Dine-in"
-  defp fulfillment_short(%{fulfillment: "pickup"}), do: "Pickup"
+  defp fulfillment_short(%{fulfillment: "pickup"}), do: "Takeout"
   defp fulfillment_short(_), do: "Order"
 
   defp show_customer_name?(%{customer_name: name}) when is_binary(name) do

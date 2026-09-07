@@ -145,7 +145,6 @@ defmodule EspresoWeb.DashboardLive do
 
             <p class="staff-order-meta">
               {Orders.fulfillment_label(order.fulfillment)}
-              <span :if={order.table_number}>· Table {order.table_number}</span>
             </p>
           </article>
         </section>
