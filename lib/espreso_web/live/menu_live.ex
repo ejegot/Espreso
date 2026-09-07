@@ -669,26 +669,6 @@ defmodule EspresoWeb.MenuLive do
             <div class="menu-qr-chrome-trailing">
               <button
                 type="button"
-                id="menu-qr-search-toggle"
-                class={[
-                  "menu-qr-chrome-search",
-                  (@search_open? || search_active?(@search)) && "is-active"
-                ]}
-                phx-click="toggle_search"
-                aria-label="Search menu"
-                aria-expanded={to_string(@search_open?)}
-                aria-controls="menu-search"
-              >
-                <.icon name="hero-magnifying-glass" class="menu-qr-chrome-icon" />
-                <span
-                  :if={search_active?(@search) && !@search_open?}
-                  class="menu-qr-chrome-search-dot"
-                  aria-hidden="true"
-                >
-                </span>
-              </button>
-              <button
-                type="button"
                 id="menu-qr-bag"
                 class={[
                   "menu-qr-chrome-bag",
@@ -716,58 +696,65 @@ defmodule EspresoWeb.MenuLive do
             </div>
           </header>
 
-          <div
-            id="menu-search"
-            class={[
-              "brune-menu-search brune-menu-search--compact menu-qr-search",
-              @search_open? && "is-open"
-            ]}
-          >
-            <form phx-change="search" phx-submit="search">
-              <div class="brune-search-wrap menu-qr-search-wrap">
-                <span class="brune-search-icon" aria-hidden="true">
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
-                  </svg>
-                </span>
-                <input
-                  id="menu-search-input"
-                  type="text"
-                  name="search"
-                  value={@search}
-                  placeholder="Search menu..."
-                  class="brune-search-input"
-                  autocomplete="off"
-                  phx-debounce="200"
-                />
-                <button
-                  type="button"
-                  id="menu-qr-search-close"
-                  class="menu-qr-search-close"
-                  phx-click="clear_search"
-                  aria-label="Clear search"
-                >
-                  <.icon name="hero-x-mark" class="menu-qr-search-close-icon" />
-                </button>
-              </div>
-            </form>
-          </div>
-
           <nav
             id="menu-craving"
             class="menu-craving menu-craving--sticky"
             aria-label="Menu categories"
           >
-            <p class="menu-craving-context" id="menu-craving-context">Categories</p>
+            <div class="menu-craving-head">
+              <p class="menu-craving-context" id="menu-craving-context">Categories</p>
+              <div
+                id="menu-search"
+                class={[
+                  "menu-qr-search-inline",
+                  (@search_open? or search_active?(@search)) && "is-open"
+                ]}
+              >
+                <button
+                  type="button"
+                  id="menu-qr-search-toggle"
+                  class="menu-qr-search-inline-toggle"
+                  phx-click="toggle_search"
+                  aria-label="Search menu"
+                  aria-expanded={to_string(@search_open? or search_active?(@search))}
+                  aria-controls="menu-search-input"
+                >
+                  <.icon name="hero-magnifying-glass" class="menu-qr-chrome-icon" />
+                </button>
+
+                <form
+                  class="menu-qr-search-inline-form"
+                  phx-change="search"
+                  phx-submit="search"
+                >
+                  <div class="menu-qr-search-inline-wrap">
+                    <span class="menu-qr-search-inline-icon" aria-hidden="true">
+                      <.icon name="hero-magnifying-glass" class="menu-qr-search-inline-glyph" />
+                    </span>
+                    <input
+                      id="menu-search-input"
+                      type="text"
+                      name="search"
+                      value={@search}
+                      placeholder="Search menu…"
+                      class="menu-qr-search-inline-input"
+                      autocomplete="off"
+                      phx-debounce="200"
+                    />
+                    <button
+                      type="button"
+                      id="menu-qr-search-close"
+                      class="menu-qr-search-close menu-qr-search-inline-close"
+                      phx-click="clear_search"
+                      aria-label="Clear search"
+                    >
+                      <.icon name="hero-x-mark" class="menu-qr-search-close-icon" />
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
             <div class="menu-craving-rail">
               <button
                 :for={chip <- menu_craving_chips(@categories)}
