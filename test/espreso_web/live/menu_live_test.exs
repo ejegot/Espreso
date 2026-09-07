@@ -461,15 +461,16 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, "#checkout-table")
   end
 
-  test "/menu chrome is back arrow, search, and bag", %{conn: conn} do
+  test "/menu chrome is back arrow, brand, and bag", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu?stage=menu")
 
-    assert has_element?(view, "#menu-qr-search-toggle .hero-magnifying-glass")
     assert has_element?(view, "#menu-qr-back[aria-label='Back to CoffeeSpot home']")
     refute has_element?(view, "#menu-qr-back", "Back")
     assert has_element?(view, "#menu-qr-back .hero-arrow-left")
+    assert has_element?(view, "#menu-qr-chrome .menu-qr-chrome-brand", "CoffeeSpot")
     assert has_element?(view, "#menu-qr-bag .hero-shopping-bag")
     assert has_element?(view, "#menu-qr-bag[aria-label='Your order, 0 items']")
+    refute has_element?(view, "#menu-qr-chrome #menu-qr-search-toggle")
     refute has_element?(view, "#menu-search.is-open")
   end
 
@@ -637,11 +638,13 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, ".brune-menu-item-name", "Beef Tapa")
   end
 
-  test "/menu search sits below chrome and above craving chips", %{conn: conn} do
+  test "/menu search expands beside Categories title above chips", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
     view = enter_menu_browse(view)
 
-    assert has_element?(view, "#menu-qr-search-toggle")
+    assert has_element?(view, ".menu-craving-head #menu-qr-search-toggle")
+    assert has_element?(view, ".menu-craving-head #menu-search")
+    assert has_element?(view, "#menu-craving-context", "Categories")
     refute has_element?(view, "#menu-search.is-open")
 
     html =
@@ -652,16 +655,17 @@ defmodule EspresoWeb.MenuLiveTest do
 
     sticky_ids =
       html
-      |> Floki.find("#menu-qr-chrome, #menu-search, #menu-craving")
+      |> Floki.find("#menu-qr-chrome, #menu-craving")
       |> Enum.map(fn {_, attrs, _} ->
         attrs |> Enum.find_value(fn {k, v} -> if k == "id", do: v end)
       end)
 
-    assert sticky_ids == ["menu-qr-chrome", "menu-search", "menu-craving"]
+    assert sticky_ids == ["menu-qr-chrome", "menu-craving"]
     assert has_element?(view, "#menu-search-input")
 
     view |> element("#menu-qr-search-toggle") |> render_click()
     assert has_element?(view, "#menu-search.is-open")
+    assert has_element?(view, ".menu-craving-head #menu-search.is-open")
   end
 
   test "/menu?stage=menu&category=ALL restores All browse on mount", %{conn: conn} do
@@ -1718,7 +1722,7 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, ".menu-qr-chrome-brand", "CoffeeSpot")
     refute has_element?(view, "#menu-craving-chooser")
     refute has_element?(view, ".brune-menu-tabs-line")
-    assert has_element?(view, "#menu-search.brune-menu-search--compact")
+    assert has_element?(view, "#menu-search.menu-qr-search-inline")
     refute has_element?(view, "#menu-search.is-open")
     assert has_element?(view, ".brune-student-promo")
     assert has_element?(view, ".brune-hours-strip")
