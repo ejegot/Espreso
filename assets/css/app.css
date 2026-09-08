@@ -5245,8 +5245,8 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-size-chip {
-  min-height: 1.6rem;
-  padding: 0.12rem 0.5rem;
+  min-height: 2.125rem;
+  padding: 0.25rem 0.65rem;
   border-radius: 999px;
   border: 1px solid rgba(56, 32, 16, 0.14);
   background: #fff;
@@ -5339,6 +5339,32 @@ a.staff-home-card:focus-visible {
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-title-row {
   margin-bottom: 0.7rem;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-title-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-clear-ticket {
+  min-height: 2.25rem;
+  padding: 0.25rem 0.5rem;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--cs-brown) 55%, var(--cs-beige));
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.16rem;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-clear-ticket:hover,
+.staff-pos-page.staff-pos-page--cafe .staff-pos-clear-ticket:focus-visible {
+  color: var(--cs-orange);
+  outline: none;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-head h2 {
@@ -5454,10 +5480,10 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-qty-btn {
-  width: 1.85rem;
-  height: 1.85rem;
-  min-width: 1.85rem;
-  min-height: 1.85rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
   border-radius: 999px;
   border: 1px solid rgba(56, 32, 16, 0.14);
   background: #fff;
@@ -5471,11 +5497,42 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-remove {
-  width: 1.85rem;
-  height: 1.85rem;
-  min-width: 1.85rem;
-  min-height: 1.85rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
   border-radius: 999px;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-undo {
+  flex: 0 0 auto;
+  min-height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.4rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--cs-orange) 24%, var(--cs-line));
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, var(--cs-orange) 7%, #fff);
+  color: var(--cs-brown);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-undo button {
+  min-height: 2rem;
+  padding: 0.2rem 0.55rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cs-orange);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.16rem;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-footer {
