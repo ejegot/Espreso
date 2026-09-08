@@ -6370,19 +6370,70 @@ a.staff-home-card:focus-visible {
   gap: 0.28rem;
 }
 
+.staff-orders-page .staff-order-paid-via-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.28rem;
+}
+
+.staff-orders-page .staff-action-paid-via {
+  min-height: 2.55rem;
+  padding: 0.35rem 0.25rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+}
+
+.staff-orders-page .staff-order-secondary-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  margin-top: 0.05rem;
+}
+
+.staff-orders-page .staff-order-secondary-row .staff-action-cancel {
+  margin-right: auto;
+  min-height: 1.85rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid color-mix(in srgb, #b42318 28%, var(--cs-line));
+  border-radius: 0.28rem;
+  background: transparent;
+  color: color-mix(in srgb, #b42318 72%, var(--cs-brown));
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.staff-orders-page .staff-order-secondary-row .staff-order-more {
+  margin-left: auto;
+}
+
 .staff-orders-page .staff-order-more {
   margin: 0;
+  position: relative;
 }
 
 .staff-orders-page .staff-order-more-summary {
   list-style: none;
   cursor: pointer;
-  min-height: 1.7rem;
+  width: 1.85rem;
+  min-height: 1.85rem;
   display: inline-flex;
   align-items: center;
-  color: color-mix(in srgb, var(--cs-brown) 55%, var(--cs-beige));
-  font-size: 0.72rem;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 0.28rem;
+  color: color-mix(in srgb, var(--cs-brown) 45%, var(--cs-beige));
+  font-size: 1.05rem;
   font-weight: 700;
+  line-height: 1;
+  user-select: none;
+}
+
+.staff-orders-page .staff-order-more-summary:hover,
+.staff-orders-page .staff-order-more-summary:focus-visible {
+  border-color: var(--cs-line);
+  background: #fff;
+  outline: none;
 }
 
 .staff-orders-page .staff-order-more-summary::-webkit-details-marker {
@@ -6390,15 +6441,70 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-orders-page .staff-order-more-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.28rem);
+  z-index: 5;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.28rem;
-  margin-top: 0.28rem;
+  min-width: 8.5rem;
+  grid-template-columns: 1fr;
+  gap: 0.2rem;
+  padding: 0.35rem;
+  border: 1px solid var(--cs-line);
+  border-radius: 0.4rem;
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(56, 32, 16, 0.12);
 }
 
 .staff-orders-page .staff-order-more-panel .staff-action {
   min-height: 2rem;
   font-size: 0.74rem;
+  justify-content: flex-start;
+}
+
+.staff-orders-page .staff-order-pay-via {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.1rem;
+  padding: 0.04rem 0.26rem;
+  border-radius: 0.14rem;
+  background: color-mix(in srgb, var(--cs-beige) 16%, #fff);
+  color: color-mix(in srgb, var(--cs-brown) 70%, var(--cs-beige));
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.staff-orders-page .staff-order-pay-state {
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.staff-orders-refresh {
+  min-width: 2rem;
+  padding: 0.26rem 0.4rem;
+  opacity: 0.55;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.staff-orders-refresh:hover,
+.staff-orders-refresh:focus-visible {
+  opacity: 1;
+}
+
+.staff-shell-tool--quiet {
+  border-color: transparent;
+  background: transparent;
+  color: color-mix(in srgb, var(--cs-brown) 50%, var(--cs-beige));
+}
+
+.staff-shell-tool--quiet:hover,
+.staff-shell-tool--quiet:focus-visible {
+  border-color: var(--cs-line);
+  background: var(--cs-surface);
+  color: var(--cs-brown);
+  outline: none;
 }
 
 .staff-pos-page .staff-pos-success-actions {

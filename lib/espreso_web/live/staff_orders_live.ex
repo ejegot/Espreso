@@ -293,7 +293,6 @@ defmodule EspresoWeb.StaffOrdersLive do
         <span class="staff-orders-kds-pill staff-orders-kds-pill--new" aria-label="New order count">
           New {length(@received_orders)}
         </span>
-        <button type="button" class="staff-shell-tool" phx-click="refresh">Refresh</button>
         <button
           type="button"
           class="staff-shell-tool staff-orders-unpaid-toggle"
@@ -317,6 +316,16 @@ defmodule EspresoWeb.StaffOrdersLive do
           <span class="staff-orders-reconciliation-toggle-count">
             {length(@paymongo_reconciliations)}
           </span>
+        </button>
+        <button
+          type="button"
+          class="staff-shell-tool staff-shell-tool--quiet staff-orders-refresh"
+          id="orders-refresh"
+          phx-click="refresh"
+          title="Refresh board"
+          aria-label="Refresh board"
+        >
+          ↻
         </button>
       </:tools>
 
@@ -465,6 +474,9 @@ defmodule EspresoWeb.StaffOrdersLive do
                   <span class={"staff-badge staff-badge--pay-#{order.payment_status}"}>
                     {payment_state_label(order)}
                   </span>
+                  <span :if={paid_via_badge(order)} class="staff-order-pay-via">
+                    {paid_via_badge(order)}
+                  </span>
                 </p>
                 <span class="staff-order-unpaid-sep" aria-hidden="true">·</span>
                 <p class="staff-order-meta">
@@ -474,11 +486,10 @@ defmodule EspresoWeb.StaffOrdersLive do
                 </p>
               </div>
               <div class="staff-order-actions">
-                {mark_paid_buttons(%{
+                {payment_action_buttons(%{
                   order: order,
                   id_prefix: "unpaid",
-                  lane: "drawer",
-                  primary?: true
+                  lane: "drawer"
                 })}
               </div>
             </article>
@@ -624,6 +635,9 @@ defmodule EspresoWeb.StaffOrdersLive do
             <span class={"staff-order-pay-state staff-badge--pay-#{@order.payment_status}"}>
               {payment_state_label(@order)}
             </span>
+            <span :if={paid_via_badge(@order)} class="staff-order-pay-via">
+              {paid_via_badge(@order)}
+            </span>
           </div>
           <p class={order_age_class(@order.inserted_at)}>{format_order_age(@order.inserted_at)}</p>
         </div>
@@ -631,11 +645,10 @@ defmodule EspresoWeb.StaffOrdersLive do
 
       <div class="staff-order-actions">
         <div :if={needs_payment_actions?(@order)} class="staff-order-pay-actions">
-          {mark_paid_buttons(%{
+          {payment_action_buttons(%{
             order: @order,
             id_prefix: "ticket",
-            lane: @lane,
-            primary?: true
+            lane: @lane
           })}
         </div>
 
@@ -672,80 +685,84 @@ defmodule EspresoWeb.StaffOrdersLive do
           Picked up
         </button>
 
-        <details
-          :if={ticket_more_actions?(@order)}
-          class="staff-order-more"
-          id={"order-more-#{@order.id}"}
+        <div
+          :if={show_cancel_action?(@order) or ticket_overflow_actions?(@order)}
+          class="staff-order-secondary-row"
         >
-          <summary class="staff-order-more-summary">More</summary>
-          <div class="staff-order-more-panel">
-            <button
-              :if={
-                @order.status in ["received", "preparing"] and not checkout_session_attached?(@order) and
-                  needs_payment_actions?(@order)
-              }
-              type="button"
-              class="staff-action staff-action-muted"
-              id={"cancel-order-#{@order.id}"}
-              phx-value-id={@order.id}
-              phx-click="cancel_order"
-            >
-              Cancel
-            </button>
-            <button
-              :if={show_abandon_payment?(@order)}
-              type="button"
-              class="staff-action staff-action-muted"
-              id={"abandon-online-payment-#{@order.id}"}
-              phx-value-id={@order.id}
-              phx-click="abandon_online_payment"
-            >
-              Abandon
-            </button>
-            <button
-              :if={Printer.enabled?() and @order.status in ["received", "preparing", "ready"]}
-              type="button"
-              class="staff-action staff-action-muted"
-              id={"kitchen-#{@order.id}"}
-              phx-click="print_kitchen"
-              phx-value-id={@order.id}
-            >
-              Kitchen
-            </button>
-            <button
-              :if={@order.payment_status == "paid" and Printer.enabled?()}
-              type="button"
-              class="staff-action staff-action-muted"
-              id={"reprint-#{@order.id}"}
-              phx-click="reprint_receipt"
-              phx-value-id={@order.id}
-            >
-              Reprint
-            </button>
-            <button
-              :if={
-                @order.payment_status == "paid" and Printer.enabled?() and
-                  Printer.cash_like?(@order.paid_via || "counter")
-              }
-              type="button"
-              class="staff-action staff-action-muted"
-              id={"open-drawer-#{@order.id}"}
-              phx-click="open_drawer"
-            >
-              Kaha
-            </button>
-          </div>
-        </details>
+          <button
+            :if={show_cancel_action?(@order)}
+            type="button"
+            class="staff-action staff-action-cancel"
+            id={"cancel-order-#{@order.id}"}
+            phx-value-id={@order.id}
+            phx-click="cancel_order"
+          >
+            Cancel
+          </button>
+
+          <details
+            :if={ticket_overflow_actions?(@order)}
+            class="staff-order-more"
+            id={"order-more-#{@order.id}"}
+          >
+            <summary class="staff-order-more-summary" aria-label="More actions">⋯</summary>
+            <div class="staff-order-more-panel">
+              <button
+                :if={show_abandon_payment?(@order)}
+                type="button"
+                class="staff-action staff-action-muted"
+                id={"abandon-online-payment-#{@order.id}"}
+                phx-value-id={@order.id}
+                phx-click="abandon_online_payment"
+              >
+                Abandon
+              </button>
+              <button
+                :if={Printer.enabled?() and @order.status in ["received", "preparing", "ready"]}
+                type="button"
+                class="staff-action staff-action-muted"
+                id={"kitchen-#{@order.id}"}
+                phx-click="print_kitchen"
+                phx-value-id={@order.id}
+              >
+                Kitchen
+              </button>
+              <button
+                :if={@order.payment_status == "paid" and Printer.enabled?()}
+                type="button"
+                class="staff-action staff-action-muted"
+                id={"reprint-#{@order.id}"}
+                phx-click="reprint_receipt"
+                phx-value-id={@order.id}
+              >
+                Reprint
+              </button>
+              <button
+                :if={
+                  @order.payment_status == "paid" and Printer.enabled?() and
+                    Printer.cash_like?(@order.paid_via || "counter")
+                }
+                type="button"
+                class="staff-action staff-action-muted"
+                id={"open-drawer-#{@order.id}"}
+                phx-click="open_drawer"
+              >
+                Kaha
+              </button>
+            </div>
+          </details>
+        </div>
       </div>
     </article>
     """
   end
 
-  defp ticket_more_actions?(order) do
-    cancel? =
-      order.status in ["received", "preparing"] and not checkout_session_attached?(order) and
-        needs_payment_actions?(order)
+  defp show_cancel_action?(order) do
+    order.status in ["received", "preparing"] and not checkout_session_attached?(order) and
+      needs_payment_actions?(order)
+  end
 
+  defp ticket_overflow_actions?(order) do
     abandon? = show_abandon_payment?(order)
 
     kitchen? =
@@ -753,7 +770,7 @@ defmodule EspresoWeb.StaffOrdersLive do
 
     paid_print? = order.payment_status == "paid" and Printer.enabled?()
 
-    cancel? or abandon? or kitchen? or paid_print?
+    abandon? or kitchen? or paid_print?
   end
 
   defp checkout_session_attached?(%{paymongo_checkout_session_id: session_id})
@@ -784,27 +801,52 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   defp show_abandon_payment?(_), do: false
 
-  defp mark_paid_buttons(assigns) do
-    assigns = Map.put_new(assigns, :primary?, false)
+  # Counter unpaid: one-tap Cash / GCash / Maya via existing mark_paid event.
+  # Online qrph_manual: keep modal (suggested wallet + cash escape).
+  defp payment_action_buttons(assigns) do
+    order = assigns.order
 
-    ~H"""
-    <button
-      :if={staff_mark_paid?(@order)}
-      type="button"
-      class={[
-        "staff-action",
-        "staff-action-mark-paid",
-        @primary? && "staff-action-primary",
-        !@primary? && "staff-action-secondary"
-      ]}
-      id={"#{@id_prefix}-#{@lane}-mark-paid-#{@order.id}"}
-      phx-click="open_mark_paid"
-      phx-value-id={@order.id}
-    >
-      Confirm payment
-    </button>
-    """
+    cond do
+      inline_paid_via?(order) ->
+        assigns =
+          Map.put(assigns, :options, [{"cash", "Cash"}, {"gcash", "GCash"}, {"maya", "Maya"}])
+
+        ~H"""
+        <div class="staff-order-paid-via-row" role="group" aria-label="Confirm payment method">
+          <button
+            :for={{paid_via, label} <- @options}
+            type="button"
+            class="staff-action staff-action-primary staff-action-paid-via"
+            id={"#{@id_prefix}-#{@lane}-paid-via-#{paid_via}-#{@order.id}"}
+            phx-click="mark_paid"
+            phx-value-id={@order.id}
+            phx-value-paid_via={paid_via}
+          >
+            {label}
+          </button>
+        </div>
+        """
+
+      staff_mark_paid?(order) ->
+        ~H"""
+        <button
+          type="button"
+          class="staff-action staff-action-primary staff-action-mark-paid"
+          id={"#{@id_prefix}-#{@lane}-mark-paid-#{@order.id}"}
+          phx-click="open_mark_paid"
+          phx-value-id={@order.id}
+        >
+          Confirm payment
+        </button>
+        """
+
+      true ->
+        ""
+    end
   end
+
+  defp inline_paid_via?(%{payment_method: "counter"} = order), do: staff_mark_paid?(order)
+  defp inline_paid_via?(_), do: false
 
   defp mark_paid_modal(%{mark_paid_order: nil}), do: nil
 
@@ -959,9 +1001,16 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   defp freshly_received?(_), do: false
 
-  defp payment_state_label(%{payment_status: "paid"}), do: "Paid"
-  defp payment_state_label(%{payment_status: "awaiting_payment"}), do: "Await QR"
-  defp payment_state_label(_), do: "Unpaid"
+  defp payment_state_label(%{payment_status: "paid"}), do: "PAID"
+  defp payment_state_label(%{payment_status: "awaiting_payment"}), do: "AWAITING PAYMENT"
+  defp payment_state_label(_), do: "UNPAID"
+
+  defp paid_via_badge(%{payment_status: "paid", paid_via: "cash"}), do: "CASH"
+  defp paid_via_badge(%{payment_status: "paid", paid_via: "gcash"}), do: "GCASH"
+  defp paid_via_badge(%{payment_status: "paid", paid_via: "maya"}), do: "MAYA"
+  defp paid_via_badge(%{payment_status: "paid", paid_via: "paymongo"}), do: "PAYMONGO"
+  defp paid_via_badge(%{payment_status: "paid", paid_via: "counter"}), do: "COUNTER"
+  defp paid_via_badge(_), do: nil
 
   defp fulfillment_short(%{fulfillment: "dine_in"}), do: "Dine-in"
   defp fulfillment_short(%{fulfillment: "pickup"}), do: "Takeout"
