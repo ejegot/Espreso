@@ -50,7 +50,8 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:added_product_id, nil)
      |> assign(:last_order, nil)
      |> assign(:print_note, nil)
-     |> assign(:error, nil), layout: false}
+     |> assign(:error, nil)
+     |> assign(:submission_error, nil), layout: false}
   end
 
   @impl true
@@ -559,6 +560,7 @@ defmodule EspresoWeb.StaffPosLive do
       socket
       |> assign(:customer_name, Map.get(params, "customer_name", socket.assigns.customer_name))
       |> assign(:notes, Map.get(params, "notes", socket.assigns.notes))
+      |> assign(:submission_error, nil)
 
     if socket.assigns.cash_tender_open? do
       {:noreply, socket}
@@ -568,7 +570,7 @@ defmodule EspresoWeb.StaffPosLive do
           {:noreply, socket}
 
         {:error, message} ->
-          {:noreply, assign(socket, :error, message)}
+          {:noreply, assign(socket, :submission_error, message)}
 
         :ok
         when socket.assigns.payment_choice == :paid and socket.assigns.paid_via == "cash" ->
@@ -1116,6 +1118,15 @@ defmodule EspresoWeb.StaffPosLive do
                     Confirm payment was received before processing.
                   </p>
 
+                  <p
+                    :if={@submission_error}
+                    class="staff-pos-flash"
+                    id="pos-submission-error"
+                    role="alert"
+                  >
+                    {@submission_error}
+                  </p>
+
                   <button
                     type="submit"
                     class={[
@@ -1288,7 +1299,7 @@ defmodule EspresoWeb.StaffPosLive do
         {:noreply, socket}
 
       {:error, message} ->
-        {:noreply, assign(socket, :error, message)}
+        {:noreply, assign(socket, :submission_error, message)}
 
       :ok ->
         customer_name = String.trim(socket.assigns.customer_name)
@@ -1346,6 +1357,7 @@ defmodule EspresoWeb.StaffPosLive do
               |> assign(:card_sizes, %{})
               |> assign(:added_product_id, nil)
               |> assign(:error, nil)
+              |> assign(:submission_error, nil)
               |> assign(:payment_choice, :paid)
               |> assign(:paid_via, "cash")
               |> assign(:customer_name, "Walk-in")
@@ -1385,26 +1397,26 @@ defmodule EspresoWeb.StaffPosLive do
             {:noreply,
              socket
              |> assign(:placing_order?, false)
-             |> assign(:error, "Add at least one item before placing an order.")}
+             |> assign(:submission_error, "Add at least one item before placing an order.")}
 
           {:error, {:unavailable, names}} ->
             {:noreply,
              socket
              |> assign(:placing_order?, false)
-             |> assign(:error, unavailable_error(names))}
+             |> assign(:submission_error, unavailable_error(names))}
 
           {:error, {:price_changed, _names}} ->
             {:noreply,
              socket
              |> assign(:placing_order?, false)
              |> assign(:categories, Menu.list_menu())
-             |> assign(:error, "Price changed — please review your ticket.")}
+             |> assign(:submission_error, "Price changed — please review your ticket.")}
 
           {:error, _changeset} ->
             {:noreply,
              socket
              |> assign(:placing_order?, false)
-             |> assign(:error, "Could not place order. Check items and try again.")}
+             |> assign(:submission_error, "Could not place order. Check items and try again.")}
         end
     end
   end
@@ -1828,6 +1840,7 @@ defmodule EspresoWeb.StaffPosLive do
     |> assign(:print_note_error?, false)
     |> assign(:last_cash_change, nil)
     |> assign(:error, nil)
+    |> assign(:submission_error, nil)
     |> assign(:payment_choice, :paid)
     |> assign(:paid_via, "cash")
     |> assign(:cash_tender_open?, false)

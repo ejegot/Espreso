@@ -653,7 +653,20 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute has_element?(view, "#pos-confirmation")
 
     view |> render_click("place_order", %{})
-    assert has_element?(view, "#pos-error", "Add at least one item")
+    assert has_element?(
+             view,
+             "#pos-ticket .staff-pos-ticket-footer #pos-submission-error[role='alert']",
+             "Add at least one item"
+           )
+  end
+
+  test "catalog selection errors remain global", %{conn: conn, barista: barista} do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    view |> render_click("add_to_cart", %{"product-id" => "-1"})
+
+    assert has_element?(view, "#pos-error", "Product is unavailable.")
+    refute has_element?(view, "#pos-submission-error")
   end
 
   test "placing order creates POS order with items, total, source, and confirmation", %{
@@ -1011,7 +1024,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     assert length(Orders.list_active_orders()) == 1
     refute has_element?(view, "#cash-tender-modal")
-    refute has_element?(view, "#pos-error")
+    refute has_element?(view, "#pos-submission-error")
   end
 
   test "unchanged authoritative price still creates one Cash order", %{
@@ -1295,7 +1308,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert length(Orders.list_active_orders()) == 1
     assert has_element?(view, "#pos-place-flash")
     assert has_element?(view, "#pos-cart-empty")
-    refute has_element?(view, "#pos-error")
+    refute has_element?(view, "#pos-submission-error")
   end
 
   test "repeated place_order is ignored while placing_order? is already true", %{
@@ -1373,7 +1386,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     assert {:noreply, next} = StaffPosLive.handle_event("place_order", %{}, socket)
     assert next.assigns.placing_order? == false
-    assert next.assigns.error == "Enter a customer name (at least 2 characters)."
+    assert next.assigns.submission_error == "Enter a customer name (at least 2 characters)."
     assert next.assigns.cart == cart
     assert Orders.list_active_orders() == []
   end
@@ -1467,9 +1480,16 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> element("#pos-product-#{espresso.id}") |> render_click()
     submit_order(view)
 
-    assert has_element?(view, "#pos-error", "Enter a customer name")
+    assert has_element?(
+             view,
+             "#pos-ticket .staff-pos-ticket-footer #pos-submission-error[role='alert']",
+             "Enter a customer name"
+           )
     refute has_element?(view, "#pos-confirmation")
     assert Orders.list_active_orders() == []
+
+    view |> render_click("new_order", %{})
+    refute has_element?(view, "#pos-submission-error")
   end
 
   test "unavailable product at place shows error, keeps cart, and resets placing_order?", %{
@@ -1486,8 +1506,14 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     submit_order(view)
 
-    assert has_element?(view, "#pos-error", "Espresso is no longer available")
+    assert has_element?(
+             view,
+             "#pos-ticket .staff-pos-ticket-footer #pos-submission-error[role='alert']",
+             "Espresso is no longer available"
+           )
     assert has_element?(view, "#pos-cart-lines", "Espresso")
+    assert has_element?(view, "#pos-place-order")
+    refute has_element?(view, "#cash-tender-modal")
     refute has_element?(view, "#pos-confirmation")
     assert Orders.list_active_orders() == []
 
@@ -1498,6 +1524,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     submit_order(view)
 
     assert has_element?(view, "#pos-place-flash")
+    refute has_element?(view, "#pos-submission-error")
     assert length(Orders.list_active_orders()) == 1
   end
 
@@ -1581,6 +1608,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute has_element?(view, "#pos-print-note")
     refute has_element?(view, "#pos-place-flash")
     refute has_element?(view, "#pos-error")
+    refute has_element?(view, "#pos-submission-error")
     refute has_element?(view, "#pos-cart-undo")
     assert has_element?(view, "#pos-cart-empty")
     assert has_element?(view, ~s(#pos-customer-name[value="Walk-in"]))
@@ -1877,7 +1905,11 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert Repo.aggregate(Espreso.Orders.OrderItem, :count, :id) == 0
     assert length(live_assigns(view).cart) == expected_lines
     assert has_element?(view, "#pos-cart-lines", cart_text)
-    assert has_element?(view, "#pos-error", "Price changed — please review your ticket.")
+    assert has_element?(
+             view,
+             "#pos-ticket .staff-pos-ticket-footer #pos-submission-error[role='alert']",
+             "Price changed — please review your ticket."
+           )
     refute has_element?(view, "#cash-tender-modal")
   end
 
@@ -1951,6 +1983,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
           last_order: nil,
           print_note: nil,
           error: nil,
+          submission_error: nil,
           notes: "",
           fulfillment: :pickup,
           table_number: "",
