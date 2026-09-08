@@ -785,6 +785,267 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute has_element?(view, "#pos-place-flash")
   end
 
+  test "Cash Process opens an accessible tender modal without creating an order", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso,
+    americano: americano
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    price_8 = Enum.find(americano.product_prices, &(&1.size == "8oz"))
+    view |> element("#pos-size-#{price_8.id}") |> render_click()
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+
+    view |> form("#pos-order-form") |> render_submit()
+
+    assert Orders.list_active_orders() == []
+    assert has_element?(view, ~s(#cash-tender-modal [role="dialog"][aria-modal="true"]))
+    assert has_element?(view, "#cash-tender-modal-title", "Cash Received")
+    assert has_element?(view, "#pos-cash-total", "₱185")
+
+    assert has_element?(
+             view,
+             ~s(#pos-cash-tendered[type="text"][inputmode="decimal"][autocomplete="off"])
+           )
+
+    assert has_element?(view, "#pos-cash-exact", "Exact")
+    refute has_element?(view, "#pos-cash-preset-100")
+    assert has_element?(view, ~s(#pos-cash-preset-200[aria-label*="₱200"]))
+    assert has_element?(view, "#pos-cash-preset-500")
+    assert has_element?(view, "#pos-cash-preset-1000")
+    assert has_element?(view, "#pos-confirm-cash[disabled]", "Confirm Payment")
+  end
+
+  test "cancelling Cash Received preserves the ticket and clears tender state", %{
+    conn: conn,
+    barista: barista,
+    americano: americano
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
+    view |> element("#pos-size-#{price_12.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    view |> element("#pos-fulfillment-dine-in") |> render_click()
+    view |> element("#pos-notes-toggle") |> render_click()
+
+    view
+    |> form("#pos-order-form", %{"customer_name" => "Maria", "notes" => "Less ice"})
+    |> render_submit()
+
+    token = live_assigns(view).cash_tender_token
+
+    view
+    |> form("#pos-cash-tender-form", %{
+      "cash_tender_token" => token,
+      "cash_tendered" => "200"
+    })
+    |> render_change()
+
+    view |> render_click("cancel_cash_tender", %{})
+
+    refute has_element?(view, "#cash-tender-modal")
+    assert Orders.list_active_orders() == []
+    assert has_element?(view, "#pos-cart-lines", "Americano")
+    assert has_element?(view, ~s(#pos-customer-name[value="Maria"]))
+    assert has_element?(view, "#pos-notes", "Less ice")
+    assert has_element?(view, "#pos-fulfillment-dine-in.is-active")
+    assert has_element?(view, "#pos-pay-cash.is-active")
+    assert live_assigns(view).cash_tendered == ""
+    assert live_assigns(view).cash_tender_error == nil
+    assert live_assigns(view).cash_tender_token == nil
+
+    view |> form("#pos-order-form") |> render_submit()
+    assert has_element?(view, ~s(#pos-cash-tendered[value=""]))
+    refute live_assigns(view).cash_tender_token == token
+  end
+
+  test "Cash tender calculates exact, change, shortfall, and replacing presets", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso,
+    americano: americano
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    price_8 = Enum.find(americano.product_prices, &(&1.size == "8oz"))
+    view |> element("#pos-size-#{price_8.id}") |> render_click()
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    view |> form("#pos-order-form") |> render_submit()
+
+    token = live_assigns(view).cash_tender_token
+
+    view
+    |> form("#pos-cash-tender-form", %{
+      "cash_tender_token" => token,
+      "cash_tendered" => "100"
+    })
+    |> render_change()
+
+    assert has_element?(view, "#pos-cash-tender-feedback.is-short", "Still needed")
+    assert has_element?(view, "#pos-cash-tender-feedback", "₱85")
+    assert has_element?(view, "#pos-confirm-cash[disabled]")
+
+    view |> element("#pos-cash-preset-200") |> render_click()
+    assert has_element?(view, ~s(#pos-cash-tendered[value="200.00"]))
+    assert has_element?(view, "#pos-cash-tender-feedback", "Change")
+    assert has_element?(view, "#pos-cash-tender-feedback", "₱15")
+    refute has_element?(view, "#pos-confirm-cash[disabled]")
+    assert Orders.list_active_orders() == []
+
+    view |> element("#pos-cash-preset-500") |> render_click()
+    assert has_element?(view, ~s(#pos-cash-tendered[value="500.00"]))
+    assert has_element?(view, "#pos-cash-tender-feedback", "₱315")
+
+    view |> element("#pos-cash-preset-1000") |> render_click()
+    assert has_element?(view, ~s(#pos-cash-tendered[value="1000.00"]))
+    assert has_element?(view, "#pos-cash-tender-feedback", "₱815")
+
+    view |> element("#pos-cash-exact") |> render_click()
+    assert has_element?(view, ~s(#pos-cash-tendered[value="185.00"]))
+    assert has_element?(view, "#pos-cash-tender-feedback", "Exact cash")
+    assert has_element?(view, "#pos-cash-tender-feedback", "₱0")
+    assert Orders.list_active_orders() == []
+  end
+
+  test "invalid or insufficient Cash confirmation never creates an order", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> form("#pos-order-form") |> render_submit()
+    token = live_assigns(view).cash_tender_token
+
+    for amount <- ["", "abc", "-1", "0", "75.001", "50"] do
+      view
+      |> form("#pos-cash-tender-form", %{
+        "cash_tender_token" => token,
+        "cash_tendered" => amount
+      })
+      |> render_submit()
+
+      assert Orders.list_active_orders() == []
+      assert has_element?(view, "#cash-tender-modal")
+    end
+
+    view
+    |> form("#pos-cash-tender-form", %{
+      "cash_tender_token" => token,
+      "cash_tendered" => "1,000.00"
+    })
+    |> render_change()
+
+    assert has_element?(view, "#pos-cash-tender-feedback", "₱925")
+    refute has_element?(view, "#pos-confirm-cash[disabled]")
+  end
+
+  test "valid Cash confirmation creates one paid order with authoritative fields and change", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso,
+    americano: americano
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    price_8 = Enum.find(americano.product_prices, &(&1.size == "8oz"))
+    view |> element("#pos-size-#{price_8.id}") |> render_click()
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    view |> element("#pos-notes-toggle") |> render_click()
+
+    view
+    |> form("#pos-order-form", %{"customer_name" => "Pedro", "notes" => "No sugar"})
+    |> render_submit()
+
+    token = live_assigns(view).cash_tender_token
+
+    view
+    |> form("#pos-cash-tender-form", %{
+      "cash_tender_token" => token,
+      "cash_tendered" => "200"
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#pos-place-flash", "Cash received ₱200")
+    assert has_element?(view, "#pos-place-flash", "Change ₱15")
+    refute has_element?(view, "#cash-tender-modal")
+
+    [order] = Orders.list_active_orders()
+    assert order.customer_name == "Pedro"
+    assert order.notes == "No sugar"
+    assert order.payment_method == "counter"
+    assert order.payment_status == "paid"
+    assert order.paid_via == "cash"
+    assert order.source == "pos"
+    assert order.status == "preparing"
+    assert Decimal.equal?(order.total, Decimal.new("185"))
+
+    assert live_assigns(view).cash_tendered == ""
+    assert live_assigns(view).cash_tender_open? == false
+    assert has_element?(view, "#pos-pay-cash.is-active")
+  end
+
+  test "stale and repeated Cash confirmations create exactly one order", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> form("#pos-order-form") |> render_submit()
+    token = live_assigns(view).cash_tender_token
+
+    view
+    |> render_click("confirm_cash_tender", %{
+      "cash_tender_token" => "stale-token",
+      "cash_tendered" => "100"
+    })
+
+    assert Orders.list_active_orders() == []
+    assert has_element?(view, "#cash-tender-modal")
+
+    params = %{"cash_tender_token" => token, "cash_tendered" => "100"}
+    view |> render_click("confirm_cash_tender", params)
+    view |> render_click("confirm_cash_tender", params)
+
+    assert length(Orders.list_active_orders()) == 1
+    refute has_element?(view, "#cash-tender-modal")
+    refute has_element?(view, "#pos-error")
+  end
+
+  test "Cash modal blocks ticket mutation and GCash bypasses tender", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso,
+    americano: americano
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> form("#pos-order-form") |> render_submit()
+
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    assert length(live_assigns(view).cart) == 1
+    assert has_element?(view, "#pos-cart-lines", "Espresso")
+    refute has_element?(view, "#pos-cart-lines", "Americano")
+
+    view |> render_click("cancel_cash_tender", %{})
+    view |> element("#pos-pay-gcash") |> render_click()
+
+    assert has_element?(view, "#pos-gcash-confirmation-cue")
+    assert has_element?(view, "#pos-place-order", "Confirm GCash & Process")
+    submit_order(view)
+
+    refute has_element?(view, "#cash-tender-modal")
+    refute has_element?(view, "#pos-place-flash", "Cash received")
+
+    [order] = Orders.list_active_orders()
+    assert order.payment_method == "counter"
+    assert order.payment_status == "paid"
+    assert order.paid_via == "gcash"
+    assert order.status == "preparing"
+  end
+
   test "POS defaults to paid and can place paid counter order", %{
     conn: conn,
     barista: barista,
@@ -881,7 +1142,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert Orders.list_active_orders() == []
   end
 
-  test "POS cash payment has no cash-received helper and places paid order", %{
+  test "POS cash payment confirms tender before placing paid order", %{
     conn: conn,
     barista: barista,
     espresso: espresso
@@ -890,8 +1151,6 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     view |> element("#pos-product-#{espresso.id}") |> render_click()
     assert has_element?(view, "#pos-pay-cash.is-active", "Cash")
-    refute has_element?(view, "#pos-cash-helper")
-    refute has_element?(view, "#pos-cash-chips")
     refute has_element?(view, "#pos-cash-tendered")
 
     submit_order(view)
@@ -1172,6 +1431,9 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-confirmation.is-error", "Print failed · order saved")
     assert has_element?(view, "#pos-print-note.is-error", "Order saved · print failed")
     assert has_element?(view, "#pos-retry-print", "Retry print")
+    refute has_element?(view, "#cash-tender-modal")
+    assert Decimal.equal?(live_assigns(view).last_cash_change.tendered, Decimal.new("75"))
+    assert Decimal.equal?(live_assigns(view).last_cash_change.change, Decimal.new("0"))
     refute has_element?(view, "#pos-clear-ticket")
     refute has_element?(view, "#pos-cart-undo")
 
@@ -1210,6 +1472,11 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert live_assigns(view).notes == ""
     assert live_assigns(view).card_sizes == %{}
     assert live_assigns(view).variant_editor_key == nil
+    assert live_assigns(view).cash_tender_open? == false
+    assert live_assigns(view).cash_tendered == ""
+    assert live_assigns(view).cash_tender_error == nil
+    assert live_assigns(view).cash_tender_token == nil
+    assert live_assigns(view).last_cash_change == nil
     assert length(Orders.list_active_orders()) == 1
   end
 
@@ -1330,9 +1597,17 @@ defmodule EspresoWeb.StaffPosLiveTest do
   end
 
   defp submit_order(view, params \\ %{}) do
-    view
-    |> form("#pos-order-form", params)
-    |> render_submit()
+    result =
+      view
+      |> form("#pos-order-form", params)
+      |> render_submit()
+
+    if has_element?(view, "#cash-tender-modal") do
+      view |> element("#pos-cash-exact") |> render_click()
+      view |> form("#pos-cash-tender-form") |> render_submit()
+    else
+      result
+    end
   end
 
   defp remove_line(view, key) do
@@ -1432,6 +1707,9 @@ defmodule EspresoWeb.StaffPosLiveTest do
           table_number: "",
           paid_via: "cash",
           cash_tendered: "",
+          cash_tender_open?: false,
+          cash_tender_error: nil,
+          cash_tender_token: nil,
           last_cash_change: nil,
           print_failed?: false,
           print_note_error?: false,

@@ -5,6 +5,7 @@ defmodule EspresoWeb.StaffPosLive do
   alias Espreso.Orders
   alias Espreso.Printer
   alias EspresoWeb.StaffNotifications
+  alias Phoenix.LiveView.JS
 
   @cart_undo_timeout_ms 4_000
 
@@ -30,6 +31,9 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:payment_choice, :paid)
      |> assign(:paid_via, "cash")
      |> assign(:cash_tendered, "")
+     |> assign(:cash_tender_open?, false)
+     |> assign(:cash_tender_error, nil)
+     |> assign(:cash_tender_token, nil)
      |> assign(:last_cash_change, nil)
      |> assign(:print_failed?, false)
      |> assign(:print_note_error?, false)
@@ -80,6 +84,29 @@ defmodule EspresoWeb.StaffPosLive do
   def handle_info({:expire_cart_undo, _token}, socket), do: {:noreply, socket}
 
   @impl true
+  def handle_event(event, _params, %{assigns: %{cash_tender_open?: true}} = socket)
+      when event in [
+             "toggle_cart_variant",
+             "change_cart_variant",
+             "select_card_size",
+             "add_to_cart",
+             "add_product",
+             "select_size",
+             "inc",
+             "dec",
+             "remove",
+             "clear_ticket",
+             "undo_cart",
+             "set_customer_name",
+             "set_notes",
+             "set_fulfillment",
+             "set_payment_method",
+             "set_payment_choice",
+             "set_paid_via"
+           ] do
+    {:noreply, socket}
+  end
+
   def handle_event("select_category", %{"name" => name}, socket) when name != "ALL" do
     {:noreply,
      socket
@@ -323,7 +350,8 @@ defmodule EspresoWeb.StaffPosLive do
      socket
      |> assign(:payment_choice, :paid)
      |> assign(:paid_via, paid_via)
-     |> assign(:cash_tendered, "")}
+     |> assign(:cash_tendered, "")
+     |> assign(:cash_tender_error, nil)}
   end
 
   def handle_event("set_payment_method", _params, socket), do: {:noreply, socket}
@@ -341,29 +369,109 @@ defmodule EspresoWeb.StaffPosLive do
     handle_event("set_payment_method", %{"method" => paid_via}, socket)
   end
 
-  def handle_event("set_cash_tendered", %{"cash_tendered" => amount}, socket) do
-    {:noreply, assign(socket, :cash_tendered, String.trim(amount))}
+  def handle_event(
+        "set_cash_tendered",
+        %{"cash_tendered" => amount},
+        %{assigns: %{cash_tender_open?: true}} = socket
+      ) do
+    {:noreply,
+     socket
+     |> assign(:cash_tendered, String.trim(amount))
+     |> assign(:cash_tender_error, nil)}
   end
 
-  def handle_event("cash_exact", _params, socket) do
+  def handle_event("set_cash_tendered", _params, socket), do: {:noreply, socket}
+
+  def handle_event("cash_exact", _params, %{assigns: %{cash_tender_open?: true}} = socket) do
     total = cart_total(socket.assigns.cart) |> Decimal.round(2) |> Decimal.to_string(:normal)
-    {:noreply, assign(socket, :cash_tendered, total)}
+
+    {:noreply,
+     socket
+     |> assign(:cash_tendered, total)
+     |> assign(:cash_tender_error, nil)}
   end
 
-  def handle_event("cash_chip", %{"amount" => amount}, socket) do
-    case parse_money(amount) do
-      {:ok, chip} ->
-        current =
-          case parse_money(socket.assigns.cash_tendered) do
-            {:ok, value} -> value
-            :error -> Decimal.new(0)
-          end
+  def handle_event("cash_exact", _params, socket), do: {:noreply, socket}
 
-        next = Decimal.add(current, chip) |> Decimal.round(2) |> Decimal.to_string(:normal)
-        {:noreply, assign(socket, :cash_tendered, next)}
+  def handle_event(
+        "cash_chip",
+        %{"amount" => amount},
+        %{assigns: %{cash_tender_open?: true}} = socket
+      ) do
+    case parse_money(amount) do
+      {:ok, tendered} ->
+        amount = tendered |> Decimal.round(2) |> Decimal.to_string(:normal)
+
+        {:noreply,
+         socket
+         |> assign(:cash_tendered, amount)
+         |> assign(:cash_tender_error, nil)}
 
       :error ->
         {:noreply, socket}
+    end
+  end
+
+  def handle_event("cash_chip", _params, socket), do: {:noreply, socket}
+
+  def handle_event("cancel_cash_tender", _params, socket) do
+    {:noreply, close_cash_tender(socket)}
+  end
+
+  def handle_event("confirm_cash_tender", params, socket) do
+    tendered = Map.get(params, "cash_tendered", socket.assigns.cash_tendered)
+    token = Map.get(params, "cash_tender_token")
+    socket = assign(socket, :cash_tendered, String.trim(to_string(tendered)))
+
+    cond do
+      not socket.assigns.cash_tender_open? ->
+        {:noreply, socket}
+
+      token != socket.assigns.cash_tender_token ->
+        {:noreply, assign(socket, :cash_tender_error, "This cash entry is no longer active.")}
+
+      socket.assigns.payment_choice != :paid or socket.assigns.paid_via != "cash" ->
+        {:noreply, assign(socket, :cash_tender_error, "Cash payment is no longer selected.")}
+
+      socket.assigns.placing_order? ->
+        {:noreply, socket}
+
+      true ->
+        case order_preflight(socket) do
+          :ignore ->
+            {:noreply, socket}
+
+          {:error, message} ->
+            {:noreply, assign(socket, :cash_tender_error, message)}
+
+          :ok ->
+            case cash_tender_state(socket.assigns.cash_tendered, cart_total(socket.assigns.cart)) do
+              {:exact, _tendered, _change} ->
+                socket
+                |> consume_cash_tender()
+                |> create_pos_order()
+
+              {:change, _tendered, _change} ->
+                socket
+                |> consume_cash_tender()
+                |> create_pos_order()
+
+              {:short, _tendered, needed} ->
+                {:noreply,
+                 assign(
+                   socket,
+                   :cash_tender_error,
+                   "Cash received is short by #{Menu.format_price(needed)}."
+                 )}
+
+              :blank ->
+                {:noreply, assign(socket, :cash_tender_error, "Enter the cash received.")}
+
+              :invalid ->
+                {:noreply,
+                 assign(socket, :cash_tender_error, "Enter a valid cash amount with up to 2 decimal places.")}
+            end
+        end
     end
   end
 
@@ -442,129 +550,23 @@ defmodule EspresoWeb.StaffPosLive do
       |> assign(:customer_name, Map.get(params, "customer_name", socket.assigns.customer_name))
       |> assign(:notes, Map.get(params, "notes", socket.assigns.notes))
 
-    cond do
-      socket.assigns.placing_order? ->
-        {:noreply, socket}
+    if socket.assigns.cash_tender_open? do
+      {:noreply, socket}
+    else
+      case order_preflight(socket) do
+        :ignore ->
+          {:noreply, socket}
 
-      socket.assigns.cart == [] and
-          (not is_nil(socket.assigns.place_flash) or not is_nil(socket.assigns.last_order)) ->
-        {:noreply, socket}
+        {:error, message} ->
+          {:noreply, assign(socket, :error, message)}
 
-      socket.assigns.cart == [] ->
-        {:noreply, assign(socket, :error, "Add at least one item before placing an order.")}
+        :ok
+        when socket.assigns.payment_choice == :paid and socket.assigns.paid_via == "cash" ->
+          {:noreply, open_cash_tender(socket)}
 
-      String.trim(socket.assigns.customer_name) == "" ||
-          String.length(String.trim(socket.assigns.customer_name)) < 2 ->
-        {:noreply,
-         assign(socket, :error, "Enter a customer name (at least 2 characters).")}
-
-      cash_short?(socket) ->
-        {:noreply, assign(socket, :error, "Cash tendered is less than the total.")}
-
-      true ->
-        customer_name = String.trim(socket.assigns.customer_name)
-        paid? = socket.assigns.payment_choice == :paid
-        paid_via = if paid?, do: socket.assigns.paid_via, else: nil
-        {tendered, change} = cash_amounts(socket)
-
-        lines =
-          Enum.map(socket.assigns.cart, fn line ->
-            %{
-              product_id: line.product_id,
-              name: line.name,
-              size: line.size,
-              quantity: line.quantity,
-              price: line.price
-            }
-          end)
-
-        attrs = %{
-          customer_name: customer_name,
-          notes: blank_notes(socket.assigns.notes),
-          fulfillment: socket.assigns.fulfillment,
-          table_number: nil,
-          payment_method: :counter,
-          payment_status: socket.assigns.payment_choice,
-          paid_via: paid_via,
-          source: :pos
-        }
-
-        socket = assign(socket, :placing_order?, true)
-
-        case Orders.create_order(lines, attrs) do
-          {:ok, order} ->
-            print_result =
-              if paid? do
-                opts =
-                  [staff_name: socket.assigns.current_user.name] ++
-                    if(tendered, do: [cash_tendered: tendered, change: change], else: [])
-
-                Printer.after_paid(order, order.paid_via || paid_via || "cash", opts)
-              else
-                :disabled
-              end
-
-            {note, failed?, note_error?} =
-              print_note_result(print_result, order.paid_via || paid_via)
-
-            cash_change = if(change, do: %{tendered: tendered, change: change})
-
-            socket =
-              socket
-              |> clear_cart_undo()
-              |> assign(:cart, [])
-              |> assign(:card_sizes, %{})
-              |> assign(:added_product_id, nil)
-              |> assign(:error, nil)
-              |> assign(:payment_choice, :paid)
-              |> assign(:paid_via, "cash")
-              |> assign(:customer_name, "Walk-in")
-              |> assign(:variant_editor_key, nil)
-              |> assign(:cash_tendered, "")
-              |> assign(:fulfillment, :pickup)
-              |> assign(:table_number, "")
-              |> assign(:placing_order?, false)
-              |> assign(:notes, "")
-              |> assign(:notes_open?, false)
-              |> assign(:categories, Menu.list_menu())
-              |> assign(:last_cash_change, cash_change)
-              |> assign(:print_note, note)
-              |> assign(:print_failed?, failed?)
-              |> assign(:print_note_error?, note_error?)
-
-            socket =
-              if failed? do
-                socket
-                |> assign(:last_order, order)
-                |> clear_place_flash()
-              else
-                flash = place_flash_message(order, note, cash_change)
-
-                socket
-                |> assign(:last_order, nil)
-                |> put_place_flash(flash)
-              end
-
-            {:noreply, socket}
-
-          {:error, :empty_cart} ->
-            {:noreply,
-             socket
-             |> assign(:placing_order?, false)
-             |> assign(:error, "Add at least one item before placing an order.")}
-
-          {:error, {:unavailable, names}} ->
-            {:noreply,
-             socket
-             |> assign(:placing_order?, false)
-             |> assign(:error, unavailable_error(names))}
-
-          {:error, _changeset} ->
-            {:noreply,
-             socket
-             |> assign(:placing_order?, false)
-             |> assign(:error, "Could not place order. Check items and try again.")}
-        end
+        :ok ->
+          create_pos_order(socket)
+      end
     end
   end
 
@@ -1123,9 +1125,312 @@ defmodule EspresoWeb.StaffPosLive do
             </aside>
           </div>
         </main>
+
+        <.cash_tender_modal
+          :if={@cash_tender_open?}
+          cart={@cart}
+          cash_tendered={@cash_tendered}
+          cash_tender_error={@cash_tender_error}
+          cash_tender_token={@cash_tender_token}
+          placing_order?={@placing_order?}
+        />
       </div>
     </.staff_shell>
     """
+  end
+
+  defp cash_tender_modal(assigns) do
+    total = cart_total(assigns.cart) |> Decimal.round(2)
+    tender_state = cash_tender_state(assigns.cash_tendered, total)
+
+    assigns =
+      assigns
+      |> assign(:total, total)
+      |> assign(:tender_state, tender_state)
+      |> assign(:quick_tenders, cash_quick_tenders(total))
+      |> assign(:confirm_enabled?, cash_tender_valid?(tender_state))
+
+    ~H"""
+    <.modal
+      id="cash-tender-modal"
+      show={true}
+      on_cancel={JS.push("cancel_cash_tender")}
+    >
+      <div class="staff-pos-cash-modal">
+        <header class="staff-pos-cash-modal-head">
+          <p class="staff-pos-cash-modal-eyebrow">Cash payment</p>
+          <h2 id="cash-tender-modal-title">Cash Received</h2>
+          <p id="cash-tender-modal-description">
+            Enter the cash handed to staff before creating this order.
+          </p>
+        </header>
+
+        <div class="staff-pos-cash-total" id="pos-cash-total">
+          <span>Total</span>
+          <strong>{Menu.format_price(@total)}</strong>
+        </div>
+
+        <form
+          id="pos-cash-tender-form"
+          phx-change="set_cash_tendered"
+          phx-submit="confirm_cash_tender"
+        >
+          <input type="hidden" name="cash_tender_token" value={@cash_tender_token} />
+
+          <label class="staff-pos-cash-field" for="pos-cash-tendered">
+            <span>Cash received</span>
+            <span class="staff-pos-cash-input-wrap">
+              <span aria-hidden="true">₱</span>
+              <input
+                type="text"
+                inputmode="decimal"
+                autocomplete="off"
+                id="pos-cash-tendered"
+                name="cash_tendered"
+                value={@cash_tendered}
+                placeholder="0.00"
+                aria-describedby="pos-cash-tender-feedback"
+                aria-invalid={to_string(@tender_state == :invalid or not is_nil(@cash_tender_error))}
+              />
+            </span>
+          </label>
+
+          <div class="staff-pos-cash-quick" id="pos-cash-quick-tenders">
+            <button
+              type="button"
+              id="pos-cash-exact"
+              phx-click="cash_exact"
+              aria-label="Set cash received to the exact total"
+            >
+              Exact
+            </button>
+            <button
+              :for={amount <- @quick_tenders}
+              type="button"
+              id={"pos-cash-preset-#{Decimal.to_integer(amount)}"}
+              phx-click="cash_chip"
+              phx-value-amount={Decimal.to_string(amount, :normal)}
+              aria-label={"Set cash received to #{Menu.format_price(amount)}"}
+            >
+              {Menu.format_price(amount)}
+            </button>
+          </div>
+
+          <div
+            class={[
+              "staff-pos-cash-feedback",
+              match?({:short, _, _}, @tender_state) && "is-short",
+              (@tender_state == :invalid or not is_nil(@cash_tender_error)) && "is-error"
+            ]}
+            id="pos-cash-tender-feedback"
+            aria-live="polite"
+          >
+            <%= case @tender_state do %>
+              <% {:exact, _tendered, change} -> %>
+                <span>Exact cash</span>
+                <strong>Change {Menu.format_price(change)}</strong>
+              <% {:change, _tendered, change} -> %>
+                <span>Change</span>
+                <strong>{Menu.format_price(change)}</strong>
+              <% {:short, _tendered, needed} -> %>
+                <span>Still needed</span>
+                <strong>{Menu.format_price(needed)}</strong>
+              <% :invalid -> %>
+                <span>Enter a valid amount with up to 2 decimal places.</span>
+              <% :blank -> %>
+                <span>Enter cash received or choose a quick amount.</span>
+            <% end %>
+            <span :if={@cash_tender_error} class="staff-pos-cash-feedback-error">
+              {@cash_tender_error}
+            </span>
+          </div>
+
+          <div class="staff-pos-cash-modal-actions">
+            <button
+              type="submit"
+              class="staff-pos-place"
+              id="pos-confirm-cash"
+              disabled={!@confirm_enabled? or @placing_order?}
+              phx-disable-with="Processing…"
+            >
+              Confirm Payment
+            </button>
+            <button
+              type="button"
+              class="staff-pos-place staff-pos-place--secondary"
+              id="pos-cancel-cash"
+              phx-click={JS.exec("data-cancel", to: "#cash-tender-modal")}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </.modal>
+    """
+  end
+
+  defp create_pos_order(socket) do
+    case order_preflight(socket) do
+      :ignore ->
+        {:noreply, socket}
+
+      {:error, message} ->
+        {:noreply, assign(socket, :error, message)}
+
+      :ok ->
+        customer_name = String.trim(socket.assigns.customer_name)
+        paid? = socket.assigns.payment_choice == :paid
+        paid_via = if paid?, do: socket.assigns.paid_via, else: nil
+        {tendered, change} = cash_amounts(socket)
+
+        lines =
+          Enum.map(socket.assigns.cart, fn line ->
+            %{
+              product_id: line.product_id,
+              name: line.name,
+              size: line.size,
+              quantity: line.quantity,
+              price: line.price
+            }
+          end)
+
+        attrs = %{
+          customer_name: customer_name,
+          notes: blank_notes(socket.assigns.notes),
+          fulfillment: socket.assigns.fulfillment,
+          table_number: nil,
+          payment_method: :counter,
+          payment_status: socket.assigns.payment_choice,
+          paid_via: paid_via,
+          source: :pos
+        }
+
+        socket = assign(socket, :placing_order?, true)
+
+        case Orders.create_order(lines, attrs) do
+          {:ok, order} ->
+            print_result =
+              if paid? do
+                opts =
+                  [staff_name: socket.assigns.current_user.name] ++
+                    if(tendered, do: [cash_tendered: tendered, change: change], else: [])
+
+                Printer.after_paid(order, order.paid_via || paid_via || "cash", opts)
+              else
+                :disabled
+              end
+
+            {note, failed?, note_error?} =
+              print_note_result(print_result, order.paid_via || paid_via)
+
+            cash_change = if(change, do: %{tendered: tendered, change: change})
+
+            socket =
+              socket
+              |> clear_cart_undo()
+              |> assign(:cart, [])
+              |> assign(:card_sizes, %{})
+              |> assign(:added_product_id, nil)
+              |> assign(:error, nil)
+              |> assign(:payment_choice, :paid)
+              |> assign(:paid_via, "cash")
+              |> assign(:customer_name, "Walk-in")
+              |> assign(:variant_editor_key, nil)
+              |> assign(:cash_tender_open?, false)
+              |> assign(:cash_tendered, "")
+              |> assign(:cash_tender_error, nil)
+              |> assign(:cash_tender_token, nil)
+              |> assign(:fulfillment, :pickup)
+              |> assign(:table_number, "")
+              |> assign(:placing_order?, false)
+              |> assign(:notes, "")
+              |> assign(:notes_open?, false)
+              |> assign(:categories, Menu.list_menu())
+              |> assign(:last_cash_change, cash_change)
+              |> assign(:print_note, note)
+              |> assign(:print_failed?, failed?)
+              |> assign(:print_note_error?, note_error?)
+
+            socket =
+              if failed? do
+                socket
+                |> assign(:last_order, order)
+                |> clear_place_flash()
+              else
+                flash = place_flash_message(order, note, cash_change)
+
+                socket
+                |> assign(:last_order, nil)
+                |> put_place_flash(flash)
+              end
+
+            {:noreply, socket}
+
+          {:error, :empty_cart} ->
+            {:noreply,
+             socket
+             |> assign(:placing_order?, false)
+             |> assign(:error, "Add at least one item before placing an order.")}
+
+          {:error, {:unavailable, names}} ->
+            {:noreply,
+             socket
+             |> assign(:placing_order?, false)
+             |> assign(:error, unavailable_error(names))}
+
+          {:error, _changeset} ->
+            {:noreply,
+             socket
+             |> assign(:placing_order?, false)
+             |> assign(:error, "Could not place order. Check items and try again.")}
+        end
+    end
+  end
+
+  defp order_preflight(socket) do
+    cond do
+      socket.assigns.placing_order? ->
+        :ignore
+
+      socket.assigns.cart == [] and
+          (not is_nil(socket.assigns.place_flash) or not is_nil(socket.assigns.last_order)) ->
+        :ignore
+
+      socket.assigns.cart == [] ->
+        {:error, "Add at least one item before placing an order."}
+
+      String.trim(socket.assigns.customer_name) == "" ||
+          String.length(String.trim(socket.assigns.customer_name)) < 2 ->
+        {:error, "Enter a customer name (at least 2 characters)."}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp open_cash_tender(socket) do
+    socket
+    |> assign(:cash_tender_open?, true)
+    |> assign(:cash_tendered, "")
+    |> assign(:cash_tender_error, nil)
+    |> assign(:cash_tender_token, Integer.to_string(System.unique_integer([:positive])))
+    |> assign(:error, nil)
+  end
+
+  defp close_cash_tender(socket) do
+    socket
+    |> assign(:cash_tender_open?, false)
+    |> assign(:cash_tendered, "")
+    |> assign(:cash_tender_error, nil)
+    |> assign(:cash_tender_token, nil)
+  end
+
+  defp consume_cash_tender(socket) do
+    socket
+    |> assign(:cash_tender_open?, false)
+    |> assign(:cash_tender_error, nil)
+    |> assign(:cash_tender_token, nil)
   end
 
   defp default_pos_category(categories) do
@@ -1503,7 +1808,10 @@ defmodule EspresoWeb.StaffPosLive do
     |> assign(:error, nil)
     |> assign(:payment_choice, :paid)
     |> assign(:paid_via, "cash")
+    |> assign(:cash_tender_open?, false)
     |> assign(:cash_tendered, "")
+    |> assign(:cash_tender_error, nil)
+    |> assign(:cash_tender_token, nil)
     |> assign(:fulfillment, :pickup)
     |> assign(:table_number, "")
     |> assign(:placing_order?, false)
@@ -1591,6 +1899,10 @@ defmodule EspresoWeb.StaffPosLive do
       [
         print_note,
         if(cash_change,
+          do: "Cash received #{Menu.format_price(cash_change.tendered)}",
+          else: nil
+        ),
+        if(cash_change,
           do: "Change #{Menu.format_price(cash_change.change)}",
           else: nil
         )
@@ -1611,22 +1923,77 @@ defmodule EspresoWeb.StaffPosLive do
   defp blank_notes(_), do: nil
 
   defp parse_money(amount) when is_binary(amount) do
-    cleaned =
-      amount
-      |> String.trim()
-      |> String.replace(",", "")
+    amount = String.trim(amount)
 
-    case Decimal.parse(cleaned) do
-      {decimal, ""} -> {:ok, Decimal.round(decimal, 2)}
-      _ -> :error
+    if Regex.match?(~r/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$|^\.\d{1,2}$/, amount) do
+      cleaned = String.replace(amount, ",", "")
+
+      case Decimal.parse(cleaned) do
+        {decimal, ""} ->
+          if Decimal.compare(decimal, Decimal.new(0)) == :gt do
+            {:ok, Decimal.round(decimal, 2)}
+          else
+            :error
+          end
+
+        _ ->
+          :error
+      end
+    else
+      :error
     end
   end
 
   defp parse_money(_), do: :error
 
-  defp cash_short?(_socket), do: false
+  defp cash_tender_state(amount, total) do
+    total = Decimal.round(total, 2)
 
-  defp cash_amounts(_socket), do: {nil, nil}
+    if is_binary(amount) and String.trim(amount) == "" do
+      :blank
+    else
+      case parse_money(amount) do
+        {:ok, tendered} ->
+          case Decimal.compare(tendered, total) do
+            :lt -> {:short, tendered, Decimal.sub(total, tendered)}
+            :eq -> {:exact, tendered, Decimal.new("0.00")}
+            :gt -> {:change, tendered, Decimal.sub(tendered, total)}
+          end
+
+        :error ->
+          :invalid
+      end
+    end
+  end
+
+  defp cash_tender_valid?({kind, _tendered, _change}) when kind in [:exact, :change], do: true
+  defp cash_tender_valid?(_state), do: false
+
+  defp cash_short?(socket) do
+    match?(
+      {:short, _tendered, _needed},
+      cash_tender_state(socket.assigns.cash_tendered, cart_total(socket.assigns.cart))
+    )
+  end
+
+  defp cash_amounts(socket) do
+    if socket.assigns.payment_choice == :paid and socket.assigns.paid_via == "cash" and
+         not cash_short?(socket) do
+      case cash_tender_state(socket.assigns.cash_tendered, cart_total(socket.assigns.cart)) do
+        {:exact, tendered, change} -> {tendered, change}
+        {:change, tendered, change} -> {tendered, change}
+        _ -> {nil, nil}
+      end
+    else
+      {nil, nil}
+    end
+  end
+
+  defp cash_quick_tenders(total) do
+    ["100", "200", "500", "1000"]
+    |> Enum.map(&Decimal.new/1)
+    |> Enum.filter(&(Decimal.compare(&1, total) in [:eq, :gt]))
+  end
 
   defp staff_initials(name) when is_binary(name) do
     name

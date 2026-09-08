@@ -5967,6 +5967,216 @@ a.staff-home-card:focus-visible {
   padding: 1rem;
 }
 
+#cash-tender-modal {
+  z-index: 70;
+}
+
+#cash-tender-modal-bg {
+  background: rgba(24, 16, 12, 0.46);
+}
+
+#cash-tender-modal-container {
+  width: min(100%, 24rem);
+  max-height: calc(100dvh - 2rem);
+  margin-inline: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 1.1rem;
+  padding-bottom: max(1.1rem, env(safe-area-inset-bottom));
+  border: 1px solid var(--cs-line);
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(24, 16, 12, 0.2);
+}
+
+.staff-pos-cash-modal {
+  display: grid;
+  gap: 0.9rem;
+  color: var(--cs-brown);
+}
+
+.staff-pos-cash-modal-head {
+  padding-right: 1.75rem;
+}
+
+.staff-pos-cash-modal-eyebrow {
+  margin: 0 0 0.15rem;
+  color: var(--cs-beige);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.staff-pos-cash-modal-head h2 {
+  margin: 0;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.staff-pos-cash-modal-head p:last-child {
+  margin: 0.25rem 0 0;
+  color: color-mix(in srgb, var(--cs-brown) 68%, var(--cs-beige));
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.staff-pos-cash-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, var(--cs-cream) 82%, #fff);
+}
+
+.staff-pos-cash-total span {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.staff-pos-cash-total strong {
+  color: var(--cs-orange);
+  font-size: 1.35rem;
+  font-variant-numeric: tabular-nums;
+}
+
+#pos-cash-tender-form,
+.staff-pos-cash-field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.staff-pos-cash-field > span:first-child {
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.staff-pos-cash-input-wrap {
+  min-height: 3rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.8rem;
+  border: 1px solid var(--cs-line);
+  border-radius: 0.7rem;
+  background: #fff;
+  color: var(--cs-brown);
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.staff-pos-cash-input-wrap:focus-within {
+  border-color: var(--cs-orange);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cs-orange) 12%, transparent);
+}
+
+.staff-pos-cash-input-wrap input {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.9rem;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.staff-pos-cash-quick {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(5.25rem, 1fr));
+  gap: 0.4rem;
+}
+
+.staff-pos-cash-quick button {
+  min-height: 2.75rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--cs-line);
+  border-radius: 0.65rem;
+  background: #fff;
+  color: var(--cs-brown);
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.staff-pos-cash-quick button:focus-visible,
+.staff-pos-cash-quick button:active {
+  border-color: var(--cs-orange);
+  background: color-mix(in srgb, var(--cs-orange) 8%, #fff);
+  color: var(--cs-orange);
+  outline: none;
+}
+
+.staff-pos-cash-feedback {
+  min-height: 3.25rem;
+  display: grid;
+  align-content: center;
+  gap: 0.1rem;
+  padding: 0.55rem 0.7rem;
+  border-left: 3px solid color-mix(in srgb, #2f7d4a 60%, transparent);
+  background: color-mix(in srgb, #2f7d4a 7%, #fff);
+  color: #235f39;
+}
+
+.staff-pos-cash-feedback span {
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.staff-pos-cash-feedback strong {
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.staff-pos-cash-feedback.is-short,
+.staff-pos-cash-feedback.is-error {
+  border-left-color: var(--cs-orange);
+  background: color-mix(in srgb, var(--cs-orange) 8%, #fff);
+  color: var(--cs-brown);
+}
+
+.staff-pos-cash-feedback-error {
+  margin-top: 0.15rem;
+  color: #9a3412;
+}
+
+.staff-pos-cash-modal-actions {
+  position: sticky;
+  bottom: -1.1rem;
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.2rem -0.1rem -0.1rem;
+  padding: 0.45rem 0.1rem 0.1rem;
+  background: #fff;
+}
+
+.staff-pos-cash-modal-actions .staff-pos-place {
+  min-height: 2.9rem;
+}
+
+@media (max-width: 480px) {
+  #cash-tender-modal-container {
+    max-height: calc(100dvh - 1rem);
+    padding: 0.9rem;
+    padding-bottom: max(0.9rem, env(safe-area-inset-bottom));
+  }
+
+  .staff-pos-cash-modal {
+    gap: 0.7rem;
+  }
+
+  .staff-pos-cash-modal-actions {
+    bottom: -0.9rem;
+  }
+}
+
 .staff-pos-page .staff-pos-size-picker-head {
   display: flex;
   align-items: flex-start;
