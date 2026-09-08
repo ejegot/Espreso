@@ -74,16 +74,19 @@ defmodule Espreso.Printer do
   was physically confirmed by the printer.
   """
   def dispatch_receipt(%Order{} = order, opts \\ []) do
-    case send_bytes_detailed(Receipt.build(order, opts), "receipt #{order.number}") do
-      :ok -> :dispatched
-      :disabled -> :disabled
-      {:error, :connect, reason} -> {:definite_failure, reason}
-      {:error, :send, reason} -> {:uncertain, reason}
-    end
+    Receipt.build(order, opts)
+    |> send_bytes_detailed("receipt #{order.number}")
+    |> dispatch_result()
   end
 
   def print_kitchen(%Order{} = order, opts \\ []) do
     send_bytes(Receipt.build_kitchen(order, opts), "kitchen #{order.number}")
+  end
+
+  def dispatch_kitchen(%Order{} = order, opts \\ []) do
+    Receipt.build_kitchen(order, opts)
+    |> send_bytes_detailed("kitchen #{order.number}")
+    |> dispatch_result()
   end
 
   def open_drawer(pin \\ :pin2) do
@@ -94,6 +97,18 @@ defmodule Espreso.Printer do
       end
 
     send_bytes(bytes, "drawer #{pin}")
+  end
+
+  def dispatch_drawer(pin \\ :pin2) do
+    bytes =
+      case pin do
+        :pin5 -> EscPos.drawer_kick_pin5()
+        _ -> EscPos.drawer_kick_pin2()
+      end
+
+    bytes
+    |> send_bytes_detailed("drawer #{pin}")
+    |> dispatch_result()
   end
 
   def test_print do
@@ -143,6 +158,11 @@ defmodule Espreso.Printer do
       :disabled
     end
   end
+
+  defp dispatch_result(:ok), do: :dispatched
+  defp dispatch_result(:disabled), do: :disabled
+  defp dispatch_result({:error, :connect, reason}), do: {:definite_failure, reason}
+  defp dispatch_result({:error, :send, reason}), do: {:uncertain, reason}
 
   defp do_send(bytes, label) do
     host = host()
