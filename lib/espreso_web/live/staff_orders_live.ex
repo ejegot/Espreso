@@ -8,14 +8,19 @@ defmodule EspresoWeb.StaffOrdersLive do
   alias EspresoWeb.StaffNotifications
 
   @ready_lane_limit 100
+  @age_tick_ms 60_000
 
   @impl true
   def mount(_params, _session, socket) do
-    if connected?(socket), do: Orders.subscribe()
+    if connected?(socket) do
+      Orders.subscribe()
+      schedule_age_tick()
+    end
 
     {:ok,
      socket
      |> assign(:page_title, "Orders")
+     |> assign(:age_now, DateTime.utc_now(:second))
      |> assign(:flash_note, nil)
      |> assign(:unpaid_drawer_open, false)
      |> assign(:reconciliation_drawer_open, false)
@@ -42,6 +47,11 @@ defmodule EspresoWeb.StaffOrdersLive do
       |> load_orders()
 
     {:noreply, socket}
+  end
+
+  def handle_info(:age_tick, socket) do
+    schedule_age_tick()
+    {:noreply, assign(socket, :age_now, DateTime.utc_now(:second))}
   end
 
   @impl true
@@ -283,11 +293,15 @@ defmodule EspresoWeb.StaffOrdersLive do
   def render(assigns) do
     received = Enum.filter(assigns.active_orders, &(&1.status == "received"))
     preparing = Enum.filter(assigns.active_orders, &(&1.status == "preparing"))
+    waiting = Enum.count(received, &waiting_for_online_payment?/1)
+    actionable = length(received) - waiting
 
     assigns =
       assigns
       |> assign(:received_orders, received)
       |> assign(:preparing_orders, preparing)
+      |> assign(:waiting_received_count, waiting)
+      |> assign(:actionable_received_count, actionable)
 
     ~H"""
     <.staff_shell current={:orders} current_user={@current_user} page_title="Orders">
@@ -335,6 +349,18 @@ defmodule EspresoWeb.StaffOrdersLive do
         <main class="staff-orders-main">
           <p :if={@flash_note} class="staff-admin-note" id="orders-flash">{@flash_note}</p>
 
+          <nav class="staff-orders-lane-jumps" aria-label="Jump to order lane">
+            <a href="#orders-new" class="staff-orders-lane-jump staff-orders-lane-jump--new">
+              New <span>{@actionable_received_count + @waiting_received_count}</span>
+            </a>
+            <a href="#orders-preparing" class="staff-orders-lane-jump">
+              Preparing <span>{length(@preparing_orders)}</span>
+            </a>
+            <a href="#orders-ready" class="staff-orders-lane-jump">
+              Ready <span>{length(@ready_orders)}</span>
+            </a>
+          </nav>
+
           <div :if={@alert_banner} class="staff-orders-alert" id="orders-alert-banner" role="status">
             <div class="staff-orders-alert-copy">
               <p class="staff-orders-alert-title">New order {@alert_banner.number}</p>
@@ -373,12 +399,25 @@ defmodule EspresoWeb.StaffOrdersLive do
                 <header class="staff-orders-kds-head staff-orders-kds-head--new">
                   <div class="staff-orders-kds-head-main">
                     <h2>New</h2>
+                    <p
+                      :if={@waiting_received_count > 0}
+                      class="staff-orders-workflow-hint"
+                      id="orders-new-workload"
+                    >
+                      <strong>{@actionable_received_count} need staff</strong>
+                      <span>· {@waiting_received_count} waiting online</span>
+                    </p>
                   </div>
                   <span class="staff-orders-count">{length(@received_orders)}</span>
                 </header>
                 <div class="staff-orders-lane-grid">
                   <p :if={@received_orders == []} class="staff-empty">No new orders.</p>
-                  <.kds_ticket :for={order <- @received_orders} order={order} lane="new" />
+                  <.kds_ticket
+                    :for={order <- @received_orders}
+                    order={order}
+                    lane="new"
+                    age_now={@age_now}
+                  />
                 </div>
               </section>
 
@@ -394,7 +433,12 @@ defmodule EspresoWeb.StaffOrdersLive do
                 </header>
                 <div class="staff-orders-lane-grid">
                   <p :if={@preparing_orders == []} class="staff-empty">Nothing preparing.</p>
-                  <.kds_ticket :for={order <- @preparing_orders} order={order} lane="preparing" />
+                  <.kds_ticket
+                    :for={order <- @preparing_orders}
+                    order={order}
+                    lane="preparing"
+                    age_now={@age_now}
+                  />
                 </div>
               </section>
 
@@ -407,7 +451,12 @@ defmodule EspresoWeb.StaffOrdersLive do
                 </header>
                 <div class="staff-orders-lane-grid">
                   <p :if={@ready_orders == []} class="staff-empty">None yet.</p>
-                  <.kds_ticket :for={order <- @ready_orders} order={order} lane="ready" />
+                  <.kds_ticket
+                    :for={order <- @ready_orders}
+                    order={order}
+                    lane="ready"
+                    age_now={@age_now}
+                  />
                 </div>
               </section>
             </div>
@@ -560,6 +609,7 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   attr :order, :map, required: true
   attr :lane, :string, default: "ticket"
+  attr :age_now, DateTime, required: true
 
   defp kds_ticket(assigns) do
     source = source_badge(assigns.order)
@@ -571,7 +621,7 @@ defmodule EspresoWeb.StaffOrdersLive do
       |> assign(:source_label, source.label)
       |> assign(:source_class, source.class)
       |> assign(:note, note)
-      |> assign(:arrived?, freshly_received?(assigns.order))
+      |> assign(:arrived?, freshly_received?(assigns.order, assigns.age_now))
       |> assign(:compact?, status in ["preparing", "ready"])
       |> assign(:handoff?, status == "ready")
 
@@ -634,7 +684,9 @@ defmodule EspresoWeb.StaffOrdersLive do
               {paid_via_badge(@order)}
             </span>
           </div>
-          <p class={order_age_class(@order.inserted_at)}>{format_order_age(@order.inserted_at)}</p>
+          <p class={order_age_class(@order.inserted_at, @age_now)}>
+            {format_order_age(@order.inserted_at, @age_now)}
+          </p>
         </div>
       </div>
 
@@ -997,13 +1049,16 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   defp order_note(_), do: nil
 
-  defp freshly_received?(%{status: "received", inserted_at: %DateTime{} = inserted_at}) do
-    DateTime.utc_now(:second)
+  defp freshly_received?(
+         %{status: "received", inserted_at: %DateTime{} = inserted_at},
+         %DateTime{} = now
+       ) do
+    now
     |> DateTime.diff(DateTime.truncate(inserted_at, :second), :second)
     |> then(&(&1 >= 0 and &1 < 90))
   end
 
-  defp freshly_received?(_), do: false
+  defp freshly_received?(_, _), do: false
 
   defp payment_state_label(%{payment_status: "paid"}), do: "PAID"
   defp payment_state_label(%{payment_status: "awaiting_payment"}), do: "AWAITING PAYMENT"
@@ -1027,9 +1082,9 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   defp show_customer_name?(_), do: false
 
-  defp format_order_age(%DateTime{} = inserted_at) do
+  defp format_order_age(%DateTime{} = inserted_at, %DateTime{} = now) do
     seconds =
-      DateTime.utc_now(:second)
+      now
       |> DateTime.diff(DateTime.truncate(inserted_at, :second), :second)
       |> max(0)
 
@@ -1047,11 +1102,11 @@ defmodule EspresoWeb.StaffOrdersLive do
     end
   end
 
-  defp format_order_age(_), do: ""
+  defp format_order_age(_, _), do: ""
 
-  defp order_age_class(%DateTime{} = inserted_at) do
+  defp order_age_class(%DateTime{} = inserted_at, %DateTime{} = now) do
     minutes =
-      DateTime.utc_now(:second)
+      now
       |> DateTime.diff(DateTime.truncate(inserted_at, :second), :second)
       |> max(0)
       |> div(60)
@@ -1064,7 +1119,11 @@ defmodule EspresoWeb.StaffOrdersLive do
     end
   end
 
-  defp order_age_class(_), do: ["staff-order-age"]
+  defp order_age_class(_, _), do: ["staff-order-age"]
+
+  defp schedule_age_tick do
+    Process.send_after(self(), :age_tick, @age_tick_ms)
+  end
 
   defp load_orders(socket) do
     socket

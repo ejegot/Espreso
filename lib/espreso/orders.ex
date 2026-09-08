@@ -204,7 +204,7 @@ defmodule Espreso.Orders do
   def list_active_orders do
     Order
     |> where([o], o.status in ^["received", "preparing"])
-    |> order_by([o], asc: o.inserted_at)
+    |> order_by([o], asc: o.inserted_at, asc: o.id)
     |> preload(:items)
     |> Repo.all()
   end
@@ -266,7 +266,7 @@ defmodule Espreso.Orders do
   def list_recent_ready(limit \\ 10) do
     Order
     |> where([o], o.status == "ready")
-    |> order_by([o], desc: o.updated_at)
+    |> order_by([o], desc: o.updated_at, desc: o.id)
     |> limit(^limit)
     |> preload(:items)
     |> Repo.all()
@@ -324,7 +324,7 @@ defmodule Espreso.Orders do
       o.inserted_at >= ^today_start and o.payment_status in ^@unpaid_payment_statuses and
         o.status in ^["received", "preparing", "ready", "completed"]
     )
-    |> order_by([o], desc: o.inserted_at)
+    |> order_by([o], desc: o.inserted_at, desc: o.id)
     |> Repo.all()
   end
 
