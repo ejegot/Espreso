@@ -1288,6 +1288,7 @@ defmodule EspresoWeb.StaffPosLive do
           Enum.map(socket.assigns.cart, fn line ->
             %{
               product_id: line.product_id,
+              price_id: line.price_id,
               name: line.name,
               size: line.size,
               quantity: line.quantity,
@@ -1378,6 +1379,13 @@ defmodule EspresoWeb.StaffPosLive do
              socket
              |> assign(:placing_order?, false)
              |> assign(:error, unavailable_error(names))}
+
+          {:error, {:price_changed, _names}} ->
+            {:noreply,
+             socket
+             |> assign(:placing_order?, false)
+             |> assign(:categories, Menu.list_menu())
+             |> assign(:error, "Price changed — please review your ticket.")}
 
           {:error, _changeset} ->
             {:noreply,

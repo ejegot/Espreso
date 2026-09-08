@@ -106,6 +106,7 @@ defmodule EspresoWeb.Api.V1.OrderController do
       {:ok,
        %{
          product_id: product.id,
+         price_id: price.id,
          name: product.name,
          size: price.size,
          quantity: quantity,

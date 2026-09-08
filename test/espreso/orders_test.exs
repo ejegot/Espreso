@@ -173,7 +173,7 @@ defmodule Espreso.OrdersTest do
   end
 
   test "create_order accepts source pos" do
-    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+    lines = [insert_pos_line!("Espresso", nil, "75")]
 
     assert {:ok, order} =
              Orders.create_order(lines, %{
@@ -611,7 +611,7 @@ defmodule Espreso.OrdersTest do
   end
 
   test "create_order allows paid only for counter payment" do
-    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+    lines = [insert_pos_line!("Espresso", nil, "75")]
 
     assert {:ok, paid} =
              Orders.create_order(lines, %{
@@ -724,6 +724,80 @@ defmodule Espreso.OrdersTest do
 
     assert Repo.aggregate(Espreso.Orders.Order, :count, :id) == before_count
     assert Repo.aggregate(Espreso.Orders.OrderItem, :count, :id) == before_items
+  end
+
+  test "POS create_order rejects changed, missing, and foreign product prices atomically" do
+    alias Espreso.Menu.{Category, Product, ProductPrice}
+
+    category =
+      %Category{}
+      |> Category.changeset(%{name: "HOT"})
+      |> Repo.insert!()
+
+    latte =
+      %Product{}
+      |> Product.changeset(%{name: "Latte", category_id: category.id, available: true})
+      |> Repo.insert!()
+
+    mocha =
+      %Product{}
+      |> Product.changeset(%{name: "Mocha", category_id: category.id, available: true})
+      |> Repo.insert!()
+
+    latte_price =
+      %ProductPrice{}
+      |> ProductPrice.changeset(%{
+        product_id: latte.id,
+        size: "12oz",
+        price: Decimal.new("120")
+      })
+      |> Repo.insert!()
+
+    mocha_price =
+      %ProductPrice{}
+      |> ProductPrice.changeset(%{
+        product_id: mocha.id,
+        size: "12oz",
+        price: Decimal.new("140")
+      })
+      |> Repo.insert!()
+
+    attrs = %{
+      customer_name: "POS price check",
+      fulfillment: :pickup,
+      payment_method: :counter,
+      payment_status: :paid,
+      paid_via: "cash",
+      source: :pos
+    }
+
+    line = %{
+      product_id: latte.id,
+      price_id: latte_price.id,
+      name: latte.name,
+      size: latte_price.size,
+      quantity: 1,
+      price: Decimal.new("120")
+    }
+
+    changed_price =
+      latte_price
+      |> ProductPrice.changeset(%{price: Decimal.new("135")})
+      |> Repo.update!()
+
+    assert {:error, {:price_changed, ["Latte"]}} = Orders.create_order([line], attrs)
+    assert Repo.aggregate(Espreso.Orders.Order, :count, :id) == 0
+    assert Repo.aggregate(Espreso.Orders.OrderItem, :count, :id) == 0
+
+    foreign_line = %{line | price_id: mocha_price.id, price: mocha_price.price}
+    assert {:error, {:price_changed, ["Latte"]}} = Orders.create_order([foreign_line], attrs)
+    assert Repo.aggregate(Espreso.Orders.Order, :count, :id) == 0
+    assert Repo.aggregate(Espreso.Orders.OrderItem, :count, :id) == 0
+
+    Repo.delete!(changed_price)
+    assert {:error, {:price_changed, ["Latte"]}} = Orders.create_order([line], attrs)
+    assert Repo.aggregate(Espreso.Orders.Order, :count, :id) == 0
+    assert Repo.aggregate(Espreso.Orders.OrderItem, :count, :id) == 0
   end
 
   test "complete_order marks ready orders picked up; unpaid cannot become ready" do
@@ -1607,5 +1681,39 @@ defmodule Espreso.OrdersTest do
     setting
     |> Ecto.Changeset.change(%{payments_mode: mode})
     |> Repo.update!()
+  end
+
+  defp insert_pos_line!(name, size, amount) do
+    category =
+      %Espreso.Menu.Category{}
+      |> Espreso.Menu.Category.changeset(%{name: "POS-#{System.unique_integer([:positive])}"})
+      |> Repo.insert!()
+
+    product =
+      %Espreso.Menu.Product{}
+      |> Espreso.Menu.Product.changeset(%{
+        name: name,
+        category_id: category.id,
+        available: true
+      })
+      |> Repo.insert!()
+
+    price =
+      %Espreso.Menu.ProductPrice{}
+      |> Espreso.Menu.ProductPrice.changeset(%{
+        product_id: product.id,
+        size: size,
+        price: Decimal.new(amount)
+      })
+      |> Repo.insert!()
+
+    %{
+      product_id: product.id,
+      price_id: price.id,
+      name: product.name,
+      size: price.size,
+      quantity: 1,
+      price: price.price
+    }
   end
 end

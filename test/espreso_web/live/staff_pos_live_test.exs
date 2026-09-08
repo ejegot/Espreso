@@ -1014,6 +1014,124 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute has_element?(view, "#pos-error")
   end
 
+  test "unchanged authoritative price still creates one Cash order", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+
+    submit_order(view)
+
+    assert [order] = Orders.list_active_orders()
+    assert Decimal.equal?(order.total, Decimal.new("75"))
+    assert [%{unit_price: unit_price}] = order.items
+    assert Decimal.equal?(unit_price, Decimal.new("75"))
+  end
+
+  test "price changed after mount but before add rejects the stale Cash ticket", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    update_price!(hd(espresso.product_prices), "90")
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    submit_order(view)
+
+    assert_stale_price_rejected(view, "Espresso", 1)
+    assert has_element?(view, "#pos-total", "₱75")
+    assert has_element?(view, "#pos-product-#{espresso.id}", "₱90")
+  end
+
+  test "price changed after add but before opening Cash tender rejects final confirmation", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    update_price!(hd(espresso.product_prices), "90")
+
+    view |> form("#pos-order-form") |> render_submit()
+    assert has_element?(view, "#pos-cash-total", "₱75")
+    view |> element("#pos-cash-exact") |> render_click()
+    view |> form("#pos-cash-tender-form") |> render_submit()
+
+    assert_stale_price_rejected(view, "Espresso", 1)
+  end
+
+  test "price changed while Cash tender is open rejects final confirmation", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> form("#pos-order-form") |> render_submit()
+    assert has_element?(view, "#pos-cash-total", "₱75")
+
+    update_price!(hd(espresso.product_prices), "90")
+    view |> element("#pos-cash-exact") |> render_click()
+    view |> form("#pos-cash-tender-form") |> render_submit()
+
+    assert_stale_price_rejected(view, "Espresso", 1)
+  end
+
+  test "price changed before GCash confirmation creates no paid order", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-pay-gcash") |> render_click()
+    update_price!(hd(espresso.product_prices), "90")
+
+    view |> form("#pos-order-form") |> render_submit()
+
+    assert_stale_price_rejected(view, "Espresso", 1)
+    assert has_element?(view, "#pos-pay-gcash.is-active")
+  end
+
+  test "one stale line rejects an entire multi-product order atomically", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso,
+    americano: americano
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    americano_line = Enum.find(live_assigns(view).cart, &(&1.product_id == americano.id))
+    update_price!(Repo.get!(ProductPrice, americano_line.price_id), "135")
+
+    submit_order(view)
+
+    assert_stale_price_rejected(view, "Espresso", 2)
+    assert has_element?(view, "#pos-cart-lines", "Americano")
+  end
+
+  test "selected variant validates its exact product price row", %{
+    conn: conn,
+    barista: barista,
+    americano: americano
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
+    view |> element("#pos-size-#{price_12.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    update_price!(price_12, "135")
+
+    submit_order(view)
+
+    assert_stale_price_rejected(view, "Americano", 1)
+    assert has_element?(view, "#pos-cart-lines", "12oz")
+    assert has_element?(view, "#pos-total", "₱120")
+  end
+
   test "Cash modal blocks ticket mutation and GCash bypasses tender", %{
     conn: conn,
     barista: barista,
@@ -1633,6 +1751,22 @@ defmodule EspresoWeb.StaffPosLiveTest do
     |> :sys.get_state()
     |> Map.fetch!(:socket)
     |> Map.fetch!(:assigns)
+  end
+
+  defp update_price!(product_price, amount) do
+    product_price
+    |> ProductPrice.changeset(%{price: Decimal.new(amount)})
+    |> Repo.update!()
+  end
+
+  defp assert_stale_price_rejected(view, cart_text, expected_lines) do
+    assert Orders.list_active_orders() == []
+    assert Repo.aggregate(Espreso.Orders.Order, :count, :id) == 0
+    assert Repo.aggregate(Espreso.Orders.OrderItem, :count, :id) == 0
+    assert length(live_assigns(view).cart) == expected_lines
+    assert has_element?(view, "#pos-cart-lines", cart_text)
+    assert has_element?(view, "#pos-error", "Price changed — please review your ticket.")
+    refute has_element?(view, "#cash-tender-modal")
   end
 
   defp restore_printer_config_on_exit do
