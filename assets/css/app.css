@@ -6348,6 +6348,16 @@ a.staff-home-card:focus-visible {
   font-weight: 800;
 }
 
+.staff-pos-page .staff-pos-success.is-error .staff-pos-success-badge {
+  background: color-mix(in srgb, #b42318 10%, #fff);
+  color: #b42318;
+}
+
+.staff-pos-page .staff-pos-success.is-success .staff-pos-success-badge {
+  background: color-mix(in srgb, #2f7d4a 11%, #fff);
+  color: #2f7d4a;
+}
+
 .staff-pos-page .staff-pos-success-eyebrow {
   margin: 0;
   color: var(--cs-beige);
@@ -6424,6 +6434,28 @@ a.staff-home-card:focus-visible {
   color: var(--cs-brown);
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+.staff-pos-page .staff-pos-ticket > .staff-pos-place-flash {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  margin-bottom: 0.65rem;
+}
+
+.staff-pos-page .staff-pos-ticket > .staff-pos-place-flash > span {
+  grid-column: 1 / -1;
+  line-height: 1.35;
+}
+
+.staff-pos-page .staff-pos-ticket > .staff-pos-place-flash-orders {
+  justify-self: start;
+  margin-left: 0;
+}
+
+.staff-pos-page .staff-pos-ticket > .staff-pos-place-flash-dismiss {
+  grid-column: 2;
 }
 
 .staff-pos-page .staff-pos-place-flash-dismiss {
@@ -7401,6 +7433,20 @@ a.staff-home-card:focus-visible {
   padding: 0.65rem 0.75rem 0.75rem;
   display: flex;
   flex-direction: column;
+}
+
+@media (max-width: 959px) {
+  .staff-app:has(.staff-pos-shell-root) .staff-shell-body,
+  .staff-app:has(.staff-pos-shell-root) .staff-shell-body--rail {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .staff-app:has(.staff-pos-shell-root) .staff-pos-main {
+    flex: 0 0 auto;
+    min-height: auto;
+    overflow: visible;
+  }
 }
 
 .staff-app .staff-home-lede,

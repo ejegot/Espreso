@@ -32,7 +32,10 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:cash_tendered, "")
      |> assign(:last_cash_change, nil)
      |> assign(:print_failed?, false)
+     |> assign(:print_note_error?, false)
      |> assign(:place_flash, nil)
+     |> assign(:place_flash_token, nil)
+     |> assign(:place_flash_timer, nil)
      |> assign(:notes_open?, false)
      |> assign(:placing_order?, false)
      |> assign(:cart_undo, nil)
@@ -51,9 +54,14 @@ defmodule EspresoWeb.StaffPosLive do
     {:noreply, socket}
   end
 
-  def handle_info(:clear_place_flash, socket) do
-    {:noreply, assign(socket, :place_flash, nil)}
+  def handle_info(
+        {:clear_place_flash, token},
+        %{assigns: %{place_flash_token: token}} = socket
+      ) do
+    {:noreply, clear_place_flash(socket)}
   end
+
+  def handle_info({:clear_place_flash, _token}, socket), do: {:noreply, socket}
 
   def handle_info(:clear_added_product, socket) do
     {:noreply, assign(socket, :added_product_id, nil)}
@@ -199,7 +207,8 @@ defmodule EspresoWeb.StaffPosLive do
        |> assign(:error, nil)
        |> assign(:last_order, nil)
        |> assign(:print_note, nil)
-       |> assign(:place_flash, nil)}
+       |> assign(:print_note_error?, false)
+       |> clear_place_flash()}
     else
       _ ->
         {:noreply, assign(socket, :error, "Product is unavailable.")}
@@ -280,7 +289,7 @@ defmodule EspresoWeb.StaffPosLive do
   end
 
   def handle_event("dismiss_place_flash", _params, socket) do
-    {:noreply, assign(socket, :place_flash, nil)}
+    {:noreply, clear_place_flash(socket)}
   end
 
   def handle_event("toggle_notes", _params, socket) do
@@ -367,26 +376,27 @@ defmodule EspresoWeb.StaffPosLive do
         order = Espreso.Repo.preload(order, :items)
         opts = print_opts(socket, order)
 
-        {note, failed?} =
+        {note, failed?, note_error?} =
           case Printer.after_paid(order, order.paid_via || "cash", opts) do
             :ok ->
               if Printer.cash_like?(order.paid_via || "cash") do
-                {"Receipt printed · kaha opened.", false}
+                {"Receipt printed · kaha opened.", false, false}
               else
-                {"Receipt printed.", false}
+                {"Receipt printed.", false, false}
               end
 
             :disabled ->
-              {"Printer is not enabled on this server.", false}
+              {"Printer is not enabled on this server.", true, false}
 
             {:error, reason} ->
-              {"Print failed (#{inspect(reason)}). Tap Retry.", true}
+              {"Print failed (#{inspect(reason)}). Tap Retry.", true, true}
           end
 
         {:noreply,
          socket
          |> assign(:print_note, note)
-         |> assign(:print_failed?, failed?)}
+         |> assign(:print_failed?, failed?)
+         |> assign(:print_note_error?, note_error?)}
     end
   end
 
@@ -398,26 +408,32 @@ defmodule EspresoWeb.StaffPosLive do
       order ->
         order = Espreso.Repo.preload(order, :items)
 
-        note =
+        {note, note_error?} =
           case Printer.print_kitchen(order, staff_name: socket.assigns.current_user.name) do
-            :ok -> "Kitchen ticket printed."
-            :disabled -> "Printer is not enabled on this server."
-            {:error, reason} -> "Kitchen print failed (#{inspect(reason)})."
+            :ok -> {"Kitchen ticket printed.", false}
+            :disabled -> {"Printer is not enabled on this server.", false}
+            {:error, reason} -> {"Kitchen print failed (#{inspect(reason)}).", true}
           end
 
-        {:noreply, assign(socket, :print_note, note)}
+        {:noreply,
+         socket
+         |> assign(:print_note, note)
+         |> assign(:print_note_error?, note_error?)}
     end
   end
 
   def handle_event("open_drawer", _params, socket) do
-    note =
+    {note, note_error?} =
       case Printer.open_drawer() do
-        :ok -> "Kaha opened."
-        :disabled -> "Printer is not enabled on this server."
-        {:error, reason} -> "Could not open kaha (#{inspect(reason)})."
+        :ok -> {"Kaha opened.", false}
+        :disabled -> {"Printer is not enabled on this server.", false}
+        {:error, reason} -> {"Could not open kaha (#{inspect(reason)}).", true}
       end
 
-    {:noreply, assign(socket, :print_note, note)}
+    {:noreply,
+     socket
+     |> assign(:print_note, note)
+     |> assign(:print_note_error?, note_error?)}
   end
 
   def handle_event("place_order", params, socket) do
@@ -428,6 +444,10 @@ defmodule EspresoWeb.StaffPosLive do
 
     cond do
       socket.assigns.placing_order? ->
+        {:noreply, socket}
+
+      socket.assigns.cart == [] and
+          (not is_nil(socket.assigns.place_flash) or not is_nil(socket.assigns.last_order)) ->
         {:noreply, socket}
 
       socket.assigns.cart == [] ->
@@ -484,7 +504,8 @@ defmodule EspresoWeb.StaffPosLive do
                 :disabled
               end
 
-            {note, failed?} = print_note_result(print_result, order.paid_via || paid_via)
+            {note, failed?, note_error?} =
+              print_note_result(print_result, order.paid_via || paid_via)
 
             cash_change = if(change, do: %{tendered: tendered, change: change})
 
@@ -509,19 +530,19 @@ defmodule EspresoWeb.StaffPosLive do
               |> assign(:last_cash_change, cash_change)
               |> assign(:print_note, note)
               |> assign(:print_failed?, failed?)
+              |> assign(:print_note_error?, note_error?)
 
             socket =
               if failed? do
-                assign(socket, :last_order, order)
-                |> assign(:place_flash, nil)
+                socket
+                |> assign(:last_order, order)
+                |> clear_place_flash()
               else
                 flash = place_flash_message(order, note, cash_change)
 
-                if connected?(socket), do: Process.send_after(self(), :clear_place_flash, 4_000)
-
                 socket
                 |> assign(:last_order, nil)
-                |> assign(:place_flash, flash)
+                |> put_place_flash(flash)
               end
 
             {:noreply, socket}
@@ -554,21 +575,6 @@ defmodule EspresoWeb.StaffPosLive do
       <div class="staff-pos-page staff-pos-shell-root staff-pos-page--cafe">
         <main class="staff-pos-main">
           <p :if={@error} class="staff-pos-flash" id="pos-error">{@error}</p>
-          <p :if={@place_flash} class="staff-pos-place-flash" id="pos-place-flash">
-            <span>{@place_flash}</span>
-            <.link navigate={~p"/orders"} class="staff-pos-place-flash-orders">
-              View Orders
-            </.link>
-            <button
-              type="button"
-              class="staff-pos-place-flash-dismiss"
-              id="pos-place-flash-dismiss"
-              phx-click="dismiss_place_flash"
-              aria-label="Dismiss"
-            >
-              ×
-            </button>
-          </p>
 
           <div class="staff-pos-layout staff-pos-layout--cafe">
             <section class="staff-pos-catalog" id="pos-catalog">
@@ -723,10 +729,46 @@ defmodule EspresoWeb.StaffPosLive do
               class={["staff-pos-ticket", @cart == [] && !@last_order && "is-empty"]}
               id="pos-ticket"
             >
+              <div
+                :if={@place_flash}
+                class="staff-pos-place-flash"
+                id="pos-place-flash"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                <span>{@place_flash}</span>
+                <.link navigate={~p"/orders"} class="staff-pos-place-flash-orders">
+                  View Orders
+                </.link>
+                <button
+                  type="button"
+                  class="staff-pos-place-flash-dismiss"
+                  id="pos-place-flash-dismiss"
+                  phx-click="dismiss_place_flash"
+                  aria-label="Dismiss"
+                >
+                  ×
+                </button>
+              </div>
+
               <%= if @last_order do %>
-                <div class="staff-pos-success" id="pos-confirmation">
-                  <div class="staff-pos-success-badge" aria-hidden="true">!</div>
-                  <p class="staff-pos-success-eyebrow">Print failed · order saved</p>
+                <div
+                  class={[
+                    "staff-pos-success",
+                    @print_failed? && "is-error",
+                    !@print_failed? && "is-success"
+                  ]}
+                  id="pos-confirmation"
+                >
+                  <div class="staff-pos-success-badge" aria-hidden="true">
+                    {if @print_failed?, do: "!", else: "✓"}
+                  </div>
+                  <p class="staff-pos-success-eyebrow">
+                    {if @print_failed?,
+                      do: "Print failed · order saved",
+                      else: "Print complete · order saved"}
+                  </p>
                   <p class="staff-order-number">{@last_order.number}</p>
                   <p class="staff-order-meta">
                     {Orders.status_label(@last_order.status)} · {@last_order.customer_name}
@@ -734,14 +776,14 @@ defmodule EspresoWeb.StaffPosLive do
                   </p>
                   <p
                     :if={@print_note}
-                    class="staff-pos-success-note is-error"
+                    class={["staff-pos-success-note", @print_note_error? && "is-error"]}
                     id="pos-print-note"
                   >
                     {@print_note}
                   </p>
                   <div class="staff-pos-success-actions">
                     <button
-                      :if={Printer.enabled?()}
+                      :if={Printer.enabled?() and @print_failed?}
                       type="button"
                       class="staff-pos-place"
                       id="pos-retry-print"
@@ -1448,6 +1490,7 @@ defmodule EspresoWeb.StaffPosLive do
   defp reset_ticket(socket) do
     socket
     |> clear_cart_undo()
+    |> clear_place_flash()
     |> assign(:cart, [])
     |> assign(:card_sizes, %{})
     |> assign(:variant_editor_key, nil)
@@ -1455,8 +1498,8 @@ defmodule EspresoWeb.StaffPosLive do
     |> assign(:last_order, nil)
     |> assign(:print_note, nil)
     |> assign(:print_failed?, false)
+    |> assign(:print_note_error?, false)
     |> assign(:last_cash_change, nil)
-    |> assign(:place_flash, nil)
     |> assign(:error, nil)
     |> assign(:payment_choice, :paid)
     |> assign(:paid_via, "cash")
@@ -1508,6 +1551,32 @@ defmodule EspresoWeb.StaffPosLive do
     socket
     |> assign(:cart_undo, nil)
     |> assign(:cart_undo_timer, nil)
+  end
+
+  defp put_place_flash(socket, flash) do
+    socket = clear_place_flash(socket)
+    token = make_ref()
+
+    timer =
+      if connected?(socket) do
+        Process.send_after(self(), {:clear_place_flash, token}, 4_000)
+      end
+
+    socket
+    |> assign(:place_flash, flash)
+    |> assign(:place_flash_token, token)
+    |> assign(:place_flash_timer, timer)
+  end
+
+  defp clear_place_flash(socket) do
+    if timer = socket.assigns[:place_flash_timer] do
+      Process.cancel_timer(timer)
+    end
+
+    socket
+    |> assign(:place_flash, nil)
+    |> assign(:place_flash_token, nil)
+    |> assign(:place_flash_timer, nil)
   end
 
   defp cart_undo_label(%{kind: :ticket}), do: "Ticket cleared"
@@ -1600,16 +1669,16 @@ defmodule EspresoWeb.StaffPosLive do
         "Receipt printed"
       end
 
-    {note, false}
+    {note, false, false}
   end
 
-  defp print_note_result(:disabled, _), do: {nil, false}
+  defp print_note_result(:disabled, _), do: {"Printing disabled", false, false}
 
   defp print_note_result({:error, reason}, _) do
-    {"Order saved · print failed (#{inspect(reason)}). Tap Retry.", true}
+    {"Order saved · print failed (#{inspect(reason)}). Tap Retry.", true, true}
   end
 
-  defp print_note_result(_, _), do: {nil, false}
+  defp print_note_result(_, _), do: {nil, false, false}
 
   defp order_note(%{notes: notes}) when is_binary(notes) do
     trimmed = String.trim(notes)
