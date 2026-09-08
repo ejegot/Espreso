@@ -16,6 +16,7 @@ defmodule Espreso.Application do
       {Finch, name: Espreso.Finch},
       # Start a worker by calling: Espreso.Worker.start_link(arg)
       # {Espreso.Worker, arg},
+      Espreso.PhysicalActionCoordinator,
       # Start to serve requests, typically the last entry
       EspresoWeb.Endpoint
     ]

@@ -3,6 +3,7 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   alias Espreso.BusinessSettings
   alias Espreso.Orders
+  alias Espreso.PhysicalActionCoordinator
   alias Espreso.Printer
   alias Espreso.Repo
   alias EspresoWeb.StaffNotifications
@@ -113,31 +114,24 @@ defmodule EspresoWeb.StaffOrdersLive do
     {:noreply, assign(socket, :flash_note, note)}
   end
 
-  def handle_event("reprint_receipt", %{"id" => id}, socket) do
-    order = Repo.get!(Espreso.Orders.Order, id) |> Repo.preload(:items)
-
+  def handle_event(
+        "reprint_receipt",
+        %{"id" => id, "action" => "receipt_reprint", "permit" => permit},
+        socket
+      ) do
     result =
-      Printer.after_paid(order, order.paid_via || "cash",
+      PhysicalActionCoordinator.execute_reprint(id, :receipt_reprint, permit,
         staff_name: socket.assigns.current_user.name
       )
 
-    note =
-      case result do
-        :ok ->
-          if Printer.cash_like?(order.paid_via || "cash") do
-            "#{order.number} receipt reprinted · kaha opened."
-          else
-            "#{order.number} receipt reprinted."
-          end
+    {:noreply,
+     socket
+     |> assign(:flash_note, reprint_note(result))
+     |> load_orders()}
+  end
 
-        :disabled ->
-          "Printer is not enabled on this server."
-
-        {:error, reason} ->
-          "#{order.number} reprint failed (#{inspect(reason)})."
-      end
-
-    {:noreply, assign(socket, :flash_note, note)}
+  def handle_event("reprint_receipt", _params, socket) do
+    {:noreply, assign(socket, :flash_note, "Reprint request is stale. No receipt was sent.")}
   end
 
   def handle_event("open_drawer", _params, socket) do
@@ -417,6 +411,7 @@ defmodule EspresoWeb.StaffOrdersLive do
                     order={order}
                     lane="new"
                     age_now={@age_now}
+                    reprint_permit={Map.get(@reprint_permits, order.id)}
                   />
                 </div>
               </section>
@@ -438,6 +433,7 @@ defmodule EspresoWeb.StaffOrdersLive do
                     order={order}
                     lane="preparing"
                     age_now={@age_now}
+                    reprint_permit={Map.get(@reprint_permits, order.id)}
                   />
                 </div>
               </section>
@@ -456,6 +452,7 @@ defmodule EspresoWeb.StaffOrdersLive do
                     order={order}
                     lane="ready"
                     age_now={@age_now}
+                    reprint_permit={Map.get(@reprint_permits, order.id)}
                   />
                 </div>
               </section>
@@ -610,6 +607,7 @@ defmodule EspresoWeb.StaffOrdersLive do
   attr :order, :map, required: true
   attr :lane, :string, default: "ticket"
   attr :age_now, DateTime, required: true
+  attr :reprint_permit, :string, default: nil
 
   defp kds_ticket(assigns) do
     source = source_badge(assigns.order)
@@ -778,12 +776,17 @@ defmodule EspresoWeb.StaffOrdersLive do
                 Kitchen
               </button>
               <button
-                :if={@order.payment_status == "paid" and Printer.enabled?()}
+                :if={
+                  @order.payment_status == "paid" and Printer.enabled?() and
+                    is_binary(@reprint_permit)
+                }
                 type="button"
                 class="staff-action staff-action-muted"
                 id={"reprint-#{@order.id}"}
                 phx-click="reprint_receipt"
                 phx-value-id={@order.id}
+                phx-value-action="receipt_reprint"
+                phx-value-permit={@reprint_permit}
               >
                 Reprint
               </button>
@@ -1126,12 +1129,60 @@ defmodule EspresoWeb.StaffOrdersLive do
   end
 
   defp load_orders(socket) do
+    active_orders = Orders.list_active_orders()
+    ready_orders = Orders.list_recent_ready(@ready_lane_limit)
+
+    reprint_order_ids =
+      (active_orders ++ ready_orders)
+      |> Enum.filter(&(&1.payment_status == "paid"))
+      |> Enum.map(& &1.id)
+
+    reprint_permits =
+      if Printer.enabled?() do
+        PhysicalActionCoordinator.reprint_permits(reprint_order_ids)
+      else
+        %{}
+      end
+
     socket
-    |> assign(:active_orders, Orders.list_active_orders())
-    |> assign(:ready_orders, Orders.list_recent_ready(@ready_lane_limit))
+    |> assign(:active_orders, active_orders)
+    |> assign(:ready_orders, ready_orders)
+    |> assign(:reprint_permits, reprint_permits)
     |> assign(:unpaid_orders, Orders.list_todays_unpaid())
     |> assign(:paymongo_reconciliations, Orders.list_open_paymongo_reconciliations())
   end
+
+  defp reprint_note({:dispatched, _next_permit}),
+    do: "Receipt command dispatched."
+
+  defp reprint_note({:definite_failure, reason, _retry_permit}),
+    do: "Reprint could not connect to the printer (#{inspect(reason)}). Try again."
+
+  defp reprint_note({:uncertain, reason}),
+    do:
+      "Receipt outcome uncertain (#{inspect(reason)}). It may already have printed; do not retry automatically."
+
+  defp reprint_note({:duplicate, _result}),
+    do: "This Reprint request was already handled. No additional receipt was sent."
+
+  defp reprint_note({:stale, _reason}),
+    do: "Reprint request is stale. No receipt was sent."
+
+  defp reprint_note({:recovery_required, _reason}),
+    do:
+      "Reprint recovery acknowledgement is required after a printer coordinator restart. No receipt was sent."
+
+  defp reprint_note({:ineligible, :order_not_found}),
+    do: "Order no longer exists. No receipt was sent."
+
+  defp reprint_note({:ineligible, :order_not_paid}),
+    do: "Only paid orders can be reprinted. No receipt was sent."
+
+  defp reprint_note({:ineligible, :order_not_eligible}),
+    do: "This order is no longer eligible for Reprint. No receipt was sent."
+
+  defp reprint_note({:ineligible, :printer_disabled}),
+    do: "Printer is not enabled on this server. No receipt was sent."
 
   defp maybe_set_alert_banner(socket, %{status: "received"} = order) do
     prev_received_ids =
