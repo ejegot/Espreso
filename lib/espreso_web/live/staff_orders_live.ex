@@ -62,7 +62,8 @@ defmodule EspresoWeb.StaffOrdersLive do
   end
 
   def handle_event("toggle_reconciliation_drawer", _params, socket) do
-    {:noreply, assign(socket, :reconciliation_drawer_open, !socket.assigns.reconciliation_drawer_open)}
+    {:noreply,
+     assign(socket, :reconciliation_drawer_open, !socket.assigns.reconciliation_drawer_open)}
   end
 
   def handle_event("close_reconciliation_drawer", _params, socket) do
@@ -161,6 +162,7 @@ defmodule EspresoWeb.StaffOrdersLive do
     case Orders.mark_paid(order, paid_via: paid_via) do
       {:ok, paid} ->
         paid = Repo.preload(paid, :items)
+
         print_result =
           Printer.after_paid(paid, paid.paid_via || paid_via,
             staff_name: socket.assigns.current_user.name
@@ -333,12 +335,7 @@ defmodule EspresoWeb.StaffOrdersLive do
         <main class="staff-orders-main">
           <p :if={@flash_note} class="staff-admin-note" id="orders-flash">{@flash_note}</p>
 
-          <div
-            :if={@alert_banner}
-            class="staff-orders-alert"
-            id="orders-alert-banner"
-            role="status"
-          >
+          <div :if={@alert_banner} class="staff-orders-alert" id="orders-alert-banner" role="status">
             <div class="staff-orders-alert-copy">
               <p class="staff-orders-alert-title">New order {@alert_banner.number}</p>
               <p class="staff-orders-alert-body">
@@ -372,10 +369,7 @@ defmodule EspresoWeb.StaffOrdersLive do
               role="region"
               aria-label="Kitchen"
             >
-              <section
-                class="staff-orders-kds-lane staff-orders-kds-lane--new"
-                id="orders-new"
-              >
+              <section class="staff-orders-kds-lane staff-orders-kds-lane--new" id="orders-new">
                 <header class="staff-orders-kds-head staff-orders-kds-head--new">
                   <div class="staff-orders-kds-head-main">
                     <h2>New</h2>
@@ -404,10 +398,7 @@ defmodule EspresoWeb.StaffOrdersLive do
                 </div>
               </section>
 
-              <section
-                class="staff-orders-kds-lane staff-orders-kds-lane--ready"
-                id="orders-ready"
-              >
+              <section class="staff-orders-kds-lane staff-orders-kds-lane--ready" id="orders-ready">
                 <header class="staff-orders-kds-head staff-orders-kds-head--ready">
                   <div class="staff-orders-kds-head-main">
                     <h2>Ready</h2>
@@ -528,7 +519,11 @@ defmodule EspresoWeb.StaffOrdersLive do
               ×
             </button>
           </header>
-          <p :if={@paymongo_reconciliations == []} class="staff-empty" id="paymongo-reconciliations-empty">
+          <p
+            :if={@paymongo_reconciliations == []}
+            class="staff-empty"
+            id="paymongo-reconciliations-empty"
+          >
             No PayMongo reconciliation items.
           </p>
           <div :if={@paymongo_reconciliations != []} class="staff-orders-unpaid-list">
@@ -627,7 +622,7 @@ defmodule EspresoWeb.StaffOrdersLive do
           <p class="staff-order-notes">{@note}</p>
         </div>
 
-        <p :if={@handoff? || !@compact?} class="staff-order-meta">{fulfillment_short(@order)}</p>
+        <p class="staff-order-meta">{fulfillment_short(@order)}</p>
 
         <div class="staff-order-ticket-foot">
           <div class="staff-order-pay">
@@ -645,6 +640,9 @@ defmodule EspresoWeb.StaffOrdersLive do
 
       <div class="staff-order-actions">
         <div :if={needs_payment_actions?(@order)} class="staff-order-pay-actions">
+          <p :if={waiting_for_online_payment?(@order)} class="staff-order-payment-waiting">
+            Waiting for online payment
+          </p>
           {payment_action_buttons(%{
             order: @order,
             id_prefix: "ticket",
@@ -785,6 +783,12 @@ defmodule EspresoWeb.StaffOrdersLive do
        do: true
 
   defp needs_payment_actions?(_), do: false
+
+  defp waiting_for_online_payment?(%{payment_method: "online"} = order) do
+    needs_payment_actions?(order) and not staff_mark_paid?(order)
+  end
+
+  defp waiting_for_online_payment?(_), do: false
 
   defp staff_mark_paid?(%{payment_method: "counter", payment_status: status})
        when status in ["unpaid", "awaiting_payment"],
@@ -1030,10 +1034,13 @@ defmodule EspresoWeb.StaffOrdersLive do
       |> max(0)
 
     cond do
-      seconds < 60 -> "Just now"
+      seconds < 60 ->
+        "Just now"
+
       seconds < 3600 ->
         minutes = div(seconds, 60)
         if minutes == 1, do: "1 min ago", else: "#{minutes} min ago"
+
       true ->
         hours = div(seconds, 3600)
         if hours == 1, do: "1 hr ago", else: "#{hours} hr ago"
