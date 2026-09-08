@@ -9,6 +9,7 @@ defmodule Espreso.Orders do
   alias Espreso.BusinessSettings
   alias Espreso.Orders.{Order, OrderItem, PaymentReconciliation}
   alias Espreso.Menu
+  alias Espreso.Menu.ProductPrice
 
   @unpaid_payment_statuses ~w(unpaid awaiting_payment)
   @paid_vias ~w(cash gcash maya counter paymongo)
@@ -20,7 +21,9 @@ defmodule Espreso.Orders do
   Creates an order from cart lines and checkout attrs.
 
   `lines` — maps with `:name`, `:size`, `:quantity`, `:price` (Decimal),
-  and preferably `:product_id` (for availability checks).
+  and preferably `:product_id` (for availability checks). POS lines must also
+  include `:price_id`; their expected prices are checked against locked,
+  authoritative product-price rows before the order is inserted.
   `attrs` — `:customer_name`, `:fulfillment` (`:dine_in` | `:pickup` or strings),
   `:table_number`, `:notes`, `:payment_method` (`:counter` | `:online`),
   `:source` (`:customer` | `:pos` or strings; default `"customer"`),
@@ -95,6 +98,9 @@ defmodule Espreso.Orders do
     }
 
     Ecto.Multi.new()
+    |> Ecto.Multi.run(:prices, fn repo, _changes ->
+      validate_authoritative_prices(repo, lines, source)
+    end)
     |> Ecto.Multi.insert(:order, Order.changeset(%Order{}, order_attrs))
     |> Ecto.Multi.run(:items, fn repo, %{order: order} ->
       items =
@@ -131,6 +137,48 @@ defmodule Espreso.Orders do
 
       {:error, _step, reason, _} ->
         {:error, reason}
+    end
+  end
+
+  defp validate_authoritative_prices(_repo, _lines, source) when source != "pos",
+    do: {:ok, :skip}
+
+  defp validate_authoritative_prices(repo, lines, "pos") do
+    price_ids =
+      lines
+      |> Enum.map(&Map.get(&1, :price_id))
+      |> Enum.filter(&is_integer/1)
+      |> Enum.uniq()
+
+    prices_by_id =
+      ProductPrice
+      |> where([price], price.id in ^price_ids)
+      |> lock("FOR SHARE")
+      |> repo.all()
+      |> Map.new(&{&1.id, &1})
+
+    changed_names =
+      lines
+      |> Enum.reject(&authoritative_price?(&1, prices_by_id))
+      |> Enum.map(&(Map.get(&1, :name) || "Item"))
+      |> Enum.uniq()
+
+    if changed_names == [] do
+      {:ok, :validated}
+    else
+      {:error, {:price_changed, changed_names}}
+    end
+  end
+
+  defp authoritative_price?(line, prices_by_id) do
+    with product_id when is_integer(product_id) <- Map.get(line, :product_id),
+         price_id when is_integer(price_id) <- Map.get(line, :price_id),
+         %Decimal{} = expected_price <- Map.get(line, :price),
+         %ProductPrice{product_id: ^product_id, price: authoritative_price} <-
+           Map.get(prices_by_id, price_id) do
+      Decimal.equal?(expected_price, authoritative_price)
+    else
+      _ -> false
     end
   end
 

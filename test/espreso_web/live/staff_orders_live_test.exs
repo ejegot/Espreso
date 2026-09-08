@@ -743,6 +743,9 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
   end
 
   test "customer source shows QR badge; pos source shows WALK-IN badge", %{conn: conn} do
+    alias Espreso.Menu.{Category, Product, ProductPrice}
+    alias Espreso.Repo
+
     {:ok, qr_order} =
       Orders.create_order(
         [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
@@ -754,9 +757,41 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
         }
       )
 
+    category =
+      %Category{}
+      |> Category.changeset(%{name: "HOT"})
+      |> Repo.insert!()
+
+    product =
+      %Product{}
+      |> Product.changeset(%{
+        name: "Americano",
+        category_id: category.id,
+        available: true
+      })
+      |> Repo.insert!()
+
+    price =
+      %ProductPrice{}
+      |> ProductPrice.changeset(%{
+        product_id: product.id,
+        size: "8oz",
+        price: Decimal.new("110")
+      })
+      |> Repo.insert!()
+
     {:ok, pos_order} =
       Orders.create_order(
-        [%{name: "Americano", size: "8oz", quantity: 1, price: Decimal.new("110")}],
+        [
+          %{
+            product_id: product.id,
+            price_id: price.id,
+            name: product.name,
+            size: price.size,
+            quantity: 1,
+            price: price.price
+          }
+        ],
         %{
           customer_name: "Walk-in",
           fulfillment: :pickup,
