@@ -6,6 +6,9 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
   alias Espreso.Accounts
   alias Espreso.Orders
+  alias Espreso.PhysicalActionCoordinator
+  alias Espreso.Printer
+  alias Espreso.Repo
 
   setup %{conn: conn} do
     {:ok, barista} =
@@ -1102,6 +1105,242 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert has_element?(view, "#unpaid-orders.staff-orders-unpaid-drawer--open")
     assert has_element?(view, "#unpaid-order-#{order.id}")
   end
+
+  test "cash Reprint dispatches one receipt, never opens the drawer, and allows a later permit",
+       %{
+         conn: conn
+       } do
+    restore_printer_config_on_exit()
+    order = paid_order!("cash")
+    {port, first_print} = start_test_printer!(1)
+    set_test_printer_port(port)
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    first_permit = live_assigns(view).reprint_permits[order.id]
+
+    view |> element("#reprint-#{order.id}") |> render_click()
+
+    assert [first_receipt] = Task.await(first_print, 2_000)
+    refute first_receipt == drawer_kick_bytes()
+    assert has_element?(view, "#orders-flash", "Receipt command dispatched.")
+
+    second_permit = live_assigns(view).reprint_permits[order.id]
+    assert is_binary(second_permit)
+    refute second_permit == first_permit
+
+    view
+    |> render_click("reprint_receipt", %{
+      "id" => to_string(order.id),
+      "action" => "receipt_reprint",
+      "permit" => first_permit
+    })
+
+    assert has_element?(
+             view,
+             "#orders-flash",
+             "This Reprint request was already handled. No additional receipt was sent."
+           )
+
+    {next_port, second_print} = start_test_printer!(1)
+    set_test_printer_port(next_port)
+    view |> element("#reprint-#{order.id}") |> render_click()
+
+    assert [second_receipt] = Task.await(second_print, 2_000)
+    refute second_receipt == drawer_kick_bytes()
+    assert has_element?(view, "#orders-flash", "Receipt command dispatched.")
+  end
+
+  test "wallet Reprint dispatches a receipt without a drawer command", %{conn: conn} do
+    restore_printer_config_on_exit()
+    order = paid_order!("gcash")
+    {port, printer_task} = start_test_printer!(1)
+    set_test_printer_port(port)
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    view |> element("#reprint-#{order.id}") |> render_click()
+
+    assert [receipt] = Task.await(printer_task, 2_000)
+    refute receipt == drawer_kick_bytes()
+    assert has_element?(view, "#orders-flash", "Receipt command dispatched.")
+  end
+
+  test "two LiveViews share a Reprint permit and its duplicate dispatches no receipt", %{
+    conn: conn
+  } do
+    restore_printer_config_on_exit()
+    order = paid_order!("cash")
+    {port, printer_task} = start_test_printer!(1)
+    set_test_printer_port(port)
+
+    {:ok, first_view, _html} = live(conn, ~p"/orders")
+    {:ok, second_view, _html} = live(conn, ~p"/orders")
+
+    permit = live_assigns(first_view).reprint_permits[order.id]
+    assert live_assigns(second_view).reprint_permits[order.id] == permit
+
+    first_view |> element("#reprint-#{order.id}") |> render_click()
+    assert [_receipt] = Task.await(printer_task, 2_000)
+
+    second_view |> element("#reprint-#{order.id}") |> render_click()
+
+    assert has_element?(
+             second_view,
+             "#orders-flash",
+             "This Reprint request was already handled. No additional receipt was sent."
+           )
+  end
+
+  test "definite Reprint connection failure exposes a fresh retry permit", %{conn: conn} do
+    restore_printer_config_on_exit()
+    set_test_printer_port(1)
+    order = paid_order!("cash")
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    first_permit = live_assigns(view).reprint_permits[order.id]
+
+    view |> element("#reprint-#{order.id}") |> render_click()
+
+    assert has_element?(
+             view,
+             "#orders-flash",
+             "Reprint could not connect to the printer"
+           )
+
+    retry_permit = live_assigns(view).reprint_permits[order.id]
+    assert is_binary(retry_permit)
+    refute retry_permit == first_permit
+  end
+
+  test "Reprint rejects unpaid, missing, disabled, and wrong-order stale requests", %{conn: conn} do
+    restore_printer_config_on_exit()
+    set_test_printer_port(1)
+
+    {:ok, unpaid} =
+      Orders.create_order(
+        [%{name: "Unpaid", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Unpaid", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    unpaid_permit =
+      PhysicalActionCoordinator.reprint_permits([unpaid.id])
+      |> Map.fetch!(unpaid.id)
+
+    {:ok, unpaid_view, _html} = live(conn, ~p"/orders")
+
+    unpaid_view
+    |> render_click("reprint_receipt", %{
+      "id" => to_string(unpaid.id),
+      "action" => "receipt_reprint",
+      "permit" => unpaid_permit
+    })
+
+    assert has_element?(unpaid_view, "#orders-flash", "Only paid orders can be reprinted.")
+
+    first = paid_order!("cash")
+    second = paid_order!("cash")
+    {:ok, paid_view, _html} = live(conn, ~p"/orders")
+    first_permit = live_assigns(paid_view).reprint_permits[first.id]
+
+    paid_view
+    |> render_click("reprint_receipt", %{
+      "id" => to_string(second.id),
+      "action" => "receipt_reprint",
+      "permit" => first_permit
+    })
+
+    assert has_element?(paid_view, "#orders-flash", "Reprint request is stale.")
+
+    Repo.delete!(first)
+
+    paid_view
+    |> render_click("reprint_receipt", %{
+      "id" => to_string(first.id),
+      "action" => "receipt_reprint",
+      "permit" => first_permit
+    })
+
+    assert has_element?(paid_view, "#orders-flash", "Order no longer exists.")
+
+    disabled_order = paid_order!("cash")
+    {:ok, disabled_view, _html} = live(conn, ~p"/orders")
+    disabled_permit = live_assigns(disabled_view).reprint_permits[disabled_order.id]
+    Application.put_env(:espreso, Printer, enabled: false, host: "")
+
+    disabled_view
+    |> render_click("reprint_receipt", %{
+      "id" => to_string(disabled_order.id),
+      "action" => "receipt_reprint",
+      "permit" => disabled_permit
+    })
+
+    assert has_element?(disabled_view, "#orders-flash", "Printer is not enabled")
+  end
+
+  defp paid_order!(paid_via) do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Reprint", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, paid} = Orders.mark_paid(order, paid_via: paid_via)
+    paid
+  end
+
+  defp live_assigns(view) do
+    view.pid
+    |> :sys.get_state()
+    |> Map.fetch!(:socket)
+    |> Map.fetch!(:assigns)
+  end
+
+  defp restore_printer_config_on_exit do
+    previous = Application.get_env(:espreso, Printer)
+
+    on_exit(fn ->
+      if previous do
+        Application.put_env(:espreso, Printer, previous)
+      else
+        Application.delete_env(:espreso, Printer)
+      end
+    end)
+  end
+
+  defp set_test_printer_port(port) do
+    Application.put_env(
+      :espreso,
+      Printer,
+      enabled: true,
+      host: "127.0.0.1",
+      port: port,
+      timeout_ms: 1_000
+    )
+  end
+
+  defp start_test_printer!(connection_count) do
+    {:ok, listener} =
+      :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true, ip: {127, 0, 0, 1}])
+
+    {:ok, {_address, port}} = :inet.sockname(listener)
+
+    task =
+      Task.async(fn ->
+        bytes =
+          Enum.map(1..connection_count, fn _ ->
+            {:ok, socket} = :gen_tcp.accept(listener, 1_500)
+            {:ok, bytes} = :gen_tcp.recv(socket, 0, 1_500)
+            :gen_tcp.close(socket)
+            bytes
+          end)
+
+        :gen_tcp.close(listener)
+        bytes
+      end)
+
+    {port, task}
+  end
+
+  defp drawer_kick_bytes, do: <<0x1B, 0x70, 0x00, 0x19, 0xFA>>
 
   defp backdate_order!(order, minutes_ago: minutes) when is_integer(minutes) and minutes >= 0 do
     at =

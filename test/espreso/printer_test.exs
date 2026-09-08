@@ -1,5 +1,5 @@
 defmodule Espreso.PrinterTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Espreso.Orders.Order
   alias Espreso.Orders.OrderItem
@@ -86,5 +86,79 @@ defmodule Espreso.PrinterTest do
     refute ticket =~ "TOTAL"
     refute ticket =~ "P120"
     refute ticket =~ "Wi-Fi"
+  end
+
+  test "dispatch_receipt reports dispatched and sends receipt bytes only" do
+    restore_printer_config_on_exit()
+    {port, printer_task} = start_test_printer!()
+    set_test_printer_port(port)
+
+    order = %Order{
+      number: "CS-DISPATCH",
+      paid_via: "cash",
+      total: Decimal.new("75"),
+      inserted_at: ~N[2026-09-05 12:00:00],
+      items: [
+        %OrderItem{
+          name: "Espresso",
+          quantity: 1,
+          unit_price: Decimal.new("75"),
+          line_total: Decimal.new("75")
+        }
+      ]
+    }
+
+    assert Printer.dispatch_receipt(order) == :dispatched
+    receipt = Task.await(printer_task, 2_000)
+    refute receipt == <<0x1B, 0x70, 0x00, 0x19, 0xFA>>
+  end
+
+  test "dispatch_receipt classifies connection failure as definite" do
+    restore_printer_config_on_exit()
+    set_test_printer_port(1)
+
+    assert {:definite_failure, _reason} =
+             Printer.dispatch_receipt(%Order{number: "CS-CONNECT", items: []})
+  end
+
+  defp restore_printer_config_on_exit do
+    previous = Application.get_env(:espreso, Printer)
+
+    on_exit(fn ->
+      if previous do
+        Application.put_env(:espreso, Printer, previous)
+      else
+        Application.delete_env(:espreso, Printer)
+      end
+    end)
+  end
+
+  defp set_test_printer_port(port) do
+    Application.put_env(
+      :espreso,
+      Printer,
+      enabled: true,
+      host: "127.0.0.1",
+      port: port,
+      timeout_ms: 1_000
+    )
+  end
+
+  defp start_test_printer! do
+    {:ok, listener} =
+      :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true, ip: {127, 0, 0, 1}])
+
+    {:ok, {_address, port}} = :inet.sockname(listener)
+
+    task =
+      Task.async(fn ->
+        {:ok, socket} = :gen_tcp.accept(listener, 1_500)
+        {:ok, bytes} = :gen_tcp.recv(socket, 0, 1_500)
+        :gen_tcp.close(socket)
+        :gen_tcp.close(listener)
+        bytes
+      end)
+
+    {port, task}
   end
 end

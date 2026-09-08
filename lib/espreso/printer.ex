@@ -67,6 +67,21 @@ defmodule Espreso.Printer do
     send_bytes(Receipt.build(order, opts), "receipt #{order.number}")
   end
 
+  @doc """
+  Dispatches receipt bytes with transport-phase result semantics.
+
+  A successful TCP send means the command was dispatched, not that paper output
+  was physically confirmed by the printer.
+  """
+  def dispatch_receipt(%Order{} = order, opts \\ []) do
+    case send_bytes_detailed(Receipt.build(order, opts), "receipt #{order.number}") do
+      :ok -> :dispatched
+      :disabled -> :disabled
+      {:error, :connect, reason} -> {:definite_failure, reason}
+      {:error, :send, reason} -> {:uncertain, reason}
+    end
+  end
+
   def print_kitchen(%Order{} = order, opts \\ []) do
     send_bytes(Receipt.build_kitchen(order, opts), "kitchen #{order.number}")
   end
@@ -114,6 +129,14 @@ defmodule Espreso.Printer do
   def describe_result({:error, reason}), do: "print failed (#{inspect(reason)})"
 
   defp send_bytes(bytes, label) when is_binary(bytes) do
+    case send_bytes_detailed(bytes, label) do
+      :ok -> :ok
+      :disabled -> :disabled
+      {:error, _phase, reason} -> {:error, reason}
+    end
+  end
+
+  defp send_bytes_detailed(bytes, label) when is_binary(bytes) do
     if enabled?() do
       do_send(bytes, label)
     else
@@ -135,17 +158,17 @@ defmodule Espreso.Printer do
               Logger.info("printer #{label} ok → #{host}:#{port}")
               :ok
 
-            {:error, reason} = err ->
+            {:error, reason} ->
               Logger.warning("printer #{label} send failed: #{inspect(reason)}")
-              err
+              {:error, :send, reason}
           end
         after
           :gen_tcp.close(socket)
         end
 
-      {:error, reason} = err ->
+      {:error, reason} ->
         Logger.warning("printer #{label} connect failed #{host}:#{port}: #{inspect(reason)}")
-        err
+        {:error, :connect, reason}
     end
   end
 end
