@@ -5687,6 +5687,15 @@ a.staff-home-card:focus-visible {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, #f85020 20%, transparent);
 }
 
+.staff-pos-page.staff-pos-page--cafe .staff-pos-payment-cue {
+  margin: -0.35rem 0 0.65rem;
+  padding-inline: 0.15rem;
+  color: color-mix(in srgb, #382010 72%, #b0a098);
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .staff-pos-page.staff-pos-page--cafe .staff-pos-place {
   min-height: 3.35rem;
   border-radius: 999px;
