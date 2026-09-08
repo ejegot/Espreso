@@ -5465,6 +5465,29 @@ a.staff-home-card:focus-visible {
   color: #b0a098;
 }
 
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-variant-trigger {
+  min-height: 2.125rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0.15rem 0 0;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid rgba(56, 32, 16, 0.14);
+  border-radius: 999px;
+  background: #fff;
+  color: color-mix(in srgb, #382010 70%, #b0a098);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-variant-trigger:focus-visible {
+  border-color: #f85020;
+  outline: 2px solid color-mix(in srgb, #f85020 20%, transparent);
+  outline-offset: 1px;
+}
+
 .staff-pos-page.staff-pos-page--cafe .staff-pos-cart-amount {
   margin: 0.35rem 0 0;
   font-size: 0.92rem;
@@ -5477,6 +5500,41 @@ a.staff-home-card:focus-visible {
   flex-direction: column;
   align-items: flex-end;
   gap: 0.35rem;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-variant-chooser {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(56, 32, 16, 0.08);
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-variant-option {
+  min-height: 2.125rem;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid rgba(56, 32, 16, 0.14);
+  border-radius: 999px;
+  background: #fff;
+  color: #382010;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-variant-option.is-active {
+  border-color: #382010;
+  background: #382010;
+  color: #fff;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-variant-option:focus-visible {
+  border-color: #f85020;
+  outline: 2px solid color-mix(in srgb, #f85020 20%, transparent);
+  outline-offset: 1px;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-qty-btn {
@@ -6659,6 +6717,11 @@ a.staff-home-card:focus-visible {
 
   .staff-pos-page.staff-pos-page--cafe .staff-pos-catalog {
     height: max(28rem, 68dvh);
+  }
+
+  .staff-pos-page.staff-pos-page--cafe .staff-pos-cart-variant-trigger,
+  .staff-pos-page.staff-pos-page--cafe .staff-pos-cart-variant-option {
+    min-height: 2.5rem;
   }
 }
 

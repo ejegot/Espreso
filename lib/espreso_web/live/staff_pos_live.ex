@@ -37,6 +37,7 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:placing_order?, false)
      |> assign(:cart_undo, nil)
      |> assign(:cart_undo_timer, nil)
+     |> assign(:variant_editor_key, nil)
      |> assign(:card_sizes, %{})
      |> assign(:added_product_id, nil)
      |> assign(:last_order, nil)
@@ -107,6 +108,63 @@ defmodule EspresoWeb.StaffPosLive do
     {:noreply, assign(socket, :search, "")}
   end
 
+  def handle_event(
+        "toggle_cart_variant",
+        _params,
+        %{assigns: %{last_order: last_order}} = socket
+      )
+      when not is_nil(last_order) do
+    {:noreply, socket}
+  end
+
+  def handle_event("toggle_cart_variant", %{"key" => key}, socket) do
+    editor_key =
+      case uniquely_find_cart_line(socket.assigns.cart, key) do
+        {:ok, line, _index} ->
+          if length(cart_variant_options(socket.assigns.categories, line)) > 1 do
+            if socket.assigns.variant_editor_key == key, do: nil, else: key
+          else
+            nil
+          end
+
+        :error ->
+          socket.assigns.variant_editor_key
+      end
+
+    {:noreply, assign(socket, :variant_editor_key, editor_key)}
+  end
+
+  def handle_event("toggle_cart_variant", _params, socket), do: {:noreply, socket}
+
+  def handle_event(
+        "change_cart_variant",
+        _params,
+        %{assigns: %{last_order: last_order}} = socket
+      )
+      when not is_nil(last_order) do
+    {:noreply, socket}
+  end
+
+  def handle_event("change_cart_variant", params, socket) do
+    key = Map.get(params, "key")
+    price_id = Map.get(params, "price-id") || Map.get(params, "price_id")
+
+    socket =
+      with key when is_binary(key) <- key,
+           {:ok, price_id} <- parse_positive_id(price_id),
+           {:ok, line, _index} <- uniquely_find_cart_line(socket.assigns.cart, key) do
+        if line.price_id == price_id do
+          assign(socket, :variant_editor_key, nil)
+        else
+          change_cart_line_variant(socket, line, key, price_id)
+        end
+      else
+        _ -> socket
+      end
+
+    {:noreply, socket}
+  end
+
   def handle_event("select_card_size", %{"product-id" => product_id, "price-id" => price_id}, socket) do
     product_id = String.to_integer(product_id)
     price_id = String.to_integer(price_id)
@@ -135,6 +193,7 @@ defmodule EspresoWeb.StaffPosLive do
       {:noreply,
        socket
        |> clear_cart_undo()
+       |> assign(:variant_editor_key, nil)
        |> assign(:cart, add_line(socket.assigns.cart, product, price, category_name, 1))
        |> assign(:added_product_id, product_id)
        |> assign(:error, nil)
@@ -204,11 +263,16 @@ defmodule EspresoWeb.StaffPosLive do
           |> clear_cart_undo()
           |> restore_ticket_draft(draft)
 
+        %{kind: :variant, draft: draft} ->
+          socket
+          |> clear_cart_undo()
+          |> restore_ticket_draft(draft)
+
         nil ->
           socket
       end
 
-    {:noreply, socket}
+    {:noreply, assign(socket, :variant_editor_key, nil)}
   end
 
   def handle_event("new_order", _params, socket) do
@@ -434,6 +498,7 @@ defmodule EspresoWeb.StaffPosLive do
               |> assign(:payment_choice, :paid)
               |> assign(:paid_via, "cash")
               |> assign(:customer_name, "Walk-in")
+              |> assign(:variant_editor_key, nil)
               |> assign(:cash_tendered, "")
               |> assign(:fulfillment, :pickup)
               |> assign(:table_number, "")
@@ -831,7 +896,7 @@ defmodule EspresoWeb.StaffPosLive do
                 </div>
 
                 <div :if={@cart_undo} class="staff-pos-cart-undo" id="pos-cart-undo" role="status">
-                  <span>{if @cart_undo.kind == :ticket, do: "Ticket cleared", else: "Item removed"}</span>
+                  <span>{cart_undo_label(@cart_undo)}</span>
                   <button type="button" id="pos-cart-undo-action" phx-click="undo_cart">
                     Undo
                   </button>
@@ -854,7 +919,22 @@ defmodule EspresoWeb.StaffPosLive do
                       <div class="staff-pos-cart-main">
                         <div class="staff-pos-cart-copy">
                           <p class="staff-pos-cart-name">{line.name}</p>
-                          <p class="staff-pos-cart-size">{size_label(line.size)}</p>
+                          <%= if length(cart_variant_options(@categories, line)) > 1 do %>
+                            <button
+                              type="button"
+                              class="staff-pos-cart-variant-trigger"
+                              id={"pos-cart-variant-trigger-#{line.key}"}
+                              phx-click="toggle_cart_variant"
+                              phx-value-key={line.key}
+                              aria-expanded={to_string(@variant_editor_key == line.key)}
+                              aria-controls={"pos-cart-variant-chooser-#{line.key}"}
+                              aria-label={"Change #{line.name} size, currently #{size_label(line.size)}"}
+                            >
+                              {size_label(line.size)} <span aria-hidden="true">▾</span>
+                            </button>
+                          <% else %>
+                            <p class="staff-pos-cart-size">{size_label(line.size)}</p>
+                          <% end %>
                           <p class="staff-pos-cart-amount">
                             {Menu.format_price(Decimal.mult(line.price, line.quantity))}
                           </p>
@@ -890,6 +970,29 @@ defmodule EspresoWeb.StaffPosLive do
                             title="Remove"
                           >
                             ×
+                          </button>
+                        </div>
+                        <div
+                          :if={@variant_editor_key == line.key}
+                          class="staff-pos-cart-variant-chooser"
+                          id={"pos-cart-variant-chooser-#{line.key}"}
+                          role="group"
+                          aria-label={"Choose size for #{line.name}"}
+                        >
+                          <button
+                            :for={price <- cart_variant_options(@categories, line)}
+                            type="button"
+                            class={[
+                              "staff-pos-cart-variant-option",
+                              price.id == line.price_id && "is-active"
+                            ]}
+                            id={"pos-cart-variant-#{line.key}-#{price.id}"}
+                            phx-click="change_cart_variant"
+                            phx-value-key={line.key}
+                            phx-value-price-id={price.id}
+                            aria-pressed={to_string(price.id == line.price_id)}
+                          >
+                            {size_label(price.size)} · {Menu.format_price(price.price)}
                           </button>
                         </div>
                       </div>
@@ -1197,9 +1300,117 @@ defmodule EspresoWeb.StaffPosLive do
 
         socket
         |> assign(:cart, List.delete_at(socket.assigns.cart, index))
+        |> assign(:variant_editor_key, nil)
         |> put_cart_undo(%{kind: :line, line: line, index: index})
     end
   end
+
+  defp change_cart_line_variant(socket, source, source_key, price_id) do
+    with prices when length(prices) > 1 <-
+           cart_variant_options(socket.assigns.categories, source),
+         %{} = target_price <- Enum.find(prices, &(&1.id == price_id)),
+         {:ok, cart} <- replace_or_merge_cart_variant(socket.assigns.cart, source_key, target_price) do
+      draft = ticket_draft(socket.assigns)
+
+      socket
+      |> assign(:cart, cart)
+      |> assign(
+        :card_sizes,
+        Map.put(socket.assigns.card_sizes, source.product_id, target_price.id)
+      )
+      |> assign(:variant_editor_key, nil)
+      |> put_cart_undo(%{kind: :variant, draft: draft})
+    else
+      _ -> socket
+    end
+  end
+
+  defp replace_or_merge_cart_variant(cart, source_key, target_price) do
+    with {:ok, source, source_index} <- uniquely_find_cart_line(cart, source_key) do
+      destinations =
+        cart
+        |> Enum.with_index()
+        |> Enum.reject(fn {_line, index} -> index == source_index end)
+        |> Enum.filter(fn {line, _index} ->
+          line.product_id == source.product_id and line.price_id == target_price.id
+        end)
+
+      case destinations do
+        [] ->
+          replacement = apply_variant_to_line(source, target_price)
+          {:ok, List.replace_at(cart, source_index, replacement)}
+
+        [{destination, destination_index}] ->
+          merged =
+            destination
+            |> apply_variant_to_line(target_price)
+            |> Map.put(:quantity, destination.quantity + source.quantity)
+
+          {:ok,
+           cart
+           |> List.replace_at(destination_index, merged)
+           |> List.delete_at(source_index)}
+
+        _ ->
+          :error
+      end
+    end
+  end
+
+  defp apply_variant_to_line(line, price) do
+    %{
+      line
+      | key: cart_line_key(line.product_id, price.id),
+        price_id: price.id,
+        size: price.size,
+        price: price.price
+    }
+  end
+
+  defp cart_line_key(product_id, price_id), do: "#{product_id}-#{price_id}"
+
+  defp uniquely_find_cart_line(cart, key) when is_binary(key) do
+    case cart |> Enum.with_index() |> Enum.filter(fn {line, _index} -> line.key == key end) do
+      [{line, index}] -> {:ok, line, index}
+      _ -> :error
+    end
+  end
+
+  defp uniquely_find_cart_line(_cart, _key), do: :error
+
+  defp cart_variant_options(categories, line) do
+    case find_product_entry(categories, line.product_id) do
+      {_category_name, %{product_prices: prices}} ->
+        ambiguous_signatures =
+          prices
+          |> Enum.group_by(&variant_display_signature/1)
+          |> Enum.filter(fn {_signature, matching} -> length(matching) > 1 end)
+          |> Map.new(fn {signature, _matching} -> {signature, true} end)
+
+        safe_prices =
+          Enum.reject(prices, &Map.has_key?(ambiguous_signatures, variant_display_signature(&1)))
+
+        if Enum.any?(safe_prices, &(&1.id == line.price_id)), do: safe_prices, else: []
+
+      _ ->
+        []
+    end
+  end
+
+  defp variant_display_signature(price) do
+    {size_label(price.size), Decimal.to_string(price.price, :normal)}
+  end
+
+  defp parse_positive_id(value) when is_integer(value) and value > 0, do: {:ok, value}
+
+  defp parse_positive_id(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {id, ""} when id > 0 -> {:ok, id}
+      _ -> :error
+    end
+  end
+
+  defp parse_positive_id(_value), do: :error
 
   defp cart_total(cart) do
     Enum.reduce(cart, Decimal.new(0), fn line, acc ->
@@ -1222,6 +1433,7 @@ defmodule EspresoWeb.StaffPosLive do
     |> clear_cart_undo()
     |> assign(:cart, [])
     |> assign(:card_sizes, %{})
+    |> assign(:variant_editor_key, nil)
     |> assign(:added_product_id, nil)
     |> assign(:last_order, nil)
     |> assign(:print_note, nil)
@@ -1280,6 +1492,10 @@ defmodule EspresoWeb.StaffPosLive do
     |> assign(:cart_undo, nil)
     |> assign(:cart_undo_timer, nil)
   end
+
+  defp cart_undo_label(%{kind: :ticket}), do: "Ticket cleared"
+  defp cart_undo_label(%{kind: :variant}), do: "Size changed"
+  defp cart_undo_label(_undo), do: "Item removed"
 
   defp place_flash_message(order, print_note, cash_change) do
     base =
