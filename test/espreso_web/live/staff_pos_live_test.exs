@@ -1620,6 +1620,9 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     assert has_element?(view, "#pos-confirmation.is-error")
     assert has_element?(view, "#pos-retry-print")
+    retry_token = live_assigns(view).print_retry_token
+    assert is_binary(retry_token)
+    assert has_element?(view, ~s(#pos-retry-print[phx-value-token="#{retry_token}"]))
 
     {port, printer_task} = start_test_printer!(2)
 
@@ -1633,12 +1636,20 @@ defmodule EspresoWeb.StaffPosLiveTest do
     )
 
     view |> element("#pos-retry-print") |> render_click()
-    Task.await(printer_task, 2_000)
+    assert [receipt_bytes, drawer_bytes] = Task.await(printer_task, 2_000)
+    assert receipt_bytes != drawer_bytes
+    assert drawer_bytes == <<0x1B, 0x70, 0x00, 0x19, 0xFA>>
 
     assert has_element?(view, "#pos-confirmation.is-success", "Print complete · order saved")
     assert has_element?(view, "#pos-print-note", "Receipt printed · kaha opened.")
     refute has_element?(view, "#pos-print-note.is-error")
     refute has_element?(view, "#pos-retry-print")
+    assert live_assigns(view).print_retry_token == nil
+
+    view |> render_click("reprint_receipt", %{"token" => retry_token})
+
+    assert has_element?(view, "#pos-confirmation.is-success", "Print complete · order saved")
+    assert live_assigns(view).print_retry_token == nil
     assert has_element?(view, "#pos-new-order", "New Order")
     assert has_element?(view, ~s(#pos-confirmation a[href="/orders"]), "View Orders")
 
@@ -1647,6 +1658,107 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-cart-empty")
     assert has_element?(view, "#pos-pay-cash.is-active")
     assert length(Orders.list_active_orders()) == 1
+  end
+
+  test "failed Retry rotates its token and only the fresh token can print", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    restore_printer_config_on_exit()
+    set_test_printer_port(1)
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    submit_order(view)
+
+    first_token = live_assigns(view).print_retry_token
+    view |> render_click("reprint_receipt", %{"token" => first_token})
+
+    second_token = live_assigns(view).print_retry_token
+    assert is_binary(second_token)
+    refute second_token == first_token
+    assert has_element?(view, "#pos-retry-print")
+
+    {port, printer_task} = start_test_printer!(2)
+    set_test_printer_port(port)
+
+    view |> render_click("reprint_receipt", %{"token" => first_token})
+    assert live_assigns(view).print_retry_token == second_token
+
+    view |> render_click("reprint_receipt", %{"token" => second_token})
+    assert [receipt_bytes, drawer_bytes] = Task.await(printer_task, 2_000)
+    assert receipt_bytes != drawer_bytes
+    assert drawer_bytes == <<0x1B, 0x70, 0x00, 0x19, 0xFA>>
+    assert live_assigns(view).print_retry_token == nil
+    assert has_element?(view, "#pos-confirmation.is-success")
+  end
+
+  test "New Order invalidates an old Retry token and a later failure gets a fresh token", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    restore_printer_config_on_exit()
+    set_test_printer_port(1)
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    submit_order(view)
+
+    old_token = live_assigns(view).print_retry_token
+    view |> element("#pos-new-order") |> render_click()
+    assert live_assigns(view).print_retry_token == nil
+
+    {port, printer_task} = start_test_printer!(2)
+    set_test_printer_port(port)
+    view |> render_click("reprint_receipt", %{"token" => old_token})
+
+    set_test_printer_port(1)
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    submit_order(view)
+
+    new_token = live_assigns(view).print_retry_token
+    assert is_binary(new_token)
+    refute new_token == old_token
+
+    set_test_printer_port(port)
+    view |> render_click("reprint_receipt", %{"token" => new_token})
+    assert [_receipt_bytes, <<0x1B, 0x70, 0x00, 0x19, 0xFA>>] =
+             Task.await(printer_task, 2_000)
+
+    assert has_element?(view, "#pos-confirmation.is-success")
+  end
+
+  test "GCash Retry token permits one receipt and rejects its duplicate", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    restore_printer_config_on_exit()
+    set_test_printer_port(1)
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-pay-gcash") |> render_click()
+    view |> form("#pos-order-form") |> render_submit()
+
+    retry_token = live_assigns(view).print_retry_token
+    assert is_binary(retry_token)
+    assert has_element?(view, "#pos-retry-print")
+
+    {port, printer_task} = start_test_printer!(1)
+    set_test_printer_port(port)
+    view |> render_click("reprint_receipt", %{"token" => retry_token})
+
+    assert [receipt_bytes] = Task.await(printer_task, 2_000)
+    refute receipt_bytes == <<0x1B, 0x70, 0x00, 0x19, 0xFA>>
+    assert has_element?(view, "#pos-confirmation.is-success")
+    assert live_assigns(view).print_retry_token == nil
+
+    view |> render_click("reprint_receipt", %{"token" => retry_token})
+    assert has_element?(view, "#pos-confirmation.is-success")
+    assert live_assigns(view).print_retry_token == nil
   end
 
   test "Kitchen and Kaha actions use result-appropriate note styling", %{
@@ -1800,13 +1912,16 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     task =
       Task.async(fn ->
-        Enum.each(1..connection_count, fn _ ->
-          {:ok, socket} = :gen_tcp.accept(listener, 1_500)
-          {:ok, _bytes} = :gen_tcp.recv(socket, 0, 1_500)
-          :gen_tcp.close(socket)
-        end)
+        bytes =
+          Enum.map(1..connection_count, fn _ ->
+            {:ok, socket} = :gen_tcp.accept(listener, 1_500)
+            {:ok, bytes} = :gen_tcp.recv(socket, 0, 1_500)
+            :gen_tcp.close(socket)
+            bytes
+          end)
 
         :gen_tcp.close(listener)
+        bytes
       end)
 
     {port, task}
@@ -1846,6 +1961,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
           cash_tender_token: nil,
           last_cash_change: nil,
           print_failed?: false,
+          print_retry_token: nil,
           print_note_error?: false,
           place_flash: nil,
           place_flash_token: nil,

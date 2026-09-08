@@ -36,6 +36,7 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:cash_tender_token, nil)
      |> assign(:last_cash_change, nil)
      |> assign(:print_failed?, false)
+     |> assign(:print_retry_token, nil)
      |> assign(:print_note_error?, false)
      |> assign(:place_flash, nil)
      |> assign(:place_flash_token, nil)
@@ -475,38 +476,47 @@ defmodule EspresoWeb.StaffPosLive do
     end
   end
 
-  def handle_event("reprint_receipt", _params, socket) do
-    case socket.assigns.last_order do
-      nil ->
-        {:noreply, socket}
+  def handle_event(
+        "reprint_receipt",
+        %{"token" => token},
+        %{
+          assigns: %{
+            last_order: order,
+            print_failed?: true,
+            print_retry_token: token
+          }
+        } = socket
+      )
+      when not is_nil(order) and not is_nil(token) do
+    socket = assign(socket, :print_retry_token, nil)
+    order = Espreso.Repo.preload(order, :items)
+    opts = print_opts(socket, order)
 
-      order ->
-        order = Espreso.Repo.preload(order, :items)
-        opts = print_opts(socket, order)
-
-        {note, failed?, note_error?} =
-          case Printer.after_paid(order, order.paid_via || "cash", opts) do
-            :ok ->
-              if Printer.cash_like?(order.paid_via || "cash") do
-                {"Receipt printed · kaha opened.", false, false}
-              else
-                {"Receipt printed.", false, false}
-              end
-
-            :disabled ->
-              {"Printer is not enabled on this server.", true, false}
-
-            {:error, reason} ->
-              {"Print failed (#{inspect(reason)}). Tap Retry.", true, true}
+    {note, failed?, note_error?} =
+      case Printer.after_paid(order, order.paid_via || "cash", opts) do
+        :ok ->
+          if Printer.cash_like?(order.paid_via || "cash") do
+            {"Receipt printed · kaha opened.", false, false}
+          else
+            {"Receipt printed.", false, false}
           end
 
-        {:noreply,
-         socket
-         |> assign(:print_note, note)
-         |> assign(:print_failed?, failed?)
-         |> assign(:print_note_error?, note_error?)}
-    end
+        :disabled ->
+          {"Printer is not enabled on this server.", true, false}
+
+        {:error, reason} ->
+          {"Print failed (#{inspect(reason)}). Tap Retry.", true, true}
+      end
+
+    {:noreply,
+     socket
+     |> assign(:print_note, note)
+     |> assign(:print_failed?, failed?)
+     |> assign(:print_retry_token, if(failed?, do: new_print_retry_token()))
+     |> assign(:print_note_error?, note_error?)}
   end
+
+  def handle_event("reprint_receipt", _params, socket), do: {:noreply, socket}
 
   def handle_event("print_kitchen", _params, socket) do
     case socket.assigns.last_order do
@@ -790,6 +800,8 @@ defmodule EspresoWeb.StaffPosLive do
                       class="staff-pos-place"
                       id="pos-retry-print"
                       phx-click="reprint_receipt"
+                      phx-value-token={@print_retry_token}
+                      phx-disable-with="Retrying…"
                     >
                       Retry print
                     </button>
@@ -1351,6 +1363,7 @@ defmodule EspresoWeb.StaffPosLive do
               |> assign(:last_cash_change, cash_change)
               |> assign(:print_note, note)
               |> assign(:print_failed?, failed?)
+              |> assign(:print_retry_token, if(failed?, do: new_print_retry_token()))
               |> assign(:print_note_error?, note_error?)
 
             socket =
@@ -1811,6 +1824,7 @@ defmodule EspresoWeb.StaffPosLive do
     |> assign(:last_order, nil)
     |> assign(:print_note, nil)
     |> assign(:print_failed?, false)
+    |> assign(:print_retry_token, nil)
     |> assign(:print_note_error?, false)
     |> assign(:last_cash_change, nil)
     |> assign(:error, nil)
@@ -2017,6 +2031,10 @@ defmodule EspresoWeb.StaffPosLive do
   end
 
   defp staff_initials(_), do: "CS"
+
+  defp new_print_retry_token do
+    Integer.to_string(System.unique_integer([:positive]))
+  end
 
   defp print_opts(socket, order) do
     base = [staff_name: socket.assigns.current_user.name]
