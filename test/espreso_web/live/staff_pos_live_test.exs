@@ -191,6 +191,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     assert has_element?(view, "#pos-place-flash")
     assert has_element?(view, "#pos-place-flash", "Paid at counter")
+    assert has_element?(view, ~s(#pos-place-flash a[href="/orders"]), "View Orders")
     assert has_element?(view, "#pos-cart-empty")
     assert has_element?(view, "#pos-place-order[disabled]")
     refute has_element?(view, "#pos-confirmation")

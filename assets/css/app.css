@@ -6311,6 +6311,16 @@ a.staff-home-card:focus-visible {
   cursor: pointer;
 }
 
+.staff-pos-page .staff-pos-place-flash-orders {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: inherit;
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 0.16rem;
+}
+
 .staff-pos-page .staff-pos-notes-toggle {
   display: inline-flex;
   align-items: center;
@@ -7318,6 +7328,10 @@ a.staff-home-card:focus-visible {
   font-weight: 700;
 }
 
+.staff-orders-page .staff-orders-lane-jumps {
+  display: none;
+}
+
 .staff-orders-page .staff-orders-alert {
   flex: 0 0 auto;
   display: flex;
@@ -7440,6 +7454,11 @@ a.staff-home-card:focus-visible {
   font-size: 0.62rem;
   font-weight: 600;
   letter-spacing: 0.02em;
+}
+
+.staff-orders-page .staff-orders-workflow-hint strong {
+  color: var(--cs-brown);
+  font-weight: 800;
 }
 
 .staff-orders-page .staff-orders-kds-head h2 {
@@ -8194,6 +8213,47 @@ a.staff-home-card:focus-visible {
 }
 
 @media (max-width: 899px) {
+  .staff-orders-page .staff-orders-lane-jumps {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.25rem;
+    margin-bottom: 0.28rem;
+  }
+
+  .staff-orders-page .staff-orders-lane-jump {
+    min-width: 0;
+    min-height: 2.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.3rem;
+    border: 1px solid var(--cs-line);
+    border-radius: var(--cs-radius-control);
+    background: var(--cs-surface);
+    color: color-mix(in srgb, var(--cs-brown) 72%, var(--cs-beige));
+    font-size: 0.64rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-decoration: none;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .staff-orders-page .staff-orders-lane-jump span {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .staff-orders-page .staff-orders-lane-jump--new {
+    border-color: color-mix(in srgb, var(--cs-orange) 32%, transparent);
+    color: var(--cs-orange);
+  }
+
+  .staff-orders-page .staff-orders-kds-lane {
+    scroll-margin-block-start: 0.4rem;
+  }
+
   .staff-orders-page .staff-orders-workboard {
     overflow-y: auto;
     overscroll-behavior: contain;

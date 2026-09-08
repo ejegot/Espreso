@@ -69,6 +69,72 @@ defmodule Espreso.OrdersTest do
     assert Orders.list_orders_by_numbers(nil) == []
   end
 
+  test "operational queues use deterministic id tie-breakers" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+    timestamp = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    active =
+      for name <- ["First", "Second", "Third"] do
+        {:ok, order} =
+          Orders.create_order(lines, %{
+            customer_name: name,
+            fulfillment: :pickup,
+            payment_method: :counter
+          })
+
+        order
+      end
+
+    active_ids = Enum.map(active, & &1.id)
+
+    Repo.update_all(
+      from(o in Order, where: o.id in ^active_ids),
+      set: [inserted_at: timestamp]
+    )
+
+    listed_active_ids =
+      Orders.list_active_orders()
+      |> Enum.filter(&(&1.id in active_ids))
+      |> Enum.map(& &1.id)
+
+    assert listed_active_ids == Enum.sort(active_ids, :asc)
+
+    listed_unpaid_ids =
+      Orders.list_todays_unpaid()
+      |> Enum.filter(&(&1.id in active_ids))
+      |> Enum.map(& &1.id)
+
+    assert listed_unpaid_ids == Enum.sort(active_ids, :desc)
+
+    ready =
+      for name <- ["Ready First", "Ready Second", "Ready Third"] do
+        {:ok, order} =
+          Orders.create_order(lines, %{
+            customer_name: name,
+            fulfillment: :pickup,
+            payment_method: :counter,
+            payment_status: :paid
+          })
+
+        {:ok, order} = Orders.update_status(order, "ready")
+        order
+      end
+
+    ready_ids = Enum.map(ready, & &1.id)
+
+    Repo.update_all(
+      from(o in Order, where: o.id in ^ready_ids),
+      set: [updated_at: timestamp]
+    )
+
+    listed_ready_ids =
+      Orders.list_recent_ready(100)
+      |> Enum.filter(&(&1.id in ready_ids))
+      |> Enum.map(& &1.id)
+
+    assert listed_ready_ids == Enum.sort(ready_ids, :desc)
+  end
+
   test "create_order assigns unique random numbers" do
     lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
 

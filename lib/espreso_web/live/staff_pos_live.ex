@@ -418,6 +418,9 @@ defmodule EspresoWeb.StaffPosLive do
           <p :if={@error} class="staff-pos-flash" id="pos-error">{@error}</p>
           <p :if={@place_flash} class="staff-pos-place-flash" id="pos-place-flash">
             <span>{@place_flash}</span>
+            <.link navigate={~p"/orders"} class="staff-pos-place-flash-orders">
+              View Orders
+            </.link>
             <button
               type="button"
               class="staff-pos-place-flash-dismiss"

@@ -67,6 +67,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     refute has_element?(view, "#order-prepare-#{order.id}")
     refute has_element?(view, "#order-ready-#{order.id}")
     refute has_element?(view, "#order-card-new-#{order.id} .staff-badge--received")
+    refute has_element?(view, "#orders-new-workload")
   end
 
   test "one-tap Cash marks paid and moves to Preparing; Ready after paid", %{conn: conn} do
@@ -159,6 +160,45 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     refute has_element?(view, "#orders-kitchen #unpaid-orders")
     assert has_element?(view, "#unpaid-order-#{order.id}")
     assert has_element?(view, "#unpaid-drawer-toggle")
+  end
+
+  test "New lane distinguishes staff-actionable and online-waiting orders", %{conn: conn} do
+    {:ok, actionable} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "At Counter", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, waiting} =
+      Orders.create_order(
+        [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("120")}],
+        %{customer_name: "Online Guest", fulfillment: :pickup, payment_method: :online}
+      )
+
+    {:ok, waiting} = Orders.attach_paymongo_session(waiting, "cs_pass3_workload")
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    assert has_element?(view, "#orders-new .staff-orders-count", "2")
+    assert has_element?(view, "#orders-new-workload", "1 need staff")
+    assert has_element?(view, "#orders-new-workload", "1 waiting online")
+    assert has_element?(view, "#ticket-new-paid-via-cash-#{actionable.id}", "Cash")
+
+    assert has_element?(
+             view,
+             "#order-card-new-#{waiting.id} .staff-order-payment-waiting",
+             "Waiting for online payment"
+           )
+
+    assert has_element?(view, ~s(.staff-orders-lane-jump[href="#orders-new"]), "New 2")
+
+    assert has_element?(
+             view,
+             ~s(.staff-orders-lane-jump[href="#orders-preparing"]),
+             "Preparing 0"
+           )
+
+    assert has_element?(view, ~s(.staff-orders-lane-jump[href="#orders-ready"]), "Ready 0")
   end
 
   test "cancel action voids unpaid active order and removes it from active list", %{conn: conn} do
@@ -654,6 +694,24 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert reloaded.status == "received"
   end
 
+  test "age presentation advances on a tick without reloading orders", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Tick Age", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    backdate_order!(order, seconds_ago: 59)
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    assert has_element?(view, "#order-card-new-#{order.id} .staff-order-age", "Just now")
+
+    Process.sleep(1_100)
+    send(view.pid, :age_tick)
+
+    assert has_element?(view, "#order-card-new-#{order.id} .staff-order-age", "1 min ago")
+  end
+
   test "15+ minute order age uses critical emphasis without changing status", %{conn: conn} do
     {:ok, order} =
       Orders.create_order(
@@ -1014,6 +1072,17 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     at =
       DateTime.utc_now(:second)
       |> DateTime.add(-minutes * 60, :second)
+
+    Espreso.Repo.update_all(
+      from(o in Espreso.Orders.Order, where: o.id == ^order.id),
+      set: [inserted_at: at, updated_at: at]
+    )
+  end
+
+  defp backdate_order!(order, seconds_ago: seconds) when is_integer(seconds) and seconds >= 0 do
+    at =
+      DateTime.utc_now(:second)
+      |> DateTime.add(-seconds, :second)
 
     Espreso.Repo.update_all(
       from(o in Espreso.Orders.Order, where: o.id == ^order.id),
