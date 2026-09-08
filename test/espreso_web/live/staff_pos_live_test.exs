@@ -454,7 +454,11 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> element("#pos-product-#{americano.id}") |> render_click()
     view |> element("#pos-product-#{espresso.id}") |> render_click()
 
-    assert has_element?(view, "#pos-line-#{espresso.id}-#{espresso_price.id} .staff-pos-cart-size")
+    assert has_element?(
+             view,
+             "#pos-line-#{espresso.id}-#{espresso_price.id} .staff-pos-cart-size"
+           )
+
     refute has_element?(view, "#pos-cart-variant-trigger-#{espresso.id}-#{espresso_price.id}")
 
     original = render(view)
@@ -476,7 +480,10 @@ defmodule EspresoWeb.StaffPosLiveTest do
     barista: barista
   } do
     hot = Repo.get_by!(Category, name: "HOT")
-    duplicate_label = insert_product!(hot, "Duplicate Label", true, [{"Large", "100"}, {"Large", "130"}])
+
+    duplicate_label =
+      insert_product!(hot, "Duplicate Label", true, [{"Large", "100"}, {"Large", "130"}])
+
     ambiguous = insert_product!(hot, "Ambiguous", true, [{"Same", "90"}, {"Same", "90"}])
     [first, second] = duplicate_label.product_prices
     [ambiguous_first | _] = ambiguous.product_prices
@@ -644,6 +651,9 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-place-order[disabled]")
     refute has_element?(view, "#pos-clear-ticket")
     refute has_element?(view, "#pos-confirmation")
+
+    view |> render_click("place_order", %{})
+    assert has_element?(view, "#pos-error", "Add at least one item")
   end
 
   test "placing order creates POS order with items, total, source, and confirmation", %{
@@ -668,11 +678,17 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     submit_order(view)
 
-    assert has_element?(view, "#pos-place-flash")
+    assert has_element?(
+             view,
+             ~s(#pos-place-flash[role="status"][aria-live="polite"][aria-atomic="true"])
+           )
+
     assert has_element?(view, "#pos-place-flash", "Paid at counter")
+    assert has_element?(view, "#pos-place-flash", "Printing disabled")
     assert has_element?(view, ~s(#pos-place-flash a[href="/orders"]), "View Orders")
     assert has_element?(view, "#pos-cart-empty")
     assert has_element?(view, "#pos-place-order[disabled]")
+    refute has_element?(view, "#pos-retry-print")
     refute has_element?(view, "#pos-confirmation")
 
     html = render(view)
@@ -697,6 +713,75 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     assert has_element?(view, "#pos-cart-empty")
     assert has_element?(view, "#pos-pay-cash.is-active", "Cash")
+    refute has_element?(view, "#pos-place-flash")
+  end
+
+  test "success flash only clears for its active token", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    submit_order(view)
+
+    first_token = live_assigns(view).place_flash_token
+    assert is_reference(first_token)
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    submit_order(view)
+
+    second_token = live_assigns(view).place_flash_token
+    assert is_reference(second_token)
+    refute second_token == first_token
+
+    send(view.pid, {:clear_place_flash, first_token})
+    assert has_element?(view, "#pos-place-flash")
+
+    send(view.pid, {:clear_place_flash, second_token})
+    refute has_element?(view, "#pos-place-flash")
+    assert live_assigns(view).place_flash_token == nil
+  end
+
+  test "success dismissal invalidates its token and adding a product clears success", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    submit_order(view)
+
+    dismissed_token = live_assigns(view).place_flash_token
+    view |> element("#pos-place-flash-dismiss") |> render_click()
+
+    refute has_element?(view, "#pos-place-flash")
+    assert live_assigns(view).place_flash_token == nil
+    assert live_assigns(view).place_flash_timer == nil
+
+    send(view.pid, {:clear_place_flash, dismissed_token})
+    refute has_element?(view, "#pos-place-flash")
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    submit_order(view)
+    assert has_element?(view, "#pos-place-flash")
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    refute has_element?(view, "#pos-place-flash")
+    assert live_assigns(view).place_flash_token == nil
+  end
+
+  test "success flash timer expires normally", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    submit_order(view)
+
+    assert has_element?(view, "#pos-place-flash")
+    Process.sleep(4_100)
     refute has_element?(view, "#pos-place-flash")
   end
 
@@ -751,6 +836,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> element("#pos-pay-gcash") |> render_click()
 
     assert has_element?(view, "#pos-pay-gcash.is-active", "GCash")
+
     assert has_element?(
              view,
              "#pos-gcash-confirmation-cue",
@@ -832,6 +918,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert length(Orders.list_active_orders()) == 1
     assert has_element?(view, "#pos-place-flash")
     assert has_element?(view, "#pos-cart-empty")
+    refute has_element?(view, "#pos-error")
   end
 
   test "repeated place_order is ignored while placing_order? is already true", %{
@@ -1040,7 +1127,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
   test "product taps do not dismiss print-failure recovery", %{
     conn: conn,
     barista: barista,
-    espresso: espresso
+    espresso: espresso,
+    americano: americano
   } do
     previous_printer_config = Application.get_env(:espreso, Espreso.Printer)
 
@@ -1062,11 +1150,27 @@ defmodule EspresoWeb.StaffPosLiveTest do
     end)
 
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
+    view |> element("#pos-size-#{price_12.id}") |> render_click()
+    view |> element("#pos-fulfillment-dine-in") |> render_click()
+
+    view
+    |> element("#pos-customer-name")
+    |> render_change(%{"customer_name" => "Maria"})
+
     view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-notes-toggle") |> render_click()
+
+    view
+    |> element("#pos-notes")
+    |> render_change(%{"notes" => "Less ice"})
+
     submit_order(view)
 
     [saved_order] = Orders.list_active_orders()
     assert has_element?(view, "#pos-confirmation", saved_order.number)
+    assert has_element?(view, "#pos-confirmation.is-error", "Print failed · order saved")
+    assert has_element?(view, "#pos-print-note.is-error", "Order saved · print failed")
     assert has_element?(view, "#pos-retry-print", "Retry print")
     refute has_element?(view, "#pos-clear-ticket")
     refute has_element?(view, "#pos-cart-undo")
@@ -1084,6 +1188,122 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-new-order", "New Order")
     refute has_element?(view, "[id^='pos-cart-variant-trigger-']")
     assert length(Orders.list_active_orders()) == 1
+
+    view |> element("#pos-retry-print") |> render_click()
+    assert has_element?(view, "#pos-confirmation.is-error", "Print failed · order saved")
+    assert has_element?(view, "#pos-print-note.is-error", "Print failed")
+    assert has_element?(view, "#pos-retry-print", "Retry print")
+
+    view |> element("#pos-new-order") |> render_click()
+
+    refute has_element?(view, "#pos-confirmation")
+    refute has_element?(view, "#pos-retry-print")
+    refute has_element?(view, "#pos-print-note")
+    refute has_element?(view, "#pos-place-flash")
+    refute has_element?(view, "#pos-error")
+    refute has_element?(view, "#pos-cart-undo")
+    assert has_element?(view, "#pos-cart-empty")
+    assert has_element?(view, ~s(#pos-customer-name[value="Walk-in"]))
+    assert has_element?(view, "#pos-fulfillment-pickup.is-active")
+    assert has_element?(view, "#pos-pay-cash.is-active")
+    assert has_element?(view, "#pos-place-order", "Process Cash Order")
+    assert live_assigns(view).notes == ""
+    assert live_assigns(view).card_sizes == %{}
+    assert live_assigns(view).variant_editor_key == nil
+    assert length(Orders.list_active_orders()) == 1
+  end
+
+  test "successful receipt retry shows recovered state and keeps recovery exits", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    restore_printer_config_on_exit()
+
+    Application.put_env(
+      :espreso,
+      Espreso.Printer,
+      enabled: true,
+      host: "127.0.0.1",
+      port: 1,
+      timeout_ms: 50
+    )
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    submit_order(view)
+
+    assert has_element?(view, "#pos-confirmation.is-error")
+    assert has_element?(view, "#pos-retry-print")
+
+    {port, printer_task} = start_test_printer!(2)
+
+    Application.put_env(
+      :espreso,
+      Espreso.Printer,
+      enabled: true,
+      host: "127.0.0.1",
+      port: port,
+      timeout_ms: 1_000
+    )
+
+    view |> element("#pos-retry-print") |> render_click()
+    Task.await(printer_task, 2_000)
+
+    assert has_element?(view, "#pos-confirmation.is-success", "Print complete · order saved")
+    assert has_element?(view, "#pos-print-note", "Receipt printed · kaha opened.")
+    refute has_element?(view, "#pos-print-note.is-error")
+    refute has_element?(view, "#pos-retry-print")
+    assert has_element?(view, "#pos-new-order", "New Order")
+    assert has_element?(view, ~s(#pos-confirmation a[href="/orders"]), "View Orders")
+
+    view |> element("#pos-new-order") |> render_click()
+    refute has_element?(view, "#pos-confirmation")
+    assert has_element?(view, "#pos-cart-empty")
+    assert has_element?(view, "#pos-pay-cash.is-active")
+    assert length(Orders.list_active_orders()) == 1
+  end
+
+  test "Kitchen and Kaha actions use result-appropriate note styling", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    restore_printer_config_on_exit()
+
+    Application.put_env(
+      :espreso,
+      Espreso.Printer,
+      enabled: true,
+      host: "127.0.0.1",
+      port: 1,
+      timeout_ms: 50
+    )
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    submit_order(view)
+
+    {kitchen_port, kitchen_task} = start_test_printer!(1)
+    set_test_printer_port(kitchen_port)
+    view |> element("#pos-print-kitchen") |> render_click()
+    Task.await(kitchen_task, 2_000)
+
+    assert has_element?(view, "#pos-print-note", "Kitchen ticket printed.")
+    refute has_element?(view, "#pos-print-note.is-error")
+
+    {drawer_port, drawer_task} = start_test_printer!(1)
+    set_test_printer_port(drawer_port)
+    view |> element("#pos-open-kaha") |> render_click()
+    Task.await(drawer_task, 2_000)
+
+    assert has_element?(view, "#pos-print-note", "Kaha opened.")
+    refute has_element?(view, "#pos-print-note.is-error")
+
+    set_test_printer_port(1)
+    view |> element("#pos-print-kitchen") |> render_click()
+    assert has_element?(view, "#pos-print-note.is-error", "Kitchen print failed")
+    assert has_element?(view, "#pos-retry-print")
   end
 
   test "staff home hub links barista to Orders and POS", %{
@@ -1133,6 +1353,56 @@ defmodule EspresoWeb.StaffPosLiveTest do
     |> render_click()
   end
 
+  defp live_assigns(view) do
+    view.pid
+    |> :sys.get_state()
+    |> Map.fetch!(:socket)
+    |> Map.fetch!(:assigns)
+  end
+
+  defp restore_printer_config_on_exit do
+    previous = Application.get_env(:espreso, Espreso.Printer)
+
+    on_exit(fn ->
+      if previous do
+        Application.put_env(:espreso, Espreso.Printer, previous)
+      else
+        Application.delete_env(:espreso, Espreso.Printer)
+      end
+    end)
+  end
+
+  defp set_test_printer_port(port) do
+    Application.put_env(
+      :espreso,
+      Espreso.Printer,
+      enabled: true,
+      host: "127.0.0.1",
+      port: port,
+      timeout_ms: 1_000
+    )
+  end
+
+  defp start_test_printer!(connection_count) do
+    {:ok, listener} =
+      :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true, ip: {127, 0, 0, 1}])
+
+    {:ok, {_address, port}} = :inet.sockname(listener)
+
+    task =
+      Task.async(fn ->
+        Enum.each(1..connection_count, fn _ ->
+          {:ok, socket} = :gen_tcp.accept(listener, 1_500)
+          {:ok, _bytes} = :gen_tcp.recv(socket, 0, 1_500)
+          :gen_tcp.close(socket)
+        end)
+
+        :gen_tcp.close(listener)
+      end)
+
+    {port, task}
+  end
+
   defp cart_line(product, price, quantity) do
     %{
       key: "#{product.id}-#{price.id}",
@@ -1164,7 +1434,10 @@ defmodule EspresoWeb.StaffPosLiveTest do
           cash_tendered: "",
           last_cash_change: nil,
           print_failed?: false,
+          print_note_error?: false,
           place_flash: nil,
+          place_flash_token: nil,
+          place_flash_timer: nil,
           notes_open?: false,
           payment_choice: :unpaid,
           placing_order?: false,
