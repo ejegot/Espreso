@@ -140,6 +140,180 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-cart-empty")
   end
 
+  test "quantity-one decrement removes a line and Undo restores it", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    key = "#{espresso.id}-#{hd(espresso.product_prices).id}"
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element(~s(button[phx-click="dec"][phx-value-key="#{key}"])) |> render_click()
+
+    assert has_element?(view, "#pos-cart-empty")
+    assert has_element?(view, "#pos-cart-undo", "Item removed")
+
+    view |> element("#pos-cart-undo-action") |> render_click()
+
+    assert has_element?(view, "#pos-line-#{key}", "1")
+    refute has_element?(view, "#pos-cart-undo")
+  end
+
+  test "remove Undo restores exact variant, quantity, and price", %{
+    conn: conn,
+    barista: barista,
+    americano: americano
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
+    key = "#{americano.id}-#{price_12.id}"
+
+    view |> element("#pos-size-#{price_12.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    view |> element(~s(button[phx-click="remove"][phx-value-key="#{key}"])) |> render_click()
+
+    view |> element("#pos-cart-undo-action") |> render_click()
+
+    assert has_element?(view, "#pos-line-#{key}", "12oz")
+    assert has_element?(view, "#pos-line-#{key}", "2")
+    assert has_element?(view, "#pos-line-#{key}", "₱240")
+  end
+
+  test "a second removal replaces the previous Undo snapshot", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso,
+    americano: americano
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    price_8 = Enum.find(americano.product_prices, &(&1.size == "8oz"))
+    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
+    espresso_key = "#{espresso.id}-#{hd(espresso.product_prices).id}"
+    key_8 = "#{americano.id}-#{price_8.id}"
+    key_12 = "#{americano.id}-#{price_12.id}"
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-size-#{price_8.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    view |> element("#pos-size-#{price_12.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+
+    remove_line(view, espresso_key)
+    remove_line(view, key_8)
+    view |> element("#pos-cart-undo-action") |> render_click()
+
+    refute has_element?(view, "#pos-line-#{espresso_key}")
+    assert has_element?(view, "#pos-line-#{key_8}")
+    assert has_element?(view, "#pos-line-#{key_12}")
+  end
+
+  test "adding a product invalidates a pending removal Undo", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso,
+    americano: americano
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    espresso_key = "#{espresso.id}-#{hd(espresso.product_prices).id}"
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    remove_line(view, espresso_key)
+    assert has_element?(view, "#pos-cart-undo")
+
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+
+    refute has_element?(view, "#pos-cart-undo")
+    refute has_element?(view, "#pos-line-#{espresso_key}")
+  end
+
+  test "removal Undo expires", %{conn: conn, barista: barista, espresso: espresso} do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    key = "#{espresso.id}-#{hd(espresso.product_prices).id}"
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    remove_line(view, key)
+    assert has_element?(view, "#pos-cart-undo")
+
+    Process.sleep(4_100)
+    refute has_element?(view, "#pos-cart-undo")
+
+    view |> render_click("undo_cart", %{})
+    refute has_element?(view, "#pos-line-#{key}")
+  end
+
+  test "Clear Ticket resets and Undo restores the complete draft", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso,
+    americano: americano
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    espresso_key = "#{espresso.id}-#{hd(espresso.product_prices).id}"
+    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
+    americano_key = "#{americano.id}-#{price_12.id}"
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-size-#{price_12.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    view |> element("#pos-fulfillment-dine-in") |> render_click()
+    view |> element("#pos-pay-gcash") |> render_click()
+
+    view
+    |> element("#pos-customer-name")
+    |> render_change(%{"customer_name" => "Maria"})
+
+    view |> element("#pos-notes-toggle") |> render_click()
+
+    view
+    |> element("#pos-notes")
+    |> render_change(%{"notes" => "Less ice"})
+
+    view |> element("#pos-clear-ticket") |> render_click()
+
+    assert has_element?(view, "#pos-cart-empty")
+    assert has_element?(view, ~s(#pos-customer-name[value="Walk-in"]))
+    assert has_element?(view, "#pos-fulfillment-pickup.is-active")
+    assert has_element?(view, "#pos-pay-cash.is-active")
+    assert has_element?(view, "#pos-cart-undo", "Ticket cleared")
+    refute has_element?(view, "#pos-clear-ticket")
+    refute has_element?(view, "#pos-notes-toggle")
+
+    view |> element("#pos-cart-undo-action") |> render_click()
+
+    assert has_element?(view, "#pos-line-#{espresso_key}", "2")
+    assert has_element?(view, "#pos-line-#{americano_key}", "12oz")
+    assert has_element?(view, ~s(#pos-customer-name[value="Maria"]))
+    assert has_element?(view, "#pos-notes", "Less ice")
+    assert has_element?(view, "#pos-fulfillment-dine-in.is-active")
+    assert has_element?(view, "#pos-pay-gcash.is-active")
+    assert has_element?(view, "#pos-size-#{price_12.id}.is-active")
+    assert has_element?(view, "#pos-clear-ticket")
+  end
+
+  test "successful Process Order invalidates pending Undo", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso,
+    americano: americano
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    espresso_key = "#{espresso.id}-#{hd(espresso.product_prices).id}"
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    remove_line(view, espresso_key)
+    assert has_element?(view, "#pos-cart-undo")
+
+    submit_order(view)
+
+    refute has_element?(view, "#pos-cart-undo")
+    view |> render_click("undo_cart", %{})
+    assert has_element?(view, "#pos-cart-empty")
+  end
+
   test "multi-price product selects size on card then add to cart", %{
     conn: conn,
     barista: barista,
@@ -164,6 +338,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
     assert has_element?(view, "#pos-place-order[disabled]")
+    refute has_element?(view, "#pos-clear-ticket")
     refute has_element?(view, "#pos-confirmation")
   end
 
@@ -551,6 +726,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
     [saved_order] = Orders.list_active_orders()
     assert has_element?(view, "#pos-confirmation", saved_order.number)
     assert has_element?(view, "#pos-retry-print", "Retry print")
+    refute has_element?(view, "#pos-clear-ticket")
+    refute has_element?(view, "#pos-cart-undo")
 
     view |> element("#pos-product-#{espresso.id}") |> render_click()
 
@@ -587,6 +764,12 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view
     |> form("#pos-order-form", params)
     |> render_submit()
+  end
+
+  defp remove_line(view, key) do
+    view
+    |> element(~s(button[phx-click="remove"][phx-value-key="#{key}"]))
+    |> render_click()
   end
 
   defp place_order_socket(assigns) do

@@ -6,6 +6,8 @@ defmodule EspresoWeb.StaffPosLive do
   alias Espreso.Printer
   alias EspresoWeb.StaffNotifications
 
+  @cart_undo_timeout_ms 4_000
+
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket), do: Orders.subscribe()
@@ -33,6 +35,8 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:place_flash, nil)
      |> assign(:notes_open?, false)
      |> assign(:placing_order?, false)
+     |> assign(:cart_undo, nil)
+     |> assign(:cart_undo_timer, nil)
      |> assign(:card_sizes, %{})
      |> assign(:added_product_id, nil)
      |> assign(:last_order, nil)
@@ -53,6 +57,18 @@ defmodule EspresoWeb.StaffPosLive do
   def handle_info(:clear_added_product, socket) do
     {:noreply, assign(socket, :added_product_id, nil)}
   end
+
+  def handle_info(
+        {:expire_cart_undo, token},
+        %{assigns: %{cart_undo: %{token: token}}} = socket
+      ) do
+    {:noreply,
+     socket
+     |> assign(:cart_undo, nil)
+     |> assign(:cart_undo_timer, nil)}
+  end
+
+  def handle_info({:expire_cart_undo, _token}, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("select_category", %{"name" => name}, socket) when name != "ALL" do
@@ -118,6 +134,7 @@ defmodule EspresoWeb.StaffPosLive do
 
       {:noreply,
        socket
+       |> clear_cart_undo()
        |> assign(:cart, add_line(socket.assigns.cart, product, price, category_name, 1))
        |> assign(:added_product_id, product_id)
        |> assign(:error, nil)
@@ -147,11 +164,51 @@ defmodule EspresoWeb.StaffPosLive do
   end
 
   def handle_event("dec", %{"key" => key}, socket) do
-    {:noreply, assign(socket, :cart, update_qty(socket.assigns.cart, key, -1))}
+    socket =
+      case Enum.find(socket.assigns.cart, &(&1.key == key)) do
+        %{quantity: 1} -> remove_cart_line(socket, key)
+        %{} -> socket |> clear_cart_undo() |> assign(:cart, update_qty(socket.assigns.cart, key, -1))
+        nil -> socket
+      end
+
+    {:noreply, socket}
   end
 
   def handle_event("remove", %{"key" => key}, socket) do
-    {:noreply, assign(socket, :cart, Enum.reject(socket.assigns.cart, &(&1.key == key)))}
+    {:noreply, remove_cart_line(socket, key)}
+  end
+
+  def handle_event("clear_ticket", _params, %{assigns: %{cart: []}} = socket) do
+    {:noreply, socket}
+  end
+
+  def handle_event("clear_ticket", _params, socket) do
+    draft = ticket_draft(socket.assigns)
+
+    {:noreply,
+     socket
+     |> reset_ticket()
+     |> put_cart_undo(%{kind: :ticket, draft: draft})}
+  end
+
+  def handle_event("undo_cart", _params, socket) do
+    socket =
+      case socket.assigns.cart_undo do
+        %{kind: :line, line: line, index: index} ->
+          socket
+          |> clear_cart_undo()
+          |> assign(:cart, List.insert_at(socket.assigns.cart, index, line))
+
+        %{kind: :ticket, draft: draft} ->
+          socket
+          |> clear_cart_undo()
+          |> restore_ticket_draft(draft)
+
+        nil ->
+          socket
+      end
+
+    {:noreply, socket}
   end
 
   def handle_event("new_order", _params, socket) do
@@ -369,6 +426,7 @@ defmodule EspresoWeb.StaffPosLive do
 
             socket =
               socket
+              |> clear_cart_undo()
               |> assign(:cart, [])
               |> assign(:card_sizes, %{})
               |> assign(:added_product_id, nil)
@@ -681,9 +739,20 @@ defmodule EspresoWeb.StaffPosLive do
 
                   <div class="staff-pos-ticket-title-row">
                     <h2>Cart</h2>
-                    <span :if={cart_item_count(@cart) > 0} class="staff-pos-cart-count">
-                      {cart_item_count(@cart)} items
-                    </span>
+                    <div class="staff-pos-ticket-title-actions">
+                      <span :if={cart_item_count(@cart) > 0} class="staff-pos-cart-count">
+                        {cart_item_count(@cart)} items
+                      </span>
+                      <button
+                        :if={@cart != []}
+                        type="button"
+                        class="staff-pos-clear-ticket"
+                        id="pos-clear-ticket"
+                        phx-click="clear_ticket"
+                      >
+                        Clear Ticket
+                      </button>
+                    </div>
                   </div>
 
                   <div
@@ -759,6 +828,13 @@ defmodule EspresoWeb.StaffPosLive do
                       placeholder="Less ice, oat milk…"
                     >{@notes}</textarea>
                   </label>
+                </div>
+
+                <div :if={@cart_undo} class="staff-pos-cart-undo" id="pos-cart-undo" role="status">
+                  <span>{if @cart_undo.kind == :ticket, do: "Ticket cleared", else: "Item removed"}</span>
+                  <button type="button" id="pos-cart-undo-action" phx-click="undo_cart">
+                    Undo
+                  </button>
                 </div>
 
                 <div class="staff-pos-ticket-body">
@@ -1111,6 +1187,20 @@ defmodule EspresoWeb.StaffPosLive do
     |> Enum.reject(&is_nil/1)
   end
 
+  defp remove_cart_line(socket, key) do
+    case Enum.find_index(socket.assigns.cart, &(&1.key == key)) do
+      nil ->
+        socket
+
+      index ->
+        line = Enum.at(socket.assigns.cart, index)
+
+        socket
+        |> assign(:cart, List.delete_at(socket.assigns.cart, index))
+        |> put_cart_undo(%{kind: :line, line: line, index: index})
+    end
+  end
+
   defp cart_total(cart) do
     Enum.reduce(cart, Decimal.new(0), fn line, acc ->
       Decimal.add(acc, Decimal.mult(line.price, line.quantity))
@@ -1129,6 +1219,7 @@ defmodule EspresoWeb.StaffPosLive do
 
   defp reset_ticket(socket) do
     socket
+    |> clear_cart_undo()
     |> assign(:cart, [])
     |> assign(:card_sizes, %{})
     |> assign(:added_product_id, nil)
@@ -1147,6 +1238,47 @@ defmodule EspresoWeb.StaffPosLive do
     |> assign(:customer_name, "Walk-in")
     |> assign(:notes, "")
     |> assign(:notes_open?, false)
+  end
+
+  defp ticket_draft(assigns) do
+    Map.take(assigns, [
+      :cart,
+      :customer_name,
+      :notes,
+      :notes_open?,
+      :fulfillment,
+      :table_number,
+      :payment_choice,
+      :paid_via,
+      :cash_tendered,
+      :card_sizes
+    ])
+  end
+
+  defp restore_ticket_draft(socket, draft) do
+    Enum.reduce(draft, socket, fn {key, value}, socket ->
+      assign(socket, key, value)
+    end)
+  end
+
+  defp put_cart_undo(socket, undo) do
+    socket = clear_cart_undo(socket)
+    token = make_ref()
+    timer = Process.send_after(self(), {:expire_cart_undo, token}, @cart_undo_timeout_ms)
+
+    socket
+    |> assign(:cart_undo, Map.put(undo, :token, token))
+    |> assign(:cart_undo_timer, timer)
+  end
+
+  defp clear_cart_undo(socket) do
+    if timer = socket.assigns[:cart_undo_timer] do
+      Process.cancel_timer(timer)
+    end
+
+    socket
+    |> assign(:cart_undo, nil)
+    |> assign(:cart_undo_timer, nil)
   end
 
   defp place_flash_message(order, print_note, cash_change) do
