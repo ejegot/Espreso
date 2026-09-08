@@ -334,6 +334,310 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-total", "₱120")
   end
 
+  test "cart variant correction replaces in place and preserves ticket state", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso,
+    americano: americano
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    price_8 = Enum.find(americano.product_prices, &(&1.size == "8oz"))
+    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
+    key_8 = "#{americano.id}-#{price_8.id}"
+    key_12 = "#{americano.id}-#{price_12.id}"
+    espresso_key = "#{espresso.id}-#{hd(espresso.product_prices).id}"
+
+    view |> element("#pos-size-#{price_12.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-fulfillment-dine-in") |> render_click()
+    view |> element("#pos-pay-gcash") |> render_click()
+
+    view
+    |> element("#pos-customer-name")
+    |> render_change(%{"customer_name" => "Maria"})
+
+    view |> element("#pos-notes-toggle") |> render_click()
+    view |> element("#pos-notes") |> render_change(%{"notes" => "Less ice"})
+
+    open_variant_editor(view, key_12)
+
+    assert has_element?(
+             view,
+             "#pos-cart-variant-#{key_12}-#{price_8.id}[aria-pressed='false']",
+             "8oz · ₱110"
+           )
+
+    change_variant(view, key_12, price_8.id)
+
+    refute has_element?(view, "#pos-line-#{key_12}")
+    assert has_element?(view, "#pos-line-#{key_8} .staff-pos-qty", "2")
+    assert has_element?(view, "#pos-line-#{key_8}", "8oz")
+    assert has_element?(view, "#pos-line-#{key_8}", "₱220")
+    assert has_element?(view, "#pos-line-#{espresso_key}")
+    assert has_element?(view, "#pos-total", "₱295")
+    assert has_element?(view, ~s(#pos-customer-name[value="Maria"]))
+    assert has_element?(view, "#pos-notes", "Less ice")
+    assert has_element?(view, "#pos-fulfillment-dine-in.is-active")
+    assert has_element?(view, "#pos-pay-gcash.is-active")
+    assert has_element?(view, "#pos-size-#{price_8.id}.is-active")
+    assert has_element?(view, "#pos-cart-undo", "Size changed")
+  end
+
+  test "cart variant correction merges into destination at its existing position", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso,
+    americano: americano
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    price_8 = Enum.find(americano.product_prices, &(&1.size == "8oz"))
+    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
+    key_8 = "#{americano.id}-#{price_8.id}"
+    key_12 = "#{americano.id}-#{price_12.id}"
+    espresso_key = "#{espresso.id}-#{hd(espresso.product_prices).id}"
+
+    view |> element("#pos-size-#{price_12.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-size-#{price_8.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+
+    open_variant_editor(view, key_12)
+    change_variant(view, key_12, price_8.id)
+
+    refute has_element?(view, "#pos-line-#{key_12}")
+    assert has_element?(view, "#pos-line-#{key_8} .staff-pos-qty", "3")
+    assert has_element?(view, "#pos-total", "₱405")
+    assert has_element?(view, "#pos-cart-lines > li:first-child#pos-line-#{espresso_key}")
+    assert has_element?(view, "#pos-cart-lines > li:last-child#pos-line-#{key_8}")
+  end
+
+  test "same cart variant closes chooser without replacing existing Undo", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso,
+    americano: americano
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    price_8 = Enum.find(americano.product_prices, &(&1.size == "8oz"))
+    americano_key = "#{americano.id}-#{price_8.id}"
+    espresso_key = "#{espresso.id}-#{hd(espresso.product_prices).id}"
+
+    view |> element("#pos-size-#{price_8.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    remove_line(view, espresso_key)
+
+    open_variant_editor(view, americano_key)
+    change_variant(view, americano_key, price_8.id)
+
+    assert has_element?(view, "#pos-line-#{americano_key}")
+    refute has_element?(view, "#pos-cart-variant-chooser-#{americano_key}")
+    assert has_element?(view, "#pos-cart-undo", "Item removed")
+  end
+
+  test "single-price lines are static and invalid variant events safely no-op", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso,
+    americano: americano
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    price_8 = Enum.find(americano.product_prices, &(&1.size == "8oz"))
+    key_8 = "#{americano.id}-#{price_8.id}"
+    espresso_price = hd(espresso.product_prices)
+
+    view |> element("#pos-size-#{price_8.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+
+    assert has_element?(view, "#pos-line-#{espresso.id}-#{espresso_price.id} .staff-pos-cart-size")
+    refute has_element?(view, "#pos-cart-variant-trigger-#{espresso.id}-#{espresso_price.id}")
+
+    original = render(view)
+
+    for params <- [
+          %{"key" => key_8},
+          %{"key" => key_8, "price-id" => "not-an-id"},
+          %{"key" => key_8, "price-id" => "999999999"},
+          %{"key" => key_8, "price-id" => to_string(espresso_price.id)},
+          %{"key" => "unknown-line", "price-id" => to_string(price_8.id)}
+        ] do
+      view |> render_click("change_cart_variant", params)
+      assert render(view) == original
+    end
+  end
+
+  test "same-size prices remain distinct by price id and ambiguous duplicates are suppressed", %{
+    conn: conn,
+    barista: barista
+  } do
+    hot = Repo.get_by!(Category, name: "HOT")
+    duplicate_label = insert_product!(hot, "Duplicate Label", true, [{"Large", "100"}, {"Large", "130"}])
+    ambiguous = insert_product!(hot, "Ambiguous", true, [{"Same", "90"}, {"Same", "90"}])
+    [first, second] = duplicate_label.product_prices
+    [ambiguous_first | _] = ambiguous.product_prices
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    view |> element("#pos-size-#{first.id}") |> render_click()
+    view |> element("#pos-product-#{duplicate_label.id}") |> render_click()
+    source_key = "#{duplicate_label.id}-#{first.id}"
+    target_key = "#{duplicate_label.id}-#{second.id}"
+    open_variant_editor(view, source_key)
+
+    assert has_element?(view, "#pos-cart-variant-#{source_key}-#{first.id}", "Large · ₱100")
+    assert has_element?(view, "#pos-cart-variant-#{source_key}-#{second.id}", "Large · ₱130")
+
+    change_variant(view, source_key, second.id)
+
+    refute has_element?(view, "#pos-line-#{source_key}")
+    assert has_element?(view, "#pos-line-#{target_key}", "₱130")
+
+    view |> element("#pos-size-#{ambiguous_first.id}") |> render_click()
+    view |> element("#pos-product-#{ambiguous.id}") |> render_click()
+
+    refute has_element?(
+             view,
+             "#pos-cart-variant-trigger-#{ambiguous.id}-#{ambiguous_first.id}"
+           )
+  end
+
+  test "variant Undo restores split lines and card selection", %{
+    conn: conn,
+    barista: barista,
+    americano: americano
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    price_8 = Enum.find(americano.product_prices, &(&1.size == "8oz"))
+    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
+    key_8 = "#{americano.id}-#{price_8.id}"
+    key_12 = "#{americano.id}-#{price_12.id}"
+
+    view |> element("#pos-size-#{price_8.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    view |> element("#pos-size-#{price_12.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+
+    open_variant_editor(view, key_12)
+    change_variant(view, key_12, price_8.id)
+    view |> element("#pos-cart-undo-action") |> render_click()
+
+    assert has_element?(view, "#pos-line-#{key_8} .staff-pos-qty", "2")
+    assert has_element?(view, "#pos-line-#{key_12} .staff-pos-qty", "1")
+    assert has_element?(view, "#pos-size-#{price_12.id}.is-active")
+    refute has_element?(view, "#pos-cart-undo")
+  end
+
+  test "removal and Clear Ticket restore a corrected variant exactly", %{
+    conn: conn,
+    barista: barista,
+    americano: americano
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    price_8 = Enum.find(americano.product_prices, &(&1.size == "8oz"))
+    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
+    key_8 = "#{americano.id}-#{price_8.id}"
+    key_12 = "#{americano.id}-#{price_12.id}"
+
+    view |> element("#pos-size-#{price_12.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    open_variant_editor(view, key_12)
+    change_variant(view, key_12, price_8.id)
+
+    remove_line(view, key_8)
+    view |> element("#pos-cart-undo-action") |> render_click()
+    assert has_element?(view, "#pos-line-#{key_8} .staff-pos-qty", "2")
+    assert has_element?(view, "#pos-line-#{key_8}", "₱220")
+
+    view |> element("#pos-clear-ticket") |> render_click()
+    view |> element("#pos-cart-undo-action") |> render_click()
+
+    assert has_element?(view, "#pos-line-#{key_8} .staff-pos-qty", "2")
+    assert has_element?(view, "#pos-size-#{price_8.id}.is-active")
+    refute has_element?(view, "#pos-cart-variant-chooser-#{key_8}")
+  end
+
+  test "corrected variant is submitted and editor and Undo reset", %{
+    conn: conn,
+    barista: barista,
+    americano: americano
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    price_8 = Enum.find(americano.product_prices, &(&1.size == "8oz"))
+    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
+    key_8 = "#{americano.id}-#{price_8.id}"
+    key_12 = "#{americano.id}-#{price_12.id}"
+
+    view |> element("#pos-size-#{price_12.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    open_variant_editor(view, key_12)
+    change_variant(view, key_12, price_8.id)
+    submit_order(view)
+
+    [order] = Orders.list_active_orders()
+    [item] = order.items
+    assert item.size == "8oz"
+    assert item.quantity == 2
+    assert Decimal.equal?(item.unit_price, Decimal.new("110"))
+    assert Decimal.equal?(order.total, Decimal.new("220"))
+    assert has_element?(view, "#pos-cart-empty")
+    refute has_element?(view, "#pos-cart-undo")
+    refute has_element?(view, "#pos-cart-variant-chooser-#{key_8}")
+  end
+
+  test "malformed duplicate source or destination lines safely no-op", %{
+    americano: americano
+  } do
+    price_8 = Enum.find(americano.product_prices, &(&1.size == "8oz"))
+    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
+    source = cart_line(americano, price_12, 1)
+    destination = cart_line(americano, price_8, 2)
+    categories = [%{name: "HOT", products: [americano]}]
+
+    duplicate_source = [source, source, destination]
+
+    source_socket =
+      place_order_socket(%{
+        categories: categories,
+        cart: duplicate_source,
+        card_sizes: %{americano.id => price_12.id}
+      })
+
+    assert {:noreply, unchanged_source} =
+             StaffPosLive.handle_event(
+               "change_cart_variant",
+               %{"key" => source.key, "price-id" => to_string(price_8.id)},
+               source_socket
+             )
+
+    assert unchanged_source.assigns.cart == duplicate_source
+
+    duplicate_destination = [source, destination, destination]
+
+    destination_socket =
+      place_order_socket(%{
+        categories: categories,
+        cart: duplicate_destination,
+        card_sizes: %{americano.id => price_12.id}
+      })
+
+    assert {:noreply, unchanged_destination} =
+             StaffPosLive.handle_event(
+               "change_cart_variant",
+               %{"key" => source.key, "price-id" => to_string(price_8.id)},
+               destination_socket
+             )
+
+    assert unchanged_destination.assigns.cart == duplicate_destination
+  end
+
   test "empty cart cannot be submitted", %{conn: conn, barista: barista} do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
@@ -731,9 +1035,16 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     view |> element("#pos-product-#{espresso.id}") |> render_click()
 
+    view
+    |> render_click("change_cart_variant", %{
+      "key" => "stale-line",
+      "price-id" => "123"
+    })
+
     assert has_element?(view, "#pos-confirmation", saved_order.number)
     assert has_element?(view, "#pos-retry-print", "Retry print")
     assert has_element?(view, "#pos-new-order", "New Order")
+    refute has_element?(view, "[id^='pos-cart-variant-trigger-']")
     assert length(Orders.list_active_orders()) == 1
   end
 
@@ -772,6 +1083,31 @@ defmodule EspresoWeb.StaffPosLiveTest do
     |> render_click()
   end
 
+  defp open_variant_editor(view, key) do
+    view
+    |> element("#pos-cart-variant-trigger-#{key}")
+    |> render_click()
+  end
+
+  defp change_variant(view, key, price_id) do
+    view
+    |> element("#pos-cart-variant-#{key}-#{price_id}")
+    |> render_click()
+  end
+
+  defp cart_line(product, price, quantity) do
+    %{
+      key: "#{product.id}-#{price.id}",
+      product_id: product.id,
+      price_id: price.id,
+      name: product.name,
+      size: price.size,
+      price: price.price,
+      quantity: quantity,
+      image: "/images/test.png"
+    }
+  end
+
   defp place_order_socket(assigns) do
     %Phoenix.LiveView.Socket{}
     |> Phoenix.Component.assign(
@@ -794,6 +1130,10 @@ defmodule EspresoWeb.StaffPosLiveTest do
           notes_open?: false,
           payment_choice: :unpaid,
           placing_order?: false,
+          cart_undo: nil,
+          cart_undo_timer: nil,
+          card_sizes: %{},
+          variant_editor_key: nil,
           customer_name: "Walk-in",
           cart: [],
           current_user: %{name: "Staff"}
