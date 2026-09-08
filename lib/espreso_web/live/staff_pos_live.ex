@@ -99,6 +99,15 @@ defmodule EspresoWeb.StaffPosLive do
      assign(socket, :card_sizes, Map.put(socket.assigns.card_sizes, product_id, price_id))}
   end
 
+  def handle_event(
+        "add_to_cart",
+        _params,
+        %{assigns: %{last_order: last_order}} = socket
+      )
+      when not is_nil(last_order) do
+    {:noreply, socket}
+  end
+
   def handle_event("add_to_cart", %{"product-id" => product_id}, socket) do
     product_id = String.to_integer(product_id)
 
@@ -290,7 +299,12 @@ defmodule EspresoWeb.StaffPosLive do
     {:noreply, assign(socket, :print_note, note)}
   end
 
-  def handle_event("place_order", _params, socket) do
+  def handle_event("place_order", params, socket) do
+    socket =
+      socket
+      |> assign(:customer_name, Map.get(params, "customer_name", socket.assigns.customer_name))
+      |> assign(:notes, Map.get(params, "notes", socket.assigns.notes))
+
     cond do
       socket.assigns.placing_order? ->
         {:noreply, socket}
@@ -361,6 +375,7 @@ defmodule EspresoWeb.StaffPosLive do
               |> assign(:error, nil)
               |> assign(:payment_choice, :paid)
               |> assign(:paid_via, "cash")
+              |> assign(:customer_name, "Walk-in")
               |> assign(:cash_tendered, "")
               |> assign(:fulfillment, :pickup)
               |> assign(:table_number, "")
@@ -648,6 +663,11 @@ defmodule EspresoWeb.StaffPosLive do
                   </div>
                 </div>
               <% else %>
+                <form
+                  class="staff-pos-order-form"
+                  id="pos-order-form"
+                  phx-submit="place_order"
+                >
                 <div class="staff-pos-ticket-head">
                   <div class="staff-pos-staff" id="pos-staff">
                     <div class="staff-pos-staff-avatar" aria-hidden="true">
@@ -849,18 +869,18 @@ defmodule EspresoWeb.StaffPosLive do
                   </div>
 
                   <button
-                    type="button"
+                    type="submit"
                     class={[
                       "staff-pos-place",
                       (@cart == [] or @placing_order?) && "is-disabled"
                     ]}
                     id="pos-place-order"
-                    phx-click="place_order"
                     disabled={@cart == [] or @placing_order?}
                   >
                     Process Order
                   </button>
                 </div>
+                </form>
               <% end %>
             </aside>
           </div>

@@ -187,7 +187,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     |> element(~s(button[phx-click="inc"][phx-value-key="#{espresso_key}"]))
     |> render_click()
 
-    view |> element("#pos-place-order") |> render_click()
+    submit_order(view)
 
     assert has_element?(view, "#pos-place-flash")
     assert has_element?(view, "#pos-place-flash", "Paid at counter")
@@ -235,7 +235,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute has_element?(view, "#pos-cash-helper")
 
     view |> element("#pos-product-#{espresso.id}") |> render_click()
-    view |> element("#pos-place-order") |> render_click()
+    submit_order(view)
 
     assert has_element?(view, "#pos-place-flash", "Paid at counter")
     assert has_element?(view, "#pos-cart-empty")
@@ -259,12 +259,18 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute has_element?(view, "#pos-table-number")
     assert has_element?(view, "#pos-fulfillment-pickup", "Takeout")
 
+    view
+    |> element("#pos-customer-name")
+    |> render_change(%{"customer_name" => "Maria"})
+
     view |> element("#pos-pay-gcash") |> render_click()
-    view |> element("#pos-place-order") |> render_click()
+    submit_order(view)
 
     assert has_element?(view, "#pos-place-flash")
+    assert has_element?(view, ~s(#pos-customer-name[value="Walk-in"]))
 
     [order] = Orders.list_active_orders()
+    assert order.customer_name == "Maria"
     assert order.fulfillment == "dine_in"
     assert order.table_number in [nil, ""]
     assert order.payment_status == "paid"
@@ -285,7 +291,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute has_element?(view, "#pos-cash-chips")
     refute has_element?(view, "#pos-cash-tendered")
 
-    view |> element("#pos-place-order") |> render_click()
+    submit_order(view)
     assert has_element?(view, "#pos-place-flash", "Paid at counter")
 
     [order] = Orders.list_active_orders()
@@ -302,7 +308,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
     view |> element("#pos-product-#{espresso.id}") |> render_click()
 
-    view |> element("#pos-place-order") |> render_click()
+    submit_order(view)
     # Cart cleared — second place with empty cart is a no-op create.
     view |> render_click("place_order", %{})
 
@@ -347,7 +353,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
   } do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
     view |> element("#pos-product-#{espresso.id}") |> render_click()
-    view |> element("#pos-place-order") |> render_click()
+    submit_order(view)
 
     assert has_element?(view, "#pos-place-flash")
     assert has_element?(view, "#pos-cart-empty")
@@ -355,7 +361,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> element("#pos-product-#{espresso.id}") |> render_click()
 
     refute has_element?(view, "#pos-place-order[disabled]")
-    view |> element("#pos-place-order") |> render_click()
+    submit_order(view)
 
     assert length(Orders.list_active_orders()) == 2
     assert has_element?(view, "#pos-place-flash")
@@ -412,13 +418,44 @@ defmodule EspresoWeb.StaffPosLiveTest do
     |> element("#pos-notes")
     |> render_change(%{"notes" => "Less ice"})
 
-    view |> element("#pos-place-order") |> render_click()
+    submit_order(view)
 
     assert has_element?(view, "#pos-place-flash", "Maria")
+    assert has_element?(view, ~s(#pos-customer-name[value="Walk-in"]))
 
     [order] = Orders.list_active_orders()
     assert order.customer_name == "Maria"
     assert order.notes == "Less ice"
+  end
+
+  test "Process Order submits the latest customer name without waiting for debounce", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+
+    submit_order(view, %{"customer_name" => "Maria"})
+
+    [order] = Orders.list_active_orders()
+    assert order.customer_name == "Maria"
+    assert has_element?(view, ~s(#pos-customer-name[value="Walk-in"]))
+  end
+
+  test "Process Order submits the latest notes without waiting for debounce", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-notes-toggle") |> render_click()
+
+    submit_order(view, %{"customer_name" => "Walk-in", "notes" => "No sugar"})
+
+    [order] = Orders.list_active_orders()
+    assert order.notes == "No sugar"
   end
 
   test "empty notes are not stored on the order", %{
@@ -429,7 +466,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
     view |> element("#pos-product-#{espresso.id}") |> render_click()
-    view |> element("#pos-place-order") |> render_click()
+    submit_order(view)
 
     [order] = Orders.list_active_orders()
     assert order.notes == nil
@@ -447,7 +484,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     |> render_change(%{"customer_name" => "A"})
 
     view |> element("#pos-product-#{espresso.id}") |> render_click()
-    view |> element("#pos-place-order") |> render_click()
+    submit_order(view)
 
     assert has_element?(view, "#pos-error", "Enter a customer name")
     refute has_element?(view, "#pos-confirmation")
@@ -466,7 +503,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     |> Product.changeset(%{available: false})
     |> Repo.update!()
 
-    view |> element("#pos-place-order") |> render_click()
+    submit_order(view)
 
     assert has_element?(view, "#pos-error", "Espresso is no longer available")
     assert has_element?(view, "#pos-cart-lines", "Espresso")
@@ -477,9 +514,49 @@ defmodule EspresoWeb.StaffPosLiveTest do
     |> Product.changeset(%{available: true})
     |> Repo.update!()
 
-    view |> element("#pos-place-order") |> render_click()
+    submit_order(view)
 
     assert has_element?(view, "#pos-place-flash")
+    assert length(Orders.list_active_orders()) == 1
+  end
+
+  test "product taps do not dismiss print-failure recovery", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    previous_printer_config = Application.get_env(:espreso, Espreso.Printer)
+
+    Application.put_env(
+      :espreso,
+      Espreso.Printer,
+      enabled: true,
+      host: "127.0.0.1",
+      port: 1,
+      timeout_ms: 50
+    )
+
+    on_exit(fn ->
+      if previous_printer_config do
+        Application.put_env(:espreso, Espreso.Printer, previous_printer_config)
+      else
+        Application.delete_env(:espreso, Espreso.Printer)
+      end
+    end)
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    submit_order(view)
+
+    [saved_order] = Orders.list_active_orders()
+    assert has_element?(view, "#pos-confirmation", saved_order.number)
+    assert has_element?(view, "#pos-retry-print", "Retry print")
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+
+    assert has_element?(view, "#pos-confirmation", saved_order.number)
+    assert has_element?(view, "#pos-retry-print", "Retry print")
+    assert has_element?(view, "#pos-new-order", "New Order")
     assert length(Orders.list_active_orders()) == 1
   end
 
@@ -504,6 +581,12 @@ defmodule EspresoWeb.StaffPosLiveTest do
     conn
     |> Phoenix.ConnTest.init_test_session(%{})
     |> Plug.Conn.put_session(:user_id, user.id)
+  end
+
+  defp submit_order(view, params \\ %{}) do
+    view
+    |> form("#pos-order-form", params)
+    |> render_submit()
   end
 
   defp place_order_socket(assigns) do

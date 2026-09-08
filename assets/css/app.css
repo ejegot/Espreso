@@ -6569,6 +6569,42 @@ a.staff-home-card:focus-visible {
   text-decoration: none;
 }
 
+.staff-pos-page .staff-pos-order-form {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 959px) {
+  .staff-app:has(.staff-pos-shell-root) .staff-shell-body,
+  .staff-app:has(.staff-pos-shell-root) .staff-shell-body--rail {
+    overflow-y: auto;
+  }
+
+  .staff-pos-page.staff-pos-page--cafe,
+  .staff-pos-page.staff-pos-page--cafe .staff-pos-main,
+  .staff-pos-page.staff-pos-page--cafe .staff-pos-layout.staff-pos-layout--cafe {
+    height: auto;
+    overflow: visible;
+  }
+
+  .staff-pos-page.staff-pos-page--cafe .staff-pos-layout.staff-pos-layout--cafe {
+    flex: 0 0 auto;
+    grid-template-rows: auto auto;
+  }
+
+  .staff-pos-page.staff-pos-page--cafe .staff-pos-catalog,
+  .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket {
+    height: auto;
+    max-height: none;
+  }
+
+  .staff-pos-page.staff-pos-page--cafe .staff-pos-catalog {
+    height: max(28rem, 68dvh);
+  }
+}
+
 .staff-pos-page .staff-pos-modal-panel {
   border-radius: 0.75rem;
   border: 1px solid var(--cs-line);
