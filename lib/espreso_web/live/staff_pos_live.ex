@@ -1042,10 +1042,23 @@ defmodule EspresoWeb.StaffPosLive do
                       phx-click="set_payment_method"
                       phx-value-method="gcash"
                       aria-pressed={to_string(@payment_choice == :paid and @paid_via == "gcash")}
+                      aria-describedby={
+                        if @payment_choice == :paid and @paid_via == "gcash",
+                          do: "pos-gcash-confirmation-cue",
+                          else: nil
+                      }
                     >
                       GCash
                     </button>
                   </div>
+
+                  <p
+                    :if={@payment_choice == :paid and @paid_via == "gcash"}
+                    class="staff-pos-payment-cue"
+                    id="pos-gcash-confirmation-cue"
+                  >
+                    Confirm payment was received before processing.
+                  </p>
 
                   <button
                     type="submit"
@@ -1056,7 +1069,11 @@ defmodule EspresoWeb.StaffPosLive do
                     id="pos-place-order"
                     disabled={@cart == [] or @placing_order?}
                   >
-                    Process Order
+                    <%= if @payment_choice == :paid and @paid_via == "gcash" do %>
+                      Confirm GCash &amp; Process
+                    <% else %>
+                      Process Cash Order
+                    <% end %>
                   </button>
                 </div>
                 </form>

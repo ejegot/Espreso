@@ -708,7 +708,10 @@ defmodule EspresoWeb.StaffPosLiveTest do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
     assert has_element?(view, "#pos-staff", "Staff")
+    assert has_element?(view, ".staff-pos-section-label", "Payment method")
     assert has_element?(view, "#pos-pay-cash.is-active", "Cash")
+    assert has_element?(view, "#pos-place-order", "Process Cash Order")
+    refute has_element?(view, "#pos-gcash-confirmation-cue")
     refute has_element?(view, "#pos-pay-later")
     refute has_element?(view, "#pos-pay-maya")
     refute has_element?(view, "#pos-cash-helper")
@@ -723,10 +726,13 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert order.source == "pos"
     assert order.payment_method == "counter"
     assert order.payment_status == "paid"
+    assert order.paid_via == "cash"
     assert order.status == "preparing"
+    assert has_element?(view, "#pos-pay-cash.is-active", "Cash")
+    assert has_element?(view, "#pos-place-order", "Process Cash Order")
   end
 
-  test "POS paid tender can be GCash; dine-in needs no table", %{
+  test "POS GCash acknowledgement remains a single paid-order submission", %{
     conn: conn,
     barista: barista,
     espresso: espresso
@@ -743,18 +749,50 @@ defmodule EspresoWeb.StaffPosLiveTest do
     |> render_change(%{"customer_name" => "Maria"})
 
     view |> element("#pos-pay-gcash") |> render_click()
+
+    assert has_element?(view, "#pos-pay-gcash.is-active", "GCash")
+    assert has_element?(
+             view,
+             "#pos-gcash-confirmation-cue",
+             "Confirm payment was received before processing."
+           )
+
+    assert has_element?(view, "#pos-place-order", "Confirm GCash & Process")
+    assert Orders.list_active_orders() == []
+
     submit_order(view)
 
     assert has_element?(view, "#pos-place-flash")
     assert has_element?(view, ~s(#pos-customer-name[value="Walk-in"]))
+    assert has_element?(view, "#pos-pay-cash.is-active", "Cash")
+    assert has_element?(view, "#pos-place-order", "Process Cash Order")
+    refute has_element?(view, "#pos-gcash-confirmation-cue")
 
     [order] = Orders.list_active_orders()
     assert order.customer_name == "Maria"
     assert order.fulfillment == "dine_in"
     assert order.table_number in [nil, ""]
+    assert order.payment_method == "counter"
     assert order.payment_status == "paid"
     assert order.paid_via == "gcash"
     assert order.status == "preparing"
+  end
+
+  test "switching from GCash back to Cash removes acknowledgement cue", %{
+    conn: conn,
+    barista: barista
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    view |> element("#pos-pay-gcash") |> render_click()
+    assert has_element?(view, "#pos-gcash-confirmation-cue")
+    assert has_element?(view, "#pos-place-order", "Confirm GCash & Process")
+
+    view |> element("#pos-pay-cash") |> render_click()
+    assert has_element?(view, "#pos-pay-cash.is-active", "Cash")
+    assert has_element?(view, "#pos-place-order", "Process Cash Order")
+    refute has_element?(view, "#pos-gcash-confirmation-cue")
+    assert Orders.list_active_orders() == []
   end
 
   test "POS cash payment has no cash-received helper and places paid order", %{
@@ -1167,7 +1205,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     %{product | product_prices: prices}
   end
 
-  test "POS search filters products and Process Order label is present", %{
+  test "POS search filters products and Cash order label is present", %{
     conn: conn,
     barista: barista,
     espresso: espresso,
@@ -1177,7 +1215,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     assert has_element?(view, "#pos-category-HOT.is-active", "Hot coffee")
     assert has_element?(view, "#pos-catalog-title", "Categories")
-    assert has_element?(view, "#pos-place-order", "Process Order")
+    assert has_element?(view, "#pos-place-order", "Process Cash Order")
     assert has_element?(view, "#pos-search-input")
     assert has_element?(view, "#pos-product-#{espresso.id}")
     assert has_element?(view, "#pos-product-#{americano.id}")
