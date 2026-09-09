@@ -101,17 +101,24 @@ defmodule EspresoWeb.StaffOrdersLive do
     end
   end
 
-  def handle_event("print_kitchen", %{"id" => id}, socket) do
-    order = Repo.get!(Espreso.Orders.Order, id) |> Repo.preload(:items)
+  def handle_event(
+        "print_kitchen",
+        %{"id" => id, "action" => "kitchen", "permit" => permit},
+        socket
+      ) do
+    result =
+      PhysicalActionCoordinator.execute(id, :kitchen, permit,
+        staff_name: socket.assigns.current_user.name
+      )
 
-    note =
-      case Printer.print_kitchen(order, staff_name: socket.assigns.current_user.name) do
-        :ok -> "#{order.number} kitchen ticket printed."
-        :disabled -> "Printer is not enabled on this server."
-        {:error, reason} -> "#{order.number} kitchen print failed (#{inspect(reason)})."
-      end
+    {:noreply,
+     socket
+     |> assign(:flash_note, physical_action_note(:kitchen, result))
+     |> load_orders()}
+  end
 
-    {:noreply, assign(socket, :flash_note, note)}
+  def handle_event("print_kitchen", _params, socket) do
+    {:noreply, assign(socket, :flash_note, "Kitchen request is stale. No ticket was sent.")}
   end
 
   def handle_event(
@@ -134,15 +141,24 @@ defmodule EspresoWeb.StaffOrdersLive do
     {:noreply, assign(socket, :flash_note, "Reprint request is stale. No receipt was sent.")}
   end
 
-  def handle_event("open_drawer", _params, socket) do
-    note =
-      case Printer.open_drawer() do
-        :ok -> "Kaha opened."
-        :disabled -> "Printer is not enabled on this server."
-        {:error, reason} -> "Could not open kaha (#{inspect(reason)})."
-      end
+  def handle_event(
+        "open_drawer",
+        %{"id" => id, "action" => "drawer", "permit" => permit},
+        socket
+      ) do
+    result =
+      PhysicalActionCoordinator.execute(id, :drawer, permit,
+        staff_name: socket.assigns.current_user.name
+      )
 
-    {:noreply, assign(socket, :flash_note, note)}
+    {:noreply,
+     socket
+     |> assign(:flash_note, physical_action_note(:drawer, result))
+     |> load_orders()}
+  end
+
+  def handle_event("open_drawer", _params, socket) do
+    {:noreply, assign(socket, :flash_note, "Kaha request is stale. Drawer was not opened.")}
   end
 
   def handle_event("open_mark_paid", %{"id" => id}, socket) do
@@ -412,6 +428,8 @@ defmodule EspresoWeb.StaffOrdersLive do
                     lane="new"
                     age_now={@age_now}
                     reprint_permit={Map.get(@reprint_permits, order.id)}
+                    kitchen_permit={Map.get(@kitchen_permits, order.id)}
+                    drawer_permit={Map.get(@drawer_permits, order.id)}
                   />
                 </div>
               </section>
@@ -434,6 +452,8 @@ defmodule EspresoWeb.StaffOrdersLive do
                     lane="preparing"
                     age_now={@age_now}
                     reprint_permit={Map.get(@reprint_permits, order.id)}
+                    kitchen_permit={Map.get(@kitchen_permits, order.id)}
+                    drawer_permit={Map.get(@drawer_permits, order.id)}
                   />
                 </div>
               </section>
@@ -453,6 +473,8 @@ defmodule EspresoWeb.StaffOrdersLive do
                     lane="ready"
                     age_now={@age_now}
                     reprint_permit={Map.get(@reprint_permits, order.id)}
+                    kitchen_permit={Map.get(@kitchen_permits, order.id)}
+                    drawer_permit={Map.get(@drawer_permits, order.id)}
                   />
                 </div>
               </section>
@@ -608,6 +630,8 @@ defmodule EspresoWeb.StaffOrdersLive do
   attr :lane, :string, default: "ticket"
   attr :age_now, DateTime, required: true
   attr :reprint_permit, :string, default: nil
+  attr :kitchen_permit, :string, default: nil
+  attr :drawer_permit, :string, default: nil
 
   defp kds_ticket(assigns) do
     source = source_badge(assigns.order)
@@ -766,12 +790,17 @@ defmodule EspresoWeb.StaffOrdersLive do
                 Abandon
               </button>
               <button
-                :if={Printer.enabled?() and @order.status in ["received", "preparing", "ready"]}
+                :if={
+                  Printer.enabled?() and @order.status in ["received", "preparing", "ready"] and
+                    is_binary(@kitchen_permit)
+                }
                 type="button"
                 class="staff-action staff-action-muted"
                 id={"kitchen-#{@order.id}"}
                 phx-click="print_kitchen"
                 phx-value-id={@order.id}
+                phx-value-action="kitchen"
+                phx-value-permit={@kitchen_permit}
               >
                 Kitchen
               </button>
@@ -793,12 +822,16 @@ defmodule EspresoWeb.StaffOrdersLive do
               <button
                 :if={
                   @order.payment_status == "paid" and Printer.enabled?() and
-                    Printer.cash_like?(@order.paid_via || "counter")
+                    Printer.cash_like?(@order.paid_via || "counter") and
+                    is_binary(@drawer_permit)
                 }
                 type="button"
                 class="staff-action staff-action-muted"
                 id={"open-drawer-#{@order.id}"}
                 phx-click="open_drawer"
+                phx-value-id={@order.id}
+                phx-value-action="drawer"
+                phx-value-permit={@drawer_permit}
               >
                 Kaha
               </button>
@@ -1132,22 +1165,41 @@ defmodule EspresoWeb.StaffOrdersLive do
     active_orders = Orders.list_active_orders()
     ready_orders = Orders.list_recent_ready(@ready_lane_limit)
 
-    reprint_order_ids =
+    operational_orders =
       (active_orders ++ ready_orders)
+      |> Enum.uniq_by(& &1.id)
+
+    reprint_order_ids =
+      operational_orders
       |> Enum.filter(&(&1.payment_status == "paid"))
       |> Enum.map(& &1.id)
 
-    reprint_permits =
+    kitchen_order_ids = Enum.map(operational_orders, & &1.id)
+
+    drawer_order_ids =
+      operational_orders
+      |> Enum.filter(
+        &(&1.payment_status == "paid" and Printer.cash_like?(&1.paid_via || "counter"))
+      )
+      |> Enum.map(& &1.id)
+
+    {reprint_permits, kitchen_permits, drawer_permits} =
       if Printer.enabled?() do
-        PhysicalActionCoordinator.reprint_permits(reprint_order_ids)
+        {
+          PhysicalActionCoordinator.reprint_permits(reprint_order_ids),
+          PhysicalActionCoordinator.permits(:kitchen, kitchen_order_ids),
+          PhysicalActionCoordinator.permits(:drawer, drawer_order_ids)
+        }
       else
-        %{}
+        {%{}, %{}, %{}}
       end
 
     socket
     |> assign(:active_orders, active_orders)
     |> assign(:ready_orders, ready_orders)
     |> assign(:reprint_permits, reprint_permits)
+    |> assign(:kitchen_permits, kitchen_permits)
+    |> assign(:drawer_permits, drawer_permits)
     |> assign(:unpaid_orders, Orders.list_todays_unpaid())
     |> assign(:paymongo_reconciliations, Orders.list_open_paymongo_reconciliations())
   end
@@ -1183,6 +1235,66 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   defp reprint_note({:ineligible, :printer_disabled}),
     do: "Printer is not enabled on this server. No receipt was sent."
+
+  defp physical_action_note(:kitchen, {:dispatched, _next_permit}),
+    do: "Kitchen ticket command dispatched."
+
+  defp physical_action_note(:drawer, {:dispatched, _next_permit}),
+    do: "Kaha command dispatched."
+
+  defp physical_action_note(:kitchen, {:definite_failure, reason, _retry_permit}),
+    do: "Kitchen could not connect to the printer (#{inspect(reason)}). Try again."
+
+  defp physical_action_note(:drawer, {:definite_failure, reason, _retry_permit}),
+    do: "Kaha could not connect to the printer (#{inspect(reason)}). Try again."
+
+  defp physical_action_note(:kitchen, {:uncertain, reason}),
+    do:
+      "Kitchen ticket outcome uncertain (#{inspect(reason)}). It may already have printed; do not retry automatically."
+
+  defp physical_action_note(:drawer, {:uncertain, reason}),
+    do:
+      "Kaha outcome uncertain (#{inspect(reason)}). The drawer may already have opened; do not retry automatically."
+
+  defp physical_action_note(:kitchen, {:duplicate, _result}),
+    do: "This Kitchen request was already handled. No additional ticket was sent."
+
+  defp physical_action_note(:drawer, {:duplicate, _result}),
+    do: "This Kaha request was already handled. Drawer was not opened again."
+
+  defp physical_action_note(:kitchen, {:stale, _reason}),
+    do: "Kitchen request is stale. No ticket was sent."
+
+  defp physical_action_note(:drawer, {:stale, _reason}),
+    do: "Kaha request is stale. Drawer was not opened."
+
+  defp physical_action_note(action, {:recovery_required, _reason})
+       when action in [:kitchen, :drawer],
+       do: "Printer recovery acknowledgement is required. No physical command was sent."
+
+  defp physical_action_note(:kitchen, {:ineligible, :order_not_found}),
+    do: "Order no longer exists. No kitchen ticket was sent."
+
+  defp physical_action_note(:drawer, {:ineligible, :order_not_found}),
+    do: "Order no longer exists. Drawer was not opened."
+
+  defp physical_action_note(:drawer, {:ineligible, :order_not_paid}),
+    do: "Only paid orders can open Kaha. Drawer was not opened."
+
+  defp physical_action_note(:drawer, {:ineligible, :payment_not_cash_like}),
+    do: "Kaha is only available for cash-like payments. Drawer was not opened."
+
+  defp physical_action_note(:kitchen, {:ineligible, :order_not_eligible}),
+    do: "This order is no longer eligible for Kitchen. No ticket was sent."
+
+  defp physical_action_note(:drawer, {:ineligible, :order_not_eligible}),
+    do: "This order is no longer eligible for Kaha. Drawer was not opened."
+
+  defp physical_action_note(:kitchen, {:ineligible, :printer_disabled}),
+    do: "Printer is not enabled on this server. No kitchen ticket was sent."
+
+  defp physical_action_note(:drawer, {:ineligible, :printer_disabled}),
+    do: "Printer is not enabled on this server. Drawer was not opened."
 
   defp maybe_set_alert_banner(socket, %{status: "received"} = order) do
     prev_received_ids =

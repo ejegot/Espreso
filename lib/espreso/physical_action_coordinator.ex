@@ -11,7 +11,7 @@ defmodule Espreso.PhysicalActionCoordinator do
   alias Espreso.Printer
   alias Espreso.Repo
 
-  @action :receipt_reprint
+  @actions [:receipt_reprint, :kitchen, :drawer]
   @eligible_statuses ~w(received preparing ready)
 
   def start_link(opts \\ []) do
@@ -19,28 +19,33 @@ defmodule Espreso.PhysicalActionCoordinator do
     GenServer.start_link(__MODULE__, opts, name: name)
   end
 
-  def reprint_permits(order_ids, server \\ __MODULE__) when is_list(order_ids) do
-    GenServer.call(server, {:reprint_permits, order_ids})
+  def permits(action, order_ids, server \\ __MODULE__)
+      when action in @actions and is_list(order_ids) do
+    GenServer.call(server, {:permits, action, order_ids})
   end
 
-  def execute_reprint(order_id, action, permit_id, opts \\ [])
+  def reprint_permits(order_ids, server \\ __MODULE__) when is_list(order_ids) do
+    permits(:receipt_reprint, order_ids, server)
+  end
 
-  def execute_reprint(order_id, action, permit_id, opts) when is_binary(order_id) do
+  def execute(order_id, action, permit_id, opts \\ [])
+
+  def execute(order_id, action, permit_id, opts) when is_binary(order_id) do
     case Integer.parse(order_id) do
-      {parsed_id, ""} -> execute_reprint(parsed_id, action, permit_id, opts)
+      {parsed_id, ""} -> execute(parsed_id, action, permit_id, opts)
       _ -> {:stale, :invalid_order_id}
     end
   end
 
-  def execute_reprint(order_id, action, permit_id, opts) when is_integer(order_id) do
+  def execute(order_id, action, permit_id, opts) when is_integer(order_id) do
     server = Keyword.get(opts, :server, __MODULE__)
     staff_name = Keyword.get(opts, :staff_name)
 
-    GenServer.call(
-      server,
-      {:execute_reprint, order_id, action, permit_id, staff_name},
-      :infinity
-    )
+    GenServer.call(server, {:execute, order_id, action, permit_id, staff_name}, :infinity)
+  end
+
+  def execute_reprint(order_id, action, permit_id, opts \\ []) do
+    execute(order_id, action, permit_id, opts)
   end
 
   def acknowledge_recovery(server \\ __MODULE__) do
@@ -58,21 +63,32 @@ defmodule Espreso.PhysicalActionCoordinator do
      %{
        permits: %{},
        recovery_required?: recovery_required?,
-       dispatch_receipt: Keyword.get(opts, :dispatch_receipt, &Printer.dispatch_receipt/2)
+       dispatchers: %{
+         receipt_reprint: Keyword.get(opts, :dispatch_receipt, &Printer.dispatch_receipt/2),
+         kitchen: Keyword.get(opts, :dispatch_kitchen, &Printer.dispatch_kitchen/2),
+         drawer:
+           Keyword.get(opts, :dispatch_drawer, fn _order, _opts ->
+             Printer.dispatch_drawer()
+           end)
+       }
      }}
   end
 
   @impl true
-  def handle_call({:reprint_permits, _order_ids}, _from, %{recovery_required?: true} = state) do
+  def handle_call(
+        {:permits, _action, _order_ids},
+        _from,
+        %{recovery_required?: true} = state
+      ) do
     {:reply, %{}, state}
   end
 
-  def handle_call({:reprint_permits, order_ids}, _from, state) do
+  def handle_call({:permits, action, order_ids}, _from, state) do
     {permits, state} =
       order_ids
       |> Enum.uniq()
       |> Enum.reduce({%{}, state}, fn order_id, {result, current_state} ->
-        {permit_id, next_state} = ensure_available_permit(current_state, order_id)
+        {permit_id, next_state} = ensure_available_permit(current_state, order_id, action)
         {Map.put(result, order_id, permit_id), next_state}
       end)
 
@@ -80,7 +96,7 @@ defmodule Espreso.PhysicalActionCoordinator do
   end
 
   def handle_call(
-        {:execute_reprint, _order_id, _action, _permit_id, _staff_name},
+        {:execute, _order_id, _action, _permit_id, _staff_name},
         _from,
         %{recovery_required?: true} = state
       ) do
@@ -88,21 +104,25 @@ defmodule Espreso.PhysicalActionCoordinator do
   end
 
   def handle_call(
-        {:execute_reprint, order_id, action, permit_id, staff_name},
+        {:execute, order_id, action, permit_id, staff_name},
         _from,
         state
       ) do
-    key = {order_id, @action}
+    if action in @actions do
+      key = {order_id, action}
 
-    case claim_status(state, key, action, permit_id) do
-      :claimable ->
-        execute_claimed_reprint(state, key, order_id, permit_id, staff_name)
+      case claim_status(state, key, permit_id) do
+        :claimable ->
+          execute_claimed_action(state, key, order_id, action, permit_id, staff_name)
 
-      {:duplicate, result} ->
-        {:reply, {:duplicate, result}, state}
+        {:duplicate, result} ->
+          {:reply, {:duplicate, result}, state}
 
-      :stale ->
-        {:reply, {:stale, :invalid_permit}, state}
+        :stale ->
+          {:reply, {:stale, :invalid_permit}, state}
+      end
+    else
+      {:reply, {:stale, :invalid_action}, state}
     end
   end
 
@@ -110,13 +130,13 @@ defmodule Espreso.PhysicalActionCoordinator do
     {:reply, :ok, %{state | recovery_required?: false, permits: %{}}}
   end
 
-  defp execute_claimed_reprint(state, key, order_id, permit_id, staff_name) do
+  defp execute_claimed_action(state, key, order_id, action, permit_id, staff_name) do
     state = put_in(state, [:permits, key, :state], :running)
 
-    case eligible_order(order_id) do
+    case eligible_order(order_id, action) do
       {:ok, order} ->
-        result = state.dispatch_receipt.(order, staff_name: staff_name)
-        complete_reprint(state, key, permit_id, result)
+        result = state.dispatchers[action].(order, staff_name: staff_name)
+        complete_action(state, key, permit_id, result)
 
       {:error, reason} ->
         result = {:ineligible, reason}
@@ -125,53 +145,76 @@ defmodule Espreso.PhysicalActionCoordinator do
     end
   end
 
-  defp complete_reprint(state, key, permit_id, :dispatched) do
+  defp complete_action(state, key, permit_id, :dispatched) do
     {next_permit, state} = rotate_permit(state, key, permit_id, :dispatched)
     {:reply, {:dispatched, next_permit}, state}
   end
 
-  defp complete_reprint(state, key, permit_id, {:definite_failure, reason}) do
+  defp complete_action(state, key, permit_id, {:definite_failure, reason}) do
     result = {:definite_failure, reason}
     {retry_permit, state} = rotate_permit(state, key, permit_id, result)
     {:reply, {:definite_failure, reason, retry_permit}, state}
   end
 
-  defp complete_reprint(state, key, permit_id, {:uncertain, reason}) do
+  defp complete_action(state, key, permit_id, {:uncertain, reason}) do
     result = {:uncertain, reason}
     state = complete_without_next_permit(state, key, permit_id, result)
     {:reply, result, state}
   end
 
-  defp complete_reprint(state, key, permit_id, :disabled) do
+  defp complete_action(state, key, permit_id, :disabled) do
     result = {:ineligible, :printer_disabled}
     state = complete_without_next_permit(state, key, permit_id, result)
     {:reply, result, state}
   end
 
-  defp eligible_order(order_id) do
+  defp eligible_order(order_id, action) do
     case Repo.get(Order, order_id) do
       nil ->
         {:error, :order_not_found}
 
-      %Order{payment_status: "paid", status: status} = order
-      when status in @eligible_statuses ->
-        if Printer.enabled?() do
-          {:ok, Repo.preload(order, :items)}
-        else
-          {:error, :printer_disabled}
-        end
-
-      %Order{payment_status: payment_status} when payment_status != "paid" ->
-        {:error, :order_not_paid}
-
-      %Order{} ->
-        {:error, :order_not_eligible}
+      %Order{} = order ->
+        validate_eligible_order(order, action)
     end
   end
 
-  defp claim_status(_state, _key, action, _permit_id) when action != @action, do: :stale
+  defp validate_eligible_order(%Order{} = order, :receipt_reprint) do
+    cond do
+      order.payment_status != "paid" -> {:error, :order_not_paid}
+      order.status not in @eligible_statuses -> {:error, :order_not_eligible}
+      not Printer.enabled?() -> {:error, :printer_disabled}
+      true -> {:ok, Repo.preload(order, :items)}
+    end
+  end
 
-  defp claim_status(state, key, @action, permit_id) do
+  defp validate_eligible_order(%Order{} = order, :kitchen) do
+    cond do
+      order.status not in @eligible_statuses -> {:error, :order_not_eligible}
+      not Printer.enabled?() -> {:error, :printer_disabled}
+      true -> {:ok, Repo.preload(order, :items)}
+    end
+  end
+
+  defp validate_eligible_order(%Order{} = order, :drawer) do
+    cond do
+      order.payment_status != "paid" ->
+        {:error, :order_not_paid}
+
+      not Printer.cash_like?(order.paid_via || "counter") ->
+        {:error, :payment_not_cash_like}
+
+      order.status not in @eligible_statuses ->
+        {:error, :order_not_eligible}
+
+      not Printer.enabled?() ->
+        {:error, :printer_disabled}
+
+      true ->
+        {:ok, order}
+    end
+  end
+
+  defp claim_status(state, key, permit_id) do
     case Map.get(state.permits, key) do
       %{current: ^permit_id, state: :available} ->
         :claimable
@@ -184,8 +227,8 @@ defmodule Espreso.PhysicalActionCoordinator do
     end
   end
 
-  defp ensure_available_permit(state, order_id) do
-    key = {order_id, @action}
+  defp ensure_available_permit(state, order_id, action) do
+    key = {order_id, action}
 
     case Map.get(state.permits, key) do
       %{current: permit_id, state: :available} when is_binary(permit_id) ->

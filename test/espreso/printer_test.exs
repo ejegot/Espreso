@@ -121,6 +121,44 @@ defmodule Espreso.PrinterTest do
              Printer.dispatch_receipt(%Order{number: "CS-CONNECT", items: []})
   end
 
+  test "dispatch_kitchen preserves the exact Kitchen payload and contains no drawer command" do
+    restore_printer_config_on_exit()
+    {port, printer_task} = start_test_printer!()
+    set_test_printer_port(port)
+
+    order = %Order{
+      number: "CS-KITCHEN",
+      customer_name: "Jay",
+      fulfillment: "pickup",
+      items: [%OrderItem{name: "Espresso", quantity: 1}]
+    }
+
+    expected = Receipt.build_kitchen(order, staff_name: "Ana")
+
+    assert Printer.dispatch_kitchen(order, staff_name: "Ana") == :dispatched
+    assert Task.await(printer_task, 2_000) == expected
+    assert :binary.match(expected, <<0x1B, 0x70>>) == :nomatch
+  end
+
+  test "dispatch_drawer sends exactly one pin-2 drawer kick command" do
+    restore_printer_config_on_exit()
+    {port, printer_task} = start_test_printer!()
+    set_test_printer_port(port)
+
+    assert Printer.dispatch_drawer() == :dispatched
+    assert Task.await(printer_task, 2_000) == <<0x1B, 0x70, 0x00, 0x19, 0xFA>>
+  end
+
+  test "Kitchen and Drawer dispatch classify connection failure as definite" do
+    restore_printer_config_on_exit()
+    set_test_printer_port(1)
+
+    assert {:definite_failure, _reason} =
+             Printer.dispatch_kitchen(%Order{number: "CS-KITCHEN-FAIL", items: []})
+
+    assert {:definite_failure, _reason} = Printer.dispatch_drawer()
+  end
+
   defp restore_printer_config_on_exit do
     previous = Application.get_env(:espreso, Printer)
 

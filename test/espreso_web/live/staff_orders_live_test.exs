@@ -1276,6 +1276,302 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert has_element?(disabled_view, "#orders-flash", "Printer is not enabled")
   end
 
+  test "Kitchen and Kaha use separate permits, dispatch exact effects, and rearm", %{conn: conn} do
+    restore_printer_config_on_exit()
+    order = paid_order!("cash")
+    {kitchen_port, kitchen_task} = start_test_printer!(1)
+    set_test_printer_port(kitchen_port)
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    kitchen_permit = live_assigns(view).kitchen_permits[order.id]
+    drawer_permit = live_assigns(view).drawer_permits[order.id]
+
+    assert has_element?(
+             view,
+             "#kitchen-#{order.id}[phx-value-action='kitchen'][phx-value-permit='#{kitchen_permit}']"
+           )
+
+    assert has_element?(
+             view,
+             "#open-drawer-#{order.id}[phx-value-id='#{order.id}'][phx-value-action='drawer'][phx-value-permit='#{drawer_permit}']"
+           )
+
+    view |> element("#kitchen-#{order.id}") |> render_click()
+    assert [kitchen_bytes] = Task.await(kitchen_task, 2_000)
+    assert kitchen_bytes =~ "KITCHEN"
+    refute kitchen_bytes == drawer_kick_bytes()
+    assert has_element?(view, "#orders-flash", "Kitchen ticket command dispatched.")
+
+    next_kitchen = live_assigns(view).kitchen_permits[order.id]
+    refute next_kitchen == kitchen_permit
+    assert live_assigns(view).drawer_permits[order.id] == drawer_permit
+
+    view
+    |> render_click("print_kitchen", %{
+      "id" => to_string(order.id),
+      "action" => "kitchen",
+      "permit" => kitchen_permit
+    })
+
+    assert has_element?(view, "#orders-flash", "already handled")
+
+    {drawer_port, drawer_task} = start_test_printer!(1)
+    set_test_printer_port(drawer_port)
+    view |> element("#open-drawer-#{order.id}") |> render_click()
+
+    assert [drawer_bytes] = Task.await(drawer_task, 2_000)
+    assert drawer_bytes == drawer_kick_bytes()
+    assert has_element?(view, "#orders-flash", "Kaha command dispatched.")
+
+    next_drawer = live_assigns(view).drawer_permits[order.id]
+    refute next_drawer == drawer_permit
+    assert live_assigns(view).kitchen_permits[order.id] == next_kitchen
+
+    view
+    |> render_click("open_drawer", %{
+      "id" => to_string(order.id),
+      "action" => "drawer",
+      "permit" => drawer_permit
+    })
+
+    assert has_element?(view, "#orders-flash", "Drawer was not opened again.")
+  end
+
+  test "unpaid operational orders retain protected Kitchen but do not expose Kaha", %{conn: conn} do
+    restore_printer_config_on_exit()
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Unpaid Kitchen", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Kitchen", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {port, printer_task} = start_test_printer!(1)
+    set_test_printer_port(port)
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    assert has_element?(view, "#kitchen-#{order.id}[phx-value-action='kitchen']")
+    refute has_element?(view, "#open-drawer-#{order.id}")
+
+    view |> element("#kitchen-#{order.id}") |> render_click()
+    assert [kitchen_bytes] = Task.await(printer_task, 2_000)
+    assert kitchen_bytes =~ "KITCHEN"
+    assert Orders.get_order_by_number!(order.number).payment_status == "unpaid"
+  end
+
+  test "two LiveViews share Kitchen and Kaha permits and duplicates perform no second effect", %{
+    conn: conn
+  } do
+    restore_printer_config_on_exit()
+    order = paid_order!("cash")
+    {kitchen_port, kitchen_task} = start_test_printer!(1)
+    set_test_printer_port(kitchen_port)
+
+    {:ok, first_view, _html} = live(conn, ~p"/orders")
+    {:ok, second_view, _html} = live(conn, ~p"/orders")
+
+    kitchen_permit = live_assigns(first_view).kitchen_permits[order.id]
+    drawer_permit = live_assigns(first_view).drawer_permits[order.id]
+    assert live_assigns(second_view).kitchen_permits[order.id] == kitchen_permit
+    assert live_assigns(second_view).drawer_permits[order.id] == drawer_permit
+
+    first_view |> element("#kitchen-#{order.id}") |> render_click()
+    assert [_kitchen] = Task.await(kitchen_task, 2_000)
+    second_view |> element("#kitchen-#{order.id}") |> render_click()
+    assert has_element?(second_view, "#orders-flash", "No additional ticket was sent.")
+
+    {drawer_port, drawer_task} = start_test_printer!(1)
+    set_test_printer_port(drawer_port)
+    first_view |> element("#open-drawer-#{order.id}") |> render_click()
+    assert [drawer_bytes] = Task.await(drawer_task, 2_000)
+    assert drawer_bytes == drawer_kick_bytes()
+    second_view |> element("#open-drawer-#{order.id}") |> render_click()
+    assert has_element?(second_view, "#orders-flash", "Drawer was not opened again.")
+  end
+
+  test "Kitchen and Kaha reject wrong, missing, ineligible, and disabled stale events", %{
+    conn: conn
+  } do
+    restore_printer_config_on_exit()
+    set_test_printer_port(1)
+    cash_order = paid_order!("cash")
+    wallet_order = paid_order!("gcash")
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    kitchen_permit = live_assigns(view).kitchen_permits[cash_order.id]
+    drawer_permit = live_assigns(view).drawer_permits[cash_order.id]
+
+    view
+    |> render_click("open_drawer", %{
+      "id" => to_string(cash_order.id),
+      "action" => "drawer",
+      "permit" => kitchen_permit
+    })
+
+    assert has_element?(view, "#orders-flash", "Kaha request is stale.")
+
+    view
+    |> render_click("open_drawer", %{
+      "id" => to_string(wallet_order.id),
+      "action" => "drawer",
+      "permit" => drawer_permit
+    })
+
+    assert has_element?(view, "#orders-flash", "Kaha request is stale.")
+
+    wallet_drawer_permit =
+      PhysicalActionCoordinator.permits(:drawer, [wallet_order.id])
+      |> Map.fetch!(wallet_order.id)
+
+    view
+    |> render_click("open_drawer", %{
+      "id" => to_string(wallet_order.id),
+      "action" => "drawer",
+      "permit" => wallet_drawer_permit
+    })
+
+    assert has_element?(view, "#orders-flash", "only available for cash-like payments")
+
+    {:ok, unpaid} =
+      Orders.create_order(
+        [%{name: "Unpaid", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Unpaid", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    unpaid_drawer_permit =
+      PhysicalActionCoordinator.permits(:drawer, [unpaid.id])
+      |> Map.fetch!(unpaid.id)
+
+    view
+    |> render_click("open_drawer", %{
+      "id" => to_string(unpaid.id),
+      "action" => "drawer",
+      "permit" => unpaid_drawer_permit
+    })
+
+    assert has_element?(view, "#orders-flash", "Only paid orders can open Kaha.")
+
+    missing_kitchen_permit =
+      PhysicalActionCoordinator.permits(:kitchen, [unpaid.id])
+      |> Map.fetch!(unpaid.id)
+
+    Repo.delete!(unpaid)
+
+    view
+    |> render_click("print_kitchen", %{
+      "id" => to_string(unpaid.id),
+      "action" => "kitchen",
+      "permit" => missing_kitchen_permit
+    })
+
+    assert has_element?(view, "#orders-flash", "Order no longer exists.")
+
+    {:ok, cancelled} =
+      Orders.create_order(
+        [%{name: "Cancelled", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Cancelled", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    cancelled_kitchen_permit =
+      PhysicalActionCoordinator.permits(:kitchen, [cancelled.id])
+      |> Map.fetch!(cancelled.id)
+
+    {:ok, cancelled} = Orders.cancel_order(cancelled)
+
+    view
+    |> render_click("print_kitchen", %{
+      "id" => to_string(cancelled.id),
+      "action" => "kitchen",
+      "permit" => cancelled_kitchen_permit
+    })
+
+    assert has_element?(view, "#orders-flash", "no longer eligible for Kitchen")
+
+    missing_drawer = paid_order!("cash")
+
+    missing_drawer_permit =
+      PhysicalActionCoordinator.permits(:drawer, [missing_drawer.id])
+      |> Map.fetch!(missing_drawer.id)
+
+    Repo.delete!(missing_drawer)
+
+    view
+    |> render_click("open_drawer", %{
+      "id" => to_string(missing_drawer.id),
+      "action" => "drawer",
+      "permit" => missing_drawer_permit
+    })
+
+    assert has_element?(view, "#orders-flash", "Order no longer exists.")
+
+    {:ok, ready} = Orders.update_status(cash_order, "ready")
+    {:ok, completed} = Orders.complete_order(ready)
+
+    view
+    |> render_click("print_kitchen", %{
+      "id" => to_string(completed.id),
+      "action" => "kitchen",
+      "permit" => kitchen_permit
+    })
+
+    assert has_element?(view, "#orders-flash", "no longer eligible for Kitchen")
+
+    view
+    |> render_click("open_drawer", %{
+      "id" => to_string(completed.id),
+      "action" => "drawer",
+      "permit" => drawer_permit
+    })
+
+    assert has_element?(view, "#orders-flash", "no longer eligible for Kaha")
+
+    disabled_order = paid_order!("cash")
+    {:ok, disabled_view, _html} = live(conn, ~p"/orders")
+    disabled_kitchen = live_assigns(disabled_view).kitchen_permits[disabled_order.id]
+    disabled_drawer = live_assigns(disabled_view).drawer_permits[disabled_order.id]
+    Application.put_env(:espreso, Printer, enabled: false, host: "")
+
+    disabled_view
+    |> render_click("print_kitchen", %{
+      "id" => to_string(disabled_order.id),
+      "action" => "kitchen",
+      "permit" => disabled_kitchen
+    })
+
+    assert has_element?(disabled_view, "#orders-flash", "No kitchen ticket was sent.")
+
+    disabled_view
+    |> render_click("open_drawer", %{
+      "id" => to_string(disabled_order.id),
+      "action" => "drawer",
+      "permit" => disabled_drawer
+    })
+
+    assert has_element?(disabled_view, "#orders-flash", "Drawer was not opened.")
+  end
+
+  test "Kitchen and Kaha definite failures rotate only their own retry permits", %{conn: conn} do
+    restore_printer_config_on_exit()
+    set_test_printer_port(1)
+    order = paid_order!("cash")
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    kitchen_permit = live_assigns(view).kitchen_permits[order.id]
+    drawer_permit = live_assigns(view).drawer_permits[order.id]
+
+    view |> element("#kitchen-#{order.id}") |> render_click()
+    kitchen_retry = live_assigns(view).kitchen_permits[order.id]
+    refute kitchen_retry == kitchen_permit
+    assert live_assigns(view).drawer_permits[order.id] == drawer_permit
+    assert has_element?(view, "#orders-flash", "Kitchen could not connect")
+
+    view |> element("#open-drawer-#{order.id}") |> render_click()
+    drawer_retry = live_assigns(view).drawer_permits[order.id]
+    refute drawer_retry == drawer_permit
+    assert live_assigns(view).kitchen_permits[order.id] == kitchen_retry
+    assert has_element?(view, "#orders-flash", "Kaha could not connect")
+  end
+
   defp paid_order!(paid_via) do
     {:ok, order} =
       Orders.create_order(
