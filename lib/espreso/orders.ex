@@ -69,7 +69,7 @@ defmodule Espreso.Orders do
 
     paid_via =
       if payment_status == "paid" do
-        normalize_paid_via_attr(Map.get(attrs, :paid_via) || Map.get(attrs, "paid_via"))
+        paid_via_attr(attrs)
       else
         nil
       end
@@ -79,6 +79,36 @@ defmodule Espreso.Orders do
         Map.get(attrs, :payment_intent) || Map.get(attrs, "payment_intent")
       )
 
+    case validate_paid_at_create(payment_status, payment_method, payment_intent, paid_via) do
+      {:ok, _validation} ->
+        persist_order(
+          lines,
+          attrs,
+          attempt,
+          fulfillment,
+          payment_method,
+          payment_status,
+          paid_via,
+          payment_intent,
+          source
+        )
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp persist_order(
+         lines,
+         attrs,
+         attempt,
+         fulfillment,
+         payment_method,
+         payment_status,
+         paid_via,
+         payment_intent,
+         source
+       ) do
     total =
       Enum.reduce(lines, Decimal.new(0), fn line, acc ->
         Decimal.add(acc, Decimal.mult(line.price, line.quantity))
@@ -672,7 +702,7 @@ defmodule Espreso.Orders do
   def mark_paid_with_transition(order, opts \\ [])
 
   def mark_paid_with_transition(%Order{id: id}, opts) when is_integer(id) do
-    paid_via = normalize_paid_via(opts)
+    paid_via = Keyword.get(opts, :paid_via, "counter")
 
     case Repo.get(Order, id) do
       nil ->
@@ -686,7 +716,7 @@ defmodule Espreso.Orders do
 
       %Order{payment_method: "online", payment_status: "awaiting_payment"} = current ->
         if BusinessSettings.qrph_manual?() do
-          apply_paid(current, paid_via)
+          apply_paid(current, paid_via, :manual)
         else
           {:error, :online_payment_required}
         end
@@ -695,7 +725,7 @@ defmodule Espreso.Orders do
         {:error, :online_payment_required}
 
       %Order{} = current ->
-        apply_paid(current, paid_via)
+        apply_paid(current, paid_via, :manual)
     end
   end
 
@@ -740,7 +770,7 @@ defmodule Espreso.Orders do
         {:error, :not_found}
 
       %Order{} = order ->
-        apply_paid(order, "paymongo") |> collapse_paid_transition()
+        apply_paid(order, "paymongo", :paymongo) |> collapse_paid_transition()
     end
   end
 
@@ -752,7 +782,7 @@ defmodule Espreso.Orders do
   def mark_paid_from_paymongo_session(session_id) when is_binary(session_id) do
     case Repo.get_by(Order, paymongo_checkout_session_id: session_id) do
       nil -> {:error, :not_found}
-      %Order{} = order -> apply_paid(order, "paymongo") |> collapse_paid_transition()
+      %Order{} = order -> apply_paid(order, "paymongo", :paymongo) |> collapse_paid_transition()
     end
   end
 
@@ -937,24 +967,78 @@ defmodule Espreso.Orders do
   defp normalize_payment_status("online", _value, "qrph_manual"), do: "awaiting_payment"
   defp normalize_payment_status("online", _value, _mode), do: "unpaid"
 
-  defp normalize_paid_via(opts) when is_list(opts) do
-    case Keyword.get(opts, :paid_via) do
-      value when value in @paid_vias -> value
-      value when is_atom(value) -> value |> Atom.to_string() |> normalize_paid_via_value()
-      _ -> "counter"
+  defp paid_via_attr(attrs) do
+    result =
+      case Map.fetch(attrs, :paid_via) do
+        :error -> Map.fetch(attrs, "paid_via")
+        result -> result
+      end
+
+    case result do
+      :error -> "cash"
+      {:ok, value} when is_atom(value) -> Atom.to_string(value)
+      {:ok, value} -> value
     end
   end
 
-  defp normalize_paid_via_value(value) when value in @paid_vias, do: value
-  defp normalize_paid_via_value(_), do: "counter"
+  defp normalize_paid_via_value(value) when value in @paid_vias, do: {:ok, value}
 
-  defp normalize_paid_via_attr(value) when value in @paid_vias, do: value
+  defp normalize_paid_via_value(value) when is_atom(value),
+    do: value |> Atom.to_string() |> normalize_paid_via_value()
 
-  defp normalize_paid_via_attr(value) when is_atom(value) do
-    value |> Atom.to_string() |> normalize_paid_via_attr()
+  defp normalize_paid_via_value(_), do: {:error, :invalid_paid_via}
+
+  defp validate_paid_at_create("paid", payment_method, payment_intent, paid_via) do
+    case validate_payment_settlement(
+           payment_method,
+           payment_intent,
+           paid_via,
+           :paid_at_create
+         ) do
+      :ok -> {:ok, :valid}
+      {:error, _reason} = error -> error
+    end
   end
 
-  defp normalize_paid_via_attr(_), do: "cash"
+  defp validate_paid_at_create(_status, _payment_method, _payment_intent, _paid_via),
+    do: {:ok, :not_paid}
+
+  defp validate_payment_settlement(payment_method, payment_intent, paid_via, context) do
+    with {:ok, paid_via} <- normalize_paid_via_value(paid_via) do
+      cond do
+        paid_via == "paymongo" and context != :paymongo ->
+          {:error, :paymongo_authority_required}
+
+        context == :paymongo and paid_via != "paymongo" ->
+          {:error, :paymongo_authority_required}
+
+        paid_via == "paymongo" and payment_method != "online" ->
+          {:error, :payment_channel_mismatch}
+
+        paid_via == "paymongo" and payment_intent in [nil, "gcash", "maya"] ->
+          :ok
+
+        paid_via == "counter" and payment_method == "counter" and
+            is_nil(payment_intent) ->
+          :ok
+
+        paid_via == "counter" ->
+          {:error, :payment_channel_mismatch}
+
+        paid_via in ["cash", "gcash", "maya"] and is_nil(payment_intent) ->
+          :ok
+
+        paid_via in ["cash", "gcash", "maya"] and paid_via == payment_intent ->
+          :ok
+
+        paid_via in ["cash", "gcash", "maya"] ->
+          {:error, {:payment_intent_mismatch, payment_intent, paid_via}}
+
+        true ->
+          {:error, :payment_channel_mismatch}
+      end
+    end
+  end
 
   defp normalize_payment_intent(value) when value in ["cash", "gcash", "maya"], do: value
 
@@ -978,26 +1062,49 @@ defmodule Espreso.Orders do
 
   defp broadcast(other), do: other
 
-  # Verified PayMongo path — does not enforce the staff/manual online restriction.
-  defp apply_paid(%Order{id: order_id}, paid_via) do
+  defp apply_paid(%Order{} = order, paid_via, settlement_context) do
+    with {:ok, paid_via} <- normalize_paid_via_value(paid_via),
+         :ok <-
+           validate_payment_settlement(
+             order.payment_method,
+             order.payment_intent,
+             paid_via,
+             settlement_context
+           ) do
+      do_apply_paid(order, paid_via, settlement_context)
+    end
+  end
+
+  # Verified PayMongo path uses the same atomic writer as staff settlement.
+  defp do_apply_paid(%Order{id: order_id} = order, paid_via, settlement_context) do
     invoke_apply_paid_barrier!()
 
     now = DateTime.utc_now() |> DateTime.truncate(:second)
-    paid_via = normalize_paid_via_value(paid_via)
 
     # Confirm payment advances New → Preparing so staff skip an extra tap.
     # Do not regress preparing / ready / completed.
-    {count, _} =
+    payment_query =
       from(o in Order,
-        where: o.id == ^order_id and o.status != "cancelled" and o.payment_status != "paid",
-        update: [
-          set: [
-            payment_status: "paid",
-            paid_via: ^paid_via,
-            status:
-              fragment("CASE WHEN status = 'received' THEN 'preparing' ELSE status END"),
-            updated_at: ^now
-          ]
+        where:
+          o.id == ^order_id and o.status != "cancelled" and o.payment_status != "paid" and
+            o.payment_method == ^order.payment_method
+      )
+
+    payment_query =
+      if is_nil(order.payment_intent) do
+        where(payment_query, [o], is_nil(o.payment_intent))
+      else
+        where(payment_query, [o], o.payment_intent == ^order.payment_intent)
+      end
+
+    {count, _} =
+      payment_query
+      |> update([o],
+        set: [
+          payment_status: "paid",
+          paid_via: ^paid_via,
+          status: fragment("CASE WHEN status = 'received' THEN 'preparing' ELSE status END"),
+          updated_at: ^now
         ]
       )
       |> Repo.update_all([])
@@ -1022,7 +1129,15 @@ defmodule Espreso.Orders do
             {:error, :cancelled}
 
           %Order{} = order ->
-            {:error, {:unexpected_apply_paid_state, order}}
+            case validate_payment_settlement(
+                   order.payment_method,
+                   order.payment_intent,
+                   paid_via,
+                   settlement_context
+                 ) do
+              :ok -> {:error, {:unexpected_apply_paid_state, order}}
+              {:error, _reason} = error -> error
+            end
         end
 
       _ ->

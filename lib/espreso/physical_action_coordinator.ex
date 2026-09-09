@@ -272,7 +272,14 @@ defmodule Espreso.PhysicalActionCoordinator do
 
       {:error, reason} ->
         result = {:ineligible, reason}
-        state = complete_mark_paid(state, key, permit_id, result)
+
+        state =
+          if recoverable_payment_settlement_error?(reason) do
+            rotate_rejected_mark_paid_permit(state, key, permit_id, result)
+          else
+            complete_mark_paid(state, key, permit_id, result)
+          end
+
         {:reply, result, state}
     end
   end
@@ -515,6 +522,32 @@ defmodule Espreso.PhysicalActionCoordinator do
 
     put_in(state, [:permits, key], entry)
   end
+
+  defp rotate_rejected_mark_paid_permit(state, key, permit_id, result) do
+    entry = %{
+      current: new_permit_id(),
+      state: :available,
+      phase: :transition,
+      paid_via: nil,
+      last: permit_id,
+      last_result: result
+    }
+
+    put_in(state, [:permits, key], entry)
+  end
+
+  defp recoverable_payment_settlement_error?(:invalid_paid_via), do: true
+  defp recoverable_payment_settlement_error?(:paymongo_authority_required), do: true
+  defp recoverable_payment_settlement_error?(:payment_channel_mismatch), do: true
+
+  defp recoverable_payment_settlement_error?({
+         :payment_intent_mismatch,
+         _payment_intent,
+         _paid_via
+       }),
+       do: true
+
+  defp recoverable_payment_settlement_error?(_reason), do: false
 
   defp complete_action(state, key, permit_id, :dispatched) do
     {next_permit, state} = rotate_permit(state, key, permit_id, :dispatched)

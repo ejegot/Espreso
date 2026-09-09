@@ -232,6 +232,16 @@ defmodule EspresoWeb.StaffOrdersLive do
            "This online order cannot be marked paid manually — wait for PayMongo or switch to QRPh mode."
          )}
 
+      {:ineligible, reason} ->
+        if recoverable_payment_choice_error?(reason) do
+          {:noreply,
+           socket
+           |> assign(:flash_note, "Could not mark order paid.")
+           |> load_orders()}
+        else
+          {:noreply, assign(socket, :flash_note, "Could not mark order paid.")}
+        end
+
       _ ->
         {:noreply, assign(socket, :flash_note, "Could not mark order paid.")}
     end
@@ -1198,6 +1208,19 @@ defmodule EspresoWeb.StaffOrdersLive do
         base <> " Print failed (#{inspect(reason)})."
     end
   end
+
+  defp recoverable_payment_choice_error?(:invalid_paid_via), do: true
+  defp recoverable_payment_choice_error?(:paymongo_authority_required), do: true
+  defp recoverable_payment_choice_error?(:payment_channel_mismatch), do: true
+
+  defp recoverable_payment_choice_error?({
+         :payment_intent_mismatch,
+         _payment_intent,
+         _paid_via
+       }),
+       do: true
+
+  defp recoverable_payment_choice_error?(_reason), do: false
 
   defp source_badge(%{source: "pos"}), do: %{label: "WALK-IN", class: "staff-order-source--pos"}
   defp source_badge(_), do: %{label: "QR", class: "staff-order-source--customer"}

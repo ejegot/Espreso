@@ -101,6 +101,35 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert has_element?(view, "#{detail_id(order.id, "preparing")} .staff-order-meta", "Takeout")
   end
 
+  test "rejected payment choice refreshes the permit for a valid retry", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Cash Intent",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_intent: :cash
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    mark_paid_via(view, order, "gcash", "ticket", "new")
+
+    rejected = Orders.get_order_by_number!(order.number)
+    assert rejected.payment_status == "unpaid"
+    assert rejected.paid_via == nil
+    assert has_element?(view, "#orders-flash", "Could not mark order paid.")
+
+    mark_paid_via(view, order, "cash", "ticket", "new")
+
+    paid = Orders.get_order_by_number!(order.number)
+    assert paid.payment_status == "paid"
+    assert paid.paid_via == "cash"
+    assert has_element?(view, "#orders-preparing #order-card-preparing-#{order.id}")
+  end
+
   test "Ready ticket shows items and Picked up as primary action", %{conn: conn} do
     {:ok, order} =
       Orders.create_order(
