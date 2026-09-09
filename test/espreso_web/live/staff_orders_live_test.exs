@@ -73,7 +73,9 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     refute has_element?(view, "#orders-new-workload")
   end
 
-  test "one-tap Cash marks paid and moves to Preparing; Ready after paid", %{conn: conn} do
+  test "Cash opens tender modal and exact confirmation moves the paid order to Preparing", %{
+    conn: conn
+  } do
     {:ok, order} =
       Orders.create_order(
         [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
@@ -92,11 +94,19 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     refute has_element?(view, "#ticket-new-paid-via-gcash-#{order.id}")
     refute has_element?(view, "#ticket-new-paid-via-maya-#{order.id}")
 
-    render_click(view, "open_mark_paid", %{"id" => Integer.to_string(order.id)})
-    refute has_element?(view, "#mark-paid-modal")
+    view |> element("#ticket-new-paid-via-cash-#{order.id}") |> render_click()
 
-    mark_paid_via(view, order, "cash", "ticket", "new")
+    assert has_element?(view, "#orders-cash-tender-modal", "Cash Received")
+    assert has_element?(view, "#orders-cash-total", "₱75")
+    assert has_element?(view, "#orders-confirm-cash[disabled]")
 
+    unchanged = Orders.get_order_by_number!(order.number)
+    assert unchanged.payment_status == "unpaid"
+    assert unchanged.paid_via == nil
+
+    confirm_cash_exact(view)
+
+    refute has_element?(view, "#orders-cash-tender-modal")
     assert has_element?(view, "#orders-preparing #order-card-preparing-#{order.id}")
     assert has_element?(view, "#order-ready-#{order.id}.staff-action-primary", "Ready")
 
@@ -107,6 +117,190 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
            )
 
     assert has_element?(view, "#{detail_id(order.id, "preparing")} .staff-order-meta", "Takeout")
+  end
+
+  test "legacy counter Cash opens the same modal while wallet actions remain direct", %{
+    conn: conn
+  } do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Legacy Cash", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    view |> element("#ticket-new-paid-via-cash-#{order.id}") |> render_click()
+
+    assert has_element?(view, "#orders-cash-tender-modal", order.number)
+    assert live_assigns(view).cash_tender_order.id == order.id
+    assert Repo.get!(Espreso.Orders.Order, order.id).payment_status == "unpaid"
+  end
+
+  test "Cash tender validates invalid and insufficient amounts without settling", %{conn: conn} do
+    order = cash_intent_order!("Cash Validation", "150")
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    view |> element("#ticket-new-paid-via-cash-#{order.id}") |> render_click()
+    token = live_assigns(view).cash_tender_token
+
+    view
+    |> render_submit("confirm_order_cash_tender", %{
+      "cash_tender_token" => "stale-token",
+      "cash_tendered" => "150"
+    })
+
+    assert has_element?(view, "#orders-cash-tender-feedback", "no longer active")
+    assert Repo.get!(Espreso.Orders.Order, order.id).payment_status == "unpaid"
+
+    for amount <- ["", "0", "-1", "abc", "150.001"] do
+      view
+      |> form("#orders-cash-tender-form", %{
+        "cash_tender_token" => token,
+        "cash_tendered" => amount
+      })
+      |> render_submit()
+
+      assert Repo.get!(Espreso.Orders.Order, order.id).payment_status == "unpaid"
+      assert has_element?(view, "#orders-cash-tender-modal")
+      assert has_element?(view, "#orders-confirm-cash[disabled]")
+    end
+
+    view
+    |> form("#orders-cash-tender-form", %{
+      "cash_tender_token" => token,
+      "cash_tendered" => "100"
+    })
+    |> render_change()
+
+    assert has_element?(view, "#orders-cash-tender-feedback.is-short", "Still needed")
+    assert has_element?(view, "#orders-cash-tender-feedback", "₱50")
+    assert has_element?(view, "#orders-confirm-cash[disabled]")
+
+    view
+    |> form("#orders-cash-tender-form", %{
+      "cash_tender_token" => token,
+      "cash_tendered" => ".50"
+    })
+    |> render_change()
+
+    assert has_element?(view, "#orders-cash-tender-feedback.is-short", "Still needed")
+  end
+
+  test "Cash tender accepts practical formats and calculates exact and overpayment change", %{
+    conn: conn
+  } do
+    order = cash_intent_order!("Cash Formats", "150")
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    view |> element("#ticket-new-paid-via-cash-#{order.id}") |> render_click()
+    token = live_assigns(view).cash_tender_token
+
+    for amount <- ["150", "150.0", "150.00", "1,000.00"] do
+      view
+      |> form("#orders-cash-tender-form", %{
+        "cash_tender_token" => token,
+        "cash_tendered" => amount
+      })
+      |> render_change()
+
+      refute has_element?(view, "#orders-confirm-cash[disabled]")
+    end
+
+    view
+    |> form("#orders-cash-tender-form", %{
+      "cash_tender_token" => token,
+      "cash_tendered" => "150"
+    })
+    |> render_change()
+
+    assert has_element?(view, "#orders-cash-tender-feedback", "Exact")
+    assert has_element?(view, "#orders-cash-tender-feedback", "₱0")
+
+    view |> element("#orders-cash-preset-200") |> render_click()
+    assert has_element?(view, ~s(#orders-cash-tendered[value="200.00"]))
+    assert has_element?(view, "#orders-cash-tender-feedback", "Change")
+    assert has_element?(view, "#orders-cash-tender-feedback", "₱50")
+    refute has_element?(view, "#orders-cash-preset-100")
+    assert has_element?(view, "#orders-cash-preset-500")
+    assert has_element?(view, "#orders-cash-preset-1000")
+  end
+
+  test "Cash overpayment settles as cash through the existing action", %{conn: conn} do
+    order = cash_intent_order!("Cash Change", "150")
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    view |> element("#ticket-new-paid-via-cash-#{order.id}") |> render_click()
+    token = live_assigns(view).cash_tender_token
+
+    view
+    |> form("#orders-cash-tender-form", %{
+      "cash_tender_token" => token,
+      "cash_tendered" => "200"
+    })
+    |> render_submit()
+
+    paid = Repo.get!(Espreso.Orders.Order, order.id)
+    assert paid.payment_status == "paid"
+    assert paid.paid_via == "cash"
+    assert paid.status == "preparing"
+    refute has_element?(view, "#orders-cash-tender-modal")
+  end
+
+  test "cancelling Cash tender clears modal state without consuming its permit", %{conn: conn} do
+    order = cash_intent_order!("Cash Cancel", "150")
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    permit = live_assigns(view).mark_paid_permits[order.id]
+    view |> element("#ticket-new-paid-via-cash-#{order.id}") |> render_click()
+    view |> element("#orders-cash-preset-200") |> render_click()
+    view |> element("#orders-cancel-cash") |> render_click()
+
+    refute has_element?(view, "#orders-cash-tender-modal")
+    assert live_assigns(view).cash_tender_order == nil
+    assert live_assigns(view).cash_tendered == ""
+    assert Repo.get!(Espreso.Orders.Order, order.id).payment_status == "unpaid"
+
+    assert PhysicalActionCoordinator.permits(:mark_paid, [order.id]) == %{
+             order.id => permit
+           }
+  end
+
+  test "stale Cash modal rejects an order paid elsewhere and repeated confirmation is inert", %{
+    conn: conn
+  } do
+    order = cash_intent_order!("Stale Cash", "150")
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    view |> element("#ticket-new-paid-via-cash-#{order.id}") |> render_click()
+    token = live_assigns(view).cash_tender_token
+
+    assert {:ok, paid} = Orders.mark_paid(order, paid_via: "cash")
+    _ = :sys.get_state(view.pid)
+
+    params = %{"cash_tender_token" => token, "cash_tendered" => "200"}
+    view |> render_submit("confirm_order_cash_tender", params)
+    view |> render_submit("confirm_order_cash_tender", params)
+
+    assert Repo.get!(Espreso.Orders.Order, order.id).payment_status == "paid"
+    assert Repo.get!(Espreso.Orders.Order, order.id).updated_at == paid.updated_at
+    refute has_element?(view, "#orders-cash-tender-modal")
+    assert has_element?(view, "#orders-flash", "Could not mark order paid.")
+  end
+
+  test "Cash modal refreshes a rotated permit before opening", %{conn: conn} do
+    order = cash_intent_order!("Rotated Cash", "150")
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    stale_permit = live_assigns(view).mark_paid_permits[order.id]
+
+    assert {:ineligible, {:payment_intent_mismatch, "cash", "gcash"}} =
+             PhysicalActionCoordinator.execute_mark_paid(order.id, stale_permit, "gcash")
+
+    fresh_permit =
+      PhysicalActionCoordinator.permits(:mark_paid, [order.id])
+      |> Map.fetch!(order.id)
+
+    refute fresh_permit == stale_permit
+    view |> element("#ticket-new-paid-via-cash-#{order.id}") |> render_click()
+
+    assert has_element?(view, "#orders-cash-tender-modal")
+    assert live_assigns(view).mark_paid_permits[order.id] == fresh_permit
+    assert Repo.get!(Espreso.Orders.Order, order.id).payment_status == "unpaid"
   end
 
   test "rejected payment choice refreshes the permit for a valid retry", %{conn: conn} do
@@ -1193,7 +1387,44 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     end
   end
 
-  test "counter unpaid shows one-tap Cash GCash Maya without modal", %{conn: conn} do
+  test "Cash modal rejects explicit wallets, PayMongo authority, paid, and cancelled orders", %{
+    conn: conn
+  } do
+    set_payments_mode!("paymongo")
+
+    wallet_orders =
+      for wallet <- [:gcash, :maya] do
+        {:ok, order} =
+          Orders.create_order(
+            [%{name: "Wallet", size: nil, quantity: 1, price: Decimal.new("100")}],
+            %{
+              customer_name: "#{wallet} Wallet",
+              fulfillment: :pickup,
+              payment_method: :online,
+              payment_intent: wallet
+            }
+          )
+
+        order
+      end
+
+    paid = cash_intent_order!("Already Paid Cash", "100")
+    assert {:ok, paid} = Orders.mark_paid(paid, paid_via: "cash")
+    cancelled = cash_intent_order!("Cancelled Cash", "100")
+    assert {:ok, cancelled} = Orders.cancel_order(cancelled)
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    for order <- wallet_orders ++ [paid, cancelled] do
+      view
+      |> render_click("open_cash_tender", %{"id" => Integer.to_string(order.id)})
+
+      refute has_element?(view, "#orders-cash-tender-modal")
+      assert has_element?(view, "#orders-flash", "Could not mark order paid.")
+    end
+  end
+
+  test "counter unpaid shows Cash GCash Maya without the generic payment modal", %{conn: conn} do
     {:ok, order} =
       Orders.create_order(
         [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
@@ -1237,6 +1468,28 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
       |> element("#mark-paid-modal-#{paid_via}")
       |> render_click()
     end
+
+    if paid_via == "cash", do: confirm_cash_exact(view)
+  end
+
+  defp confirm_cash_exact(view) do
+    view |> element("#orders-cash-exact") |> render_click()
+    view |> form("#orders-cash-tender-form") |> render_submit()
+  end
+
+  defp cash_intent_order!(customer_name, total) do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Cash Item", size: nil, quantity: 1, price: Decimal.new(total)}],
+        %{
+          customer_name: customer_name,
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_intent: :cash
+        }
+      )
+
+    order
   end
 
   test "notification bell shows new order and mark all read", %{conn: conn} do
@@ -1310,6 +1563,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
            )
 
     view |> element("#ticket-new-paid-via-cash-#{order.id}") |> render_click()
+    confirm_cash_exact(view)
 
     assert [receipt_bytes, drawer_bytes] = Task.await(printer_task, 2_000)
     assert receipt_bytes =~ order.number
@@ -1337,16 +1591,15 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert live_assigns(second_view).mark_paid_permits[order.id] == permit
 
     first_view |> element("#ticket-new-paid-via-cash-#{order.id}") |> render_click()
+    second_view |> element("#ticket-new-paid-via-cash-#{order.id}") |> render_click()
+    assert has_element?(first_view, "#orders-cash-tender-modal")
+    assert has_element?(second_view, "#orders-cash-tender-modal")
+
+    confirm_cash_exact(first_view)
     assert [_receipt, drawer] = Task.await(printer_task, 2_000)
     assert drawer == drawer_kick_bytes()
 
-    second_view
-    |> render_click("mark_paid", %{
-      "id" => to_string(order.id),
-      "action" => "mark_paid",
-      "permit" => permit,
-      "paid_via" => "cash"
-    })
+    confirm_cash_exact(second_view)
 
     assert Process.alive?(second_view.pid)
     assert Repo.get!(Espreso.Orders.Order, order.id).payment_status == "paid"
@@ -1365,6 +1618,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     set_test_printer_port(receipt_port)
     {:ok, view, _html} = live(conn, ~p"/orders")
     view |> element("#ticket-new-paid-via-cash-#{order.id}") |> render_click()
+    confirm_cash_exact(view)
 
     assert [receipt_bytes] = Task.await(receipt_task, 2_000)
     assert receipt_bytes =~ order.number
