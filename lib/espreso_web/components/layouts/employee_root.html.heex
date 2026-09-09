@@ -5,9 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="csrf-token" content={get_csrf_token()} />
     <meta name="description" content="ELIlai Kafe employee operations" />
+    <meta name="theme-color" content="#382010" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="ELIlai Kafe" />
     <.live_title default="ELIlai Kafe" suffix=" · ELIlai Kafe">
       {assigns[:page_title]}
     </.live_title>
+    <link rel="manifest" href={~p"/elilai-kafe.webmanifest"} />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

@@ -24,6 +24,9 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
 
       assert html =~ ~s(data-application="elilai-kafe-employee")
       assert html =~ ~s(class="site-body elilai-kafe-employee-root")
+      assert html =~ ~s(rel="manifest")
+      assert html =~ ~s(href="/elilai-kafe.webmanifest")
+      assert html =~ ~s(name="apple-mobile-web-app-title")
       assert has_element?(view, ".staff-auth-brand-name", "ELIlai Kafe")
     end
   end
@@ -49,6 +52,7 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
 
       assert html =~ ~s(data-application="elilai-kafe-employee")
       assert html =~ ~s(class="site-body elilai-kafe-employee-root")
+      assert html =~ ~s(href="/elilai-kafe.webmanifest")
 
       if path == ~p"/pos" do
         assert has_element?(view, "#staff-pos-rail .staff-pos-rail-wordmark", "ELIlai Kafe")
@@ -78,6 +82,8 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
 
       refute html =~ ~s(data-application="elilai-kafe-employee")
       refute html =~ "elilai-kafe-employee-root"
+      refute html =~ "/elilai-kafe.webmanifest"
+      refute html =~ ~s(name="apple-mobile-web-app-title")
     end
   end
 
