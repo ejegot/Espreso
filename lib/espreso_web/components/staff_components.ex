@@ -93,10 +93,7 @@ defmodule EspresoWeb.StaffComponents do
             >
               {staff_initials(@current_user.name)}
             </div>
-            <.live_component
-              module={EspresoWeb.StaffNotificationsComponent}
-              id="staff-notifications"
-            />
+            <.live_component module={EspresoWeb.StaffNotificationsComponent} id="staff-notifications" />
           </div>
         </aside>
 
@@ -106,24 +103,45 @@ defmodule EspresoWeb.StaffComponents do
         </div>
       <% else %>
         <header class="staff-shell" id="staff-shell">
-          <div class="staff-shell-bar">
-            <div class="staff-shell-brand-block">
-              <p class="staff-shell-brand">CoffeeSpot</p>
-              <div class="staff-shell-heading">
-                <h1 class="staff-shell-title">{@page_title}</h1>
-                <p class="staff-shell-user">
+          <div class={["staff-shell-bar", @current == :orders && "staff-shell-bar--orders"]}>
+            <%= if @current == :orders do %>
+              <div class="staff-shell-heading staff-shell-heading--orders">
+                <h1 class="staff-shell-title staff-shell-orders-title">{@page_title}</h1>
+              </div>
+
+              <p class="staff-shell-brand staff-shell-orders-brand">CoffeeSpot</p>
+
+              <div class="staff-shell-tools-block staff-shell-tools-block--orders">
+                <div class="staff-shell-tools staff-shell-tools--orders">
+                  <.live_component
+                    module={EspresoWeb.StaffNotificationsComponent}
+                    id="staff-notifications"
+                  />
+                  {render_slot(@tools)}
+                </div>
+                <p class="staff-shell-user staff-shell-user--orders">
                   {@current_user.name} · {User.role_label(@current_user.role)}
                 </p>
               </div>
-            </div>
+            <% else %>
+              <div class="staff-shell-brand-block">
+                <p class="staff-shell-brand">CoffeeSpot</p>
+                <div class="staff-shell-heading">
+                  <h1 class="staff-shell-title">{@page_title}</h1>
+                  <p class="staff-shell-user">
+                    {@current_user.name} · {User.role_label(@current_user.role)}
+                  </p>
+                </div>
+              </div>
 
-            <div class="staff-shell-tools">
-              <.live_component
-                module={EspresoWeb.StaffNotificationsComponent}
-                id="staff-notifications"
-              />
-              {render_slot(@tools)}
-            </div>
+              <div class="staff-shell-tools">
+                <.live_component
+                  module={EspresoWeb.StaffNotificationsComponent}
+                  id="staff-notifications"
+                />
+                {render_slot(@tools)}
+              </div>
+            <% end %>
           </div>
 
           <nav class="staff-shell-nav" aria-label="Staff">
@@ -137,10 +155,7 @@ defmodule EspresoWeb.StaffComponents do
               {item.label}
             </.link>
 
-            <details
-              class={["staff-shell-more", @more_active? && "is-active"]}
-              id="staff-shell-more"
-            >
+            <details class={["staff-shell-more", @more_active? && "is-active"]} id="staff-shell-more">
               <summary class="staff-shell-more-summary" id="staff-nav-more">More</summary>
               <div class="staff-shell-more-panel" role="menu" aria-label="More staff tools">
                 <.link

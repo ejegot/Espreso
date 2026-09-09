@@ -6892,13 +6892,17 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-orders-refresh {
-  width: 2.5rem;
-  min-width: 2.5rem;
-  min-height: 2.5rem;
+  width: 2.35rem;
+  min-width: 2.35rem;
+  min-height: 2.35rem;
   padding: 0;
   opacity: 0.55;
-  font-size: 0.95rem;
   font-weight: 500;
+}
+
+.staff-orders-refresh-icon {
+  width: 1.15rem;
+  height: 1.15rem;
 }
 
 .staff-orders-refresh:hover,
@@ -7261,6 +7265,67 @@ a.staff-home-card:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
+}
+
+.staff-shell-bar--orders {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  min-height: 3.4rem;
+  padding-block: 0.45rem 0.3rem;
+}
+
+.staff-shell-heading--orders {
+  align-self: center;
+  justify-self: start;
+}
+
+.staff-shell-orders-brand {
+  align-self: center;
+  justify-self: center;
+  color: var(--cs-brown);
+  font-size: 0.86rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.staff-shell-tools-block--orders {
+  min-width: 0;
+  justify-self: end;
+}
+
+.staff-shell-tools--orders {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.staff-shell-user--orders {
+  margin-top: 0.22rem;
+  padding-right: 0.1rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.staff-shell-tools--orders .staff-notif {
+  order: 4;
+  margin-left: 0.18rem;
+  padding-left: 0.55rem;
+  border-left: 1px solid var(--cs-line);
+}
+
+.staff-shell-tools--orders .staff-notif-bell {
+  width: 2.35rem;
+  height: 2.35rem;
+  min-width: 2.35rem;
+  min-height: 2.35rem;
+  border-radius: 0.55rem;
+}
+
+.staff-shell-tools--orders .staff-notif-bell svg {
+  width: 1.3rem;
+  height: 1.3rem;
+  stroke-width: 1.8;
 }
 
 .staff-notif {
@@ -8341,19 +8406,57 @@ a.staff-home-card:focus-visible {
   color: var(--cs-brown);
 }
 
-.staff-orders-page .staff-orders-unpaid-toggle-count {
+.staff-orders-header-tool {
+  position: relative;
+  min-height: 2.35rem;
+  padding-inline: 0.8rem;
+  border-radius: 0.5rem;
+  font-size: 0.76rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.staff-orders-header-tool--new {
+  order: 1;
+  border-color: color-mix(in srgb, var(--cs-orange) 24%, var(--cs-line));
+  background: color-mix(in srgb, var(--cs-orange) 5%, #fff);
+}
+
+.staff-orders-unpaid-toggle {
+  order: 2;
+}
+
+.staff-orders-reconciliation-toggle {
+  order: 3;
+}
+
+.staff-orders-header-icon {
+  order: 5;
+}
+
+.staff-orders-tool-badge {
+  position: absolute;
+  top: -0.38rem;
+  right: -0.38rem;
   display: inline-flex;
-  min-width: 1.15rem;
-  height: 1.15rem;
+  min-width: 1.12rem;
+  height: 1.12rem;
   align-items: center;
   justify-content: center;
-  margin-left: 0.12rem;
-  padding: 0 0.25rem;
+  padding: 0 0.28rem;
+  border: 2px solid #fff;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--cs-brown) 10%, #fff);
-  color: var(--cs-brown);
-  font-size: 0.7rem;
+  background: var(--cs-orange);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(56, 32, 16, 0.18);
+  font-size: 0.62rem;
   font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.staff-orders-tool-badge--unpaid {
+  background: var(--cs-brown);
 }
 
 .staff-orders-page .staff-orders-drawer-backdrop {
@@ -8605,11 +8708,11 @@ a.staff-home-card:focus-visible {
 
 /* Orders utilities remain available without competing with the New signal. */
 .staff-app:has(.staff-orders-shell-root) .staff-notif-bell {
-  width: 2.5rem;
-  height: 2.5rem;
-  min-width: 2.5rem;
-  min-height: 2.5rem;
-  border-color: transparent;
+  width: 2.35rem;
+  height: 2.35rem;
+  min-width: 2.35rem;
+  min-height: 2.35rem;
+  border-color: var(--cs-line);
   color: color-mix(in srgb, var(--cs-brown) 62%, var(--cs-beige));
 }
 
@@ -8618,7 +8721,46 @@ a.staff-home-card:focus-visible {
   color: var(--cs-brown);
 }
 
+@media (max-width: 760px) {
+  .staff-shell-bar--orders {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.35rem 0.55rem;
+  }
+
+  .staff-shell-orders-brand {
+    grid-row: 1;
+    grid-column: 1 / -1;
+  }
+
+  .staff-shell-heading--orders {
+    grid-row: 2;
+    grid-column: 1;
+  }
+
+  .staff-shell-tools-block--orders {
+    grid-row: 2;
+    grid-column: 2;
+  }
+}
+
 @media (max-width: 430px) {
+  .staff-shell-tools--orders {
+    gap: 0.28rem;
+  }
+
+  .staff-orders-header-tool {
+    padding-inline: 0.55rem;
+  }
+
+  .staff-shell-tools--orders .staff-notif {
+    margin-left: 0.08rem;
+    padding-left: 0.35rem;
+  }
+
+  .staff-shell-user--orders {
+    font-size: 0.62rem;
+  }
+
   .staff-orders-page .staff-orders-unpaid-drawer {
     width: min(21rem, 92vw);
   }

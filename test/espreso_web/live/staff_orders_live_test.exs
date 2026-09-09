@@ -27,6 +27,41 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     %{conn: conn, barista: barista}
   end
 
+  test "Orders header centers CoffeeSpot and overlays actionable counts", %{
+    conn: conn,
+    barista: barista
+  } do
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    assert has_element?(view, "#staff-shell .staff-shell-bar--orders")
+    assert has_element?(view, ".staff-shell-orders-title", "Orders")
+    assert has_element?(view, ".staff-shell-orders-brand", "CoffeeSpot")
+
+    assert has_element?(
+             view,
+             ".staff-shell-tools-block--orders .staff-shell-user--orders",
+             "#{barista.name} · Staff"
+           )
+
+    assert has_element?(view, "#orders-new-header-link[href='#orders-new']", "New")
+    assert has_element?(view, "#unpaid-drawer-toggle", "Unpaid")
+    assert has_element?(view, "#staff-notif-toggle svg")
+    assert has_element?(view, "#orders-refresh .staff-orders-refresh-icon")
+    refute has_element?(view, "#orders-new-header-count")
+    refute has_element?(view, "#orders-unpaid-header-count")
+
+    {:ok, _order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Header Count", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    _ = :sys.get_state(view.pid)
+
+    assert has_element?(view, "#orders-new-header-count.staff-orders-tool-badge", "1")
+    assert has_element?(view, "#orders-unpaid-header-count.staff-orders-tool-badge", "1")
+  end
+
   test "new unpaid ticket shows Cash GCash Maya; Prepare waits for payment", %{
     conn: conn
   } do

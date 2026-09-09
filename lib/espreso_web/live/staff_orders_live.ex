@@ -477,18 +477,38 @@ defmodule EspresoWeb.StaffOrdersLive do
     ~H"""
     <.staff_shell current={:orders} current_user={@current_user} page_title="Orders">
       <:tools>
-        <span class="staff-orders-kds-pill staff-orders-kds-pill--new" aria-label="New order count">
-          New {length(@received_orders)}
-        </span>
+        <a
+          href="#orders-new"
+          class="staff-shell-tool staff-orders-header-tool staff-orders-header-tool--new"
+          id="orders-new-header-link"
+          aria-label={"New orders: #{length(@received_orders)}"}
+        >
+          <span>New</span>
+          <span
+            :if={@received_orders != []}
+            class="staff-orders-tool-badge staff-orders-tool-badge--new"
+            id="orders-new-header-count"
+          >
+            {length(@received_orders)}
+          </span>
+        </a>
         <button
           type="button"
-          class="staff-shell-tool staff-orders-unpaid-toggle"
+          class="staff-shell-tool staff-orders-header-tool staff-orders-unpaid-toggle"
           id="unpaid-drawer-toggle"
           phx-click="toggle_unpaid_drawer"
           aria-expanded={to_string(@unpaid_drawer_open)}
           aria-controls="unpaid-orders"
+          aria-label={"Unpaid orders: #{length(@unpaid_orders)}"}
         >
-          Unpaid <span class="staff-orders-unpaid-toggle-count">{length(@unpaid_orders)}</span>
+          <span>Unpaid</span>
+          <span
+            :if={@unpaid_orders != []}
+            class="staff-orders-tool-badge staff-orders-tool-badge--unpaid"
+            id="orders-unpaid-header-count"
+          >
+            {length(@unpaid_orders)}
+          </span>
         </button>
         <button
           :if={@paymongo_reconciliations != []}
@@ -506,13 +526,13 @@ defmodule EspresoWeb.StaffOrdersLive do
         </button>
         <button
           type="button"
-          class="staff-shell-tool staff-shell-tool--quiet staff-orders-refresh"
+          class="staff-shell-tool staff-shell-tool--quiet staff-orders-header-icon staff-orders-refresh"
           id="orders-refresh"
           phx-click="refresh"
           title="Refresh board"
           aria-label="Refresh board"
         >
-          ↻
+          <.icon name="hero-arrow-path" class="staff-orders-refresh-icon" />
         </button>
       </:tools>
 
