@@ -2,6 +2,7 @@ defmodule Espreso.Orders.Order do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias Espreso.Accounts.User
   alias Espreso.Orders.OrderItem
 
   @statuses ~w(received preparing ready completed cancelled)
@@ -11,6 +12,7 @@ defmodule Espreso.Orders.Order do
   @payment_intents ~w(cash gcash maya)
   @fulfillments ~w(dine_in pickup)
   @sources ~w(customer pos)
+  @settlement_sources ~w(pos staff_orders api paymongo manual legacy)
 
   schema "orders" do
     field :number, :string
@@ -26,8 +28,14 @@ defmodule Espreso.Orders.Order do
     field :source, :string, default: "customer"
     field :paymongo_checkout_session_id, :string
     field :total, :decimal
+    field :settled_at, :utc_datetime
+    field :settlement_source, :string
+    field :cash_tendered, :decimal
+    field :change_due, :decimal
+    field :settlement_time_estimated, :boolean, default: false
 
     has_many :items, OrderItem
+    belongs_to :settled_by_user, User
 
     timestamps(type: :utc_datetime)
   end
@@ -39,6 +47,7 @@ defmodule Espreso.Orders.Order do
   def payment_intents, do: @payment_intents
   def fulfillments, do: @fulfillments
   def sources, do: @sources
+  def settlement_sources, do: @settlement_sources
 
   def changeset(order, attrs) do
     order
@@ -55,7 +64,13 @@ defmodule Espreso.Orders.Order do
       :payment_intent,
       :source,
       :paymongo_checkout_session_id,
-      :total
+      :total,
+      :settled_at,
+      :settled_by_user_id,
+      :settlement_source,
+      :cash_tendered,
+      :change_due,
+      :settlement_time_estimated
     ])
     |> validate_required([
       :customer_name,
@@ -75,9 +90,17 @@ defmodule Espreso.Orders.Order do
     |> validate_paid_via()
     |> validate_payment_intent()
     |> validate_inclusion(:source, @sources)
+    |> validate_inclusion(:settlement_source, @settlement_sources)
     |> validate_fulfillment_table()
     |> validate_number(:total, greater_than_or_equal_to: 0)
+    |> validate_number(:cash_tendered, greater_than_or_equal_to: 0)
+    |> validate_number(:change_due, greater_than_or_equal_to: 0)
     |> unique_constraint(:number)
+    |> foreign_key_constraint(:settled_by_user_id)
+    |> check_constraint(:settled_at, name: :paid_orders_have_settlement_time)
+    |> check_constraint(:settlement_source, name: :paid_orders_have_settlement_source)
+    |> check_constraint(:cash_tendered, name: :cash_tendered_is_nonnegative)
+    |> check_constraint(:change_due, name: :change_due_is_nonnegative)
   end
 
   def status_changeset(order, status) when status in @statuses do

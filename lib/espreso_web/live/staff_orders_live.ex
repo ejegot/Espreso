@@ -283,10 +283,15 @@ defmodule EspresoWeb.StaffOrdersLive do
       ) do
     paid_via = Map.get(params, "paid_via", "counter")
 
+    settlement_opts =
+      [
+        staff_name: socket.assigns.current_user.name,
+        settled_by_user_id: socket.assigns.current_user.id,
+        settlement_source: "staff_orders"
+      ] ++ cash_settlement_opts(params, paid_via)
+
     result =
-      PhysicalActionCoordinator.execute_mark_paid(id, permit, paid_via,
-        staff_name: socket.assigns.current_user.name
-      )
+      PhysicalActionCoordinator.execute_mark_paid(id, permit, paid_via, settlement_opts)
 
     case result do
       {:ok, :transitioned, paid, physical_result} ->
@@ -1524,6 +1529,11 @@ defmodule EspresoWeb.StaffOrdersLive do
   defp recoverable_payment_choice_error?(:invalid_paid_via), do: true
   defp recoverable_payment_choice_error?(:paymongo_authority_required), do: true
   defp recoverable_payment_choice_error?(:payment_channel_mismatch), do: true
+  defp recoverable_payment_choice_error?(:invalid_settlement_source), do: true
+  defp recoverable_payment_choice_error?(:invalid_settled_by_user), do: true
+  defp recoverable_payment_choice_error?(:invalid_cash_tendered), do: true
+  defp recoverable_payment_choice_error?(:cash_tender_too_low), do: true
+  defp recoverable_payment_choice_error?(:cash_metadata_not_applicable), do: true
 
   defp recoverable_payment_choice_error?({
          :payment_intent_mismatch,
@@ -1540,7 +1550,7 @@ defmodule EspresoWeb.StaffOrdersLive do
 
     with %Espreso.Orders.Order{} = order <- Repo.get(Espreso.Orders.Order, order_id),
          true <- cash_payment_action?(order),
-         {:ok, _tendered, _change} <-
+         {:ok, tendered, _change} <-
            valid_cash_tender(socket.assigns.cash_tendered, order.total),
          permit when is_binary(permit) <- Map.get(socket.assigns.mark_paid_permits, order.id) do
       socket
@@ -1552,7 +1562,8 @@ defmodule EspresoWeb.StaffOrdersLive do
             "id" => Integer.to_string(order.id),
             "action" => "mark_paid",
             "permit" => permit,
-            "paid_via" => "cash"
+            "paid_via" => "cash",
+            "cash_tendered" => Decimal.to_string(tendered, :normal)
           },
           &1
         )
@@ -1577,6 +1588,12 @@ defmodule EspresoWeb.StaffOrdersLive do
     |> assign(:cash_tender_error, nil)
     |> assign(:cash_tender_token, nil)
   end
+
+  defp cash_settlement_opts(%{"cash_tendered" => tendered}, paid_via)
+       when paid_via in ["cash", "counter"],
+       do: [cash_tendered: tendered]
+
+  defp cash_settlement_opts(_params, _paid_via), do: []
 
   defp valid_cash_tender(amount, total) do
     case cash_tender_state(amount, total) do

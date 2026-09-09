@@ -3,7 +3,7 @@ defmodule Espreso.OrdersTest do
 
   import Ecto.Query
 
-  alias Espreso.Orders
+  alias Espreso.{Accounts, Orders}
   alias Espreso.Orders.Order
   alias Espreso.Repo
 
@@ -31,6 +31,8 @@ defmodule Espreso.OrdersTest do
     assert order.payment_status == "unpaid"
     assert order.status == "received"
     assert order.source == "customer"
+    assert order.settled_at == nil
+    assert order.settlement_source == nil
     assert Decimal.equal?(order.total, Decimal.new("315"))
     assert length(order.items) == 2
   end
@@ -242,6 +244,67 @@ defmodule Espreso.OrdersTest do
     assert paid.paid_via == "maya"
   end
 
+  test "mark_paid atomically records settlement actor, source, cash, and computed change" do
+    {:ok, cashier} =
+      Accounts.register_user(%{
+        name: "Settlement Cashier",
+        email: "settlement-#{System.unique_integer([:positive])}@test.local",
+        password: "password123",
+        role: "barista"
+      })
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Metadata", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    assert {:ok, paid} =
+             Orders.mark_paid(order,
+               paid_via: "cash",
+               settled_by_user_id: cashier.id,
+               settlement_source: "staff_orders",
+               cash_tendered: Decimal.new("100")
+             )
+
+    assert %DateTime{} = paid.settled_at
+    assert paid.settled_by_user_id == cashier.id
+    assert paid.settlement_source == "staff_orders"
+    assert paid.settlement_time_estimated == false
+    assert Decimal.equal?(paid.cash_tendered, Decimal.new("100"))
+    assert Decimal.equal?(paid.change_due, Decimal.new("25"))
+
+    assert {:ok, same} =
+             Orders.mark_paid(paid,
+               paid_via: "cash",
+               settlement_source: "api",
+               cash_tendered: Decimal.new("200")
+             )
+
+    assert same.settlement_source == "staff_orders"
+    assert Decimal.equal?(same.cash_tendered, Decimal.new("100"))
+    assert Decimal.equal?(same.change_due, Decimal.new("25"))
+  end
+
+  test "mark_paid rejects insufficient cash metadata without settling" do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Short Cash", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    assert {:error, :cash_tender_too_low} =
+             Orders.mark_paid(order,
+               paid_via: "cash",
+               settlement_source: "staff_orders",
+               cash_tendered: Decimal.new("50")
+             )
+
+    reloaded = Repo.get!(Order, order.id)
+    assert reloaded.payment_status == "unpaid"
+    assert reloaded.settled_at == nil
+  end
+
   test "mark_paid is idempotent when already paid" do
     lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
 
@@ -323,6 +386,9 @@ defmodule Espreso.OrdersTest do
     assert {:ok, paid} = Orders.mark_paid_from_paymongo(order.number)
     assert paid.payment_status == "paid"
     assert paid.payment_method == "online"
+    assert %DateTime{} = paid.settled_at
+    assert paid.settlement_source == "paymongo"
+    assert paid.settled_by_user_id == nil
 
     assert {:ok, again} = Orders.mark_paid(paid)
     assert again.payment_status == "paid"
@@ -652,6 +718,9 @@ defmodule Espreso.OrdersTest do
     assert paid.payment_status == "paid"
     assert paid.source == "pos"
     assert paid.status == "preparing"
+    assert %DateTime{} = paid.settled_at
+    assert paid.settlement_source == "pos"
+    assert paid.settlement_time_estimated == false
 
     assert {:ok, online} =
              Orders.create_order(lines, %{
@@ -1176,7 +1245,7 @@ defmodule Espreso.OrdersTest do
     {1, _} =
       Espreso.Repo.update_all(
         from(o in Espreso.Orders.Order, where: o.id == ^yesterday_paid.id),
-        set: [inserted_at: yesterday, updated_at: yesterday]
+        set: [inserted_at: yesterday, settled_at: yesterday, updated_at: yesterday]
       )
 
     sales = Orders.sales_overview()
@@ -1232,7 +1301,7 @@ defmodule Espreso.OrdersTest do
     {1, _} =
       Espreso.Repo.update_all(
         from(o in Espreso.Orders.Order, where: o.id == ^yesterday_paid.id),
-        set: [inserted_at: yesterday, updated_at: yesterday]
+        set: [inserted_at: yesterday, settled_at: yesterday, updated_at: yesterday]
       )
 
     popular = Orders.popular_products()
@@ -1309,19 +1378,19 @@ defmodule Espreso.OrdersTest do
     {1, _} =
       Espreso.Repo.update_all(
         from(o in Espreso.Orders.Order, where: o.id == ^paid_mid.id),
-        set: [inserted_at: mid_window, updated_at: mid_window]
+        set: [inserted_at: mid_window, settled_at: mid_window, updated_at: mid_window]
       )
 
     {1, _} =
       Espreso.Repo.update_all(
         from(o in Espreso.Orders.Order, where: o.id == ^paid_edge.id),
-        set: [inserted_at: edge_window, updated_at: edge_window]
+        set: [inserted_at: edge_window, settled_at: edge_window, updated_at: edge_window]
       )
 
     {1, _} =
       Espreso.Repo.update_all(
         from(o in Espreso.Orders.Order, where: o.id == ^paid_old.id),
-        set: [inserted_at: too_old, updated_at: too_old]
+        set: [inserted_at: too_old, settled_at: too_old, updated_at: too_old]
       )
 
     reports = Orders.reports_overview()
@@ -1389,13 +1458,21 @@ defmodule Espreso.OrdersTest do
     {1, _} =
       Espreso.Repo.update_all(
         from(o in Espreso.Orders.Order, where: o.id == ^today_paid.id),
-        set: [inserted_at: after_manila_midnight, updated_at: after_manila_midnight]
+        set: [
+          inserted_at: after_manila_midnight,
+          settled_at: after_manila_midnight,
+          updated_at: after_manila_midnight
+        ]
       )
 
     {1, _} =
       Espreso.Repo.update_all(
         from(o in Espreso.Orders.Order, where: o.id == ^previous_paid.id),
-        set: [inserted_at: before_manila_midnight, updated_at: before_manila_midnight]
+        set: [
+          inserted_at: before_manila_midnight,
+          settled_at: before_manila_midnight,
+          updated_at: before_manila_midnight
+        ]
       )
 
     todays = Orders.list_todays_orders()

@@ -27,7 +27,7 @@ defmodule EspresoWeb.Api.V1.OrderController do
 
   def create(conn, params) do
     with {:ok, lines} <- build_lines(params["lines"] || []),
-         {:ok, attrs} <- build_create_attrs(params),
+         {:ok, attrs} <- build_create_attrs(params, conn.assigns.current_user.id),
          {:ok, order} <- Orders.create_order(lines, attrs) do
       conn
       |> put_status(:created)
@@ -49,9 +49,17 @@ defmodule EspresoWeb.Api.V1.OrderController do
   def mark_paid(conn, %{"id" => id} = params) do
     paid_via = Map.get(params, "paid_via", "counter")
 
+    settlement_opts =
+      [
+        paid_via: paid_via,
+        settled_by_user_id: conn.assigns.current_user.id,
+        settlement_source: "api"
+      ]
+      |> maybe_put_cash_tendered(params)
+
     with {:ok, id} <- parse_id(id),
          {:ok, order} <- Orders.get_order_for_api(id),
-         {:ok, paid} <- Orders.mark_paid(order, paid_via: paid_via),
+         {:ok, paid} <- Orders.mark_paid(order, settlement_opts),
          {:ok, paid} <- Orders.get_order_for_api(paid.id) do
       json(conn, %{order: JSON.order(paid)})
     end
@@ -66,21 +74,33 @@ defmodule EspresoWeb.Api.V1.OrderController do
     end
   end
 
-  defp build_create_attrs(params) do
+  defp build_create_attrs(params, user_id) do
     customer_name = params["customer_name"] || "Walk-in"
     payment_status = params["payment_status"] || "unpaid"
 
-    attrs = %{
-      customer_name: customer_name,
-      fulfillment: :pickup,
-      payment_method: :counter,
-      payment_status: payment_status,
-      source: :pos,
-      notes: blank_to_nil(params["notes"])
-    }
+    attrs =
+      %{
+        customer_name: customer_name,
+        fulfillment: :pickup,
+        payment_method: :counter,
+        payment_status: payment_status,
+        source: :pos,
+        settled_by_user_id: user_id,
+        settlement_source: :api,
+        notes: blank_to_nil(params["notes"])
+      }
+      |> maybe_put_cash_tendered(params)
 
     {:ok, attrs}
   end
+
+  defp maybe_put_cash_tendered(attrs, %{"cash_tendered" => cash_tendered}) when is_list(attrs),
+    do: Keyword.put(attrs, :cash_tendered, cash_tendered)
+
+  defp maybe_put_cash_tendered(attrs, %{"cash_tendered" => cash_tendered}) when is_map(attrs),
+    do: Map.put(attrs, :cash_tendered, cash_tendered)
+
+  defp maybe_put_cash_tendered(attrs, _params), do: attrs
 
   defp build_lines(lines) when is_list(lines) do
     menu = Menu.list_menu()

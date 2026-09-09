@@ -60,7 +60,7 @@ defmodule Espreso.Printer.Receipt do
           EscPos.size_normal(),
           EscPos.columns(Orders.paid_via_label(paid_via), money(order.total))
         ] ++
-        cash_change_lines(opts) ++
+        cash_change_lines(order, opts) ++
         [
           EscPos.bold_off(),
           EscPos.feed(1),
@@ -121,9 +121,9 @@ defmodule Espreso.Printer.Receipt do
     )
   end
 
-  defp cash_change_lines(opts) do
-    tendered = Keyword.get(opts, :cash_tendered)
-    change = Keyword.get(opts, :change)
+  defp cash_change_lines(order, opts) do
+    tendered = Keyword.get(opts, :cash_tendered) || order.cash_tendered
+    change = Keyword.get(opts, :change) || order.change_due
 
     if match?(%Decimal{}, tendered) and match?(%Decimal{}, change) do
       [
@@ -200,6 +200,9 @@ defmodule Espreso.Printer.Receipt do
   defp fulfillment_line(%{fulfillment: "dine_in"}), do: "Dine-in"
   defp fulfillment_line(_), do: "Takeout"
 
+  defp timestamp_line(%{settled_at: %DateTime{} = at}), do: format_shop_timestamp(at)
+  defp timestamp_line(%{inserted_at: %DateTime{} = at}), do: format_shop_timestamp(at)
+
   defp timestamp_line(%{inserted_at: %NaiveDateTime{} = at}) do
     hour12 = rem(at.hour + 11, 12) + 1
     ampm = if at.hour >= 12, do: "PM", else: "AM"
@@ -208,6 +211,12 @@ defmodule Espreso.Printer.Receipt do
   end
 
   defp timestamp_line(_), do: timestamp_line(%{inserted_at: NaiveDateTime.local_now()})
+
+  defp format_shop_timestamp(%DateTime{} = at) do
+    at
+    |> DateTime.add(8 * 60 * 60, :second)
+    |> then(&timestamp_line(%{inserted_at: DateTime.to_naive(&1)}))
+  end
 
   defp item_lines(item) do
     size = if item.size in [nil, ""], do: "", else: " #{item.size}"
@@ -269,6 +278,7 @@ defmodule Espreso.Printer.Receipt do
   end
 
   defp blank_to_nil(nil), do: nil
+
   defp blank_to_nil(name) when is_binary(name) do
     trimmed = String.trim(name)
     if trimmed == "", do: nil, else: trimmed

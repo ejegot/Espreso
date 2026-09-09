@@ -114,61 +114,68 @@ defmodule Espreso.Orders do
         Decimal.add(acc, Decimal.mult(line.price, line.quantity))
       end)
 
-    order_attrs = %{
-      number: generate_order_number(),
-      customer_name: Map.get(attrs, :customer_name) || Map.get(attrs, "customer_name"),
-      fulfillment: fulfillment,
-      table_number: Map.get(attrs, :table_number) || Map.get(attrs, "table_number"),
-      notes: blank_to_nil(Map.get(attrs, :notes) || Map.get(attrs, "notes")),
-      payment_method: payment_method,
-      payment_status: payment_status,
-      paid_via: paid_via,
-      payment_intent: payment_intent,
-      source: source,
-      status: if(payment_status == "paid", do: "preparing", else: "received"),
-      total: total
-    }
+    with {:ok, settlement_attrs} <-
+           build_settlement_attrs(payment_status, paid_via, total, attrs,
+             default_source: if(source == "pos", do: "pos", else: "manual")
+           ) do
+      order_attrs =
+        %{
+          number: generate_order_number(),
+          customer_name: Map.get(attrs, :customer_name) || Map.get(attrs, "customer_name"),
+          fulfillment: fulfillment,
+          table_number: Map.get(attrs, :table_number) || Map.get(attrs, "table_number"),
+          notes: blank_to_nil(Map.get(attrs, :notes) || Map.get(attrs, "notes")),
+          payment_method: payment_method,
+          payment_status: payment_status,
+          paid_via: paid_via,
+          payment_intent: payment_intent,
+          source: source,
+          status: if(payment_status == "paid", do: "preparing", else: "received"),
+          total: total
+        }
+        |> Map.merge(settlement_attrs)
 
-    Ecto.Multi.new()
-    |> Ecto.Multi.run(:prices, fn repo, _changes ->
-      validate_authoritative_prices(repo, lines, source)
-    end)
-    |> Ecto.Multi.insert(:order, Order.changeset(%Order{}, order_attrs))
-    |> Ecto.Multi.run(:items, fn repo, %{order: order} ->
-      items =
-        Enum.map(lines, fn line ->
-          qty = line.quantity
-          unit = line.price
-          line_total = Decimal.mult(unit, qty)
+      Ecto.Multi.new()
+      |> Ecto.Multi.run(:prices, fn repo, _changes ->
+        validate_authoritative_prices(repo, lines, source)
+      end)
+      |> Ecto.Multi.insert(:order, Order.changeset(%Order{}, order_attrs))
+      |> Ecto.Multi.run(:items, fn repo, %{order: order} ->
+        items =
+          Enum.map(lines, fn line ->
+            qty = line.quantity
+            unit = line.price
+            line_total = Decimal.mult(unit, qty)
 
-          %OrderItem{}
-          |> OrderItem.changeset(%{
-            order_id: order.id,
-            name: line.name,
-            size: blank_to_nil(Map.get(line, :size)),
-            quantity: qty,
-            unit_price: unit,
-            line_total: line_total
-          })
-          |> repo.insert!()
-        end)
+            %OrderItem{}
+            |> OrderItem.changeset(%{
+              order_id: order.id,
+              name: line.name,
+              size: blank_to_nil(Map.get(line, :size)),
+              quantity: qty,
+              unit_price: unit,
+              line_total: line_total
+            })
+            |> repo.insert!()
+          end)
 
-      {:ok, items}
-    end)
-    |> Repo.transaction()
-    |> case do
-      {:ok, %{order: order, items: items}} ->
-        broadcast({:ok, %{order | items: items}})
+        {:ok, items}
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{order: order, items: items}} ->
+          broadcast({:ok, %{order | items: items}})
 
-      {:error, :order, changeset, _} ->
-        if unique_number_conflict?(changeset) and attempt < @order_number_max_attempts do
-          do_create_order(lines, attrs, attempt + 1)
-        else
-          {:error, changeset}
-        end
+        {:error, :order, changeset, _} ->
+          if unique_number_conflict?(changeset) and attempt < @order_number_max_attempts do
+            do_create_order(lines, attrs, attempt + 1)
+          else
+            {:error, changeset}
+          end
 
-      {:error, _step, reason, _} ->
-        {:error, reason}
+        {:error, _step, reason, _} ->
+          {:error, reason}
+      end
     end
   end
 
@@ -336,7 +343,9 @@ defmodule Espreso.Orders do
     end
   end
 
-  defp cancel_order_for_api(%Order{payment_method: "online", paymongo_checkout_session_id: session_id} = order)
+  defp cancel_order_for_api(
+         %Order{payment_method: "online", paymongo_checkout_session_id: session_id} = order
+       )
        when is_binary(session_id) and session_id != "" do
     abandon_online_payment(order)
   end
@@ -420,7 +429,7 @@ defmodule Espreso.Orders do
 
     rows =
       from(o in Order,
-        where: o.payment_status == "paid" and o.inserted_at >= ^today_start,
+        where: o.payment_status == "paid" and o.settled_at >= ^today_start,
         group_by: o.paid_via,
         select: {o.paid_via, count(o.id), sum(o.total)}
       )
@@ -495,7 +504,7 @@ defmodule Espreso.Orders do
 
     paid_period =
       Order
-      |> where([o], o.payment_status == "paid" and o.inserted_at >= ^period_start)
+      |> where([o], o.payment_status == "paid" and o.settled_at >= ^period_start)
 
     total = Repo.aggregate(paid_period, :sum, :total) || Decimal.new("0")
     count = Repo.aggregate(paid_period, :count, :id)
@@ -522,7 +531,7 @@ defmodule Espreso.Orders do
 
     from(i in OrderItem,
       join: o in assoc(i, :order),
-      where: o.payment_status == "paid" and o.inserted_at >= ^today_start,
+      where: o.payment_status == "paid" and o.settled_at >= ^today_start,
       group_by: i.name,
       order_by: [desc: sum(i.quantity), asc: i.name],
       limit: ^limit,
@@ -716,7 +725,7 @@ defmodule Espreso.Orders do
 
       %Order{payment_method: "online", payment_status: "awaiting_payment"} = current ->
         if BusinessSettings.qrph_manual?() do
-          apply_paid(current, paid_via, :manual)
+          apply_paid(current, paid_via, :manual, opts)
         else
           {:error, :online_payment_required}
         end
@@ -725,7 +734,7 @@ defmodule Espreso.Orders do
         {:error, :online_payment_required}
 
       %Order{} = current ->
-        apply_paid(current, paid_via, :manual)
+        apply_paid(current, paid_via, :manual, opts)
     end
   end
 
@@ -770,7 +779,8 @@ defmodule Espreso.Orders do
         {:error, :not_found}
 
       %Order{} = order ->
-        apply_paid(order, "paymongo", :paymongo) |> collapse_paid_transition()
+        apply_paid(order, "paymongo", :paymongo, settlement_source: "paymongo")
+        |> collapse_paid_transition()
     end
   end
 
@@ -781,8 +791,12 @@ defmodule Espreso.Orders do
   """
   def mark_paid_from_paymongo_session(session_id) when is_binary(session_id) do
     case Repo.get_by(Order, paymongo_checkout_session_id: session_id) do
-      nil -> {:error, :not_found}
-      %Order{} = order -> apply_paid(order, "paymongo", :paymongo) |> collapse_paid_transition()
+      nil ->
+        {:error, :not_found}
+
+      %Order{} = order ->
+        apply_paid(order, "paymongo", :paymongo, settlement_source: "paymongo")
+        |> collapse_paid_transition()
     end
   end
 
@@ -1047,6 +1061,99 @@ defmodule Espreso.Orders do
 
   defp normalize_payment_intent(_), do: nil
 
+  defp build_settlement_attrs(status, _paid_via, _total, _attrs, _opts)
+       when status != "paid",
+       do: {:ok, %{}}
+
+  defp build_settlement_attrs("paid", paid_via, total, attrs, opts) do
+    default_source = Keyword.fetch!(opts, :default_source)
+
+    with {:ok, source} <-
+           normalize_settlement_source(
+             settlement_value(attrs, :settlement_source),
+             default_source
+           ),
+         {:ok, user_id} <-
+           normalize_settled_by_user_id(settlement_value(attrs, :settled_by_user_id)),
+         {:ok, cash_tendered, change_due} <-
+           normalize_cash_settlement(
+             paid_via,
+             settlement_value(attrs, :cash_tendered),
+             total
+           ) do
+      {:ok,
+       %{
+         settled_at: DateTime.utc_now() |> DateTime.truncate(:second),
+         settled_by_user_id: user_id,
+         settlement_source: source,
+         cash_tendered: cash_tendered,
+         change_due: change_due,
+         settlement_time_estimated: false
+       }}
+    end
+  end
+
+  defp settlement_value(attrs, key) when is_list(attrs), do: Keyword.get(attrs, key)
+
+  defp settlement_value(attrs, key) when is_map(attrs) do
+    case Map.fetch(attrs, key) do
+      {:ok, value} -> value
+      :error -> Map.get(attrs, Atom.to_string(key))
+    end
+  end
+
+  defp settlement_value(_, _), do: nil
+
+  defp normalize_settlement_source(nil, default), do: normalize_settlement_source(default, nil)
+
+  defp normalize_settlement_source(source, _default) when is_atom(source),
+    do: source |> Atom.to_string() |> normalize_settlement_source(nil)
+
+  defp normalize_settlement_source(source, _default)
+       when source in ["pos", "staff_orders", "api", "paymongo", "manual", "legacy"],
+       do: {:ok, source}
+
+  defp normalize_settlement_source(_, _), do: {:error, :invalid_settlement_source}
+
+  defp normalize_settled_by_user_id(nil), do: {:ok, nil}
+  defp normalize_settled_by_user_id(id) when is_integer(id) and id > 0, do: {:ok, id}
+  defp normalize_settled_by_user_id(_), do: {:error, :invalid_settled_by_user}
+
+  defp normalize_cash_settlement(paid_via, nil, _total)
+       when paid_via in ["cash", "counter"],
+       do: {:ok, nil, nil}
+
+  defp normalize_cash_settlement(paid_via, cash_tendered, total)
+       when paid_via in ["cash", "counter"] do
+    with {:ok, cash_tendered} <- normalize_money(cash_tendered),
+         true <- Decimal.compare(cash_tendered, total) in [:eq, :gt] do
+      {:ok, cash_tendered, Decimal.sub(cash_tendered, total) |> Decimal.round(2)}
+    else
+      false -> {:error, :cash_tender_too_low}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp normalize_cash_settlement(_paid_via, nil, _total), do: {:ok, nil, nil}
+
+  defp normalize_cash_settlement(_paid_via, _cash_tendered, _total),
+    do: {:error, :cash_metadata_not_applicable}
+
+  defp normalize_money(%Decimal{} = value), do: {:ok, Decimal.round(value, 2)}
+  defp normalize_money(value) when is_integer(value), do: {:ok, Decimal.new(value)}
+
+  defp normalize_money(value) when is_binary(value) do
+    case Decimal.parse(String.trim(value)) do
+      {decimal, ""} -> {:ok, Decimal.round(decimal, 2)}
+      _ -> {:error, :invalid_cash_tendered}
+    end
+  end
+
+  defp normalize_money(_), do: {:error, :invalid_cash_tendered}
+
+  defp default_settlement_source(:paymongo), do: "paymongo"
+  defp default_settlement_source(_), do: "manual"
+
   defp normalize_source(value) when value in [:pos, "pos"], do: "pos"
   defp normalize_source(_), do: "customer"
 
@@ -1062,7 +1169,7 @@ defmodule Espreso.Orders do
 
   defp broadcast(other), do: other
 
-  defp apply_paid(%Order{} = order, paid_via, settlement_context) do
+  defp apply_paid(%Order{} = order, paid_via, settlement_context, opts) do
     with {:ok, paid_via} <- normalize_paid_via_value(paid_via),
          :ok <-
            validate_payment_settlement(
@@ -1070,16 +1177,30 @@ defmodule Espreso.Orders do
              order.payment_intent,
              paid_via,
              settlement_context
+           ),
+         {:ok, settlement_attrs} <-
+           build_settlement_attrs("paid", paid_via, order.total, opts,
+             default_source: default_settlement_source(settlement_context)
            ) do
-      do_apply_paid(order, paid_via, settlement_context)
+      do_apply_paid(order, paid_via, settlement_context, settlement_attrs)
     end
   end
 
   # Verified PayMongo path uses the same atomic writer as staff settlement.
-  defp do_apply_paid(%Order{id: order_id} = order, paid_via, settlement_context) do
+  defp do_apply_paid(
+         %Order{id: order_id} = order,
+         paid_via,
+         settlement_context,
+         settlement_attrs
+       ) do
     invoke_apply_paid_barrier!()
 
     now = DateTime.utc_now() |> DateTime.truncate(:second)
+    settled_at = Map.fetch!(settlement_attrs, :settled_at)
+    settled_by_user_id = Map.get(settlement_attrs, :settled_by_user_id)
+    settlement_source = Map.fetch!(settlement_attrs, :settlement_source)
+    cash_tendered = Map.get(settlement_attrs, :cash_tendered)
+    change_due = Map.get(settlement_attrs, :change_due)
 
     # Confirm payment advances New → Preparing so staff skip an extra tap.
     # Do not regress preparing / ready / completed.
@@ -1103,6 +1224,12 @@ defmodule Espreso.Orders do
         set: [
           payment_status: "paid",
           paid_via: ^paid_via,
+          settled_at: ^settled_at,
+          settled_by_user_id: ^settled_by_user_id,
+          settlement_source: ^settlement_source,
+          cash_tendered: ^cash_tendered,
+          change_due: ^change_due,
+          settlement_time_estimated: false,
           status: fragment("CASE WHEN status = 'received' THEN 'preparing' ELSE status END"),
           updated_at: ^now
         ]
