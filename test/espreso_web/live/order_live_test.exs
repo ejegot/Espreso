@@ -432,7 +432,7 @@ defmodule EspresoWeb.OrderLiveTest do
           customer_name: "QR Customer",
           fulfillment: :pickup,
           payment_method: :online,
-          online_wallet: :gcash
+          payment_intent: :gcash
         }
       )
 
@@ -482,7 +482,7 @@ defmodule EspresoWeb.OrderLiveTest do
           customer_name: "QR Confirm",
           fulfillment: :pickup,
           payment_method: :online,
-          online_wallet: :gcash
+          payment_intent: :gcash
         }
       )
 

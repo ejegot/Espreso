@@ -1126,7 +1126,7 @@ defmodule EspresoWeb.StaffOrdersLive do
     ]
   end
 
-  defp mark_paid_note(%{payment_method: "online", online_wallet: wallet})
+  defp mark_paid_note(%{payment_method: "online", payment_intent: wallet})
        when wallet in ["gcash", "maya"] do
     "Expected #{wallet_label(wallet)}. Confirm the wallet they used, or cash if they paid at the counter."
   end
@@ -1139,7 +1139,7 @@ defmodule EspresoWeb.StaffOrdersLive do
     "How did they pay? This clears unpaid and updates today’s totals."
   end
 
-  defp suggested_paid_via(%{payment_method: "online", online_wallet: wallet})
+  defp suggested_paid_via(%{payment_method: "online", payment_intent: wallet})
        when wallet in ["gcash", "maya"],
        do: wallet
 

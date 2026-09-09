@@ -74,8 +74,10 @@ defmodule Espreso.Orders do
         nil
       end
 
-    online_wallet =
-      normalize_online_wallet(Map.get(attrs, :online_wallet) || Map.get(attrs, "online_wallet"))
+    payment_intent =
+      normalize_payment_intent(
+        Map.get(attrs, :payment_intent) || Map.get(attrs, "payment_intent")
+      )
 
     total =
       Enum.reduce(lines, Decimal.new(0), fn line, acc ->
@@ -91,7 +93,7 @@ defmodule Espreso.Orders do
       payment_method: payment_method,
       payment_status: payment_status,
       paid_via: paid_via,
-      online_wallet: online_wallet,
+      payment_intent: payment_intent,
       source: source,
       status: if(payment_status == "paid", do: "preparing", else: "received"),
       total: total
@@ -856,7 +858,7 @@ defmodule Espreso.Orders do
   def payment_label(%Order{
         payment_method: "online",
         payment_status: "awaiting_payment",
-        online_wallet: wallet
+        payment_intent: wallet
       })
       when wallet in ["gcash", "maya"] do
     "Awaiting #{wallet_brand_label(wallet)} payment"
@@ -954,12 +956,12 @@ defmodule Espreso.Orders do
 
   defp normalize_paid_via_attr(_), do: "cash"
 
-  defp normalize_online_wallet(value) when value in ["gcash", "maya"], do: value
+  defp normalize_payment_intent(value) when value in ["cash", "gcash", "maya"], do: value
 
-  defp normalize_online_wallet(value) when value in [:gcash, :maya],
+  defp normalize_payment_intent(value) when value in [:cash, :gcash, :maya],
     do: value |> Atom.to_string()
 
-  defp normalize_online_wallet(_), do: nil
+  defp normalize_payment_intent(_), do: nil
 
   defp normalize_source(value) when value in [:pos, "pos"], do: "pos"
   defp normalize_source(_), do: "customer"

@@ -973,7 +973,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
           customer_name: "QR Guest",
           fulfillment: :pickup,
           payment_method: :online,
-          online_wallet: :gcash
+          payment_intent: :gcash
         }
       )
 
