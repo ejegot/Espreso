@@ -1224,6 +1224,7 @@ defmodule EspresoWeb.StaffPosLive do
               id="pos-cash-exact"
               phx-click="cash_exact"
               aria-label="Set cash received to the exact total"
+              data-dismiss-keyboard
             >
               Exact
             </button>
@@ -1234,6 +1235,7 @@ defmodule EspresoWeb.StaffPosLive do
               phx-click="cash_chip"
               phx-value-amount={Decimal.to_string(amount, :normal)}
               aria-label={"Set cash received to #{Menu.format_price(amount)}"}
+              data-dismiss-keyboard
             >
               {Menu.format_price(amount)}
             </button>
@@ -1275,6 +1277,7 @@ defmodule EspresoWeb.StaffPosLive do
               id="pos-confirm-cash"
               disabled={!@confirm_enabled? or @placing_order?}
               phx-disable-with="Processing…"
+              data-dismiss-keyboard
             >
               Confirm Payment
             </button>

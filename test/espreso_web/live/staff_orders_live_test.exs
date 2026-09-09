@@ -133,7 +133,9 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     assert has_element?(view, "#orders-cash-tender-modal", "Cash Received")
     assert has_element?(view, "#orders-cash-total", "₱75")
-    assert has_element?(view, "#orders-confirm-cash[disabled]")
+    assert has_element?(view, "#orders-cash-exact[data-dismiss-keyboard]")
+    assert has_element?(view, "#orders-cash-preset-100[data-dismiss-keyboard]")
+    assert has_element?(view, "#orders-confirm-cash[disabled][data-dismiss-keyboard]")
 
     unchanged = Orders.get_order_by_number!(order.number)
     assert unchanged.payment_status == "unpaid"

@@ -850,12 +850,19 @@ defmodule EspresoWeb.StaffPosLiveTest do
              ~s(#pos-cash-tendered[type="text"][inputmode="decimal"][autocomplete="off"])
            )
 
-    assert has_element?(view, "#pos-cash-exact", "Exact")
+    assert has_element?(view, "#pos-cash-exact[data-dismiss-keyboard]", "Exact")
     refute has_element?(view, "#pos-cash-preset-100")
-    assert has_element?(view, ~s(#pos-cash-preset-200[aria-label*="₱200"]))
-    assert has_element?(view, "#pos-cash-preset-500")
-    assert has_element?(view, "#pos-cash-preset-1000")
-    assert has_element?(view, "#pos-confirm-cash[disabled]", "Confirm Payment")
+    assert has_element?(
+             view,
+             ~s(#pos-cash-preset-200[data-dismiss-keyboard][aria-label*="₱200"])
+           )
+    assert has_element?(view, "#pos-cash-preset-500[data-dismiss-keyboard]")
+    assert has_element?(view, "#pos-cash-preset-1000[data-dismiss-keyboard]")
+    assert has_element?(
+             view,
+             "#pos-confirm-cash[disabled][data-dismiss-keyboard]",
+             "Confirm Payment"
+           )
   end
 
   test "cancelling Cash Received preserves the ticket and clears tender state", %{

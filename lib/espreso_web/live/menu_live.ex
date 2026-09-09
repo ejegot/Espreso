@@ -1339,6 +1339,7 @@ defmodule EspresoWeb.MenuLive do
                 class="menu-basket-checkout"
                 phx-click="place_order"
                 disabled={@placing_order?}
+                data-dismiss-keyboard
               >
                 {checkout_button_label(@payment_method, @placing_order?, @payments_mode)}
               </button>
