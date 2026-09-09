@@ -24,7 +24,19 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
 
       assert html =~ ~s(data-application="elilai-kafe-employee")
       assert html =~ ~s(class="site-body elilai-kafe-employee-root")
-      assert has_element?(view, ".staff-auth-brand-name", "ELIlai Kafe")
+      assert html =~ ~s(rel="manifest")
+      assert html =~ ~s(href="/elilai-kafe.webmanifest")
+      assert html =~ ~s(name="theme-color" content="#394331")
+      assert html =~ ~s(rel="apple-touch-icon")
+      assert html =~ ~s(href="/images/elilai-kafe/apple-touch-icon.png")
+      assert html =~ ~s(name="apple-mobile-web-app-title")
+
+      assert has_element?(
+               view,
+               "img.staff-auth-logo[src='/images/elilai-kafe/elilai-kafe-logo.jpg']"
+             )
+
+      assert has_element?(view, "h1.staff-auth-title")
     end
   end
 
@@ -49,11 +61,19 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
 
       assert html =~ ~s(data-application="elilai-kafe-employee")
       assert html =~ ~s(class="site-body elilai-kafe-employee-root")
+      assert html =~ ~s(href="/elilai-kafe.webmanifest")
+      assert html =~ ~s(href="/images/elilai-kafe/apple-touch-icon.png")
 
       if path == ~p"/pos" do
-        assert has_element?(view, "#staff-pos-rail .staff-pos-rail-wordmark", "ELIlai Kafe")
+        assert has_element?(
+                 view,
+                 "#staff-pos-rail img.staff-pos-rail-logo[src='/images/elilai-kafe/elilai-kafe-logo.jpg']"
+               )
       else
-        assert has_element?(view, "#staff-shell .staff-shell-brand", "ELIlai Kafe")
+        assert has_element?(
+                 view,
+                 "#staff-shell img.staff-shell-brand-logo[src='/images/elilai-kafe/elilai-kafe-logo.jpg']"
+               )
       end
     end
   end
@@ -78,6 +98,10 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
 
       refute html =~ ~s(data-application="elilai-kafe-employee")
       refute html =~ "elilai-kafe-employee-root"
+      refute html =~ "/elilai-kafe.webmanifest"
+      refute html =~ ~s(name="apple-mobile-web-app-title")
+      refute html =~ "/images/elilai-kafe/apple-touch-icon.png"
+      refute html =~ "/images/elilai-kafe/elilai-kafe-logo.jpg"
     end
   end
 

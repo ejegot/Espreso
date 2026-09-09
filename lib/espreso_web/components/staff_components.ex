@@ -37,7 +37,14 @@ defmodule EspresoWeb.StaffComponents do
       <%= if @chrome == :rail do %>
         <aside class="staff-pos-rail staff-pos-rail--icons" id="staff-pos-rail" aria-label="Staff">
           <div class="staff-pos-rail-brand" title="ELIlai Kafe">
-            <span class="staff-pos-rail-wordmark" aria-hidden="true">ELIlai Kafe</span>
+            <img
+              src={~p"/images/elilai-kafe/elilai-kafe-logo.jpg"}
+              alt=""
+              class="staff-pos-rail-logo"
+              width="1024"
+              height="1024"
+              aria-hidden="true"
+            />
             <span class="sr-only">ELIlai Kafe · {@page_title}</span>
           </div>
 
@@ -121,7 +128,13 @@ defmodule EspresoWeb.StaffComponents do
                 <h1 class="staff-shell-title staff-shell-orders-title">{@page_title}</h1>
               </div>
 
-              <p class="staff-shell-brand staff-shell-orders-brand">ELIlai Kafe</p>
+              <img
+                src={~p"/images/elilai-kafe/elilai-kafe-logo.jpg"}
+                alt="ELIlai Kafe"
+                class="staff-shell-brand-logo staff-shell-orders-brand"
+                width="1024"
+                height="1024"
+              />
 
               <div class="staff-shell-tools-block staff-shell-tools-block--orders">
                 <div class="staff-shell-tools staff-shell-tools--orders">
@@ -137,7 +150,13 @@ defmodule EspresoWeb.StaffComponents do
               </div>
             <% else %>
               <div class="staff-shell-brand-block">
-                <p class="staff-shell-brand">ELIlai Kafe</p>
+                <img
+                  src={~p"/images/elilai-kafe/elilai-kafe-logo.jpg"}
+                  alt="ELIlai Kafe"
+                  class="staff-shell-brand-logo"
+                  width="1024"
+                  height="1024"
+                />
                 <div class="staff-shell-heading">
                   <h1 class="staff-shell-title">{@page_title}</h1>
                   <p class="staff-shell-user">

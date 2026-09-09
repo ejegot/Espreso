@@ -1,0 +1,24 @@
+{
+  "name": "ELIlai Kafe",
+  "short_name": "ELIlai",
+  "description": "ELIlai Kafe employee operations",
+  "start_url": "/login",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F4EFE3",
+  "theme_color": "#394331",
+  "icons": [
+    {
+      "src": "/images/elilai-kafe/app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/elilai-kafe/app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

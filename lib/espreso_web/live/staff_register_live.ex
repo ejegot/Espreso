@@ -83,7 +83,13 @@ defmodule EspresoWeb.StaffRegisterLive do
       <main class="staff-auth-panel">
         <div class="staff-auth-panel-inner">
           <header class="staff-auth-brand">
-            <p class="staff-auth-brand-name">ELIlai Kafe</p>
+            <img
+              src={~p"/images/elilai-kafe/elilai-kafe-logo.jpg"}
+              alt="ELIlai Kafe"
+              class="staff-auth-logo"
+              width="1024"
+              height="1024"
+            />
           </header>
 
           <h1 class="staff-auth-title">Create your account</h1>

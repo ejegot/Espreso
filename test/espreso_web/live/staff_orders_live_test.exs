@@ -35,7 +35,11 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     assert has_element?(view, "#staff-shell .staff-shell-bar--orders")
     assert has_element?(view, ".staff-shell-orders-title", "Orders")
-    assert has_element?(view, ".staff-shell-orders-brand", "ELIlai Kafe")
+
+    assert has_element?(
+             view,
+             ".staff-shell-orders-brand[src='/images/elilai-kafe/elilai-kafe-logo.jpg']"
+           )
 
     assert has_element?(
              view,

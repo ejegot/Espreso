@@ -159,7 +159,13 @@ defmodule EspresoWeb.StaffLoginLive do
           @login_mode == :email && "staff-auth-panel-inner--owner"
         ]}>
           <header class="staff-auth-brand">
-            <p class="staff-auth-brand-name">ELIlai Kafe</p>
+            <img
+              src={~p"/images/elilai-kafe/elilai-kafe-logo.jpg"}
+              alt="ELIlai Kafe"
+              class="staff-auth-logo"
+              width="1024"
+              height="1024"
+            />
           </header>
 
           <h1 class="staff-auth-title">{login_title(@login_mode)}</h1>
@@ -247,12 +253,7 @@ defmodule EspresoWeb.StaffLoginLive do
                 id="staff-pin-form"
               >
                 <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
-                <input
-                  :if={@selected_staff}
-                  type="hidden"
-                  name="user_id"
-                  value={@selected_staff.id}
-                />
+                <input :if={@selected_staff} type="hidden" name="user_id" value={@selected_staff.id} />
                 <input type="hidden" name="pin" value={@pin} />
 
                 <p :if={!@pin_ready?} class="staff-pin-hint" id="staff-pin-select-hint">
