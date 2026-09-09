@@ -91,6 +91,26 @@ defmodule Espreso.PhysicalActionCoordinatorTest do
     refute_receive {:dispatched, _}
   end
 
+  test "completed paid orders remain eligible for receipt-only history reprints" do
+    parent = self()
+
+    start_coordinator(fn order, _opts ->
+      send(parent, {:completed_receipt, order.id})
+      :dispatched
+    end)
+
+    order = paid_order!()
+    {:ok, ready} = Orders.update_status(order, "ready")
+    {:ok, completed} = Orders.complete_order(ready)
+    permit = permit_for(completed.id, :receipt_reprint)
+
+    assert {:dispatched, _next_permit} =
+             execute(completed.id, :receipt_reprint, permit)
+
+    assert_receive {:completed_receipt, order_id}
+    assert order_id == completed.id
+  end
+
   test "concurrent claims of one permit execute exactly one receipt" do
     parent = self()
 

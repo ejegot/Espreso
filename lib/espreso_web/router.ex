@@ -117,6 +117,7 @@ defmodule EspresoWeb.Router do
       live "/staff", StaffHomeLive
       live "/orders", StaffOrdersLive
       live "/pos", StaffPosLive
+      live "/transactions", StaffTransactionsLive
     end
   end
 

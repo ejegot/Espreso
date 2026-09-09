@@ -234,6 +234,13 @@ defmodule EspresoWeb.StaffComponents do
         show?: Authorization.can?(user, :orders)
       },
       %{
+        key: :transactions,
+        label: "Transactions",
+        icon: "hero-receipt-percent",
+        path: ~p"/transactions",
+        show?: Authorization.can?(user, :orders)
+      },
+      %{
         key: :dashboard,
         label: "Dashboard",
         icon: "hero-chart-bar",

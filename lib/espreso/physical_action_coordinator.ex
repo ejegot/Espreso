@@ -14,6 +14,7 @@ defmodule Espreso.PhysicalActionCoordinator do
 
   @actions [:receipt_reprint, :kitchen, :drawer, :mark_paid]
   @eligible_statuses ~w(received preparing ready)
+  @receipt_reprint_statuses ~w(received preparing ready completed)
 
   def start_link(opts \\ []) do
     name = Keyword.get(opts, :name, __MODULE__)
@@ -599,7 +600,7 @@ defmodule Espreso.PhysicalActionCoordinator do
   defp validate_eligible_order(%Order{} = order, :receipt_reprint) do
     cond do
       order.payment_status != "paid" -> {:error, :order_not_paid}
-      order.status not in @eligible_statuses -> {:error, :order_not_eligible}
+      order.status not in @receipt_reprint_statuses -> {:error, :order_not_eligible}
       not Printer.enabled?() -> {:error, :printer_disabled}
       true -> {:ok, Repo.preload(order, :items)}
     end

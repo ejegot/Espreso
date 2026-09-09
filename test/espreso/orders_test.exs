@@ -305,6 +305,78 @@ defmodule Espreso.OrdersTest do
     assert reloaded.settled_at == nil
   end
 
+  test "daily transactions use settlement day and apply receipt filters with exact totals" do
+    {:ok, cash} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Alice Cash",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_status: :paid,
+          paid_via: "cash",
+          settlement_source: "pos",
+          cash_tendered: Decimal.new("100")
+        }
+      )
+
+    {:ok, wallet} =
+      Orders.create_order(
+        [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("120")}],
+        %{
+          customer_name: "Bob Wallet",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_status: :paid,
+          paid_via: "gcash",
+          settlement_source: "api"
+        }
+      )
+
+    {:ok, old} =
+      Orders.create_order(
+        [%{name: "Mocha", size: nil, quantity: 1, price: Decimal.new("200")}],
+        %{
+          customer_name: "Yesterday",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_status: :paid,
+          paid_via: "cash",
+          settlement_source: "manual"
+        }
+      )
+
+    {:ok, wallet} = Orders.update_status(wallet, "ready")
+    {today_start, _today_end} = Orders.shop_day_bounds_utc(Orders.shop_date_today())
+    yesterday = DateTime.add(today_start, -1, :second)
+
+    {1, _} =
+      Repo.update_all(
+        from(o in Order, where: o.id == ^old.id),
+        set: [settled_at: yesterday]
+      )
+
+    %{orders: today, filters: filters} = Orders.list_transactions(%{})
+    assert filters.date == Orders.shop_date_today()
+    assert MapSet.new(Enum.map(today, & &1.id)) == MapSet.new([cash.id, wallet.id])
+
+    assert %{orders: [%{id: cash_id}]} =
+             Orders.list_transactions(%{"payment" => "cash"})
+
+    assert cash_id == cash.id
+
+    assert %{orders: [%{id: wallet_id}]} =
+             Orders.list_transactions(%{"search" => "bob", "status" => "ready", "source" => "api"})
+
+    assert wallet_id == wallet.id
+
+    summary = Orders.transaction_summary(%{})
+    assert summary.count == 2
+    assert Decimal.equal?(summary.total, Decimal.new("195"))
+    assert summary.by_via["cash"].count == 1
+    assert summary.by_via["gcash"].count == 1
+  end
+
   test "mark_paid is idempotent when already paid" do
     lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
 
