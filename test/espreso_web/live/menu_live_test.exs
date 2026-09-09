@@ -1108,6 +1108,34 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(detail_view, "#order-confirm")
   end
 
+  test "/menu Cash at counter persists intent without settling payment", %{conn: conn} do
+    set_payments_mode!("qrph_manual")
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view = enter_menu_browse(view)
+
+    view = add_to_order(view, "Espresso")
+    view |> element("button.brune-icon-bag") |> render_click()
+
+    view
+    |> form("#menu-checkout-form", %{customer_name: "Cash Guest"})
+    |> render_change()
+
+    view |> element("#checkout-pay-counter") |> render_click()
+
+    {:ok, _order_view, _html} =
+      view
+      |> element("button.menu-basket-checkout", "Place order")
+      |> render_click()
+      |> follow_redirect(conn)
+
+    [order] = Orders.list_active_orders()
+    assert order.source == "customer"
+    assert order.payment_method == "counter"
+    assert order.payment_intent == "cash"
+    assert order.payment_status == "unpaid"
+    assert order.paid_via == nil
+  end
+
   test "/menu GCash checkout creates unpaid order and redirects to PayMongo", %{conn: conn} do
     set_payments_mode!("paymongo")
     {:ok, view, _html} = live(conn, ~p"/menu")
@@ -1137,8 +1165,11 @@ defmodule EspresoWeb.MenuLiveTest do
 
     [order] = Orders.list_active_orders()
     assert order.customer_name == "Gina"
+    assert order.source == "customer"
     assert order.payment_method == "online"
+    assert order.payment_intent == "gcash"
     assert order.payment_status == "unpaid"
+    assert order.paid_via == nil
     assert is_binary(order.paymongo_checkout_session_id)
   end
 
@@ -1167,6 +1198,14 @@ defmodule EspresoWeb.MenuLiveTest do
              |> render_click()
 
     assert checkout_url =~ "checkout.paymongo.test"
+
+    [order] = Orders.list_active_orders()
+    assert order.customer_name == "Maya Test"
+    assert order.source == "customer"
+    assert order.payment_method == "online"
+    assert order.payment_intent == "maya"
+    assert order.payment_status == "unpaid"
+    assert order.paid_via == nil
   end
 
   test "/menu QRPh GCash checkout places awaiting_payment order without PayMongo", %{conn: conn} do
