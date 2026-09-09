@@ -56,36 +56,48 @@ defmodule EspresoWeb.StaffComponents do
             </.link>
           </nav>
 
-          <div class="staff-pos-rail-more">
-            <.link
-              :for={item <- @more_nav}
-              navigate={item.path}
-              class={[
-                "staff-pos-rail-link staff-pos-rail-link--more",
-                @current == item.key && "is-active"
-              ]}
-              id={"staff-nav-#{item.key}"}
-              aria-label={item.label}
-              title={item.label}
-              aria-current={if(@current == item.key, do: "page", else: nil)}
+          <details
+            class={["staff-pos-rail-more", @more_active? && "is-active"]}
+            id="staff-pos-rail-more"
+          >
+            <summary
+              class="staff-pos-rail-link staff-pos-rail-more-summary"
+              id="staff-nav-more"
+              aria-label="More staff tools"
+              title="More"
             >
-              <.icon name={item.icon} class="staff-pos-rail-icon" />
-              <span class="sr-only">{item.label}</span>
-            </.link>
-            <.link
-              href={~p"/logout"}
-              method="delete"
-              class="staff-pos-rail-link staff-pos-rail-link--more staff-pos-rail-logout"
-              id="staff-nav-logout"
-              aria-label="Log out"
-              title="Log out"
-            >
-              <.icon name="hero-arrow-right-on-rectangle" class="staff-pos-rail-icon" />
-              <span class="sr-only">Log out</span>
-            </.link>
-          </div>
+              <.icon name="hero-ellipsis-horizontal" class="staff-pos-rail-icon" />
+              <span class="sr-only">More</span>
+            </summary>
+            <div class="staff-pos-rail-more-panel" role="menu" aria-label="More staff tools">
+              <.link
+                :for={item <- @more_nav}
+                navigate={item.path}
+                class={[
+                  "staff-pos-rail-more-link",
+                  @current == item.key && "is-active"
+                ]}
+                id={"staff-nav-#{item.key}"}
+                role="menuitem"
+                aria-current={if(@current == item.key, do: "page", else: nil)}
+              >
+                <.icon name={item.icon} class="staff-pos-rail-more-icon" />
+                <span>{item.label}</span>
+              </.link>
+              <.link
+                href={~p"/logout"}
+                method="delete"
+                class="staff-pos-rail-more-link staff-pos-rail-logout"
+                id="staff-nav-logout"
+                role="menuitem"
+              >
+                <.icon name="hero-arrow-right-on-rectangle" class="staff-pos-rail-more-icon" />
+                <span>Log out</span>
+              </.link>
+            </div>
+          </details>
 
-          <div class="staff-pos-rail-footer">
+          <div class="staff-pos-rail-footer" id="staff-pos-rail-footer">
             <div
               class="staff-pos-rail-avatar"
               title={"#{@current_user.name} · #{User.role_label(@current_user.role)}"}

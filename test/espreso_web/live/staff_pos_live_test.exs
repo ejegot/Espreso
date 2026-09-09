@@ -59,15 +59,35 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, ".staff-shell-title", "POS")
     assert has_element?(view, "#pos-catalog")
     assert has_element?(view, "#pos-ticket")
+    assert has_element?(view, "#staff-pos-rail")
+    assert has_element?(view, "#staff-nav-pos.is-active")
+    assert has_element?(view, "#staff-pos-rail-more > #staff-nav-more", "More")
+    assert has_element?(view, "#staff-pos-rail-more .staff-pos-rail-more-panel")
+    assert has_element?(view, "#staff-pos-rail-more #staff-nav-logout", "Log out")
+    assert has_element?(view, "#staff-pos-rail-footer")
+    refute has_element?(view, "#staff-nav-dashboard")
     refute render(view) =~ "Coming soon"
   end
 
   test "manager and owner can open POS", %{conn: conn, manager: manager, owner: owner} do
     {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/pos")
     assert has_element?(manager_view, "#pos-place-order")
+    assert has_element?(manager_view, "#staff-pos-rail-more #staff-nav-dashboard", "Dashboard")
+
+    assert has_element?(
+             manager_view,
+             "#staff-pos-rail-more #staff-nav-availability",
+             "Availability"
+           )
+
+    assert has_element?(manager_view, "#staff-pos-rail-more #staff-nav-reports", "Reports")
+    refute has_element?(manager_view, "#staff-nav-staff")
+    refute has_element?(manager_view, "#staff-nav-settings")
 
     {:ok, owner_view, _html} = live(log_in(conn, owner), ~p"/pos")
     assert has_element?(owner_view, "#pos-place-order")
+    assert has_element?(owner_view, "#staff-pos-rail-more #staff-nav-staff", "Staff")
+    assert has_element?(owner_view, "#staff-pos-rail-more #staff-nav-settings", "Settings")
   end
 
   test "POS shows available products and hides unavailable", %{
@@ -325,8 +345,15 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-product-#{americano.id} .staff-pos-size-chips")
     refute has_element?(view, "#pos-size-picker")
 
+    price_8 = Enum.find(americano.product_prices, &(&1.size == "8oz"))
+    view |> element("#pos-size-#{price_8.id}") |> render_click()
+    assert has_element?(view, "#pos-product-#{americano.id} .staff-pos-product-price", "₱110")
+
     price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
     view |> element("#pos-size-#{price_12.id}") |> render_click()
+
+    assert has_element?(view, "#pos-product-#{americano.id} .staff-pos-product-price", "₱120")
+
     view |> element("#pos-product-#{americano.id}") |> render_click()
 
     assert has_element?(view, "#pos-cart-lines", "Americano")
@@ -653,6 +680,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute has_element?(view, "#pos-confirmation")
 
     view |> render_click("place_order", %{})
+
     assert has_element?(
              view,
              "#pos-ticket .staff-pos-ticket-footer #pos-submission-error[role='alert']",
@@ -1485,6 +1513,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
              "#pos-ticket .staff-pos-ticket-footer #pos-submission-error[role='alert']",
              "Enter a customer name"
            )
+
     refute has_element?(view, "#pos-confirmation")
     assert Orders.list_active_orders() == []
 
@@ -1511,6 +1540,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
              "#pos-ticket .staff-pos-ticket-footer #pos-submission-error[role='alert']",
              "Espresso is no longer available"
            )
+
     assert has_element?(view, "#pos-cart-lines", "Espresso")
     assert has_element?(view, "#pos-place-order")
     refute has_element?(view, "#cash-tender-modal")
@@ -1752,6 +1782,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     set_test_printer_port(port)
     view |> render_click("reprint_receipt", %{"token" => new_token})
+
     assert [_receipt_bytes, <<0x1B, 0x70, 0x00, 0x19, 0xFA>>] =
              Task.await(printer_task, 2_000)
 
@@ -1905,11 +1936,13 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert Repo.aggregate(Espreso.Orders.OrderItem, :count, :id) == 0
     assert length(live_assigns(view).cart) == expected_lines
     assert has_element?(view, "#pos-cart-lines", cart_text)
+
     assert has_element?(
              view,
              "#pos-ticket .staff-pos-ticket-footer #pos-submission-error[role='alert']",
              "Price changed — please review your ticket."
            )
+
     refute has_element?(view, "#cash-tender-modal")
   end
 
