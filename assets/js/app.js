@@ -786,8 +786,18 @@ window.addEventListener("phx:page-loading-stop", _info => {
   page.classList.add("is-entering")
 })
 
+function registerEmployeeServiceWorker() {
+  if (!("serviceWorker" in navigator)) return
+
+  const root = document.documentElement
+  if (root?.dataset.application !== "elilai-kafe-employee") return
+
+  navigator.serviceWorker.register("/sw.js")
+}
+
 // connect if there are any LiveViews on the page
 liveSocket.connect()
+registerEmployeeServiceWorker()
 
 // expose liveSocket on window for web console debug logs and latency simulation:
 // >> liveSocket.enableDebug()
