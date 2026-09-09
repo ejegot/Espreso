@@ -2610,6 +2610,11 @@ body:has(.menu-page-locked) {
 }
 
 /* —— Merka-style staff sign-in (staff only; customer site unchanged) —— */
+.elilai-kafe-employee-root {
+  min-height: 100%;
+  background: #faf7f4;
+}
+
 .staff-auth-page {
   display: grid;
   height: 100vh;
@@ -4553,6 +4558,18 @@ a.staff-home-card:focus-visible {
   display: flex;
   justify-content: center;
   width: 100%;
+}
+
+.staff-pos-rail-wordmark {
+  display: inline-block;
+  max-width: 3rem;
+  color: #382010;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 0.64rem;
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.035em;
+  text-align: center;
 }
 
 .staff-pos-rail-mark {

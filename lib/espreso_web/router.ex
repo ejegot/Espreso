@@ -13,6 +13,10 @@ defmodule EspresoWeb.Router do
     plug :fetch_current_user
   end
 
+  pipeline :employee_root do
+    plug :put_root_layout, html: {EspresoWeb.Layouts, :employee_root}
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
   end
@@ -82,7 +86,7 @@ defmodule EspresoWeb.Router do
   end
 
   scope "/", EspresoWeb do
-    pipe_through [:browser, :redirect_if_staff_is_authenticated]
+    pipe_through [:browser, :employee_root, :redirect_if_staff_is_authenticated]
 
     live_session :redirect_if_authenticated,
       on_mount: [{EspresoWeb.StaffAuth, :redirect_if_authenticated}] do
@@ -100,7 +104,7 @@ defmodule EspresoWeb.Router do
   end
 
   scope "/", EspresoWeb do
-    pipe_through [:browser, :require_authenticated_staff]
+    pipe_through [:browser, :employee_root, :require_authenticated_staff]
 
     live_session :dashboard,
       on_mount: [{EspresoWeb.StaffAuth, {:ensure_permission, :dashboard}}] do
@@ -122,7 +126,7 @@ defmodule EspresoWeb.Router do
   end
 
   scope "/", EspresoWeb do
-    pipe_through [:browser, :require_authenticated_staff, :require_owner]
+    pipe_through [:browser, :employee_root, :require_authenticated_staff, :require_owner]
 
     live_session :owner,
       on_mount: [{EspresoWeb.StaffAuth, :ensure_owner}] do
@@ -131,7 +135,7 @@ defmodule EspresoWeb.Router do
   end
 
   scope "/", EspresoWeb do
-    pipe_through [:browser, :require_authenticated_staff]
+    pipe_through [:browser, :employee_root, :require_authenticated_staff]
 
     live_session :business_settings,
       on_mount: [{EspresoWeb.StaffAuth, {:ensure_permission, :business_settings}}] do
