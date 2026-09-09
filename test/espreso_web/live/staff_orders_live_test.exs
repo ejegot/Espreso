@@ -80,13 +80,21 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
         %{
           customer_name: "Mia",
           fulfillment: :pickup,
-          payment_method: :counter
+          payment_method: :counter,
+          payment_intent: :cash
         }
       )
 
     {:ok, view, _html} = live(conn, ~p"/orders")
 
     refute has_element?(view, "#order-prepare-#{order.id}")
+    assert has_element?(view, "#ticket-new-paid-via-cash-#{order.id}", "Cash")
+    refute has_element?(view, "#ticket-new-paid-via-gcash-#{order.id}")
+    refute has_element?(view, "#ticket-new-paid-via-maya-#{order.id}")
+
+    render_click(view, "open_mark_paid", %{"id" => Integer.to_string(order.id)})
+    refute has_element?(view, "#mark-paid-modal")
+
     mark_paid_via(view, order, "cash", "ticket", "new")
 
     assert has_element?(view, "#orders-preparing #order-card-preparing-#{order.id}")
@@ -115,7 +123,20 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/orders")
 
-    mark_paid_via(view, order, "gcash", "ticket", "new")
+    assert has_element?(view, "#ticket-new-paid-via-cash-#{order.id}")
+    refute has_element?(view, "#ticket-new-paid-via-gcash-#{order.id}")
+    refute has_element?(view, "#ticket-new-paid-via-maya-#{order.id}")
+
+    rejected_permit =
+      PhysicalActionCoordinator.permits(:mark_paid, [order.id])
+      |> Map.fetch!(order.id)
+
+    render_click(view, "mark_paid", %{
+      "id" => Integer.to_string(order.id),
+      "action" => "mark_paid",
+      "permit" => rejected_permit,
+      "paid_via" => "gcash"
+    })
 
     rejected = Orders.get_order_by_number!(order.number)
     assert rejected.payment_status == "unpaid"
@@ -251,6 +272,9 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     assert has_element?(view, "#orders-flash", "#{order.number} cancelled.")
     refute has_element?(view, ".staff-order-number", order.number)
+    refute has_element?(view, "#ticket-new-paid-via-cash-#{order.id}")
+    refute has_element?(view, "#ticket-new-paid-via-gcash-#{order.id}")
+    refute has_element?(view, "#ticket-new-paid-via-maya-#{order.id}")
     assert Orders.list_active_orders() == []
   end
 
@@ -390,6 +414,46 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert reloaded.payment_status == "unpaid"
   end
 
+  test "PayMongo GCash and Maya intents wait for webhook settlement without manual actions", %{
+    conn: conn
+  } do
+    set_payments_mode!("paymongo")
+
+    orders =
+      for wallet <- [:gcash, :maya] do
+        {:ok, order} =
+          Orders.create_order(
+            [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("100")}],
+            %{
+              customer_name: "#{wallet} PayMongo",
+              fulfillment: :pickup,
+              payment_method: :online,
+              payment_intent: wallet
+            }
+          )
+
+        {:ok, order} =
+          Orders.attach_paymongo_session(order, "cs_staff_#{wallet}_intent")
+
+        order
+      end
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    for order <- orders do
+      assert has_element?(
+               view,
+               "#order-card-new-#{order.id} .staff-order-payment-waiting",
+               "Waiting for online payment"
+             )
+
+      refute has_element?(view, "#ticket-new-mark-paid-#{order.id}")
+      refute has_element?(view, "#ticket-new-paid-via-cash-#{order.id}")
+      refute has_element?(view, "#ticket-new-paid-via-gcash-#{order.id}")
+      refute has_element?(view, "#ticket-new-paid-via-maya-#{order.id}")
+    end
+  end
+
   test "online paid ticket can ready and be picked up", %{conn: conn} do
     {:ok, order} =
       Orders.create_order(
@@ -410,6 +474,9 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert has_element?(view, "#order-ready-#{order.id}", "Ready")
     refute has_element?(view, "#order-prepare-#{order.id}")
     refute has_element?(view, "#order-card-new-#{order.id} button", "Cash")
+    refute has_element?(view, "#ticket-preparing-mark-paid-#{order.id}")
+    refute has_element?(view, "#ticket-preparing-paid-via-gcash-#{order.id}")
+    refute has_element?(view, "#ticket-preparing-paid-via-maya-#{order.id}")
 
     view |> element("#order-ready-#{order.id}") |> render_click()
     assert has_element?(view, "#ready-complete-#{order.id}", "Picked up")
@@ -1018,14 +1085,8 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     view |> element("#ticket-new-mark-paid-#{order.id}") |> render_click()
 
     assert has_element?(view, "#mark-paid-modal-gcash.is-suggested", "GCash")
-    assert has_element?(view, "#mark-paid-modal-maya", "Maya")
-
-    assert has_element?(
-             view,
-             "#mark-paid-modal-cash.staff-mark-paid-option--escape",
-             "Paid cash instead"
-           )
-
+    refute has_element?(view, "#mark-paid-modal-maya")
+    refute has_element?(view, "#mark-paid-modal-cash")
     refute has_element?(view, "#mark-paid-modal-counter")
 
     view |> element("#mark-paid-modal-gcash") |> render_click()
@@ -1036,6 +1097,100 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert reloaded.payment_status == "paid"
     assert reloaded.paid_via == "gcash"
     assert reloaded.status == "preparing"
+  end
+
+  test "qrph Maya intent confirms through a Maya-only modal", %{conn: conn} do
+    set_payments_mode!("qrph_manual")
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("120")}],
+        %{
+          customer_name: "Maya QR Guest",
+          fulfillment: :pickup,
+          payment_method: :online,
+          payment_intent: :maya
+        }
+      )
+
+    assert order.payment_status == "awaiting_payment"
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    assert has_element?(view, "#ticket-new-mark-paid-#{order.id}", "Confirm payment")
+    view |> element("#ticket-new-mark-paid-#{order.id}") |> render_click()
+
+    assert has_element?(view, "#mark-paid-modal-maya.is-suggested", "Maya")
+    refute has_element?(view, "#mark-paid-modal-gcash")
+    refute has_element?(view, "#mark-paid-modal-cash")
+
+    view |> element("#mark-paid-modal-maya") |> render_click()
+
+    reloaded = Orders.get_order_by_number!(order.number)
+    assert reloaded.payment_status == "paid"
+    assert reloaded.paid_via == "maya"
+    assert reloaded.status == "preparing"
+  end
+
+  test "legacy qrph order without intent preserves the generic confirmation modal", %{conn: conn} do
+    set_payments_mode!("qrph_manual")
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("120")}],
+        %{
+          customer_name: "Legacy QR Guest",
+          fulfillment: :pickup,
+          payment_method: :online
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    assert has_element?(view, "#ticket-new-mark-paid-#{order.id}", "Confirm payment")
+    view |> element("#ticket-new-mark-paid-#{order.id}") |> render_click()
+
+    assert has_element?(view, "#mark-paid-modal-gcash", "GCash")
+    assert has_element?(view, "#mark-paid-modal-maya", "Maya")
+    assert has_element?(view, "#mark-paid-modal-cash", "Paid cash instead")
+  end
+
+  test "noncanonical intent and channel combinations expose no payment path", %{conn: conn} do
+    set_payments_mode!("qrph_manual")
+
+    {:ok, counter_wallet} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Counter Wallet",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_intent: :gcash
+        }
+      )
+
+    {:ok, online_cash} =
+      Orders.create_order(
+        [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("120")}],
+        %{
+          customer_name: "Online Cash",
+          fulfillment: :pickup,
+          payment_method: :online,
+          payment_intent: :cash
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    for order <- [counter_wallet, online_cash] do
+      refute has_element?(view, "#ticket-new-mark-paid-#{order.id}")
+      refute has_element?(view, "#ticket-new-paid-via-cash-#{order.id}")
+      refute has_element?(view, "#ticket-new-paid-via-gcash-#{order.id}")
+      refute has_element?(view, "#ticket-new-paid-via-maya-#{order.id}")
+
+      render_click(view, "open_mark_paid", %{"id" => Integer.to_string(order.id)})
+      refute has_element?(view, "#mark-paid-modal")
+    end
   end
 
   test "counter unpaid shows one-tap Cash GCash Maya without modal", %{conn: conn} do

@@ -165,7 +165,7 @@ defmodule EspresoWeb.StaffOrdersLive do
   def handle_event("open_mark_paid", %{"id" => id}, socket) do
     with {order_id, ""} <- Integer.parse(id),
          %Espreso.Orders.Order{} = order <- Repo.get(Espreso.Orders.Order, order_id) do
-      if staff_mark_paid?(order) do
+      if modal_payment_action?(order) do
         {:noreply, assign(socket, :mark_paid_order, order)}
       else
         {:noreply, socket}
@@ -986,20 +986,13 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   defp needs_payment_actions?(_), do: false
 
-  defp waiting_for_online_payment?(%{payment_method: "online"} = order) do
-    needs_payment_actions?(order) and not staff_mark_paid?(order)
-  end
+  defp waiting_for_online_payment?(order), do: payment_action_projection(order) == :waiting
 
-  defp waiting_for_online_payment?(_), do: false
+  defp staff_mark_paid?(order),
+    do: match?({kind, _options} when kind in [:inline, :modal], payment_action_projection(order))
 
-  defp staff_mark_paid?(%{payment_method: "counter", payment_status: status})
-       when status in ["unpaid", "awaiting_payment"],
-       do: true
-
-  defp staff_mark_paid?(%{payment_method: "online", payment_status: "awaiting_payment"}),
-    do: BusinessSettings.qrph_manual?()
-
-  defp staff_mark_paid?(_), do: false
+  defp modal_payment_action?(order),
+    do: match?({:modal, _options}, payment_action_projection(order))
 
   defp show_abandon_payment?(%{payment_method: "online", payment_status: "unpaid"} = order) do
     checkout_session_attached?(order) and not BusinessSettings.qrph_manual?()
@@ -1007,15 +1000,10 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   defp show_abandon_payment?(_), do: false
 
-  # Counter unpaid: one-tap Cash / GCash / Maya via existing mark_paid event.
-  # Online qrph_manual: keep modal (suggested wallet + cash escape).
   defp payment_action_buttons(assigns) do
-    order = assigns.order
-
-    cond do
-      inline_paid_via?(order) ->
-        assigns =
-          Map.put(assigns, :options, [{"cash", "Cash"}, {"gcash", "GCash"}, {"maya", "Maya"}])
+    case payment_action_projection(assigns.order) do
+      {:inline, options} ->
+        assigns = Map.put(assigns, :options, options)
 
         ~H"""
         <div class="staff-order-paid-via-row" role="group" aria-label="Confirm payment method">
@@ -1035,7 +1023,7 @@ defmodule EspresoWeb.StaffOrdersLive do
         </div>
         """
 
-      staff_mark_paid?(order) ->
+      {:modal, _options} ->
         ~H"""
         <button
           type="button"
@@ -1048,19 +1036,74 @@ defmodule EspresoWeb.StaffOrdersLive do
         </button>
         """
 
-      true ->
+      _ ->
         ""
     end
   end
 
-  defp inline_paid_via?(%{payment_method: "counter"} = order), do: staff_mark_paid?(order)
-  defp inline_paid_via?(_), do: false
+  defp payment_action_projection(%{status: "cancelled"}), do: :none
+
+  defp payment_action_projection(%{payment_status: status})
+       when status not in ["unpaid", "awaiting_payment"],
+       do: :none
+
+  defp payment_action_projection(%{payment_method: "counter", payment_intent: "cash"}),
+    do: {:inline, [{"cash", "Cash"}]}
+
+  defp payment_action_projection(%{payment_method: "counter", payment_intent: nil}),
+    do: {:inline, legacy_counter_payment_options()}
+
+  defp payment_action_projection(%{
+         payment_method: "online",
+         payment_intent: wallet,
+         payment_status: "awaiting_payment"
+       })
+       when wallet in ["gcash", "maya"] do
+    if BusinessSettings.qrph_manual?() do
+      {:modal, [{wallet, wallet_label(wallet), :primary}]}
+    else
+      :waiting
+    end
+  end
+
+  defp payment_action_projection(%{
+         payment_method: "online",
+         payment_intent: nil,
+         payment_status: "awaiting_payment"
+       }) do
+    if BusinessSettings.qrph_manual?() do
+      {:modal, legacy_online_payment_options()}
+    else
+      :waiting
+    end
+  end
+
+  defp payment_action_projection(%{
+         payment_method: "online",
+         payment_intent: wallet
+       })
+       when wallet in [nil, "gcash", "maya"],
+       do: :waiting
+
+  defp payment_action_projection(_order), do: :none
+
+  defp legacy_counter_payment_options do
+    [{"cash", "Cash"}, {"gcash", "GCash"}, {"maya", "Maya"}]
+  end
+
+  defp legacy_online_payment_options do
+    [
+      {"gcash", "GCash", :primary},
+      {"maya", "Maya", :primary},
+      {"cash", "Paid cash instead", :escape}
+    ]
+  end
 
   defp mark_paid_modal(%{mark_paid_order: nil}), do: nil
 
   defp mark_paid_modal(assigns) do
     order = assigns.mark_paid_order
-    options = mark_paid_options(order)
+    {:modal, options} = payment_action_projection(order)
 
     assigns =
       assigns
@@ -1118,27 +1161,9 @@ defmodule EspresoWeb.StaffOrdersLive do
     """
   end
 
-  # Unpaid counter / POS pay-later: cash + wallets (no vague "Counter").
-  defp mark_paid_options(%{payment_method: "counter"}) do
-    [
-      {"cash", "Cash", :primary},
-      {"gcash", "GCash", :primary},
-      {"maya", "Maya", :primary}
-    ]
-  end
-
-  # Online / QR awaiting: wallets first; cash as quiet escape if they paid at counter instead.
-  defp mark_paid_options(_order) do
-    [
-      {"gcash", "GCash", :primary},
-      {"maya", "Maya", :primary},
-      {"cash", "Paid cash instead", :escape}
-    ]
-  end
-
   defp mark_paid_note(%{payment_method: "online", payment_intent: wallet})
        when wallet in ["gcash", "maya"] do
-    "Expected #{wallet_label(wallet)}. Confirm the wallet they used, or cash if they paid at the counter."
+    "Expected #{wallet_label(wallet)}. Confirm that payment was received."
   end
 
   defp mark_paid_note(%{payment_method: "online"}) do
