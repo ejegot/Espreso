@@ -1319,16 +1319,20 @@ defmodule EspresoWeb.StaffPosLive do
             }
           end)
 
-        attrs = %{
-          customer_name: customer_name,
-          notes: blank_notes(socket.assigns.notes),
-          fulfillment: socket.assigns.fulfillment,
-          table_number: nil,
-          payment_method: :counter,
-          payment_status: socket.assigns.payment_choice,
-          paid_via: paid_via,
-          source: :pos
-        }
+        attrs =
+          %{
+            customer_name: customer_name,
+            notes: blank_notes(socket.assigns.notes),
+            fulfillment: socket.assigns.fulfillment,
+            table_number: nil,
+            payment_method: :counter,
+            payment_status: socket.assigns.payment_choice,
+            paid_via: paid_via,
+            source: :pos
+          }
+          |> maybe_put_cash_settlement(tendered)
+          |> Map.put(:settled_by_user_id, socket.assigns.current_user.id)
+          |> Map.put(:settlement_source, :pos)
 
         socket = assign(socket, :placing_order?, true)
 
@@ -2085,6 +2089,11 @@ defmodule EspresoWeb.StaffPosLive do
   end
 
   defp print_note_result(_, _), do: {nil, false, false}
+
+  defp maybe_put_cash_settlement(attrs, %Decimal{} = tendered),
+    do: Map.put(attrs, :cash_tendered, tendered)
+
+  defp maybe_put_cash_settlement(attrs, _), do: attrs
 
   defp order_note(%{notes: notes}) when is_binary(notes) do
     trimmed = String.trim(notes)

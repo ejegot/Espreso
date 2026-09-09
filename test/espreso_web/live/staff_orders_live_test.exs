@@ -259,7 +259,10 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert has_element?(view, "#orders-cash-preset-1000")
   end
 
-  test "Cash overpayment settles as cash through the existing action", %{conn: conn} do
+  test "Cash overpayment settles as cash through the existing action", %{
+    conn: conn,
+    barista: barista
+  } do
     order = cash_intent_order!("Cash Change", "150")
     {:ok, view, _html} = live(conn, ~p"/orders")
     view |> element("#ticket-new-paid-via-cash-#{order.id}") |> render_click()
@@ -276,6 +279,12 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert paid.payment_status == "paid"
     assert paid.paid_via == "cash"
     assert paid.status == "preparing"
+    assert %DateTime{} = paid.settled_at
+    assert paid.settled_by_user_id == barista.id
+    assert paid.settlement_source == "staff_orders"
+    assert paid.settlement_time_estimated == false
+    assert Decimal.equal?(paid.cash_tendered, Decimal.new("200"))
+    assert Decimal.equal?(paid.change_due, Decimal.new("50"))
     refute has_element?(view, "#orders-cash-tender-modal")
   end
 

@@ -63,9 +63,12 @@ defmodule Espreso.PhysicalActionCoordinator do
     server = Keyword.get(opts, :server, __MODULE__)
     staff_name = Keyword.get(opts, :staff_name)
 
+    settlement_opts =
+      Keyword.take(opts, [:settled_by_user_id, :settlement_source, :cash_tendered])
+
     GenServer.call(
       server,
-      {:execute_mark_paid, order_id, permit_id, paid_via, staff_name},
+      {:execute_mark_paid, order_id, permit_id, paid_via, staff_name, settlement_opts},
       :infinity
     )
   end
@@ -130,7 +133,7 @@ defmodule Espreso.PhysicalActionCoordinator do
   end
 
   def handle_call(
-        {:execute_mark_paid, _order_id, _permit_id, _paid_via, _staff_name},
+        {:execute_mark_paid, _order_id, _permit_id, _paid_via, _staff_name, _settlement_opts},
         _from,
         %{recovery_required?: true} = state
       ) do
@@ -150,7 +153,7 @@ defmodule Espreso.PhysicalActionCoordinator do
   end
 
   def handle_call(
-        {:execute_mark_paid, order_id, permit_id, paid_via, staff_name},
+        {:execute_mark_paid, order_id, permit_id, paid_via, staff_name, settlement_opts},
         _from,
         state
       ) do
@@ -164,7 +167,8 @@ defmodule Espreso.PhysicalActionCoordinator do
           order_id,
           permit_id,
           paid_via,
-          staff_name
+          staff_name,
+          settlement_opts
         )
 
       {:duplicate, result} ->
@@ -219,7 +223,8 @@ defmodule Espreso.PhysicalActionCoordinator do
          order_id,
          permit_id,
          paid_via,
-         staff_name
+         staff_name,
+         settlement_opts
        ) do
     entry = Map.fetch!(state.permits, key)
     state = put_in(state, [:permits, key, :state], :running)
@@ -232,7 +237,8 @@ defmodule Espreso.PhysicalActionCoordinator do
           order_id,
           permit_id,
           paid_via,
-          staff_name
+          staff_name,
+          settlement_opts
         )
 
       :receipt ->
@@ -249,9 +255,12 @@ defmodule Espreso.PhysicalActionCoordinator do
          order_id,
          permit_id,
          paid_via,
-         staff_name
+         staff_name,
+         settlement_opts
        ) do
-    case Orders.mark_paid_with_transition(%Order{id: order_id}, paid_via: paid_via) do
+    mark_paid_opts = [paid_via: paid_via] ++ settlement_opts
+
+    case Orders.mark_paid_with_transition(%Order{id: order_id}, mark_paid_opts) do
       {:ok, :transitioned, order} ->
         order = Repo.preload(order, :items)
 
@@ -539,6 +548,11 @@ defmodule Espreso.PhysicalActionCoordinator do
   defp recoverable_payment_settlement_error?(:invalid_paid_via), do: true
   defp recoverable_payment_settlement_error?(:paymongo_authority_required), do: true
   defp recoverable_payment_settlement_error?(:payment_channel_mismatch), do: true
+  defp recoverable_payment_settlement_error?(:invalid_settlement_source), do: true
+  defp recoverable_payment_settlement_error?(:invalid_settled_by_user), do: true
+  defp recoverable_payment_settlement_error?(:invalid_cash_tendered), do: true
+  defp recoverable_payment_settlement_error?(:cash_tender_too_low), do: true
+  defp recoverable_payment_settlement_error?(:cash_metadata_not_applicable), do: true
 
   defp recoverable_payment_settlement_error?({
          :payment_intent_mismatch,

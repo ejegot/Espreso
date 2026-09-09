@@ -26,6 +26,9 @@ defmodule Espreso.PrinterTest do
       paid_via: "cash",
       total: Decimal.new("170"),
       inserted_at: ~N[2026-09-05 12:00:00],
+      settled_at: ~U[2026-09-05 12:00:00Z],
+      cash_tendered: Decimal.new("200"),
+      change_due: Decimal.new("30"),
       items: [
         %OrderItem{
           name: "Americano",
@@ -53,6 +56,11 @@ defmodule Espreso.PrinterTest do
     assert receipt =~ "TOTAL"
     assert receipt =~ "P95.00"
     assert receipt =~ "P170.00"
+    assert receipt =~ "Cash"
+    assert receipt =~ "P200.00"
+    assert receipt =~ "Change"
+    assert receipt =~ "P30.00"
+    assert receipt =~ "9/5/26 8:00 PM"
     assert receipt =~ "Employee: Jun"
     assert receipt =~ "84 Lilac St., Marikina City"
     assert receipt =~ "CoffeeSpot_Guest"

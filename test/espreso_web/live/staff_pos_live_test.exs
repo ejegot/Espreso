@@ -1021,6 +1021,12 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert order.source == "pos"
     assert order.status == "preparing"
     assert Decimal.equal?(order.total, Decimal.new("185"))
+    assert %DateTime{} = order.settled_at
+    assert order.settled_by_user_id == barista.id
+    assert order.settlement_source == "pos"
+    assert order.settlement_time_estimated == false
+    assert Decimal.equal?(order.cash_tendered, Decimal.new("200"))
+    assert Decimal.equal?(order.change_due, Decimal.new("15"))
 
     assert live_assigns(view).cash_tendered == ""
     assert live_assigns(view).cash_tender_open? == false

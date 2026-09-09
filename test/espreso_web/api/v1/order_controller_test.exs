@@ -29,7 +29,15 @@ defmodule EspresoWeb.Api.V1.OrderControllerTest do
   } do
     {:ok, order} =
       Orders.create_order(
-        [%{product_id: product.id, name: product.name, size: nil, quantity: 1, price: price.price}],
+        [
+          %{
+            product_id: product.id,
+            name: product.name,
+            size: nil,
+            quantity: 1,
+            price: price.price
+          }
+        ],
         %{customer_name: "API Guest", fulfillment: :pickup, payment_method: :counter}
       )
 
@@ -47,10 +55,20 @@ defmodule EspresoWeb.Api.V1.OrderControllerTest do
     conn =
       build_conn()
       |> json_auth_conn(barista)
-      |> patch(~p"/api/v1/orders/#{order.id}/mark_paid", %{paid_via: "cash"})
+      |> patch(~p"/api/v1/orders/#{order.id}/mark_paid", %{
+        paid_via: "cash",
+        cash_tendered: "100"
+      })
 
     assert %{"order" => %{"payment_status" => "paid", "paid_via" => "cash"}} =
              json_response(conn, 200)
+
+    paid = Repo.get!(Espreso.Orders.Order, order.id)
+    assert %DateTime{} = paid.settled_at
+    assert paid.settled_by_user_id == barista.id
+    assert paid.settlement_source == "api"
+    assert Decimal.equal?(paid.cash_tendered, Decimal.new("100"))
+    assert Decimal.equal?(paid.change_due, Decimal.new("25"))
   end
 
   test "POST /orders creates a walk-in POS order", %{
@@ -70,6 +88,33 @@ defmodule EspresoWeb.Api.V1.OrderControllerTest do
 
     assert %{"order" => %{"customer_name" => "Walk-in API", "source" => "pos"}} =
              json_response(conn, 201)
+  end
+
+  test "POST /orders records API settlement metadata for paid-at-create orders", %{
+    conn: conn,
+    barista: barista,
+    product: product,
+    price: price
+  } do
+    conn =
+      conn
+      |> json_auth_conn(barista)
+      |> post(~p"/api/v1/orders", %{
+        customer_name: "Paid API",
+        payment_status: "paid",
+        cash_tendered: "100",
+        lines: [%{product_id: product.id, price_id: price.id, quantity: 1}]
+      })
+
+    assert %{"order" => %{"id" => order_id, "payment_status" => "paid"}} =
+             json_response(conn, 201)
+
+    paid = Repo.get!(Espreso.Orders.Order, order_id)
+    assert %DateTime{} = paid.settled_at
+    assert paid.settled_by_user_id == barista.id
+    assert paid.settlement_source == "api"
+    assert Decimal.equal?(paid.cash_tendered, Decimal.new("100"))
+    assert Decimal.equal?(paid.change_due, Decimal.new("25"))
   end
 
   test "settings business is readable by any authenticated staff", %{conn: conn, barista: barista} do
