@@ -27,6 +27,10 @@ defmodule EspresoWeb.StaffOrdersLive do
      |> assign(:reconciliation_drawer_open, false)
      |> assign(:mark_paid_order, nil)
      |> assign(:mark_paid_recoveries, %{})
+     |> assign(:cash_tender_order, nil)
+     |> assign(:cash_tendered, "")
+     |> assign(:cash_tender_error, nil)
+     |> assign(:cash_tender_token, nil)
      |> assign(:alert_banner, nil)
      |> load_orders(), layout: false}
   end
@@ -177,6 +181,99 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   def handle_event("close_mark_paid", _params, socket) do
     {:noreply, assign(socket, :mark_paid_order, nil)}
+  end
+
+  def handle_event("open_cash_tender", %{"id" => id}, socket) do
+    socket = load_orders(socket)
+
+    with {order_id, ""} <- Integer.parse(id),
+         %Espreso.Orders.Order{} = order <- Repo.get(Espreso.Orders.Order, order_id),
+         true <- cash_payment_action?(order),
+         permit when is_binary(permit) <- Map.get(socket.assigns.mark_paid_permits, order_id) do
+      {:noreply,
+       socket
+       |> assign(:mark_paid_order, nil)
+       |> assign(:cash_tender_order, order)
+       |> assign(:cash_tendered, "")
+       |> assign(:cash_tender_error, nil)
+       |> assign(:cash_tender_token, new_cash_tender_token())}
+    else
+      _ ->
+        {:noreply,
+         socket
+         |> close_cash_tender()
+         |> assign(:flash_note, "Could not mark order paid.")}
+    end
+  end
+
+  def handle_event("open_cash_tender", _params, socket) do
+    {:noreply, assign(socket, :flash_note, "Could not mark order paid.")}
+  end
+
+  def handle_event(
+        "set_order_cash_tendered",
+        %{"cash_tendered" => amount},
+        %{assigns: %{cash_tender_order: %Espreso.Orders.Order{}}} = socket
+      ) do
+    {:noreply,
+     socket
+     |> assign(:cash_tendered, String.trim(amount))
+     |> assign(:cash_tender_error, nil)}
+  end
+
+  def handle_event("set_order_cash_tendered", _params, socket), do: {:noreply, socket}
+
+  def handle_event(
+        "order_cash_exact",
+        _params,
+        %{assigns: %{cash_tender_order: %Espreso.Orders.Order{total: total}}} = socket
+      ) do
+    {:noreply,
+     socket
+     |> assign(:cash_tendered, money_input(total))
+     |> assign(:cash_tender_error, nil)}
+  end
+
+  def handle_event("order_cash_exact", _params, socket), do: {:noreply, socket}
+
+  def handle_event(
+        "order_cash_chip",
+        %{"amount" => amount},
+        %{assigns: %{cash_tender_order: %Espreso.Orders.Order{}}} = socket
+      ) do
+    case parse_money(amount) do
+      {:ok, tendered} ->
+        {:noreply,
+         socket
+         |> assign(:cash_tendered, money_input(tendered))
+         |> assign(:cash_tender_error, nil)}
+
+      :error ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("order_cash_chip", _params, socket), do: {:noreply, socket}
+
+  def handle_event("cancel_order_cash_tender", _params, socket) do
+    {:noreply, close_cash_tender(socket)}
+  end
+
+  def handle_event("confirm_order_cash_tender", params, socket) do
+    tendered = Map.get(params, "cash_tendered", socket.assigns.cash_tendered)
+    token = Map.get(params, "cash_tender_token")
+    socket = assign(socket, :cash_tendered, String.trim(to_string(tendered)))
+
+    cond do
+      is_nil(socket.assigns.cash_tender_order) ->
+        {:noreply, socket}
+
+      token != socket.assigns.cash_tender_token ->
+        {:noreply, assign(socket, :cash_tender_error, "This cash entry is no longer active.")}
+
+      true ->
+        confirm_order_cash_tender(socket)
+    end
   end
 
   def handle_event(
@@ -691,6 +788,7 @@ defmodule EspresoWeb.StaffOrdersLive do
           </div>
         </aside>
 
+        {order_cash_tender_modal(assigns)}
         {mark_paid_modal(assigns)}
       </div>
     </.staff_shell>
@@ -1012,7 +1110,7 @@ defmodule EspresoWeb.StaffOrdersLive do
             type="button"
             class="staff-action staff-action-primary staff-action-paid-via"
             id={"#{@id_prefix}-#{@lane}-paid-via-#{paid_via}-#{@order.id}"}
-            phx-click="mark_paid"
+            phx-click={if(paid_via == "cash", do: "open_cash_tender", else: "mark_paid")}
             phx-value-id={@order.id}
             phx-value-paid_via={paid_via}
             phx-value-action="mark_paid"
@@ -1087,6 +1185,19 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   defp payment_action_projection(_order), do: :none
 
+  defp cash_payment_action?(order) do
+    case payment_action_projection(order) do
+      {:inline, options} ->
+        Enum.any?(options, fn {paid_via, _label} -> paid_via == "cash" end)
+
+      {:modal, options} ->
+        Enum.any?(options, fn {paid_via, _label, _kind} -> paid_via == "cash" end)
+
+      _ ->
+        false
+    end
+  end
+
   defp legacy_counter_payment_options do
     [{"cash", "Cash"}, {"gcash", "GCash"}, {"maya", "Maya"}]
   end
@@ -1097,6 +1208,162 @@ defmodule EspresoWeb.StaffOrdersLive do
       {"maya", "Maya", :primary},
       {"cash", "Paid cash instead", :escape}
     ]
+  end
+
+  defp order_cash_tender_modal(%{cash_tender_order: nil}), do: nil
+
+  defp order_cash_tender_modal(assigns) do
+    order = assigns.cash_tender_order
+    total = Decimal.round(order.total, 2)
+    tender_state = cash_tender_state(assigns.cash_tendered, total)
+
+    assigns =
+      assigns
+      |> assign(:order, order)
+      |> assign(:total, total)
+      |> assign(:tender_state, tender_state)
+      |> assign(:quick_tenders, cash_quick_tenders(total))
+      |> assign(:confirm_enabled?, cash_tender_valid?(tender_state))
+      |> assign(:mark_paid_permit, Map.get(assigns.mark_paid_permits, order.id))
+
+    ~H"""
+    <div
+      class="staff-mark-paid-modal"
+      id="orders-cash-tender-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="orders-cash-tender-modal-title"
+    >
+      <button
+        type="button"
+        class="staff-mark-paid-modal-backdrop"
+        phx-click="cancel_order_cash_tender"
+        aria-label="Close Cash Received dialog"
+      />
+      <div class="staff-mark-paid-modal-panel staff-pos-cash-modal">
+        <header class="staff-mark-paid-modal-head staff-pos-cash-modal-head">
+          <div>
+            <p class="staff-mark-paid-modal-eyebrow">Cash payment</p>
+            <h2 id="orders-cash-tender-modal-title" class="staff-mark-paid-modal-title">
+              Cash Received
+            </h2>
+            <p class="staff-mark-paid-modal-sub">
+              {@order.number} · {@order.customer_name}
+            </p>
+          </div>
+          <button
+            type="button"
+            class="staff-mark-paid-modal-close"
+            phx-click="cancel_order_cash_tender"
+            aria-label="Close Cash Received dialog"
+          >
+            ×
+          </button>
+        </header>
+
+        <div class="staff-pos-cash-total" id="orders-cash-total">
+          <span>Order total</span>
+          <strong>{Orders.format_total(@order)}</strong>
+        </div>
+
+        <form
+          id="orders-cash-tender-form"
+          phx-change="set_order_cash_tendered"
+          phx-submit="confirm_order_cash_tender"
+        >
+          <input type="hidden" name="cash_tender_token" value={@cash_tender_token} />
+
+          <label class="staff-pos-cash-field" for="orders-cash-tendered">
+            <span>Cash received</span>
+            <span class="staff-pos-cash-input-wrap">
+              <span aria-hidden="true">₱</span>
+              <input
+                type="text"
+                inputmode="decimal"
+                autocomplete="off"
+                id="orders-cash-tendered"
+                name="cash_tendered"
+                value={@cash_tendered}
+                placeholder="0.00"
+                aria-describedby="orders-cash-tender-feedback"
+                aria-invalid={to_string(@tender_state == :invalid or not is_nil(@cash_tender_error))}
+              />
+            </span>
+          </label>
+
+          <div class="staff-pos-cash-quick" id="orders-cash-quick-tenders">
+            <button
+              type="button"
+              id="orders-cash-exact"
+              phx-click="order_cash_exact"
+              aria-label="Set cash received to the exact order total"
+            >
+              Exact
+            </button>
+            <button
+              :for={amount <- @quick_tenders}
+              type="button"
+              id={"orders-cash-preset-#{Decimal.to_integer(amount)}"}
+              phx-click="order_cash_chip"
+              phx-value-amount={Decimal.to_string(amount, :normal)}
+              aria-label={"Set cash received to #{format_money(amount)}"}
+            >
+              {format_money(amount)}
+            </button>
+          </div>
+
+          <div
+            class={[
+              "staff-pos-cash-feedback",
+              match?({:short, _, _}, @tender_state) && "is-short",
+              (@tender_state == :invalid or not is_nil(@cash_tender_error)) && "is-error"
+            ]}
+            id="orders-cash-tender-feedback"
+            aria-live="polite"
+          >
+            <%= case @tender_state do %>
+              <% {:exact, _tendered, change} -> %>
+                <span>Exact</span>
+                <strong>{format_money(change)} change</strong>
+              <% {:change, _tendered, change} -> %>
+                <span>Change</span>
+                <strong>{format_money(change)}</strong>
+              <% {:short, _tendered, needed} -> %>
+                <span>Still needed</span>
+                <strong>{format_money(needed)}</strong>
+              <% :invalid -> %>
+                <span>Enter a valid amount with up to 2 decimal places.</span>
+              <% :blank -> %>
+                <span>Enter cash received or choose a quick amount.</span>
+            <% end %>
+            <span :if={@cash_tender_error} class="staff-pos-cash-feedback-error">
+              {@cash_tender_error}
+            </span>
+          </div>
+
+          <div class="staff-pos-cash-modal-actions">
+            <button
+              type="button"
+              class="staff-action"
+              id="orders-cancel-cash"
+              phx-click="cancel_order_cash_tender"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="staff-action staff-action-primary"
+              id="orders-confirm-cash"
+              disabled={!@confirm_enabled? or not is_binary(@mark_paid_permit)}
+              phx-disable-with="Processing…"
+            >
+              Confirm Cash
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    """
   end
 
   defp mark_paid_modal(%{mark_paid_order: nil}), do: nil
@@ -1147,7 +1414,7 @@ defmodule EspresoWeb.StaffOrdersLive do
               @suggested_paid_via == paid_via && "is-suggested"
             ]}
             id={"mark-paid-modal-#{paid_via}"}
-            phx-click="mark_paid"
+            phx-click={if(paid_via == "cash", do: "open_cash_tender", else: "mark_paid")}
             phx-value-id={@order.id}
             phx-value-paid_via={paid_via}
             phx-value-action="mark_paid"
@@ -1246,6 +1513,126 @@ defmodule EspresoWeb.StaffOrdersLive do
        do: true
 
   defp recoverable_payment_choice_error?(_reason), do: false
+
+  defp confirm_order_cash_tender(socket) do
+    order_id = socket.assigns.cash_tender_order.id
+    socket = load_orders(socket)
+
+    with %Espreso.Orders.Order{} = order <- Repo.get(Espreso.Orders.Order, order_id),
+         true <- cash_payment_action?(order),
+         {:ok, _tendered, _change} <-
+           valid_cash_tender(socket.assigns.cash_tendered, order.total),
+         permit when is_binary(permit) <- Map.get(socket.assigns.mark_paid_permits, order.id) do
+      socket
+      |> close_cash_tender()
+      |> then(
+        &handle_event(
+          "mark_paid",
+          %{
+            "id" => Integer.to_string(order.id),
+            "action" => "mark_paid",
+            "permit" => permit,
+            "paid_via" => "cash"
+          },
+          &1
+        )
+      )
+    else
+      {:error, message} ->
+        {:noreply, assign(socket, :cash_tender_error, message)}
+
+      _ ->
+        {:noreply,
+         socket
+         |> close_cash_tender()
+         |> load_orders()
+         |> assign(:flash_note, "Could not mark order paid.")}
+    end
+  end
+
+  defp close_cash_tender(socket) do
+    socket
+    |> assign(:cash_tender_order, nil)
+    |> assign(:cash_tendered, "")
+    |> assign(:cash_tender_error, nil)
+    |> assign(:cash_tender_token, nil)
+  end
+
+  defp valid_cash_tender(amount, total) do
+    case cash_tender_state(amount, total) do
+      {:exact, tendered, change} ->
+        {:ok, tendered, change}
+
+      {:change, tendered, change} ->
+        {:ok, tendered, change}
+
+      {:short, _tendered, needed} ->
+        {:error, "Cash received is short by #{format_money(needed)}."}
+
+      :blank ->
+        {:error, "Enter the cash received."}
+
+      :invalid ->
+        {:error, "Enter a valid cash amount with up to 2 decimal places."}
+    end
+  end
+
+  defp parse_money(amount) when is_binary(amount) do
+    amount = String.trim(amount)
+
+    if Regex.match?(~r/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$|^\.\d{1,2}$/, amount) do
+      cleaned = String.replace(amount, ",", "")
+
+      case Decimal.parse(cleaned) do
+        {decimal, ""} ->
+          if Decimal.compare(decimal, Decimal.new(0)) == :gt do
+            {:ok, Decimal.round(decimal, 2)}
+          else
+            :error
+          end
+
+        _ ->
+          :error
+      end
+    else
+      :error
+    end
+  end
+
+  defp parse_money(_), do: :error
+
+  defp cash_tender_state(amount, total) do
+    total = Decimal.round(total, 2)
+
+    if is_binary(amount) and String.trim(amount) == "" do
+      :blank
+    else
+      case parse_money(amount) do
+        {:ok, tendered} ->
+          case Decimal.compare(tendered, total) do
+            :lt -> {:short, tendered, Decimal.sub(total, tendered)}
+            :eq -> {:exact, tendered, Decimal.new("0.00")}
+            :gt -> {:change, tendered, Decimal.sub(tendered, total)}
+          end
+
+        :error ->
+          :invalid
+      end
+    end
+  end
+
+  defp cash_tender_valid?({kind, _tendered, _change}) when kind in [:exact, :change], do: true
+  defp cash_tender_valid?(_state), do: false
+
+  defp cash_quick_tenders(total) do
+    ["100", "200", "500", "1000"]
+    |> Enum.map(&Decimal.new/1)
+    |> Enum.filter(&(Decimal.compare(&1, total) in [:eq, :gt]))
+  end
+
+  defp money_input(value), do: value |> Decimal.round(2) |> Decimal.to_string(:normal)
+  defp format_money(value), do: Espreso.Menu.format_price(value)
+  defp new_cash_tender_token, do: Integer.to_string(System.unique_integer([:positive]))
 
   defp source_badge(%{source: "pos"}), do: %{label: "WALK-IN", class: "staff-order-source--pos"}
   defp source_badge(_), do: %{label: "QR", class: "staff-order-source--customer"}
