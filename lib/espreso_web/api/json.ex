@@ -32,7 +32,7 @@ defmodule EspresoWeb.Api.JSON do
       payment_method: order.payment_method,
       payment_status: order.payment_status,
       paid_via: order.paid_via,
-      online_wallet: order.online_wallet,
+      online_wallet: order.payment_intent,
       payment_label: Orders.payment_label(order),
       source: order.source,
       total: decimal_string(order.total),

@@ -38,7 +38,10 @@ defmodule EspresoWeb.Api.V1.OrderControllerTest do
     assert Enum.any?(orders, &(&1["id"] == order.id))
 
     conn = build_conn() |> json_auth_conn(barista) |> get(~p"/api/v1/orders/#{order.id}")
-    assert %{"order" => %{"number" => number}} = json_response(conn, 200)
+
+    assert %{"order" => %{"number" => number, "online_wallet" => nil}} =
+             json_response(conn, 200)
+
     assert number == order.number
 
     conn =

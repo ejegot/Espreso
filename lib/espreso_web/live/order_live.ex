@@ -380,19 +380,19 @@ defmodule EspresoWeb.OrderLive do
     """
   end
 
-  defp qrph_title(%{online_wallet: "gcash"}), do: "Pay with GCash"
-  defp qrph_title(%{online_wallet: "maya"}), do: "Pay with Maya"
+  defp qrph_title(%{payment_intent: "gcash"}), do: "Pay with GCash"
+  defp qrph_title(%{payment_intent: "maya"}), do: "Pay with Maya"
   defp qrph_title(_), do: "Pay with QRPh"
 
-  defp qrph_wallet_brand(%{online_wallet: "gcash"}), do: "GCash"
-  defp qrph_wallet_brand(%{online_wallet: "maya"}), do: "Maya"
+  defp qrph_wallet_brand(%{payment_intent: "gcash"}), do: "GCash"
+  defp qrph_wallet_brand(%{payment_intent: "maya"}), do: "Maya"
   defp qrph_wallet_brand(_), do: nil
 
-  defp qrph_open_actions(%{online_wallet: "gcash"}) do
+  defp qrph_open_actions(%{payment_intent: "gcash"}) do
     [%{id: "gcash", label: "Open GCash", href: wallet_open_href("gcash")}]
   end
 
-  defp qrph_open_actions(%{online_wallet: "maya"}) do
+  defp qrph_open_actions(%{payment_intent: "maya"}) do
     [%{id: "maya", label: "Open Maya", href: wallet_open_href("maya")}]
   end
 
@@ -453,7 +453,7 @@ defmodule EspresoWeb.OrderLive do
          status: "received",
          payment_method: "online",
          payment_status: "awaiting_payment",
-         online_wallet: "gcash"
+         payment_intent: "gcash"
        }),
        do: "Keep this screen open — it updates when staff confirms your GCash payment."
 
@@ -461,7 +461,7 @@ defmodule EspresoWeb.OrderLive do
          status: "received",
          payment_method: "online",
          payment_status: "awaiting_payment",
-         online_wallet: "maya"
+         payment_intent: "maya"
        }),
        do: "Keep this screen open — it updates when staff confirms your Maya payment."
 

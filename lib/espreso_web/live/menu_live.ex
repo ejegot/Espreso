@@ -2728,7 +2728,7 @@ defmodule EspresoWeb.MenuLive do
     }
 
     if payment_method == :online and wallet do
-      Map.put(attrs, :online_wallet, wallet)
+      Map.put(attrs, :payment_intent, wallet)
     else
       attrs
     end

@@ -1621,7 +1621,7 @@ defmodule Espreso.OrdersTest do
                  customer_name: "GCash Guest",
                  fulfillment: :pickup,
                  payment_method: :online,
-                 online_wallet: :gcash
+                 payment_intent: :gcash
                })
 
       assert Orders.payment_label(gcash_order) == "Awaiting GCash payment"
@@ -1631,10 +1631,26 @@ defmodule Espreso.OrdersTest do
                  customer_name: "Maya Guest",
                  fulfillment: :pickup,
                  payment_method: :online,
-                 online_wallet: :maya
+                 payment_intent: :maya
                })
 
       assert Orders.payment_label(maya_order) == "Awaiting Maya payment"
+    end
+
+    test "payment intent accepts cash without treating it as settlement" do
+      lines = [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("100")}]
+
+      assert {:ok, order} =
+               Orders.create_order(lines, %{
+                 customer_name: "Cash Intent",
+                 fulfillment: :pickup,
+                 payment_method: :counter,
+                 payment_intent: :cash
+               })
+
+      assert order.payment_intent == "cash"
+      assert order.payment_status == "unpaid"
+      assert order.paid_via == nil
     end
 
     test "online unpaid paymongo orders still block manual mark_paid" do
