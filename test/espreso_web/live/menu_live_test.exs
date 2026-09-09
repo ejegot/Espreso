@@ -1040,7 +1040,11 @@ defmodule EspresoWeb.MenuLiveTest do
 
     refute has_element?(view, "#menu-checkout-summary")
     refute has_element?(view, ".menu-checkout-payment .menu-checkout-option")
-    assert has_element?(view, "button.menu-basket-checkout", "Place order")
+    assert has_element?(
+             view,
+             "button.menu-basket-checkout[data-dismiss-keyboard]",
+             "Place order"
+           )
     assert has_element?(view, ".menu-checkout-payment-note", "Pay at the counter when your order is ready.")
     refute has_element?(view, ".menu-basket-submit-payment")
     refute has_element?(view, ".menu-basket-alt-label")

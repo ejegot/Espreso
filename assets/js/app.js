@@ -703,6 +703,61 @@ Hooks.MenuSheet = {
   }
 }
 
+const keyboardDismissSelector = "[data-dismiss-keyboard]"
+const nonTextInputTypes = new Set([
+  "button",
+  "checkbox",
+  "color",
+  "file",
+  "hidden",
+  "image",
+  "radio",
+  "range",
+  "reset",
+  "submit"
+])
+let inputMethodComposing = false
+
+const acceptsVirtualKeyboardInput = element =>
+  element instanceof HTMLTextAreaElement ||
+  (element instanceof HTMLInputElement && !nonTextInputTypes.has(element.type))
+
+document.addEventListener("compositionstart", () => {
+  inputMethodComposing = true
+}, true)
+
+document.addEventListener("compositionend", () => {
+  inputMethodComposing = false
+}, true)
+
+document.addEventListener("pointerdown", event => {
+  if (
+    inputMethodComposing ||
+    event.isPrimary === false ||
+    (event.pointerType !== "touch" && event.pointerType !== "pen")
+  ) {
+    return
+  }
+
+  const completionControl =
+    event.target instanceof Element
+      ? event.target.closest(keyboardDismissSelector)
+      : null
+
+  if (
+    !completionControl ||
+    completionControl.matches(":disabled") ||
+    completionControl.getAttribute("aria-disabled") === "true"
+  ) {
+    return
+  }
+
+  const activeElement = document.activeElement
+  if (!acceptsVirtualKeyboardInput(activeElement)) return
+
+  activeElement.blur()
+}, true)
+
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
