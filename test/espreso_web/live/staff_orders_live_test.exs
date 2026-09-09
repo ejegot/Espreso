@@ -27,7 +27,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     %{conn: conn, barista: barista}
   end
 
-  test "Orders header centers CoffeeSpot and overlays actionable counts", %{
+  test "Orders header centers ELIlai Kafe and overlays actionable counts", %{
     conn: conn,
     barista: barista
   } do
@@ -35,7 +35,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     assert has_element?(view, "#staff-shell .staff-shell-bar--orders")
     assert has_element?(view, ".staff-shell-orders-title", "Orders")
-    assert has_element?(view, ".staff-shell-orders-brand", "CoffeeSpot")
+    assert has_element?(view, ".staff-shell-orders-brand", "ELIlai Kafe")
 
     assert has_element?(
              view,

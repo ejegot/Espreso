@@ -1,6 +1,6 @@
 defmodule EspresoWeb.StaffComponents do
   @moduledoc """
-  Shared staff chrome for the CoffeeSpot operations UI.
+  Shared employee chrome for the ELIlai Kafe operations UI.
   """
   use Phoenix.Component
 
@@ -36,9 +36,9 @@ defmodule EspresoWeb.StaffComponents do
     <div class={["staff-app site-page", @chrome == :rail && "staff-app--rail"]}>
       <%= if @chrome == :rail do %>
         <aside class="staff-pos-rail staff-pos-rail--icons" id="staff-pos-rail" aria-label="Staff">
-          <div class="staff-pos-rail-brand" title="CoffeeSpot">
-            <span class="staff-pos-rail-mark" aria-hidden="true">C</span>
-            <span class="sr-only">CoffeeSpot · {@page_title}</span>
+          <div class="staff-pos-rail-brand" title="ELIlai Kafe">
+            <span class="staff-pos-rail-wordmark" aria-hidden="true">ELIlai Kafe</span>
+            <span class="sr-only">ELIlai Kafe · {@page_title}</span>
           </div>
 
           <nav class="staff-pos-rail-nav">
@@ -121,7 +121,7 @@ defmodule EspresoWeb.StaffComponents do
                 <h1 class="staff-shell-title staff-shell-orders-title">{@page_title}</h1>
               </div>
 
-              <p class="staff-shell-brand staff-shell-orders-brand">CoffeeSpot</p>
+              <p class="staff-shell-brand staff-shell-orders-brand">ELIlai Kafe</p>
 
               <div class="staff-shell-tools-block staff-shell-tools-block--orders">
                 <div class="staff-shell-tools staff-shell-tools--orders">
@@ -137,7 +137,7 @@ defmodule EspresoWeb.StaffComponents do
               </div>
             <% else %>
               <div class="staff-shell-brand-block">
-                <p class="staff-shell-brand">CoffeeSpot</p>
+                <p class="staff-shell-brand">ELIlai Kafe</p>
                 <div class="staff-shell-heading">
                   <h1 class="staff-shell-title">{@page_title}</h1>
                   <p class="staff-shell-user">

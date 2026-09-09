@@ -76,15 +76,14 @@ defmodule EspresoWeb.StaffRegisterLive do
           <blockquote>
             “Skipping the morning line is a lifesaver!”
           </blockquote>
-          <figcaption>CoffeeSpot · Team</figcaption>
+          <figcaption>ELIlai Kafe · Team</figcaption>
         </figure>
       </aside>
 
       <main class="staff-auth-panel">
         <div class="staff-auth-panel-inner">
           <header class="staff-auth-brand">
-            <span class="staff-auth-mark" aria-hidden="true">☕</span>
-            <p class="staff-auth-brand-name">coffeespot</p>
+            <p class="staff-auth-brand-name">ELIlai Kafe</p>
           </header>
 
           <h1 class="staff-auth-title">Create your account</h1>
@@ -131,7 +130,7 @@ defmodule EspresoWeb.StaffRegisterLive do
                 type="email"
                 name="user[email]"
                 value={@form[:email].value}
-                placeholder="you@coffeespot.local"
+                placeholder="name@company.com"
                 autocomplete="username"
                 required
               />

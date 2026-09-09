@@ -147,7 +147,7 @@ defmodule EspresoWeb.StaffLoginLive do
             <div class="staff-auth-visual-shade"></div>
             <figure class="staff-auth-quote">
               <blockquote>“{slide.quote}”</blockquote>
-              <figcaption>CoffeeSpot · Lilac Marikina</figcaption>
+              <figcaption>ELIlai Kafe · Team</figcaption>
             </figure>
           </div>
         </div>
@@ -159,8 +159,7 @@ defmodule EspresoWeb.StaffLoginLive do
           @login_mode == :email && "staff-auth-panel-inner--owner"
         ]}>
           <header class="staff-auth-brand">
-            <span class="staff-auth-mark" aria-hidden="true">☕</span>
-            <p class="staff-auth-brand-name">coffeespot</p>
+            <p class="staff-auth-brand-name">ELIlai Kafe</p>
           </header>
 
           <h1 class="staff-auth-title">{login_title(@login_mode)}</h1>
@@ -337,7 +336,7 @@ defmodule EspresoWeb.StaffLoginLive do
                 type="email"
                 name="user[email]"
                 value={@form[:email].value}
-                placeholder="you@coffeespot.local"
+                placeholder="name@company.com"
                 autocomplete="username"
                 required
               />
