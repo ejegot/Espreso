@@ -262,6 +262,32 @@ defmodule Espreso.OrdersTest do
     assert again.payment_method == "counter"
   end
 
+  test "mark_paid_with_transition identifies the transition winner without changing mark_paid contract" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    {:ok, order} =
+      Orders.create_order(lines, %{
+        customer_name: "Transition Result",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    assert {:ok, :transitioned, paid} =
+             Orders.mark_paid_with_transition(order, paid_via: "cash")
+
+    assert paid.payment_status == "paid"
+    assert paid.paid_via == "cash"
+
+    assert {:ok, :already_paid, same_paid} =
+             Orders.mark_paid_with_transition(order, paid_via: "maya")
+
+    assert same_paid.id == paid.id
+    assert same_paid.paid_via == "cash"
+    assert {:ok, compatible} = Orders.mark_paid(order, paid_via: "maya")
+    assert compatible.id == paid.id
+    assert compatible.paid_via == "cash"
+  end
+
   test "mark_paid rejects cancelled orders" do
     lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
 

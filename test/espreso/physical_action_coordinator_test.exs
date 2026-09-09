@@ -322,6 +322,340 @@ defmodule Espreso.PhysicalActionCoordinatorTest do
            }
   end
 
+  test "Mark Paid transition winner dispatches one Cash receipt and one drawer command" do
+    parent = self()
+
+    start_coordinator_with(
+      dispatch_receipt: fn order, _opts ->
+        send(parent, {:mark_paid_receipt, order.id})
+        :dispatched
+      end,
+      dispatch_drawer: fn order, _opts ->
+        send(parent, {:mark_paid_drawer, order.id})
+        :dispatched
+      end
+    )
+
+    order = unpaid_order!()
+    permit = permit_for(order.id, :mark_paid)
+
+    assert {:ok, :transitioned, paid, {:dispatched, :receipt_and_drawer}} =
+             PhysicalActionCoordinator.execute_mark_paid(
+               order.id,
+               permit,
+               "cash",
+               server: @server
+             )
+
+    assert paid.payment_status == "paid"
+    assert paid.paid_via == "cash"
+    assert_receive {:mark_paid_receipt, order_id}
+    assert order_id == order.id
+    assert_receive {:mark_paid_drawer, ^order_id}
+    refute_receive {:mark_paid_receipt, _}
+    refute_receive {:mark_paid_drawer, _}
+
+    assert PhysicalActionCoordinator.permits(:mark_paid, [order.id], @server) == %{
+             order.id => nil
+           }
+  end
+
+  test "duplicate and concurrent Mark Paid claims execute exactly one physical sequence" do
+    parent = self()
+
+    start_coordinator_with(
+      dispatch_receipt: fn order, _opts ->
+        send(parent, {:mark_paid_receipt, order.id})
+        Process.sleep(50)
+        :dispatched
+      end,
+      dispatch_drawer: fn order, _opts ->
+        send(parent, {:mark_paid_drawer, order.id})
+        :dispatched
+      end
+    )
+
+    order = unpaid_order!()
+    permit = permit_for(order.id, :mark_paid)
+
+    results =
+      1..2
+      |> Enum.map(fn _ ->
+        Task.async(fn ->
+          PhysicalActionCoordinator.execute_mark_paid(
+            order.id,
+            permit,
+            "cash",
+            server: @server
+          )
+        end)
+      end)
+      |> Task.await_many()
+
+    assert Enum.count(results, &match?({:ok, :transitioned, _, _}, &1)) == 1
+    assert Enum.count(results, &match?({:duplicate, _}, &1)) == 1
+    assert_receive {:mark_paid_receipt, order_id}
+    assert order_id == order.id
+    assert_receive {:mark_paid_drawer, ^order_id}
+    refute_receive {:mark_paid_receipt, _}
+    refute_receive {:mark_paid_drawer, _}
+  end
+
+  test "already-paid Mark Paid claimant performs no physical effect" do
+    parent = self()
+
+    start_coordinator_with(
+      dispatch_receipt: fn order, _opts ->
+        send(parent, {:unexpected_receipt, order.id})
+        :dispatched
+      end,
+      dispatch_drawer: fn order, _opts ->
+        send(parent, {:unexpected_drawer, order.id})
+        :dispatched
+      end
+    )
+
+    order = unpaid_order!()
+    permit = permit_for(order.id, :mark_paid)
+    assert {:ok, paid} = Orders.mark_paid(order, paid_via: "cash")
+
+    assert {:ok, :already_paid, same_paid} =
+             PhysicalActionCoordinator.execute_mark_paid(
+               order.id,
+               permit,
+               "cash",
+               server: @server
+             )
+
+    assert same_paid.id == paid.id
+    refute_receive {:unexpected_receipt, _}
+    refute_receive {:unexpected_drawer, _}
+  end
+
+  test "wallet Mark Paid dispatches only the receipt phase" do
+    parent = self()
+
+    start_coordinator_with(
+      dispatch_receipt: fn order, _opts ->
+        send(parent, {:wallet_receipt, order.id})
+        :dispatched
+      end,
+      dispatch_drawer: fn order, _opts ->
+        send(parent, {:unexpected_drawer, order.id})
+        :dispatched
+      end
+    )
+
+    order = unpaid_order!()
+    permit = permit_for(order.id, :mark_paid)
+
+    assert {:ok, :transitioned, paid, {:dispatched, :receipt}} =
+             PhysicalActionCoordinator.execute_mark_paid(
+               order.id,
+               permit,
+               "gcash",
+               server: @server
+             )
+
+    assert paid.paid_via == "gcash"
+    assert_receive {:wallet_receipt, order_id}
+    assert order_id == order.id
+    refute_receive {:unexpected_drawer, _}
+  end
+
+  test "Cash drawer definite failure retries only the drawer phase" do
+    parent = self()
+    {:ok, attempts} = Agent.start_link(fn -> 0 end)
+
+    start_coordinator_with(
+      dispatch_receipt: fn order, _opts ->
+        send(parent, {:mark_paid_receipt, order.id})
+        :dispatched
+      end,
+      dispatch_drawer: fn order, _opts ->
+        attempt = Agent.get_and_update(attempts, &{&1 + 1, &1 + 1})
+        send(parent, {:mark_paid_drawer, order.id, attempt})
+        if attempt == 1, do: {:definite_failure, :econnrefused}, else: :dispatched
+      end
+    )
+
+    order = unpaid_order!()
+    permit = permit_for(order.id, :mark_paid)
+
+    assert {:ok, :transitioned, _paid, {:definite_failure, :drawer, :econnrefused, retry_permit}} =
+             PhysicalActionCoordinator.execute_mark_paid(
+               order.id,
+               permit,
+               "cash",
+               server: @server
+             )
+
+    assert_receive {:mark_paid_receipt, order_id}
+    assert order_id == order.id
+    assert_receive {:mark_paid_drawer, ^order_id, 1}
+
+    assert {:ok, :recovery, _paid, {:dispatched, :drawer}} =
+             PhysicalActionCoordinator.execute_mark_paid(
+               order.id,
+               retry_permit,
+               "maya",
+               server: @server
+             )
+
+    assert_receive {:mark_paid_drawer, ^order_id, 2}
+    refute_receive {:mark_paid_receipt, _}
+    refute_receive {:mark_paid_drawer, _, _}
+  end
+
+  test "Mark Paid receipt connection failure requires an explicit phase retry" do
+    parent = self()
+    {:ok, attempts} = Agent.start_link(fn -> 0 end)
+
+    start_coordinator_with(
+      dispatch_receipt: fn order, _opts ->
+        attempt = Agent.get_and_update(attempts, &{&1 + 1, &1 + 1})
+        send(parent, {:mark_paid_receipt_attempt, order.id, attempt})
+        if attempt == 1, do: {:definite_failure, :econnrefused}, else: :dispatched
+      end,
+      dispatch_drawer: fn order, _opts ->
+        send(parent, {:mark_paid_drawer, order.id})
+        :dispatched
+      end
+    )
+
+    order = unpaid_order!()
+    permit = permit_for(order.id, :mark_paid)
+
+    assert {:ok, :transitioned, _paid, {:definite_failure, :receipt, :econnrefused, retry_permit}} =
+             PhysicalActionCoordinator.execute_mark_paid(
+               order.id,
+               permit,
+               "cash",
+               server: @server
+             )
+
+    assert_receive {:mark_paid_receipt_attempt, order_id, 1}
+    assert order_id == order.id
+    refute_receive {:mark_paid_drawer, _}
+
+    assert {:ok, :recovery, _paid, {:dispatched, :receipt_and_drawer}} =
+             PhysicalActionCoordinator.execute_mark_paid(
+               order.id,
+               retry_permit,
+               "cash",
+               server: @server
+             )
+
+    assert_receive {:mark_paid_receipt_attempt, ^order_id, 2}
+    assert_receive {:mark_paid_drawer, ^order_id}
+  end
+
+  test "uncertain Mark Paid receipt is not retried and never attempts the drawer" do
+    parent = self()
+
+    start_coordinator_with(
+      dispatch_receipt: fn order, _opts ->
+        send(parent, {:mark_paid_receipt, order.id})
+        {:uncertain, :closed}
+      end,
+      dispatch_drawer: fn order, _opts ->
+        send(parent, {:unexpected_drawer, order.id})
+        :dispatched
+      end
+    )
+
+    order = unpaid_order!()
+    permit = permit_for(order.id, :mark_paid)
+
+    assert {:ok, :transitioned, _paid, {:uncertain, :receipt, :closed}} =
+             PhysicalActionCoordinator.execute_mark_paid(
+               order.id,
+               permit,
+               "cash",
+               server: @server
+             )
+
+    assert_receive {:mark_paid_receipt, order_id}
+    assert order_id == order.id
+    refute_receive {:unexpected_drawer, _}
+
+    assert PhysicalActionCoordinator.permits(:mark_paid, [order.id], @server) == %{
+             order.id => nil
+           }
+
+    assert {:duplicate, {:ok, :transitioned, _paid, {:uncertain, :receipt, :closed}}} =
+             PhysicalActionCoordinator.execute_mark_paid(
+               order.id,
+               permit,
+               "cash",
+               server: @server
+             )
+
+    refute_receive {:mark_paid_receipt, _}
+  end
+
+  test "uncertain Mark Paid drawer locks drawer recovery without replaying receipt" do
+    parent = self()
+
+    start_coordinator_with(
+      dispatch_receipt: fn order, _opts ->
+        send(parent, {:mark_paid_receipt, order.id})
+        :dispatched
+      end,
+      dispatch_drawer: fn order, _opts ->
+        send(parent, {:mark_paid_drawer, order.id})
+        {:uncertain, :closed}
+      end
+    )
+
+    order = unpaid_order!()
+    permit = permit_for(order.id, :mark_paid)
+
+    assert {:ok, :transitioned, _paid, {:uncertain, :drawer, :closed}} =
+             PhysicalActionCoordinator.execute_mark_paid(
+               order.id,
+               permit,
+               "cash",
+               server: @server
+             )
+
+    assert_receive {:mark_paid_receipt, order_id}
+    assert order_id == order.id
+    assert_receive {:mark_paid_drawer, ^order_id}
+
+    assert PhysicalActionCoordinator.permits(:mark_paid, [order.id], @server) == %{
+             order.id => nil
+           }
+
+    assert PhysicalActionCoordinator.permits(:drawer, [order.id], @server) == %{
+             order.id => nil
+           }
+
+    refute_receive {:mark_paid_receipt, _}
+    refute_receive {:mark_paid_drawer, _}
+  end
+
+  test "coordinator restart invalidates Mark Paid permits" do
+    order = unpaid_order!()
+    start_coordinator(fn _order, _opts -> :dispatched end)
+    permit = permit_for(order.id, :mark_paid)
+
+    stop_supervised!(@server)
+    start_coordinator(fn _order, _opts -> :dispatched end, acknowledge?: false)
+
+    assert {:recovery_required, :coordinator_restarted} =
+             PhysicalActionCoordinator.execute_mark_paid(
+               order.id,
+               permit,
+               "cash",
+               server: @server
+             )
+
+    assert PhysicalActionCoordinator.permits(:mark_paid, [order.id], @server) == %{}
+    assert :ok = PhysicalActionCoordinator.acknowledge_recovery(@server)
+    refute permit_for(order.id, :mark_paid) == permit
+  end
+
   test "coordinator restart invalidates permits and requires acknowledgement" do
     order = paid_order!()
     start_coordinator(fn _order, _opts -> :dispatched end)
@@ -381,13 +715,18 @@ defmodule Espreso.PhysicalActionCoordinatorTest do
   end
 
   defp paid_order! do
+    order = unpaid_order!()
+    {:ok, paid} = Orders.mark_paid(order, paid_via: "cash")
+    paid
+  end
+
+  defp unpaid_order! do
     {:ok, order} =
       Orders.create_order(
         [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
         %{customer_name: "Permit", fulfillment: :pickup, payment_method: :counter}
       )
 
-    {:ok, paid} = Orders.mark_paid(order, paid_via: "cash")
-    paid
+    order
   end
 end

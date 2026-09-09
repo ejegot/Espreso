@@ -26,6 +26,7 @@ defmodule EspresoWeb.StaffOrdersLive do
      |> assign(:unpaid_drawer_open, false)
      |> assign(:reconciliation_drawer_open, false)
      |> assign(:mark_paid_order, nil)
+     |> assign(:mark_paid_recoveries, %{})
      |> assign(:alert_banner, nil)
      |> load_orders(), layout: false}
   end
@@ -162,12 +163,15 @@ defmodule EspresoWeb.StaffOrdersLive do
   end
 
   def handle_event("open_mark_paid", %{"id" => id}, socket) do
-    order = Espreso.Repo.get!(Espreso.Orders.Order, id)
-
-    if staff_mark_paid?(order) do
-      {:noreply, assign(socket, :mark_paid_order, order)}
+    with {order_id, ""} <- Integer.parse(id),
+         %Espreso.Orders.Order{} = order <- Repo.get(Espreso.Orders.Order, order_id) do
+      if staff_mark_paid?(order) do
+        {:noreply, assign(socket, :mark_paid_order, order)}
+      else
+        {:noreply, socket}
+      end
     else
-      {:noreply, socket}
+      _ -> {:noreply, assign(socket, :flash_note, "Could not mark order paid.")}
     end
   end
 
@@ -175,26 +179,32 @@ defmodule EspresoWeb.StaffOrdersLive do
     {:noreply, assign(socket, :mark_paid_order, nil)}
   end
 
-  def handle_event("mark_paid", %{"id" => id} = params, socket) do
-    order = Repo.get!(Espreso.Orders.Order, id)
+  def handle_event(
+        "mark_paid",
+        %{"id" => id, "action" => "mark_paid", "permit" => permit} = params,
+        socket
+      ) do
     paid_via = Map.get(params, "paid_via", "counter")
 
-    case Orders.mark_paid(order, paid_via: paid_via) do
-      {:ok, paid} ->
-        paid = Repo.preload(paid, :items)
+    result =
+      PhysicalActionCoordinator.execute_mark_paid(id, permit, paid_via,
+        staff_name: socket.assigns.current_user.name
+      )
 
-        print_result =
-          Printer.after_paid(paid, paid.paid_via || paid_via,
-            staff_name: socket.assigns.current_user.name
-          )
-
+    case result do
+      {:ok, :transitioned, paid, physical_result} ->
         {:noreply,
          socket
          |> assign(:mark_paid_order, nil)
-         |> assign(
-           :flash_note,
-           mark_paid_flash(paid, paid_via, print_result)
-         )
+         |> update_mark_paid_recovery(paid.id, paid.paid_via || paid_via, physical_result)
+         |> assign(:flash_note, mark_paid_flash(paid, paid_via, physical_result))
+         |> load_orders()}
+
+      {:ok, :already_paid, paid} ->
+        {:noreply,
+         socket
+         |> assign(:mark_paid_order, nil)
+         |> assign(:flash_note, mark_paid_flash(paid, paid.paid_via || paid_via, :disabled))
          |> load_orders()}
 
       {:error, :cancelled} ->
@@ -210,7 +220,51 @@ defmodule EspresoWeb.StaffOrdersLive do
 
       {:error, _} ->
         {:noreply, assign(socket, :flash_note, "Could not mark order paid.")}
+
+      {:ineligible, :cancelled} ->
+        {:noreply, assign(socket, :flash_note, "Cancelled orders cannot be marked paid.")}
+
+      {:ineligible, :online_payment_required} ->
+        {:noreply,
+         assign(
+           socket,
+           :flash_note,
+           "This online order cannot be marked paid manually — wait for PayMongo or switch to QRPh mode."
+         )}
+
+      _ ->
+        {:noreply, assign(socket, :flash_note, "Could not mark order paid.")}
     end
+  end
+
+  def handle_event("mark_paid", _params, socket) do
+    {:noreply, assign(socket, :flash_note, "Could not mark order paid.")}
+  end
+
+  def handle_event(
+        "retry_mark_paid",
+        %{
+          "id" => id,
+          "action" => "mark_paid",
+          "permit" => permit,
+          "paid_via" => paid_via,
+          "phase" => phase
+        },
+        socket
+      ) do
+    result =
+      PhysicalActionCoordinator.execute_mark_paid(id, permit, paid_via,
+        staff_name: socket.assigns.current_user.name
+      )
+
+    {:noreply,
+     socket
+     |> handle_mark_paid_recovery_result(id, paid_via, phase, result)
+     |> load_orders()}
+  end
+
+  def handle_event("retry_mark_paid", _params, socket) do
+    {:noreply, assign(socket, :flash_note, "Could not mark order paid.")}
   end
 
   def handle_event("cancel_order", %{"id" => id}, socket) do
@@ -430,6 +484,8 @@ defmodule EspresoWeb.StaffOrdersLive do
                     reprint_permit={Map.get(@reprint_permits, order.id)}
                     kitchen_permit={Map.get(@kitchen_permits, order.id)}
                     drawer_permit={Map.get(@drawer_permits, order.id)}
+                    mark_paid_permit={Map.get(@mark_paid_permits, order.id)}
+                    mark_paid_recovery={Map.get(@mark_paid_recoveries, order.id)}
                   />
                 </div>
               </section>
@@ -454,6 +510,8 @@ defmodule EspresoWeb.StaffOrdersLive do
                     reprint_permit={Map.get(@reprint_permits, order.id)}
                     kitchen_permit={Map.get(@kitchen_permits, order.id)}
                     drawer_permit={Map.get(@drawer_permits, order.id)}
+                    mark_paid_permit={Map.get(@mark_paid_permits, order.id)}
+                    mark_paid_recovery={Map.get(@mark_paid_recoveries, order.id)}
                   />
                 </div>
               </section>
@@ -475,6 +533,8 @@ defmodule EspresoWeb.StaffOrdersLive do
                     reprint_permit={Map.get(@reprint_permits, order.id)}
                     kitchen_permit={Map.get(@kitchen_permits, order.id)}
                     drawer_permit={Map.get(@drawer_permits, order.id)}
+                    mark_paid_permit={Map.get(@mark_paid_permits, order.id)}
+                    mark_paid_recovery={Map.get(@mark_paid_recoveries, order.id)}
                   />
                 </div>
               </section>
@@ -548,7 +608,8 @@ defmodule EspresoWeb.StaffOrdersLive do
                 {payment_action_buttons(%{
                   order: order,
                   id_prefix: "unpaid",
-                  lane: "drawer"
+                  lane: "drawer",
+                  mark_paid_permit: Map.get(@mark_paid_permits, order.id)
                 })}
               </div>
             </article>
@@ -632,6 +693,8 @@ defmodule EspresoWeb.StaffOrdersLive do
   attr :reprint_permit, :string, default: nil
   attr :kitchen_permit, :string, default: nil
   attr :drawer_permit, :string, default: nil
+  attr :mark_paid_permit, :string, default: nil
+  attr :mark_paid_recovery, :map, default: nil
 
   defp kds_ticket(assigns) do
     source = source_badge(assigns.order)
@@ -720,7 +783,8 @@ defmodule EspresoWeb.StaffOrdersLive do
           {payment_action_buttons(%{
             order: @order,
             id_prefix: "ticket",
-            lane: @lane
+            lane: @lane,
+            mark_paid_permit: @mark_paid_permit
           })}
         </div>
 
@@ -807,15 +871,35 @@ defmodule EspresoWeb.StaffOrdersLive do
               <button
                 :if={
                   @order.payment_status == "paid" and Printer.enabled?() and
-                    is_binary(@reprint_permit)
+                    (is_binary(@reprint_permit) or
+                       match?(%{phase: :receipt}, @mark_paid_recovery))
                 }
                 type="button"
                 class="staff-action staff-action-muted"
                 id={"reprint-#{@order.id}"}
-                phx-click="reprint_receipt"
+                phx-click={
+                  if match?(%{phase: :receipt}, @mark_paid_recovery),
+                    do: "retry_mark_paid",
+                    else: "reprint_receipt"
+                }
                 phx-value-id={@order.id}
-                phx-value-action="receipt_reprint"
-                phx-value-permit={@reprint_permit}
+                phx-value-action={
+                  if match?(%{phase: :receipt}, @mark_paid_recovery),
+                    do: "mark_paid",
+                    else: "receipt_reprint"
+                }
+                phx-value-permit={
+                  if match?(
+                       %{phase: :receipt, permit: permit} when is_binary(permit),
+                       @mark_paid_recovery
+                     ),
+                     do: @mark_paid_recovery.permit,
+                     else: @reprint_permit
+                }
+                phx-value-paid_via={
+                  if @mark_paid_recovery, do: @mark_paid_recovery.paid_via, else: nil
+                }
+                phx-value-phase="receipt"
               >
                 Reprint
               </button>
@@ -823,15 +907,35 @@ defmodule EspresoWeb.StaffOrdersLive do
                 :if={
                   @order.payment_status == "paid" and Printer.enabled?() and
                     Printer.cash_like?(@order.paid_via || "counter") and
-                    is_binary(@drawer_permit)
+                    (is_binary(@drawer_permit) or
+                       match?(%{phase: :drawer}, @mark_paid_recovery))
                 }
                 type="button"
                 class="staff-action staff-action-muted"
                 id={"open-drawer-#{@order.id}"}
-                phx-click="open_drawer"
+                phx-click={
+                  if match?(%{phase: :drawer}, @mark_paid_recovery),
+                    do: "retry_mark_paid",
+                    else: "open_drawer"
+                }
                 phx-value-id={@order.id}
-                phx-value-action="drawer"
-                phx-value-permit={@drawer_permit}
+                phx-value-action={
+                  if match?(%{phase: :drawer}, @mark_paid_recovery),
+                    do: "mark_paid",
+                    else: "drawer"
+                }
+                phx-value-permit={
+                  if match?(
+                       %{phase: :drawer, permit: permit} when is_binary(permit),
+                       @mark_paid_recovery
+                     ),
+                     do: @mark_paid_recovery.permit,
+                     else: @drawer_permit
+                }
+                phx-value-paid_via={
+                  if @mark_paid_recovery, do: @mark_paid_recovery.paid_via, else: nil
+                }
+                phx-value-phase="drawer"
               >
                 Kaha
               </button>
@@ -913,6 +1017,8 @@ defmodule EspresoWeb.StaffOrdersLive do
             phx-click="mark_paid"
             phx-value-id={@order.id}
             phx-value-paid_via={paid_via}
+            phx-value-action="mark_paid"
+            phx-value-permit={@mark_paid_permit}
           >
             {label}
           </button>
@@ -949,6 +1055,7 @@ defmodule EspresoWeb.StaffOrdersLive do
     assigns =
       assigns
       |> assign(:order, order)
+      |> assign(:mark_paid_permit, Map.get(assigns.mark_paid_permits, order.id))
       |> assign(:suggested_paid_via, suggested_paid_via(order))
       |> assign(:mark_paid_options, options)
       |> assign(:mark_paid_note, mark_paid_note(order))
@@ -990,6 +1097,8 @@ defmodule EspresoWeb.StaffOrdersLive do
             phx-click="mark_paid"
             phx-value-id={@order.id}
             phx-value-paid_via={paid_via}
+            phx-value-action="mark_paid"
+            phx-value-permit={@mark_paid_permit}
           >
             {label}
           </button>
@@ -1066,6 +1175,21 @@ defmodule EspresoWeb.StaffOrdersLive do
         else
           base <> " Receipt printed."
         end
+
+      {:dispatched, :receipt_and_drawer} ->
+        base <> " Receipt printed · kaha opened."
+
+      {:dispatched, :receipt} ->
+        base <> " Receipt printed."
+
+      {:definite_failure, _phase, :printer_disabled, _permit} ->
+        base
+
+      {:definite_failure, _phase, reason, _permit} ->
+        base <> " Print failed (#{inspect(reason)})."
+
+      {:uncertain, _phase, reason} ->
+        base <> " Print failed (#{inspect(reason)})."
 
       :disabled ->
         base
@@ -1164,6 +1288,7 @@ defmodule EspresoWeb.StaffOrdersLive do
   defp load_orders(socket) do
     active_orders = Orders.list_active_orders()
     ready_orders = Orders.list_recent_ready(@ready_lane_limit)
+    unpaid_orders = Orders.list_todays_unpaid()
 
     operational_orders =
       (active_orders ++ ready_orders)
@@ -1183,6 +1308,11 @@ defmodule EspresoWeb.StaffOrdersLive do
       )
       |> Enum.map(& &1.id)
 
+    mark_paid_order_ids =
+      unpaid_orders
+      |> Enum.filter(&staff_mark_paid?/1)
+      |> Enum.map(& &1.id)
+
     {reprint_permits, kitchen_permits, drawer_permits} =
       if Printer.enabled?() do
         {
@@ -1194,15 +1324,77 @@ defmodule EspresoWeb.StaffOrdersLive do
         {%{}, %{}, %{}}
       end
 
+    mark_paid_permits =
+      PhysicalActionCoordinator.permits(:mark_paid, mark_paid_order_ids)
+
     socket
     |> assign(:active_orders, active_orders)
     |> assign(:ready_orders, ready_orders)
     |> assign(:reprint_permits, reprint_permits)
     |> assign(:kitchen_permits, kitchen_permits)
     |> assign(:drawer_permits, drawer_permits)
-    |> assign(:unpaid_orders, Orders.list_todays_unpaid())
+    |> assign(:mark_paid_permits, mark_paid_permits)
+    |> assign(:unpaid_orders, unpaid_orders)
     |> assign(:paymongo_reconciliations, Orders.list_open_paymongo_reconciliations())
   end
+
+  defp update_mark_paid_recovery(socket, order_id, paid_via, physical_result) do
+    case physical_result do
+      {:definite_failure, phase, _reason, permit} ->
+        update(
+          socket,
+          :mark_paid_recoveries,
+          &Map.put(&1, order_id, %{phase: phase, permit: permit, paid_via: paid_via})
+        )
+
+      _ ->
+        update(socket, :mark_paid_recoveries, &Map.delete(&1, order_id))
+    end
+  end
+
+  defp handle_mark_paid_recovery_result(socket, id, paid_via, phase, result) do
+    order_id =
+      case Integer.parse(id) do
+        {parsed, ""} -> parsed
+        _ -> nil
+      end
+
+    case result do
+      {:ok, :recovery, paid, physical_result} ->
+        socket
+        |> update_mark_paid_recovery(paid.id, paid.paid_via || paid_via, physical_result)
+        |> assign(:flash_note, mark_paid_recovery_note(phase, physical_result))
+
+      _ ->
+        socket
+        |> then(fn current ->
+          if order_id do
+            update(current, :mark_paid_recoveries, &Map.delete(&1, order_id))
+          else
+            current
+          end
+        end)
+        |> assign(:flash_note, "Could not mark order paid.")
+    end
+  end
+
+  defp mark_paid_recovery_note("receipt", {:dispatched, _phase}),
+    do: reprint_note({:dispatched, nil})
+
+  defp mark_paid_recovery_note("drawer", {:dispatched, _phase}),
+    do: physical_action_note(:drawer, {:dispatched, nil})
+
+  defp mark_paid_recovery_note(_phase, {:definite_failure, :receipt, reason, _permit}),
+    do: reprint_note({:definite_failure, reason, nil})
+
+  defp mark_paid_recovery_note(_phase, {:definite_failure, :drawer, reason, _permit}),
+    do: physical_action_note(:drawer, {:definite_failure, reason, nil})
+
+  defp mark_paid_recovery_note(_phase, {:uncertain, :receipt, reason}),
+    do: reprint_note({:uncertain, reason})
+
+  defp mark_paid_recovery_note(_phase, {:uncertain, :drawer, reason}),
+    do: physical_action_note(:drawer, {:uncertain, reason})
 
   defp reprint_note({:dispatched, _next_permit}),
     do: "Receipt command dispatched."

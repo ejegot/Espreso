@@ -7,11 +7,12 @@ defmodule Espreso.PhysicalActionCoordinator do
 
   use GenServer
 
+  alias Espreso.Orders
   alias Espreso.Orders.Order
   alias Espreso.Printer
   alias Espreso.Repo
 
-  @actions [:receipt_reprint, :kitchen, :drawer]
+  @actions [:receipt_reprint, :kitchen, :drawer, :mark_paid]
   @eligible_statuses ~w(received preparing ready)
 
   def start_link(opts \\ []) do
@@ -46,6 +47,27 @@ defmodule Espreso.PhysicalActionCoordinator do
 
   def execute_reprint(order_id, action, permit_id, opts \\ []) do
     execute(order_id, action, permit_id, opts)
+  end
+
+  def execute_mark_paid(order_id, permit_id, paid_via, opts \\ [])
+
+  def execute_mark_paid(order_id, permit_id, paid_via, opts) when is_binary(order_id) do
+    case Integer.parse(order_id) do
+      {parsed_id, ""} -> execute_mark_paid(parsed_id, permit_id, paid_via, opts)
+      _ -> {:stale, :invalid_order_id}
+    end
+  end
+
+  def execute_mark_paid(order_id, permit_id, paid_via, opts)
+      when is_integer(order_id) and is_binary(paid_via) do
+    server = Keyword.get(opts, :server, __MODULE__)
+    staff_name = Keyword.get(opts, :staff_name)
+
+    GenServer.call(
+      server,
+      {:execute_mark_paid, order_id, permit_id, paid_via, staff_name},
+      :infinity
+    )
   end
 
   def acknowledge_recovery(server \\ __MODULE__) do
@@ -88,8 +110,12 @@ defmodule Espreso.PhysicalActionCoordinator do
       order_ids
       |> Enum.uniq()
       |> Enum.reduce({%{}, state}, fn order_id, {result, current_state} ->
-        {permit_id, next_state} = ensure_available_permit(current_state, order_id, action)
-        {Map.put(result, order_id, permit_id), next_state}
+        if mark_paid_conflict?(current_state, order_id, action) do
+          {Map.put(result, order_id, nil), current_state}
+        else
+          {permit_id, next_state} = ensure_available_permit(current_state, order_id, action)
+          {Map.put(result, order_id, permit_id), next_state}
+        end
       end)
 
     {:reply, permits, state}
@@ -104,11 +130,57 @@ defmodule Espreso.PhysicalActionCoordinator do
   end
 
   def handle_call(
+        {:execute_mark_paid, _order_id, _permit_id, _paid_via, _staff_name},
+        _from,
+        %{recovery_required?: true} = state
+      ) do
+    {:reply, {:recovery_required, :coordinator_restarted}, state}
+  end
+
+  def handle_call(
         {:execute, order_id, action, permit_id, staff_name},
         _from,
         state
       ) do
-    if action in @actions do
+    if mark_paid_conflict?(state, order_id, action) do
+      {:reply, {:stale, :mark_paid_recovery_pending}, state}
+    else
+      execute_claimed_physical_action(state, order_id, action, permit_id, staff_name)
+    end
+  end
+
+  def handle_call(
+        {:execute_mark_paid, order_id, permit_id, paid_via, staff_name},
+        _from,
+        state
+      ) do
+    key = {order_id, :mark_paid}
+
+    case claim_status(state, key, permit_id) do
+      :claimable ->
+        execute_claimed_mark_paid(
+          state,
+          key,
+          order_id,
+          permit_id,
+          paid_via,
+          staff_name
+        )
+
+      {:duplicate, result} ->
+        {:reply, {:duplicate, result}, state}
+
+      :stale ->
+        {:reply, {:stale, :invalid_permit}, state}
+    end
+  end
+
+  def handle_call(:acknowledge_recovery, _from, state) do
+    {:reply, :ok, %{state | recovery_required?: false, permits: %{}}}
+  end
+
+  defp execute_claimed_physical_action(state, order_id, action, permit_id, staff_name) do
+    if action in @actions and action != :mark_paid do
       key = {order_id, action}
 
       case claim_status(state, key, permit_id) do
@@ -126,10 +198,6 @@ defmodule Espreso.PhysicalActionCoordinator do
     end
   end
 
-  def handle_call(:acknowledge_recovery, _from, state) do
-    {:reply, :ok, %{state | recovery_required?: false, permits: %{}}}
-  end
-
   defp execute_claimed_action(state, key, order_id, action, permit_id, staff_name) do
     state = put_in(state, [:permits, key, :state], :running)
 
@@ -143,6 +211,309 @@ defmodule Espreso.PhysicalActionCoordinator do
         state = complete_without_next_permit(state, key, permit_id, result)
         {:reply, result, state}
     end
+  end
+
+  defp execute_claimed_mark_paid(
+         state,
+         key,
+         order_id,
+         permit_id,
+         paid_via,
+         staff_name
+       ) do
+    entry = Map.fetch!(state.permits, key)
+    state = put_in(state, [:permits, key, :state], :running)
+
+    case Map.get(entry, :phase, :transition) do
+      :transition ->
+        transition_and_dispatch(
+          state,
+          key,
+          order_id,
+          permit_id,
+          paid_via,
+          staff_name
+        )
+
+      :receipt ->
+        retry_mark_paid_receipt(state, key, order_id, permit_id, entry, staff_name)
+
+      :drawer ->
+        retry_mark_paid_drawer(state, key, order_id, permit_id, entry, staff_name)
+    end
+  end
+
+  defp transition_and_dispatch(
+         state,
+         key,
+         order_id,
+         permit_id,
+         paid_via,
+         staff_name
+       ) do
+    case Orders.mark_paid_with_transition(%Order{id: order_id}, paid_via: paid_via) do
+      {:ok, :transitioned, order} ->
+        order = Repo.preload(order, :items)
+
+        dispatch_mark_paid_receipt(
+          state,
+          key,
+          permit_id,
+          order,
+          order.paid_via || paid_via,
+          staff_name,
+          :transitioned
+        )
+
+      {:ok, :already_paid, order} ->
+        result = {:ok, :already_paid, order}
+        state = complete_mark_paid(state, key, permit_id, result)
+        {:reply, result, state}
+
+      {:error, reason} ->
+        result = {:ineligible, reason}
+        state = complete_mark_paid(state, key, permit_id, result)
+        {:reply, result, state}
+    end
+  end
+
+  defp retry_mark_paid_receipt(state, key, order_id, permit_id, entry, staff_name) do
+    case paid_order_with_items(order_id) do
+      {:ok, order} ->
+        dispatch_mark_paid_receipt(
+          state,
+          key,
+          permit_id,
+          order,
+          entry.paid_via,
+          staff_name,
+          :recovery
+        )
+
+      {:error, reason} ->
+        result = {:ineligible, reason}
+        state = complete_mark_paid(state, key, permit_id, result)
+        {:reply, result, state}
+    end
+  end
+
+  defp retry_mark_paid_drawer(state, key, order_id, permit_id, entry, staff_name) do
+    case paid_cash_order(order_id, entry.paid_via) do
+      {:ok, order} ->
+        dispatch_mark_paid_drawer(
+          state,
+          key,
+          permit_id,
+          order,
+          entry.paid_via,
+          staff_name,
+          :recovery,
+          :drawer
+        )
+
+      {:error, reason} ->
+        result = {:ineligible, reason}
+        state = complete_mark_paid(state, key, permit_id, result)
+        {:reply, result, state}
+    end
+  end
+
+  defp dispatch_mark_paid_receipt(
+         state,
+         key,
+         permit_id,
+         order,
+         paid_via,
+         staff_name,
+         operation
+       ) do
+    case state.dispatchers.receipt_reprint.(order, staff_name: staff_name) do
+      :dispatched when paid_via in ["cash", "counter"] ->
+        dispatch_mark_paid_drawer(
+          state,
+          key,
+          permit_id,
+          order,
+          paid_via,
+          staff_name,
+          operation
+        )
+
+      :dispatched ->
+        finish_mark_paid(
+          state,
+          key,
+          permit_id,
+          operation,
+          order,
+          {:dispatched, :receipt}
+        )
+
+      {:definite_failure, reason} ->
+        retry_mark_paid_phase(
+          state,
+          key,
+          permit_id,
+          order,
+          paid_via,
+          operation,
+          :receipt,
+          reason
+        )
+
+      {:uncertain, reason} ->
+        uncertain_mark_paid_phase(
+          state,
+          key,
+          permit_id,
+          order,
+          paid_via,
+          operation,
+          :receipt,
+          reason
+        )
+
+      :disabled ->
+        retry_mark_paid_phase(
+          state,
+          key,
+          permit_id,
+          order,
+          paid_via,
+          operation,
+          :receipt,
+          :printer_disabled
+        )
+    end
+  end
+
+  defp dispatch_mark_paid_drawer(
+         state,
+         key,
+         permit_id,
+         order,
+         paid_via,
+         staff_name,
+         operation,
+         success_phase \\ :receipt_and_drawer
+       ) do
+    case state.dispatchers.drawer.(order, staff_name: staff_name) do
+      :dispatched ->
+        finish_mark_paid(
+          state,
+          key,
+          permit_id,
+          operation,
+          order,
+          {:dispatched, success_phase}
+        )
+
+      {:definite_failure, reason} ->
+        retry_mark_paid_phase(
+          state,
+          key,
+          permit_id,
+          order,
+          paid_via,
+          operation,
+          :drawer,
+          reason
+        )
+
+      {:uncertain, reason} ->
+        uncertain_mark_paid_phase(
+          state,
+          key,
+          permit_id,
+          order,
+          paid_via,
+          operation,
+          :drawer,
+          reason
+        )
+
+      :disabled ->
+        retry_mark_paid_phase(
+          state,
+          key,
+          permit_id,
+          order,
+          paid_via,
+          operation,
+          :drawer,
+          :printer_disabled
+        )
+    end
+  end
+
+  defp finish_mark_paid(state, key, permit_id, operation, order, physical_result) do
+    result = {:ok, operation, order, physical_result}
+    state = complete_mark_paid(state, key, permit_id, result)
+    {:reply, result, state}
+  end
+
+  defp retry_mark_paid_phase(
+         state,
+         key,
+         permit_id,
+         order,
+         paid_via,
+         operation,
+         phase,
+         reason
+       ) do
+    next_permit = new_permit_id()
+    physical_result = {:definite_failure, phase, reason, next_permit}
+    result = {:ok, operation, order, physical_result}
+
+    entry = %{
+      current: next_permit,
+      state: :available,
+      phase: phase,
+      paid_via: paid_via,
+      last: permit_id,
+      last_result: result
+    }
+
+    {:reply, result, put_in(state, [:permits, key], entry)}
+  end
+
+  defp uncertain_mark_paid_phase(
+         state,
+         key,
+         permit_id,
+         order,
+         paid_via,
+         operation,
+         phase,
+         reason
+       ) do
+    physical_result = {:uncertain, phase, reason}
+    result = {:ok, operation, order, physical_result}
+
+    entry = %{
+      current: nil,
+      state: :uncertain,
+      phase: phase,
+      paid_via: paid_via,
+      last: permit_id,
+      last_result: result
+    }
+
+    {:reply, result, put_in(state, [:permits, key], entry)}
+  end
+
+  defp complete_mark_paid(state, key, permit_id, result) do
+    entry = %{
+      current: nil,
+      state: :complete,
+      phase: nil,
+      paid_via: nil,
+      last: permit_id,
+      last_result: result
+    }
+
+    put_in(state, [:permits, key], entry)
   end
 
   defp complete_action(state, key, permit_id, :dispatched) do
@@ -214,6 +585,27 @@ defmodule Espreso.PhysicalActionCoordinator do
     end
   end
 
+  defp paid_order_with_items(order_id) do
+    case Repo.get(Order, order_id) do
+      nil -> {:error, :order_not_found}
+      %Order{payment_status: "paid"} = order -> {:ok, Repo.preload(order, :items)}
+      %Order{} -> {:error, :order_not_paid}
+    end
+  end
+
+  defp paid_cash_order(order_id, paid_via) do
+    case Repo.get(Order, order_id) do
+      nil ->
+        {:error, :order_not_found}
+
+      %Order{payment_status: status} when status != "paid" ->
+        {:error, :order_not_paid}
+
+      %Order{} = order ->
+        if Printer.cash_like?(paid_via), do: {:ok, order}, else: {:error, :payment_not_cash_like}
+    end
+  end
+
   defp claim_status(state, key, permit_id) do
     case Map.get(state.permits, key) do
       %{current: ^permit_id, state: :available} ->
@@ -227,6 +619,26 @@ defmodule Espreso.PhysicalActionCoordinator do
     end
   end
 
+  defp mark_paid_conflict?(state, order_id, action)
+       when action in [:receipt_reprint, :drawer] do
+    case Map.get(state.permits, {order_id, :mark_paid}) do
+      %{state: mark_state, phase: :receipt}
+      when mark_state in [:available, :running, :uncertain] ->
+        action == :receipt_reprint or
+          (action == :drawer and
+             Printer.cash_like?(state.permits[{order_id, :mark_paid}].paid_via || "counter"))
+
+      %{state: mark_state, phase: :drawer}
+      when mark_state in [:available, :running, :uncertain] ->
+        action == :drawer
+
+      _ ->
+        false
+    end
+  end
+
+  defp mark_paid_conflict?(_state, _order_id, _action), do: false
+
   defp ensure_available_permit(state, order_id, action) do
     key = {order_id, action}
 
@@ -236,10 +648,22 @@ defmodule Espreso.PhysicalActionCoordinator do
 
       nil ->
         permit_id = new_permit_id()
-        entry = %{current: permit_id, state: :available, last: nil, last_result: nil}
+
+        entry = %{
+          current: permit_id,
+          state: :available,
+          phase: initial_phase(action),
+          paid_via: nil,
+          last: nil,
+          last_result: nil
+        }
+
         {permit_id, put_in(state, [:permits, key], entry)}
 
       %{current: nil, state: :uncertain} ->
+        {nil, state}
+
+      %{current: nil, state: :complete} when action == :mark_paid ->
         {nil, state}
 
       %{current: nil} = entry ->
@@ -261,6 +685,9 @@ defmodule Espreso.PhysicalActionCoordinator do
 
     {next_permit, put_in(state, [:permits, key], entry)}
   end
+
+  defp initial_phase(:mark_paid), do: :transition
+  defp initial_phase(_action), do: nil
 
   defp complete_without_next_permit(state, key, used_permit, result) do
     entry = %{current: nil, state: result_state(result), last: used_permit, last_result: result}

@@ -650,7 +650,26 @@ defmodule Espreso.Orders do
   confirmed when shop `payments_mode` is `qrph_manual`.
   """
   def mark_paid(order, opts \\ [])
+
   def mark_paid(%Order{id: id}, opts) when is_integer(id) do
+    case mark_paid_with_transition(%Order{id: id}, opts) do
+      {:ok, _transition, order} -> {:ok, order}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  def mark_paid(%Order{} = order, opts), do: mark_paid(%Order{id: order.id}, opts)
+
+  @doc """
+  Marks an order paid through the staff/manual path and reports whether this
+  caller performed the atomic unpaid-to-paid transition.
+
+  Existing callers should continue to use `mark_paid/2` unless they must own
+  side effects that are authorized only for the transition winner.
+  """
+  def mark_paid_with_transition(order, opts \\ [])
+
+  def mark_paid_with_transition(%Order{id: id}, opts) when is_integer(id) do
     paid_via = normalize_paid_via(opts)
 
     case Repo.get(Order, id) do
@@ -661,7 +680,7 @@ defmodule Espreso.Orders do
         {:error, :cancelled}
 
       %Order{payment_status: "paid"} = current ->
-        {:ok, current}
+        {:ok, :already_paid, current}
 
       %Order{payment_method: "online", payment_status: "awaiting_payment"} = current ->
         if BusinessSettings.qrph_manual?() do
@@ -678,7 +697,8 @@ defmodule Espreso.Orders do
     end
   end
 
-  def mark_paid(%Order{} = order, opts), do: mark_paid(%Order{id: order.id}, opts)
+  def mark_paid_with_transition(%Order{} = order, opts),
+    do: mark_paid_with_transition(%Order{id: order.id}, opts)
 
   @doc """
   Stores the PayMongo checkout session id on an order after session creation.
@@ -718,7 +738,7 @@ defmodule Espreso.Orders do
         {:error, :not_found}
 
       %Order{} = order ->
-        apply_paid(order, "paymongo")
+        apply_paid(order, "paymongo") |> collapse_paid_transition()
     end
   end
 
@@ -730,7 +750,7 @@ defmodule Espreso.Orders do
   def mark_paid_from_paymongo_session(session_id) when is_binary(session_id) do
     case Repo.get_by(Order, paymongo_checkout_session_id: session_id) do
       nil -> {:error, :not_found}
-      %Order{} = order -> apply_paid(order, "paymongo")
+      %Order{} = order -> apply_paid(order, "paymongo") |> collapse_paid_transition()
     end
   end
 
@@ -983,7 +1003,10 @@ defmodule Espreso.Orders do
     case count do
       1 ->
         order = Repo.get!(Order, order_id)
-        broadcast({:ok, order})
+
+        case broadcast({:ok, order}) do
+          {:ok, broadcasted} -> {:ok, :transitioned, broadcasted}
+        end
 
       0 ->
         case Repo.get(Order, order_id) do
@@ -991,7 +1014,7 @@ defmodule Espreso.Orders do
             {:error, :not_found}
 
           %Order{payment_status: "paid"} = order ->
-            {:ok, order}
+            {:ok, :already_paid, order}
 
           %Order{status: "cancelled"} ->
             {:error, :cancelled}
@@ -1004,6 +1027,9 @@ defmodule Espreso.Orders do
         {:error, :unexpected_update_count}
     end
   end
+
+  defp collapse_paid_transition({:ok, _transition, order}), do: {:ok, order}
+  defp collapse_paid_transition({:error, _reason} = error), do: error
 
   defp atomically_cancel_order(order_id, scope)
        when is_integer(order_id) and scope in [:without_session, :with_online_session] do

@@ -1106,6 +1106,127 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert has_element?(view, "#unpaid-order-#{order.id}")
   end
 
+  test "Mark Paid Cash permit dispatches one receipt and one drawer command", %{conn: conn} do
+    restore_printer_config_on_exit()
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Mark Paid Physical", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {port, printer_task} = start_test_printer!(2)
+    set_test_printer_port(port)
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    permit = live_assigns(view).mark_paid_permits[order.id]
+
+    assert has_element?(
+             view,
+             "#ticket-new-paid-via-cash-#{order.id}[phx-value-action='mark_paid'][phx-value-permit='#{permit}']"
+           )
+
+    view |> element("#ticket-new-paid-via-cash-#{order.id}") |> render_click()
+
+    assert [receipt_bytes, drawer_bytes] = Task.await(printer_task, 2_000)
+    assert receipt_bytes =~ order.number
+    assert drawer_bytes == drawer_kick_bytes()
+    assert Repo.get!(Espreso.Orders.Order, order.id).payment_status == "paid"
+  end
+
+  test "two LiveViews share one Mark Paid permit and the second causes no physical replay", %{
+    conn: conn
+  } do
+    restore_printer_config_on_exit()
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Two Tabs", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {port, printer_task} = start_test_printer!(2)
+    set_test_printer_port(port)
+    {:ok, first_view, _html} = live(conn, ~p"/orders")
+    {:ok, second_view, _html} = live(conn, ~p"/orders")
+
+    permit = live_assigns(first_view).mark_paid_permits[order.id]
+    assert live_assigns(second_view).mark_paid_permits[order.id] == permit
+
+    first_view |> element("#ticket-new-paid-via-cash-#{order.id}") |> render_click()
+    assert [_receipt, drawer] = Task.await(printer_task, 2_000)
+    assert drawer == drawer_kick_bytes()
+
+    second_view
+    |> render_click("mark_paid", %{
+      "id" => to_string(order.id),
+      "action" => "mark_paid",
+      "permit" => permit,
+      "paid_via" => "cash"
+    })
+
+    assert Process.alive?(second_view.pid)
+    assert Repo.get!(Espreso.Orders.Order, order.id).payment_status == "paid"
+  end
+
+  test "Mark Paid Cash drawer retry does not reprint the receipt", %{conn: conn} do
+    restore_printer_config_on_exit()
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Drawer Recovery", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {receipt_port, receipt_task} = start_test_printer!(1)
+    set_test_printer_port(receipt_port)
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    view |> element("#ticket-new-paid-via-cash-#{order.id}") |> render_click()
+
+    assert [receipt_bytes] = Task.await(receipt_task, 2_000)
+    assert receipt_bytes =~ order.number
+
+    recovery = live_assigns(view).mark_paid_recoveries[order.id]
+    assert recovery.phase == :drawer
+    assert is_binary(recovery.permit)
+
+    {drawer_port, drawer_task} = start_test_printer!(1)
+    set_test_printer_port(drawer_port)
+
+    assert has_element?(
+             view,
+             "#open-drawer-#{order.id}[phx-click='retry_mark_paid'][phx-value-action='mark_paid'][phx-value-permit='#{recovery.permit}']"
+           )
+
+    view |> element("#open-drawer-#{order.id}") |> render_click()
+
+    assert [drawer_bytes] = Task.await(drawer_task, 2_000)
+    assert drawer_bytes == drawer_kick_bytes()
+    refute Map.has_key?(live_assigns(view).mark_paid_recoveries, order.id)
+  end
+
+  test "stale Mark Paid event for a missing order is rejected without crashing", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Missing Mark Paid", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    permit = live_assigns(view).mark_paid_permits[order.id]
+    Repo.delete!(order)
+
+    view
+    |> render_click("mark_paid", %{
+      "id" => to_string(order.id),
+      "action" => "mark_paid",
+      "permit" => permit,
+      "paid_via" => "cash"
+    })
+
+    assert Process.alive?(view.pid)
+    assert has_element?(view, "#orders-flash", "Could not mark order paid.")
+  end
+
   test "cash Reprint dispatches one receipt, never opens the drawer, and allows a later permit",
        %{
          conn: conn

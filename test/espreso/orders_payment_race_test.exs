@@ -95,6 +95,45 @@ defmodule Espreso.OrdersPaymentRaceTest do
     assert Repo.aggregate(PaymentReconciliation, :count, :id) == 0
   end
 
+  test "concurrent transition-aware staff payments have exactly one winner" do
+    {:ok, order} =
+      Orders.create_order(
+        [line("Espresso", "75.00")],
+        %{customer_name: "Concurrent Staff", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    parent = self()
+
+    Application.put_env(:espreso, :orders_apply_paid_barrier, fn ->
+      send(parent, {:apply_paid_barrier, self()})
+
+      receive do
+        :continue_apply_paid -> :ok
+      end
+    end)
+
+    tasks =
+      Enum.map(["cash", "maya"], fn paid_via ->
+        Task.async(fn ->
+          Ecto.Adapters.SQL.Sandbox.allow(Espreso.Repo, parent, self())
+          Orders.mark_paid_with_transition(order, paid_via: paid_via)
+        end)
+      end)
+
+    task_pids =
+      Enum.map(tasks, fn _task ->
+        assert_receive {:apply_paid_barrier, task_pid}
+        task_pid
+      end)
+
+    Enum.each(task_pids, &send(&1, :continue_apply_paid))
+    results = Task.await_many(tasks)
+
+    assert Enum.count(results, &match?({:ok, :transitioned, _}, &1)) == 1
+    assert Enum.count(results, &match?({:ok, :already_paid, _}, &1)) == 1
+    assert Repo.get!(Order, order.id).payment_status == "paid"
+  end
+
   defp online_order!(session_id) do
     {:ok, order} =
       Orders.create_order(
