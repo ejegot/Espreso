@@ -280,6 +280,74 @@ defmodule Espreso.Orders do
 
   def list_orders_by_numbers(_), do: []
 
+  @doc """
+  Lists paid receipt transactions for one Asia/Manila shop day.
+
+  Supported filters are `date`, `search`, `payment`, `status`, and `source`.
+  Results are newest-settled first and capped at 500 rows for the staff UI.
+  """
+  def list_transactions(filters \\ %{}) when is_map(filters) do
+    {query, normalized} = transaction_query(filters)
+
+    orders =
+      query
+      |> order_by([o], desc: o.settled_at, desc: o.id)
+      |> limit(500)
+      |> preload([:items, :settled_by_user])
+      |> Repo.all()
+
+    %{orders: orders, filters: normalized}
+  end
+
+  @doc """
+  Returns exact paid count, total, and payment-method breakdown for transaction filters.
+  """
+  def transaction_summary(filters \\ %{}) when is_map(filters) do
+    {query, normalized} = transaction_query(filters)
+
+    rows =
+      query
+      |> group_by([o], o.paid_via)
+      |> select([o], {o.paid_via, count(o.id), sum(o.total)})
+      |> Repo.all()
+
+    empty = %{total: Decimal.new("0"), count: 0}
+    by_via = Map.new(@paid_vias, &{&1, empty})
+
+    by_via =
+      Enum.reduce(rows, by_via, fn {via, count, total}, acc ->
+        key = if via in @paid_vias, do: via, else: "counter"
+        current = Map.fetch!(acc, key)
+
+        Map.put(acc, key, %{
+          count: current.count + count,
+          total: Decimal.add(current.total, decimalize(total))
+        })
+      end)
+
+    %{
+      filters: normalized,
+      count: Enum.reduce(by_via, 0, fn {_via, row}, acc -> acc + row.count end),
+      total:
+        Enum.reduce(by_via, Decimal.new("0"), fn {_via, row}, acc ->
+          Decimal.add(acc, row.total)
+        end),
+      by_via: by_via
+    }
+  end
+
+  @doc """
+  Loads one paid receipt transaction with its items and settlement staff.
+  """
+  def get_transaction(id) when is_integer(id) do
+    Order
+    |> where([o], o.id == ^id and o.payment_status == "paid" and not is_nil(o.settled_at))
+    |> preload([:items, :settled_by_user])
+    |> Repo.one()
+  end
+
+  def get_transaction(_), do: nil
+
   defp normalize_lookup_number(number) when is_binary(number) do
     trimmed = String.trim(number)
 
@@ -287,6 +355,99 @@ defmodule Espreso.Orders do
   end
 
   defp normalize_lookup_number(_), do: nil
+
+  defp transaction_query(filters) do
+    normalized = normalize_transaction_filters(filters)
+    {day_start, day_end} = shop_day_bounds_utc(normalized.date)
+
+    query =
+      from(o in Order,
+        where:
+          o.payment_status == "paid" and not is_nil(o.settled_at) and
+            o.settled_at >= ^day_start and o.settled_at < ^day_end
+      )
+      |> filter_transaction_search(normalized.search)
+      |> filter_transaction_value(:paid_via, normalized.payment)
+      |> filter_transaction_value(:status, normalized.status)
+      |> filter_transaction_value(:settlement_source, normalized.source)
+
+    {query, normalized}
+  end
+
+  defp normalize_transaction_filters(filters) do
+    %{
+      date: normalize_transaction_date(filter_value(filters, :date)),
+      search: normalize_transaction_search(filter_value(filters, :search)),
+      payment:
+        normalize_transaction_filter(
+          filter_value(filters, :payment),
+          @paid_vias
+        ),
+      status:
+        normalize_transaction_filter(
+          filter_value(filters, :status),
+          ~w(received preparing ready completed)
+        ),
+      source:
+        normalize_transaction_filter(
+          filter_value(filters, :source),
+          Order.settlement_sources()
+        )
+    }
+  end
+
+  defp filter_value(filters, key) do
+    case Map.fetch(filters, key) do
+      {:ok, value} -> value
+      :error -> Map.get(filters, Atom.to_string(key))
+    end
+  end
+
+  defp normalize_transaction_date(%Date{} = date), do: date
+
+  defp normalize_transaction_date(value) when is_binary(value) do
+    case Date.from_iso8601(value) do
+      {:ok, date} -> date
+      _ -> shop_date_today()
+    end
+  end
+
+  defp normalize_transaction_date(_), do: shop_date_today()
+
+  defp normalize_transaction_search(value) when is_binary(value) do
+    value
+    |> String.trim()
+    |> String.slice(0, 60)
+  end
+
+  defp normalize_transaction_search(_), do: ""
+
+  defp normalize_transaction_filter(value, allowed) when is_atom(value),
+    do: value |> Atom.to_string() |> normalize_transaction_filter(allowed)
+
+  defp normalize_transaction_filter(value, allowed) when is_binary(value) do
+    if value in allowed, do: value, else: "all"
+  end
+
+  defp normalize_transaction_filter(_, _allowed), do: "all"
+
+  defp filter_transaction_search(query, ""), do: query
+
+  defp filter_transaction_search(query, search) do
+    pattern = "%#{search}%"
+
+    where(
+      query,
+      [o],
+      ilike(o.number, ^pattern) or
+        ilike(fragment("COALESCE(?, '')", o.customer_name), ^pattern)
+    )
+  end
+
+  defp filter_transaction_value(query, _field, "all"), do: query
+
+  defp filter_transaction_value(query, field_name, value),
+    do: where(query, [o], field(o, ^field_name) == ^value)
 
   def list_active_orders do
     Order
@@ -476,6 +637,18 @@ defmodule Espreso.Orders do
     DateTime.utc_now()
     |> DateTime.add(@shop_utc_offset_seconds, :second)
     |> DateTime.to_date()
+  end
+
+  @doc """
+  UTC half-open time range for an Asia/Manila shop date.
+  """
+  def shop_day_bounds_utc(%Date{} = date) do
+    day_start =
+      date
+      |> DateTime.new!(~T[00:00:00], "Etc/UTC")
+      |> DateTime.add(-@shop_utc_offset_seconds, :second)
+
+    {day_start, DateTime.add(day_start, 1, :day)}
   end
 
   @doc """

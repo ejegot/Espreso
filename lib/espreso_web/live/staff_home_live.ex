@@ -251,6 +251,14 @@ defmodule EspresoWeb.StaffHomeLive do
         count: unpaid_count,
         show?: Authorization.can?(user, :orders),
         class: "staff-home-tool-link--attention"
+      },
+      %{
+        id: "transactions",
+        title: "Transactions",
+        body: "Daily receipts & reprints",
+        path: ~p"/transactions",
+        count: nil,
+        show?: Authorization.can?(user, :orders)
       }
     ]
 
