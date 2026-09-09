@@ -4521,7 +4521,7 @@ a.staff-home-card:focus-visible {
   padding: 1rem 0.75rem;
   border-right: 1px solid rgba(56, 32, 16, 0.1);
   background: #fff;
-  overflow-y: auto;
+  overflow: visible;
 }
 
 .staff-pos-rail.staff-pos-rail--icons {
@@ -4582,6 +4582,7 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-rail-more {
+  position: relative;
   margin-top: auto;
   padding-top: 0.75rem;
   border-top: 1px solid rgba(56, 32, 16, 0.1);
@@ -4592,13 +4593,66 @@ a.staff-home-card:focus-visible {
   border-top: 1px solid rgba(56, 32, 16, 0.1);
 }
 
-.staff-pos-rail-more-label {
-  margin: 0 0 0.35rem;
-  color: #b0a098;
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.staff-pos-rail-more-summary {
+  list-style: none;
+}
+
+.staff-pos-rail-more-summary::-webkit-details-marker {
+  display: none;
+}
+
+.staff-pos-rail-more[open] .staff-pos-rail-more-summary,
+.staff-pos-rail-more.is-active .staff-pos-rail-more-summary {
+  border-color: color-mix(in srgb, #f85020 35%, transparent);
+  background: color-mix(in srgb, #f85020 10%, #fff);
+  color: #f85020;
+}
+
+.staff-pos-rail-more-panel {
+  position: absolute;
+  left: calc(100% + 0.65rem);
+  bottom: 0;
+  z-index: 80;
+  display: grid;
+  width: 13rem;
+  max-height: min(26rem, calc(100dvh - 2rem));
+  overflow-y: auto;
+  padding: 0.4rem;
+  border: 1px solid rgba(56, 32, 16, 0.12);
+  border-radius: 0.85rem;
+  background: #fff;
+  box-shadow: 0 18px 42px rgba(56, 32, 16, 0.16);
+}
+
+.staff-pos-rail-more:not([open]) .staff-pos-rail-more-panel {
+  display: none;
+}
+
+.staff-pos-rail-more-link {
+  display: grid;
+  grid-template-columns: 1.3rem minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: center;
+  min-height: 2.55rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.55rem;
+  color: #382010;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.staff-pos-rail-more-link:hover,
+.staff-pos-rail-more-link:focus-visible,
+.staff-pos-rail-more-link.is-active {
+  background: color-mix(in srgb, #f85020 9%, #fff);
+  color: #f85020;
+  outline: none;
+}
+
+.staff-pos-rail-more-icon {
+  width: 1.05rem;
+  height: 1.05rem;
 }
 
 .staff-pos-rail-link {
@@ -4645,17 +4699,6 @@ a.staff-home-card:focus-visible {
   width: 0.22rem;
   border-radius: 999px;
   background: #f85020;
-}
-
-.staff-pos-rail-link--more {
-  min-height: 2.2rem;
-  font-size: 0.82rem;
-}
-
-.staff-pos-rail--icons .staff-pos-rail-link--more {
-  width: 2.35rem;
-  height: 2.35rem;
-  min-height: 2.35rem;
 }
 
 .staff-pos-rail-footer {
@@ -4752,9 +4795,34 @@ a.staff-home-card:focus-visible {
     display: none;
   }
 
-  .staff-pos-rail-more,
-  .staff-pos-rail-footer {
-    display: none;
+  .staff-pos-rail-more {
+    width: auto;
+    margin: 0 0 0 auto;
+    padding: 0;
+    border: 0;
+  }
+
+  .staff-pos-rail--icons .staff-pos-rail-more {
+    width: auto;
+    border: 0;
+  }
+
+  .staff-pos-rail-more-panel {
+    top: calc(100% + 0.55rem);
+    right: 0;
+    bottom: auto;
+    left: auto;
+    max-height: min(26rem, calc(100dvh - 5rem));
+  }
+
+  .staff-pos-rail-footer,
+  .staff-pos-rail--icons .staff-pos-rail-footer {
+    display: flex;
+    width: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0;
   }
 }
 
@@ -5185,7 +5253,7 @@ a.staff-home-card:focus-visible {
 .staff-pos-page.staff-pos-page--cafe .staff-pos-product-card-media {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 3 / 2;
   min-height: 6.5rem;
   overflow: hidden;
   background: #ebe8e6;
@@ -5205,16 +5273,21 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-product-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  gap: 0.35rem 0.55rem;
+  align-content: start;
+  align-items: start;
   min-width: 0;
   flex: 1 1 auto;
-  padding: 0.55rem 0.65rem 0.65rem;
+  padding: 0.5rem 0.6rem 0.55rem;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-product-card-body .staff-pos-product-name,
 .staff-pos-page.staff-pos-page--cafe .staff-pos-product-card .staff-pos-product-name {
+  grid-row: 1;
+  grid-column: 1;
   margin: 0;
   padding: 0;
   font-size: 0.88rem;
@@ -5226,10 +5299,12 @@ a.staff-home-card:focus-visible {
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;
-  min-height: 2.1rem;
+  min-height: 0;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-product-sizes {
+  grid-row: 2;
+  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -5265,18 +5340,21 @@ a.staff-home-card:focus-visible {
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-product-card-body .staff-pos-product-price,
 .staff-pos-page.staff-pos-page--cafe .staff-pos-product-card .staff-pos-product-price {
+  grid-row: 1;
+  grid-column: 2;
   margin: 0;
-  margin-top: auto;
-  padding: 0.1rem 0 0;
+  padding: 0;
   border-radius: 0;
   background: transparent;
   color: #f85020;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 800;
   line-height: 1.2;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   display: block;
+  justify-self: end;
+  text-align: right;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket {
