@@ -11,7 +11,12 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
     {:ok, order} =
       Orders.create_order(
         [line("Latte", "100.00")],
-        %{customer_name: "Mia", fulfillment: :pickup, payment_method: :online}
+        %{
+          customer_name: "Mia",
+          fulfillment: :pickup,
+          payment_method: :online,
+          payment_intent: :gcash
+        }
       )
 
     payload = paid_webhook_payload(order.number, amount: 10_000)
@@ -36,9 +41,41 @@ defmodule EspresoWeb.PayMongoWebhookControllerTest do
 
     order = Repo.get!(Order, order.id)
     assert order.payment_status == "paid"
+    assert order.payment_intent == "gcash"
+    assert order.paid_via == "paymongo"
     assert Decimal.equal?(order.total, Decimal.new("100.00"))
     assert order.paymongo_checkout_session_id == "cs_test_webhook"
     assert Repo.aggregate(PaymentReconciliation, :count, :id) == 0
+  end
+
+  test "verified webhook settles Maya intent through PayMongo", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [line("Latte", "100.00")],
+        %{
+          customer_name: "Maya Guest",
+          fulfillment: :pickup,
+          payment_method: :online,
+          payment_intent: :maya
+        }
+      )
+
+    {:ok, order} = Orders.attach_paymongo_session(order, "cs_test_webhook")
+    payload = paid_webhook_payload(order.number, amount: 10_000)
+    signature = PayMongo.sign_for_test(payload)
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("paymongo-signature", signature)
+      |> post(~p"/webhooks/paymongo", payload)
+
+    assert json_response(conn, 200) == %{"received" => true}
+
+    paid = Repo.get!(Order, order.id)
+    assert paid.payment_status == "paid"
+    assert paid.payment_intent == "maya"
+    assert paid.paid_via == "paymongo"
   end
 
   test "rejects paid webhook for cancelled order and does not mark paid", %{

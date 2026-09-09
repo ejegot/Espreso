@@ -1653,6 +1653,153 @@ defmodule Espreso.OrdersTest do
       assert order.paid_via == nil
     end
 
+    test "matching Cash, GCash, and Maya intents settle through the manual boundary" do
+      set_payments_mode!("qrph_manual")
+
+      for {payment_method, payment_intent, paid_via} <- [
+            {:counter, :cash, "cash"},
+            {:online, :gcash, "gcash"},
+            {:online, :maya, "maya"}
+          ] do
+        order = settlement_order!(payment_method, payment_intent)
+
+        assert {:ok, paid} = Orders.mark_paid(order, paid_via: paid_via)
+        assert paid.payment_status == "paid"
+        assert paid.payment_intent == Atom.to_string(payment_intent)
+        assert paid.paid_via == paid_via
+      end
+    end
+
+    test "mismatched human tenders are rejected without changing payment state" do
+      set_payments_mode!("qrph_manual")
+
+      for {payment_method, payment_intent, paid_via} <- [
+            {:counter, :cash, "gcash"},
+            {:counter, :cash, "maya"},
+            {:online, :gcash, "cash"},
+            {:online, :gcash, "maya"},
+            {:online, :maya, "cash"},
+            {:online, :maya, "gcash"}
+          ] do
+        order = settlement_order!(payment_method, payment_intent)
+
+        assert {:error, {:payment_intent_mismatch, expected_intent, ^paid_via}} =
+                 Orders.mark_paid(order, paid_via: paid_via)
+
+        assert expected_intent == Atom.to_string(payment_intent)
+        reloaded = Repo.get!(Order, order.id)
+        assert reloaded.payment_status != "paid"
+        assert reloaded.paid_via == nil
+      end
+    end
+
+    test "legacy nil-intent counter orders retain all supported counter settlements" do
+      for paid_via <- ~w(cash gcash maya counter) do
+        order = settlement_order!(:counter, nil)
+
+        assert {:ok, paid} = Orders.mark_paid(order, paid_via: paid_via)
+        assert paid.payment_status == "paid"
+        assert paid.payment_intent == nil
+        assert paid.paid_via == paid_via
+      end
+    end
+
+    test "trusted PayMongo settlement supports wallet and legacy nil intents" do
+      for payment_intent <- [:gcash, :maya, nil] do
+        order = settlement_order!(:online, payment_intent)
+        expected_intent = if payment_intent, do: Atom.to_string(payment_intent), else: nil
+
+        assert {:ok, paid} = Orders.mark_paid_from_paymongo(order.number)
+        assert paid.payment_status == "paid"
+        assert paid.payment_intent == expected_intent
+        assert paid.paid_via == "paymongo"
+      end
+    end
+
+    test "manual PayMongo, channel mismatches, and invalid tenders are rejected" do
+      set_payments_mode!("qrph_manual")
+
+      for payment_intent <- [:cash, :gcash, :maya] do
+        order = settlement_order!(:counter, payment_intent)
+
+        assert {:error, :paymongo_authority_required} =
+                 Orders.mark_paid(order, paid_via: "paymongo")
+
+        assert {:error, :payment_channel_mismatch} =
+                 Orders.mark_paid(order, paid_via: "counter")
+      end
+
+      cash_intent = settlement_order!(:counter, :cash)
+
+      assert {:error, :invalid_paid_via} =
+               Orders.mark_paid(cash_intent, paid_via: "bitcoin")
+
+      online = settlement_order!(:online, :gcash)
+      assert {:error, :payment_channel_mismatch} = Orders.mark_paid(online)
+
+      assert {:error, :paymongo_authority_required} =
+               Orders.mark_paid(online, paid_via: "paymongo")
+
+      counter = settlement_order!(:counter, nil)
+
+      assert {:error, :payment_channel_mismatch} =
+               Orders.mark_paid_from_paymongo(counter.number)
+    end
+
+    test "paid-at-create rejects invalid or mismatched tenders without breaking nil-intent POS" do
+      lines = [insert_pos_line!("Espresso", nil, "75")]
+
+      for paid_via <- ["cash", "gcash"] do
+        assert {:ok, paid} =
+                 Orders.create_order(lines, %{
+                   customer_name: "POS #{paid_via}",
+                   fulfillment: :pickup,
+                   payment_method: :counter,
+                   payment_status: :paid,
+                   paid_via: paid_via,
+                   source: :pos
+                 })
+
+        assert paid.payment_status == "paid"
+        assert paid.payment_intent == nil
+        assert paid.paid_via == paid_via
+      end
+
+      assert {:ok, defaulted_cash} =
+               Orders.create_order(lines, %{
+                 customer_name: "Default POS",
+                 fulfillment: :pickup,
+                 payment_method: :counter,
+                 payment_status: :paid,
+                 source: :pos
+               })
+
+      assert defaulted_cash.payment_status == "paid"
+      assert defaulted_cash.payment_intent == nil
+      assert defaulted_cash.paid_via == "cash"
+
+      assert {:error, :invalid_paid_via} =
+               Orders.create_order(lines, %{
+                 customer_name: "Invalid POS",
+                 fulfillment: :pickup,
+                 payment_method: :counter,
+                 payment_status: :paid,
+                 paid_via: "bitcoin",
+                 source: :pos
+               })
+
+      assert {:error, {:payment_intent_mismatch, "cash", "gcash"}} =
+               Orders.create_order(lines, %{
+                 customer_name: "Mismatch POS",
+                 fulfillment: :pickup,
+                 payment_method: :counter,
+                 payment_status: :paid,
+                 payment_intent: :cash,
+                 paid_via: :gcash,
+                 source: :pos
+               })
+    end
+
     test "online unpaid paymongo orders still block manual mark_paid" do
       set_payments_mode!("paymongo")
 
@@ -1715,6 +1862,29 @@ defmodule Espreso.OrdersTest do
       unpaid_numbers = Orders.list_todays_unpaid() |> Enum.map(& &1.number)
       assert order.number in unpaid_numbers
     end
+  end
+
+  defp settlement_order!(payment_method, payment_intent) do
+    attrs = %{
+      customer_name: "Settlement",
+      fulfillment: :pickup,
+      payment_method: payment_method
+    }
+
+    attrs =
+      if payment_intent do
+        Map.put(attrs, :payment_intent, payment_intent)
+      else
+        attrs
+      end
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        attrs
+      )
+
+    order
   end
 
   defp set_payments_mode!(mode) do

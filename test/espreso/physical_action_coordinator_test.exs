@@ -463,6 +463,63 @@ defmodule Espreso.PhysicalActionCoordinatorTest do
     refute_receive {:unexpected_drawer, _}
   end
 
+  test "payment mismatch consumes its permit, performs no physical effect, and allows a valid retry" do
+    parent = self()
+
+    start_coordinator_with(
+      dispatch_receipt: fn order, _opts ->
+        send(parent, {:mark_paid_receipt, order.id})
+        :dispatched
+      end,
+      dispatch_drawer: fn order, _opts ->
+        send(parent, {:mark_paid_drawer, order.id})
+        :dispatched
+      end
+    )
+
+    order = unpaid_order!(%{payment_intent: :cash})
+    rejected_permit = permit_for(order.id, :mark_paid)
+
+    assert {:ineligible, {:payment_intent_mismatch, "cash", "gcash"}} =
+             PhysicalActionCoordinator.execute_mark_paid(
+               order.id,
+               rejected_permit,
+               "gcash",
+               server: @server
+             )
+
+    reloaded = Espreso.Repo.get!(Espreso.Orders.Order, order.id)
+    assert reloaded.payment_status == "unpaid"
+    assert reloaded.paid_via == nil
+    refute_receive {:mark_paid_receipt, _}
+    refute_receive {:mark_paid_drawer, _}
+
+    retry_permit = permit_for(order.id, :mark_paid)
+    refute retry_permit == rejected_permit
+
+    assert {:duplicate, {:ineligible, {:payment_intent_mismatch, "cash", "gcash"}}} =
+             PhysicalActionCoordinator.execute_mark_paid(
+               order.id,
+               rejected_permit,
+               "gcash",
+               server: @server
+             )
+
+    assert {:ok, :transitioned, paid, {:dispatched, :receipt_and_drawer}} =
+             PhysicalActionCoordinator.execute_mark_paid(
+               order.id,
+               retry_permit,
+               "cash",
+               server: @server
+             )
+
+    assert paid.payment_status == "paid"
+    assert paid.paid_via == "cash"
+    assert_receive {:mark_paid_receipt, order_id}
+    assert order_id == order.id
+    assert_receive {:mark_paid_drawer, ^order_id}
+  end
+
   test "Cash drawer definite failure retries only the drawer phase" do
     parent = self()
     {:ok, attempts} = Agent.start_link(fn -> 0 end)
@@ -720,11 +777,17 @@ defmodule Espreso.PhysicalActionCoordinatorTest do
     paid
   end
 
-  defp unpaid_order! do
+  defp unpaid_order!(overrides \\ %{}) do
+    attrs =
+      Map.merge(
+        %{customer_name: "Permit", fulfillment: :pickup, payment_method: :counter},
+        overrides
+      )
+
     {:ok, order} =
       Orders.create_order(
         [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
-        %{customer_name: "Permit", fulfillment: :pickup, payment_method: :counter}
+        attrs
       )
 
     order
