@@ -103,6 +103,18 @@ defmodule EspresoWeb.AdminUsersLive do
       {:error, :unauthorized} ->
         {:noreply, assign(socket, :flash_note, "You don’t have permission to manage users.")}
 
+      {:error, :last_owner} ->
+        {:noreply,
+         socket
+         |> assign(:confirm, nil)
+         |> assign(:flash_note, "You can’t disable or demote the last active Owner.")}
+
+      {:error, :cannot_deactivate_self} ->
+        {:noreply,
+         socket
+         |> assign(:confirm, nil)
+         |> assign(:flash_note, "You can’t deactivate your own account.")}
+
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign(socket, :edit_form, to_form(changeset))}
     end
@@ -132,7 +144,7 @@ defmodule EspresoWeb.AdminUsersLive do
         {:noreply,
          socket
          |> assign(:confirm, nil)
-         |> assign(:flash_note, "You can’t disable your own account.")}
+         |> assign(:flash_note, "You can’t deactivate your own account.")}
 
       true ->
         case Accounts.update_user_as(actor, user, %{active: !user.active}) do
@@ -148,6 +160,18 @@ defmodule EspresoWeb.AdminUsersLive do
 
           {:error, :unauthorized} ->
             {:noreply, assign(socket, :flash_note, "You don’t have permission to manage users.")}
+
+          {:error, :last_owner} ->
+            {:noreply,
+             socket
+             |> assign(:confirm, nil)
+             |> assign(:flash_note, "You can’t disable or demote the last active Owner.")}
+
+          {:error, :cannot_deactivate_self} ->
+            {:noreply,
+             socket
+             |> assign(:confirm, nil)
+             |> assign(:flash_note, "You can’t deactivate your own account.")}
         end
     end
   end
