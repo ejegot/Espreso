@@ -269,6 +269,13 @@ defmodule EspresoWeb.StaffComponents do
         show?: user.role == "barista"
       },
       %{
+        key: :cash_out,
+        label: "Cash Out",
+        icon: "hero-banknotes",
+        path: ~p"/staff/cash-out",
+        show?: Espreso.CashOuts.can_access?(user)
+      },
+      %{
         key: :dashboard,
         label: "Dashboard",
         icon: "hero-chart-bar",

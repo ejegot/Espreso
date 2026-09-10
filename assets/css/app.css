@@ -4069,6 +4069,46 @@ body:has(.menu-page-locked) {
   line-height: 1.35;
 }
 
+.staff-shift-close-cash-outs {
+  margin-bottom: 0.75rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid color-mix(in srgb, var(--close-forest) 18%, transparent);
+  border-radius: var(--cs-radius-panel, 0.65rem);
+  background: #fff;
+}
+
+.staff-shift-close-cash-out-list {
+  list-style: none;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.staff-shift-close-cash-out-row {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.45rem 0;
+  border-top: 1px solid color-mix(in srgb, var(--close-forest) 12%, transparent);
+}
+
+.staff-shift-close-cash-out-amount {
+  color: var(--close-forest);
+  font-weight: 800;
+}
+
+.staff-shift-close-cash-out-category {
+  color: var(--close-muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.staff-shift-close-cash-out-note {
+  color: var(--close-muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
 .staff-shift-close-lede {
   margin: 0.55rem 0 0 !important;
   max-width: 36rem;
@@ -19955,6 +19995,217 @@ a.brune-contact-value:focus-visible {
 
 @media (min-width: 720px) {
   .staff-attendance {
+    padding: 1.25rem 1.35rem 2rem;
+  }
+}
+
+/* Staff Cash Out */
+.staff-cash-out {
+  --co-forest: #394331;
+  --co-ivory: #f4efe3;
+  --co-muted: color-mix(in srgb, #394331 58%, #7a7468);
+  display: grid;
+  gap: 0.95rem;
+  padding: 1rem 1rem 2rem;
+  max-width: 42rem;
+}
+
+.staff-cash-out-head {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.staff-cash-out-form,
+.staff-cash-out-today,
+.staff-cash-out-blocked,
+.staff-cash-out-confirm {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.95rem;
+  border: 1px solid color-mix(in srgb, var(--co-forest) 16%, transparent);
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--co-ivory) 70%, #fff);
+}
+
+.staff-cash-out-blocked {
+  border-color: color-mix(in srgb, #b54708 28%, transparent);
+  background: color-mix(in srgb, #b54708 6%, #fff);
+}
+
+.staff-cash-out-blocked-title,
+.staff-cash-out-confirm-title {
+  margin: 0;
+  color: var(--co-forest);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.staff-cash-out-blocked-copy,
+.staff-cash-out-confirm-meta {
+  margin: 0;
+  color: var(--co-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.staff-cash-out-confirm-amount {
+  margin: 0;
+  color: var(--co-forest);
+  font-size: 1.55rem;
+  font-weight: 800;
+}
+
+.staff-cash-out-field {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--co-forest);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.staff-cash-out-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--co-forest) 22%, transparent);
+  border-radius: 0.7rem;
+  background: #fff;
+}
+
+.staff-cash-out-currency {
+  color: var(--co-muted);
+  font-weight: 800;
+}
+
+.staff-cash-out-input {
+  width: 100%;
+  min-height: 2.75rem;
+  border: 1px solid color-mix(in srgb, var(--co-forest) 22%, transparent);
+  border-radius: 0.7rem;
+  padding: 0.55rem 0.75rem;
+  background: #fff;
+  color: var(--co-forest);
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.staff-cash-out-input-wrap .staff-cash-out-input {
+  border: 0;
+  padding-left: 0;
+}
+
+.staff-cash-out-input--notes {
+  min-height: 3.5rem;
+  resize: vertical;
+}
+
+.staff-cash-out-select {
+  appearance: none;
+}
+
+.staff-cash-out-submit {
+  min-height: 3rem;
+  border: 0;
+  border-radius: 0.85rem;
+  background: var(--co-forest);
+  color: var(--co-ivory);
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.staff-cash-out-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.staff-cash-out-today-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.staff-cash-out-section-label {
+  margin: 0;
+  color: var(--co-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.staff-cash-out-total {
+  margin: 0.15rem 0 0;
+  color: var(--co-forest);
+  font-size: 1.45rem;
+  font-weight: 800;
+}
+
+.staff-cash-out-count,
+.staff-cash-out-empty,
+.staff-cash-out-row-meta,
+.staff-cash-out-row-note {
+  margin: 0;
+  color: var(--co-muted);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.staff-cash-out-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.staff-cash-out-row {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--co-forest) 14%, transparent);
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.staff-cash-out-row--voided {
+  opacity: 0.72;
+}
+
+.staff-cash-out-row-amount {
+  margin: 0;
+  color: var(--co-forest);
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.staff-cash-out-row-category {
+  margin: 0;
+  color: var(--co-forest);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.staff-cash-out-void-badge {
+  margin: 0.25rem 0 0;
+  color: #9a3412;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.staff-cash-out-void-form {
+  display: grid;
+  gap: 0.4rem;
+}
+
+@media (min-width: 720px) {
+  .staff-cash-out {
     padding: 1.25rem 1.35rem 2rem;
   }
 }
