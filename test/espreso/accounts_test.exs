@@ -224,6 +224,218 @@ defmodule Espreso.AccountsTest do
     assert promoted.role == "manager"
   end
 
+  test "owner cannot deactivate self through update_user_as" do
+    {:ok, owner} =
+      Accounts.register_user(%{
+        name: "Solo Owner",
+        email: "solo.owner@coffeespot.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    assert {:error, :cannot_deactivate_self} =
+             Accounts.update_user_as(owner, owner, %{active: false})
+
+    assert Accounts.get_user!(owner.id).active
+  end
+
+  test "cannot disable or demote an Owner when they are the last active Owner" do
+    {:ok, owner_a} =
+      Accounts.register_user(%{
+        name: "Owner A",
+        email: "owner.a.last@coffeespot.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    {:ok, owner_b} =
+      Accounts.register_user(%{
+        name: "Owner B",
+        email: "owner.b.last@coffeespot.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    assert {:ok, _} = Accounts.update_user_as(owner_a, owner_b, %{active: false})
+
+    assert {:error, :cannot_deactivate_self} =
+             Accounts.update_user_as(owner_a, owner_a, %{active: false})
+
+    # Inactive Owners must not count: add one and keep owner_a as sole active Owner.
+    {:ok, inactive_owner} =
+      Accounts.register_user(%{
+        name: "Parked Owner",
+        email: "parked.owner.last@coffeespot.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    {:ok, _} = Accounts.update_user(inactive_owner, %{active: false})
+
+    assert {:error, :cannot_deactivate_self} =
+             Accounts.update_user_as(owner_a, owner_a, %{active: false})
+
+    assert {:ok, still} =
+             Accounts.update_user_as(owner_a, owner_a, %{
+               "name" => "Owner A Renamed",
+               "email" => owner_a.email,
+               "role" => "manager"
+             })
+
+    assert still.role == "owner"
+    assert still.name == "Owner A Renamed"
+    assert still.active
+
+    # Stale in-memory Owner actor (demoted in DB) must still be blocked by last-owner.
+    {:ok, owner_b} =
+      Accounts.update_user_as(owner_a, Accounts.get_user!(owner_b.id), %{
+        "name" => owner_b.name,
+        "email" => owner_b.email,
+        "role" => "owner",
+        "active" => true
+      })
+
+    stale_b = owner_b
+
+    assert {:ok, _} =
+             Accounts.update_user_as(owner_a, owner_b, %{
+               "name" => owner_b.name,
+               "email" => owner_b.email,
+               "role" => "manager"
+             })
+
+    assert {:error, :last_owner} =
+             Accounts.update_user_as(stale_b, owner_a, %{active: false})
+
+    assert {:error, :last_owner} =
+             Accounts.update_user_as(stale_b, owner_a, %{
+               "name" => owner_a.name,
+               "email" => owner_a.email,
+               "role" => "barista"
+             })
+
+    assert Accounts.get_user!(owner_a.id).active
+    assert Accounts.get_user!(owner_a.id).role == "owner"
+  end
+
+  test "inactive Owners do not count toward last-owner protection" do
+    {:ok, owner_a} =
+      Accounts.register_user(%{
+        name: "Active Owner",
+        email: "active.owner.safety@coffeespot.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    {:ok, inactive} =
+      Accounts.register_user(%{
+        name: "Inactive Owner",
+        email: "inactive.owner.safety@coffeespot.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    {:ok, _} = Accounts.update_user(inactive, %{active: false})
+
+    {:ok, owner_b} =
+      Accounts.register_user(%{
+        name: "Actor Owner",
+        email: "actor.owner.safety@coffeespot.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    assert {:ok, _} = Accounts.update_user_as(owner_b, owner_a, %{active: false})
+
+    inactive = Accounts.get_user!(inactive.id)
+    owner_a = Accounts.get_user!(owner_a.id)
+
+    # Reloaded inactive Owner cannot authorize user management.
+    assert {:error, :unauthorized} =
+             Accounts.update_user_as(inactive, owner_b, %{
+               "name" => owner_b.name,
+               "email" => owner_b.email,
+               "role" => "manager"
+             })
+
+    assert {:error, :unauthorized} =
+             Accounts.update_user_as(owner_a, owner_b, %{active: false})
+
+    assert {:error, :cannot_deactivate_self} =
+             Accounts.update_user_as(owner_b, owner_b, %{active: false})
+
+    assert Accounts.get_user!(owner_b.id).active
+    assert Accounts.get_user!(owner_b.id).role == "owner"
+  end
+
+  test "can disable or demote an Owner when another active Owner remains" do
+    {:ok, owner_a} =
+      Accounts.register_user(%{
+        name: "Owner A2",
+        email: "owner.a2.safety@coffeespot.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    {:ok, owner_b} =
+      Accounts.register_user(%{
+        name: "Owner B2",
+        email: "owner.b2.safety@coffeespot.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    assert {:ok, disabled} = Accounts.update_user_as(owner_a, owner_b, %{active: false})
+    refute disabled.active
+
+    {:ok, owner_c} =
+      Accounts.register_user(%{
+        name: "Owner C2",
+        email: "owner.c2.safety@coffeespot.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    assert {:ok, demoted} =
+             Accounts.update_user_as(owner_a, owner_c, %{
+               "name" => owner_c.name,
+               "email" => owner_c.email,
+               "role" => "manager"
+             })
+
+    assert demoted.role == "manager"
+  end
+
+  test "can edit last Owner non-role fields and create additional Owners" do
+    {:ok, owner} =
+      Accounts.register_user(%{
+        name: "Editable Owner",
+        email: "editable.owner@coffeespot.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    assert {:ok, updated} =
+             Accounts.update_user_as(owner, owner, %{
+               "name" => "Editable Owner Updated",
+               "email" => "editable.owner@coffeespot.local"
+             })
+
+    assert updated.name == "Editable Owner Updated"
+    assert updated.role == "owner"
+    assert updated.active
+
+    assert {:ok, second} =
+             Accounts.create_user_as(owner, %{
+               "name" => "Second Owner",
+               "email" => "second.owner.safety@coffeespot.local",
+               "password" => "password123",
+               "role" => "owner"
+             })
+
+    assert second.role == "owner"
+  end
+
   test "set_pin, verify_pin, and clear_pin" do
     {:ok, user} =
       Accounts.register_user(%{

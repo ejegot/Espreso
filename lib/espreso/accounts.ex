@@ -99,11 +99,14 @@ defmodule Espreso.Accounts do
   Updates a user when the actor has `:user_management` permission.
 
   Actors cannot change their own role (blocks self escalation / demotion).
+  Actors cannot deactivate themselves.
+  Disabling or demoting an Owner is rejected when it would leave zero active Owners.
   """
   def update_user_as(%User{} = actor, %User{} = target, attrs) when is_map(attrs) do
-    with :ok <- Authorization.authorize(actor, :user_management) do
-      attrs = reject_self_role_change(actor, target, attrs)
-      update_user(target, attrs)
+    with :ok <- Authorization.authorize(actor, :user_management),
+         attrs <- reject_self_role_change(actor, target, attrs),
+         :ok <- reject_self_deactivation(actor, target, attrs) do
+      update_user_as_safe(target, attrs)
     end
   end
 
@@ -122,6 +125,107 @@ defmodule Espreso.Accounts do
   end
 
   defp reject_self_role_change(_actor, _target, attrs), do: attrs
+
+  defp reject_self_deactivation(%User{id: id}, %User{id: id}, attrs) do
+    if deactivating_attrs?(attrs) do
+      {:error, :cannot_deactivate_self}
+    else
+      :ok
+    end
+  end
+
+  defp reject_self_deactivation(_actor, _target, _attrs), do: :ok
+
+  defp update_user_as_safe(%User{} = target, attrs) do
+    result =
+      Repo.transaction(fn ->
+        # Lock active Owners in stable id order first to avoid deadlocks when two
+        # Owners concurrently demote/disable each other.
+        active_owners =
+          User
+          |> where([u], u.role == "owner" and u.active == true)
+          |> order_by([u], asc: u.id)
+          |> lock("FOR UPDATE")
+          |> Repo.all()
+
+        locked_target =
+          case Enum.find(active_owners, &(&1.id == target.id)) do
+            %User{} = owner ->
+              owner
+
+            nil ->
+              User
+              |> where([u], u.id == ^target.id)
+              |> lock("FOR UPDATE")
+              |> Repo.one!()
+          end
+
+        case reject_last_owner_violation(locked_target, attrs) do
+          {:error, reason} ->
+            Repo.rollback(reason)
+
+          :ok ->
+            case update_user(locked_target, attrs) do
+              {:ok, user} -> user
+              {:error, %Ecto.Changeset{} = changeset} -> Repo.rollback(changeset)
+            end
+        end
+      end)
+
+    case result do
+      {:ok, %User{} = user} -> {:ok, user}
+      {:error, %Ecto.Changeset{} = changeset} -> {:error, changeset}
+      {:error, :last_owner} -> {:error, :last_owner}
+      {:error, :cannot_deactivate_self} -> {:error, :cannot_deactivate_self}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp reject_last_owner_violation(%User{role: "owner", active: true} = target, attrs) do
+    if owner_privilege_loss?(attrs) do
+      other_active_owners =
+        User
+        |> where([u], u.role == "owner" and u.active == true and u.id != ^target.id)
+        |> Repo.aggregate(:count, :id)
+
+      if other_active_owners == 0 do
+        {:error, :last_owner}
+      else
+        :ok
+      end
+    else
+      :ok
+    end
+  end
+
+  defp reject_last_owner_violation(_target, _attrs), do: :ok
+
+  defp owner_privilege_loss?(attrs) do
+    deactivating_attrs?(attrs) or demoting_owner_attrs?(attrs)
+  end
+
+  defp deactivating_attrs?(attrs) do
+    case attr(attrs, :active) do
+      false -> true
+      "false" -> true
+      _ -> false
+    end
+  end
+
+  defp demoting_owner_attrs?(attrs) do
+    case attr(attrs, :role) do
+      role when role in ["barista", "manager"] -> true
+      _ -> false
+    end
+  end
+
+  defp attr(attrs, key) when is_atom(key) do
+    cond do
+      Map.has_key?(attrs, key) -> Map.get(attrs, key)
+      Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
+      true -> nil
+    end
+  end
 
   @doc """
   Authenticates by email and password.
