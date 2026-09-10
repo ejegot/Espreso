@@ -10,6 +10,7 @@ defmodule Espreso.Orders do
   alias Espreso.Orders.{Order, OrderItem, PaymentReconciliation}
   alias Espreso.Menu
   alias Espreso.Menu.ProductPrice
+  alias Espreso.StaffShifts.StaffShift
 
   @unpaid_payment_statuses ~w(unpaid awaiting_payment)
   @paid_vias ~w(cash gcash maya counter paymongo)
@@ -347,6 +348,37 @@ defmodule Espreso.Orders do
   end
 
   def get_transaction(_), do: nil
+
+  @doc """
+  Paid POS sales attributed to one staff attendance shift.
+
+  Credit belongs to the settler (`settled_by_user_id`) for orders with
+  `source == "pos"` whose `settled_at` falls in the half-open window
+  `[started_at, ended_at)`. Open shifts (`ended_at` nil) have no upper bound.
+
+  Does not filter by `settlement_source` or `paid_via`. Customer / PayMongo
+  orders are excluded via `source != "pos"`.
+  """
+  def sales_summary_for_staff_shift(%StaffShift{} = shift) do
+    query =
+      from(o in Order,
+        where:
+          o.payment_status == "paid" and o.source == "pos" and
+            o.settled_by_user_id == ^shift.user_id and not is_nil(o.settled_at) and
+            o.settled_at >= ^shift.started_at
+      )
+
+    query =
+      case shift.ended_at do
+        nil -> query
+        ended_at -> from(o in query, where: o.settled_at < ^ended_at)
+      end
+
+    {count, total} =
+      Repo.one(from(o in query, select: {count(o.id), sum(o.total)})) || {0, nil}
+
+    %{order_count: count, total: decimalize(total)}
+  end
 
   defp normalize_lookup_number(number) when is_binary(number) do
     trimmed = String.trim(number)
