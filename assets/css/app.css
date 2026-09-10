@@ -19807,3 +19807,109 @@ a.brune-contact-value:focus-visible {
     padding: 1.25rem 1.35rem 2rem;
   }
 }
+
+/* —— Staff Attendance (PASS 5E) —— */
+.staff-attendance {
+  --att-forest: var(--elilai-forest, #394331);
+  --att-ivory: var(--elilai-ivory, #f4efe3);
+  --att-muted: color-mix(in srgb, var(--att-forest) 58%, #fff);
+  display: grid;
+  gap: 1.15rem;
+  padding: 1rem 1rem 1.75rem;
+  max-width: 42rem;
+}
+
+.staff-attendance-head {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.staff-attendance-eyebrow,
+.staff-attendance-section-label {
+  margin: 0;
+  color: var(--att-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.staff-attendance-head h2 {
+  margin: 0;
+  color: var(--att-forest);
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(1.55rem, 3vw, 1.9rem);
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+.staff-attendance-head > div > p:last-child {
+  margin: 0.15rem 0 0;
+  color: var(--att-muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.staff-attendance-section {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.staff-attendance-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.staff-attendance-row {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid color-mix(in srgb, var(--att-forest) 14%, transparent);
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--att-ivory) 55%, #fff);
+}
+
+.staff-attendance-row--open {
+  border-color: color-mix(in srgb, var(--att-forest) 28%, transparent);
+  background: color-mix(in srgb, var(--att-ivory) 78%, #fff);
+}
+
+.staff-attendance-name {
+  margin: 0;
+  color: var(--att-forest);
+  font-size: 0.98rem;
+  font-weight: 750;
+}
+
+.staff-attendance-when {
+  margin: 0;
+  color: var(--att-forest);
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+
+.staff-attendance-sales {
+  margin: 0;
+  color: var(--att-muted);
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.staff-attendance-empty {
+  display: grid;
+  gap: 0.28rem;
+  justify-items: center;
+  padding: 2.25rem 1rem;
+  color: var(--att-muted);
+  text-align: center;
+}
+
+.staff-attendance-empty strong {
+  color: var(--att-forest);
+}
+
+@media (min-width: 720px) {
+  .staff-attendance {
+    padding: 1.25rem 1.35rem 2rem;
+  }
+}

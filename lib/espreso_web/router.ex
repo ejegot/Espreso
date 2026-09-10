@@ -114,6 +114,7 @@ defmodule EspresoWeb.Router do
     live_session :reports,
       on_mount: [{EspresoWeb.StaffAuth, {:ensure_permission, :reports}}] do
       live "/staff/close", StaffShiftCloseLive
+      live "/staff/attendance", StaffAttendanceLive
     end
 
     live_session :staff,
