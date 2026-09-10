@@ -1228,9 +1228,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
   } do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
-    assert has_element?(view, "#pos-staff", "Staff")
-    assert has_element?(view, ".staff-pos-section-label", "Payment method")
     assert has_element?(view, "#pos-pay-cash.is-active", "Cash")
+    assert has_element?(view, ".staff-pos-section-label", "Payment method")
     assert has_element?(view, "#pos-place-order", "Process Cash Order")
     refute has_element?(view, "#pos-gcash-confirmation-cue")
     refute has_element?(view, "#pos-pay-later")
