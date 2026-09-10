@@ -243,6 +243,14 @@ defmodule EspresoWeb.StaffHomeLive do
         path: ~p"/transactions",
         count: nil,
         show?: Authorization.can?(user, :orders)
+      },
+      %{
+        id: "my-shifts",
+        title: "My shifts",
+        body: "Time In, Time Out & sales",
+        path: ~p"/staff/shifts",
+        count: nil,
+        show?: Authorization.can?(user, :orders)
       }
     ]
 

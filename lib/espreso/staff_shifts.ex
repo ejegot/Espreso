@@ -24,6 +24,22 @@ defmodule Espreso.StaffShifts do
   end
 
   @doc """
+  Lists attendance shifts for one employee, newest first.
+
+  Includes open and closed shifts. Options:
+  - `:limit` — max rows (default 30, clamped 1..100)
+  """
+  def list_shifts_for_user(user_id, opts \\ []) when is_integer(user_id) and is_list(opts) do
+    limit = opts |> Keyword.get(:limit, 30) |> normalize_limit()
+
+    StaffShift
+    |> where([s], s.user_id == ^user_id)
+    |> order_by([s], desc: s.started_at, desc: s.id)
+    |> limit(^limit)
+    |> Repo.all()
+  end
+
+  @doc """
   Opens a staff shift for a successful browser login.
 
   If an open shift already exists, closes it with `end_reason: "auto_close"`
@@ -122,4 +138,10 @@ defmodule Espreso.StaffShifts do
   defp utc_now do
     DateTime.utc_now() |> DateTime.truncate(:second)
   end
+
+  defp normalize_limit(limit) when is_integer(limit) and limit > 0 do
+    min(limit, 100)
+  end
+
+  defp normalize_limit(_), do: 30
 end
