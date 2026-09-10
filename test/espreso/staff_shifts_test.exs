@@ -79,6 +79,65 @@ defmodule Espreso.StaffShiftsTest do
     end
   end
 
+  describe "close_shift_for_shift_close/2" do
+    test "closes open shift with shift_close reason and given ended_at", %{user: user} do
+      assert {:ok, open} = StaffShifts.open_shift_for_login(user)
+      ended_at = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      assert {:ok, closed} = StaffShifts.close_shift_for_shift_close(user.id, ended_at)
+
+      assert closed.id == open.id
+      assert closed.end_reason == "shift_close"
+      assert DateTime.compare(closed.ended_at, ended_at) == :eq
+      assert is_nil(StaffShifts.get_open_shift(user))
+    end
+
+    test "does not close another user's open shift", %{user: user} do
+      {:ok, other} =
+        Accounts.register_user(%{
+          name: "Other Closer",
+          email: "other.closer@test.local",
+          password: "password123",
+          role: "barista"
+        })
+
+      assert {:ok, open_user} = StaffShifts.open_shift_for_login(user)
+      assert {:ok, open_other} = StaffShifts.open_shift_for_login(other)
+
+      ended_at = DateTime.utc_now() |> DateTime.truncate(:second)
+      assert {:ok, closed} = StaffShifts.close_shift_for_shift_close(user.id, ended_at)
+
+      assert closed.id == open_user.id
+      assert StaffShifts.get_open_shift(other).id == open_other.id
+      assert is_nil(Repo.get!(StaffShift, open_other.id).ended_at)
+    end
+
+    test "no open shift is a successful no-op", %{user: user} do
+      ended_at = DateTime.utc_now() |> DateTime.truncate(:second)
+      assert {:ok, :none} = StaffShifts.close_shift_for_shift_close(user.id, ended_at)
+    end
+  end
+
+  describe "last_active_closer_status/1" do
+    test "ok only when barista is sole open shift", %{user: user} do
+      assert {:error, :not_on_shift} = StaffShifts.last_active_closer_status(user)
+
+      assert {:ok, _} = StaffShifts.open_shift_for_login(user)
+      assert :ok = StaffShifts.last_active_closer_status(user)
+
+      {:ok, other} =
+        Accounts.register_user(%{
+          name: "Peer",
+          email: "peer.last.active@test.local",
+          password: "password123",
+          role: "barista"
+        })
+
+      assert {:ok, _} = StaffShifts.open_shift_for_login(other)
+      assert {:error, :other_staff_active} = StaffShifts.last_active_closer_status(user)
+    end
+  end
+
   describe "StaffShift changesets" do
     test "rejects invalid end_reason" do
       {:ok, user} =

@@ -7,7 +7,10 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
   alias Espreso.Orders
   alias Espreso.Shifts
 
-  test "manager home shows paid breakdown and close tile; barista does not", %{conn: conn} do
+  test "manager home shows paid breakdown and close tile; barista sees close without paid breakdown",
+       %{
+         conn: conn
+       } do
     {:ok, manager} =
       Accounts.register_user(%{
         name: "Mgr",
@@ -50,7 +53,7 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
 
     {:ok, barista_view, _html} = live(barista_conn, ~p"/staff")
     refute has_element?(barista_view, "#staff-home-paid-breakdown")
-    refute has_element?(barista_view, "#staff-home-close")
+    assert has_element?(barista_view, "#staff-home-close", "Close shift")
     assert has_element?(barista_view, "#staff-home-today-barista")
 
     assert {:ok, _} = Shifts.record_close(manager, %{counted_cash: "75"})

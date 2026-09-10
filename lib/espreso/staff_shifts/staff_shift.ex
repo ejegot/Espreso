@@ -10,7 +10,7 @@ defmodule Espreso.StaffShifts.StaffShift do
 
   alias Espreso.Accounts.User
 
-  @end_reasons ~w(logout auto_close)
+  @end_reasons ~w(logout auto_close shift_close)
 
   schema "staff_shifts" do
     field :started_at, :utc_datetime

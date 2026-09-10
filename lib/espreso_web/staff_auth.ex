@@ -156,6 +156,22 @@ defmodule EspresoWeb.StaffAuth do
     end
   end
 
+  def on_mount(:ensure_can_close_shift, _params, session, socket) do
+    socket = mount_current_user(socket, session)
+    user = socket.assigns.current_user
+
+    if Espreso.Shifts.can_access_close?(user) do
+      {:cont, socket}
+    else
+      socket =
+        socket
+        |> Phoenix.LiveView.put_flash(:error, "You don’t have permission to do that.")
+        |> Phoenix.LiveView.redirect(to: home_path(user))
+
+      {:halt, socket}
+    end
+  end
+
   def on_mount(:redirect_if_authenticated, _params, session, socket) do
     socket = mount_current_user(socket, session)
 

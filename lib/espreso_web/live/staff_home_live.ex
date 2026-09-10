@@ -251,6 +251,15 @@ defmodule EspresoWeb.StaffHomeLive do
         path: ~p"/staff/shifts",
         count: nil,
         show?: user.role == "barista"
+      },
+      %{
+        id: "close",
+        title: if(shift_close, do: "Shift closed", else: "Close shift"),
+        body: if(shift_close, do: "View close snapshot", else: "Totals & counted cash"),
+        path: ~p"/staff/close",
+        count: nil,
+        show?: Shifts.can_access_close?(user),
+        class: "staff-home-tool-link--close"
       }
     ]
 
@@ -264,15 +273,6 @@ defmodule EspresoWeb.StaffHomeLive do
             path: ~p"/dashboard",
             count: nil,
             show?: true
-          },
-          %{
-            id: "close",
-            title: if(shift_close, do: "Shift closed", else: "Close shift"),
-            body: if(shift_close, do: "View close snapshot", else: "Totals & counted cash"),
-            path: ~p"/staff/close",
-            count: nil,
-            show?: Authorization.can?(user, :reports),
-            class: "staff-home-tool-link--close"
           },
           %{
             id: "availability",

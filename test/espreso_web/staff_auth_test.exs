@@ -499,7 +499,8 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(barista_view, "#staff-home-orders", "Orders")
     assert has_element?(barista_view, "#staff-home-pos", "POS")
     refute has_element?(barista_view, "#staff-home-dashboard")
-    refute has_element?(barista_view, "#staff-nav-close")
+    assert has_element?(barista_view, "#staff-nav-close", "Close shift")
+    assert has_element?(barista_view, "#staff-home-close", "Close shift")
 
     {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/staff")
     assert has_element?(manager_view, "#staff-home-dashboard", "Dashboard")

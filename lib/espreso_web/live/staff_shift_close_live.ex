@@ -2,15 +2,17 @@ defmodule EspresoWeb.StaffShiftCloseLive do
   use EspresoWeb, :live_view
 
   alias Espreso.Accounts.Authorization
+  alias Espreso.Accounts.User
   alias Espreso.Menu
   alias Espreso.Orders
   alias Espreso.Shifts
+  alias Espreso.StaffShifts
 
   @impl true
   def mount(_params, _session, socket) do
     user = socket.assigns.current_user
 
-    if Authorization.can?(user, :reports) do
+    if Shifts.can_access_close?(user) do
       {:ok, assign_close_state(socket), layout: false}
     else
       {:ok,
@@ -22,21 +24,29 @@ defmodule EspresoWeb.StaffShiftCloseLive do
 
   @impl true
   def handle_event("validate", %{"close" => params}, socket) do
-    {:noreply,
-     socket
-     |> assign(:counted_cash, Map.get(params, "counted_cash", ""))
-     |> assign(:notes, Map.get(params, "notes", ""))
-     |> assign(:confirming?, false)
-     |> assign(:form_error, nil)}
+    if socket.assigns.blocked? do
+      {:noreply, socket}
+    else
+      {:noreply,
+       socket
+       |> assign(:counted_cash, Map.get(params, "counted_cash", ""))
+       |> assign(:notes, Map.get(params, "notes", ""))
+       |> assign(:confirming?, false)
+       |> assign(:form_error, nil)}
+    end
   end
 
   def handle_event("prepare_close", %{"close" => params}, socket) do
-    {:noreply,
-     socket
-     |> assign(:counted_cash, Map.get(params, "counted_cash", ""))
-     |> assign(:notes, Map.get(params, "notes", ""))
-     |> assign(:confirming?, true)
-     |> assign(:form_error, nil)}
+    if socket.assigns.blocked? do
+      {:noreply, socket}
+    else
+      {:noreply,
+       socket
+       |> assign(:counted_cash, Map.get(params, "counted_cash", ""))
+       |> assign(:notes, Map.get(params, "notes", ""))
+       |> assign(:confirming?, true)
+       |> assign(:form_error, nil)}
+    end
   end
 
   def handle_event("cancel_confirm", _params, socket) do
@@ -44,40 +54,64 @@ defmodule EspresoWeb.StaffShiftCloseLive do
   end
 
   def handle_event("record_close", _params, socket) do
-    params = %{
-      "counted_cash" => socket.assigns.counted_cash,
-      "notes" => socket.assigns.notes
-    }
+    if socket.assigns.blocked? do
+      {:noreply, assign_close_state(socket)}
+    else
+      params = %{
+        "counted_cash" => socket.assigns.counted_cash,
+        "notes" => socket.assigns.notes
+      }
 
-    case Shifts.record_close(socket.assigns.current_user, params) do
-      {:ok, close} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Shift close recorded")
-         |> assign(:close, close)
-         |> assign(:already_closed?, true)
-         |> assign(:confirming?, false)
-         |> assign(:form_error, nil)}
+      case Shifts.record_close(socket.assigns.current_user, params) do
+        {:ok, close} ->
+          staff_shift_ended? = barista?(socket.assigns.current_user)
 
-      {:error, :already_closed} ->
-        {:noreply,
-         socket
-         |> assign(:close, Shifts.get_todays_close())
-         |> assign(:already_closed?, true)
-         |> assign(:confirming?, false)
-         |> assign(:form_error, "Shift already closed for today.")}
+          {:noreply,
+           socket
+           |> put_flash(:info, close_success_flash(staff_shift_ended?))
+           |> assign(:close, close)
+           |> assign(:already_closed?, true)
+           |> assign(:blocked?, false)
+           |> assign(:staff_shift_ended?, staff_shift_ended?)
+           |> assign(:confirming?, false)
+           |> assign(:form_error, nil)}
 
-      {:error, :unauthorized} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, "You don’t have access to close shift.")
-         |> push_navigate(to: ~p"/staff")}
+        {:error, :already_closed} ->
+          {:noreply,
+           socket
+           |> assign(:close, Shifts.get_todays_close())
+           |> assign(:already_closed?, true)
+           |> assign(:blocked?, false)
+           |> assign(:confirming?, false)
+           |> assign(:form_error, "Shift already closed for today.")}
 
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply,
-         socket
-         |> assign(:confirming?, false)
-         |> assign(:form_error, close_changeset_error(changeset))}
+        {:error, :other_staff_active} ->
+          {:noreply,
+           socket
+           |> assign_close_state()
+           |> assign(:form_error, other_staff_message())}
+
+        {:error, :not_on_shift} ->
+          {:noreply,
+           socket
+           |> assign_close_state()
+           |> assign(
+             :form_error,
+             "You need an open staff shift to close the shop as barista."
+           )}
+
+        {:error, :unauthorized} ->
+          {:noreply,
+           socket
+           |> put_flash(:error, "You don’t have access to close shift.")
+           |> push_navigate(to: ~p"/staff")}
+
+        {:error, %Ecto.Changeset{} = changeset} ->
+          {:noreply,
+           socket
+           |> assign(:confirming?, false)
+           |> assign(:form_error, close_changeset_error(changeset))}
+      end
     end
   end
 
@@ -107,19 +141,34 @@ defmodule EspresoWeb.StaffShiftCloseLive do
             <p
               class={[
                 "staff-shift-close-status",
-                @already_closed? && "staff-shift-close-status--closed"
+                @already_closed? && "staff-shift-close-status--closed",
+                @blocked? && "staff-shift-close-status--blocked"
               ]}
               id="staff-shift-close-status"
             >
-              {if(@already_closed?, do: "Shift closed", else: "Open")}
+              <%= cond do %>
+                <% @already_closed? -> %>
+                  Shift closed
+                <% @block_reason == :other_staff_active -> %>
+                  Waiting on staff
+                <% @blocked? -> %>
+                  Not ready
+                <% true -> %>
+                  Open
+              <% end %>
             </p>
           </div>
           <p class="staff-home-lede staff-shift-close-lede">
-            <%= if @already_closed? do %>
-              Sealed snapshot of today’s settled sales and the drawer cash count that was recorded.
-            <% else %>
-              Review today’s settled sales, enter the cash physically counted in the drawer, then seal the day.
-              System paid totals are settled sales — not a physical cash target.
+            <%= cond do %>
+              <% @already_closed? -> %>
+                Sealed snapshot of today’s settled sales and the drawer cash count that was recorded.
+              <% @block_reason == :other_staff_active -> %>
+                Another staff member is still on shift. They need to Time Out before you can Close Shift.
+              <% @block_reason == :not_on_shift -> %>
+                You need an open staff shift to close the shop. Log in again if your shift already ended.
+              <% true -> %>
+                Review today’s settled sales, enter the cash physically counted in the drawer, then seal the day.
+                System paid totals are settled sales — not a physical cash target.
             <% end %>
           </p>
         </header>
@@ -135,6 +184,13 @@ defmodule EspresoWeb.StaffShiftCloseLive do
             <p class="staff-shift-close-done-copy" id="staff-shift-close-done-meta">
               Closed at {Shifts.format_closed_at(@close.closed_at)}
               <span :if={@close.closed_by_user}>by {@close.closed_by_user.name}</span>
+            </p>
+            <p
+              :if={@staff_shift_ended?}
+              class="staff-shift-close-timed-out"
+              id="staff-shift-close-timed-out"
+            >
+              Your staff shift has ended (Time Out). You are still signed in — log out when you are done.
             </p>
             <p class="staff-shift-close-seal-note">
               These are the numbers sealed when this shift was closed.
@@ -186,8 +242,21 @@ defmodule EspresoWeb.StaffShiftCloseLive do
             </p>
 
             <div class="staff-shift-close-nav">
+              <.link
+                :if={@staff_shift_ended?}
+                href={~p"/logout"}
+                method="delete"
+                class="staff-shift-close-submit"
+                id="staff-shift-close-logout"
+              >
+                Log out
+              </.link>
               <.link navigate={~p"/staff"} class="staff-shell-tool">Back to Home</.link>
-              <.link navigate={~p"/dashboard"} class="staff-shell-tool staff-shell-tool--quiet">
+              <.link
+                :if={Authorization.can?(@current_user, :dashboard) and not barista?(@current_user)}
+                navigate={~p"/dashboard"}
+                class="staff-shell-tool staff-shell-tool--quiet"
+              >
                 Back to Dashboard
               </.link>
               <.link navigate={~p"/transactions"} class="staff-shell-tool staff-shell-tool--quiet">
@@ -197,6 +266,33 @@ defmodule EspresoWeb.StaffShiftCloseLive do
           </section>
         <% else %>
           <section
+            :if={@blocked?}
+            class="staff-shift-close-blocked"
+            id="staff-shift-close-blocked"
+            role="status"
+          >
+            <p class="staff-shift-close-blocked-title">Cannot close yet</p>
+            <p class="staff-shift-close-blocked-copy" id="staff-shift-close-blocked-copy">
+              <%= if @block_reason == :not_on_shift do %>
+                You need an open staff shift to close the shop. Log in again if your shift already ended.
+              <% else %>
+                Another staff member is still on shift. They need to Time Out before you can Close Shift.
+              <% end %>
+            </p>
+            <ul
+              :if={@other_active_names != []}
+              class="staff-shift-close-blocked-list"
+              id="staff-shift-close-blocked-staff"
+            >
+              <li :for={name <- @other_active_names}>{name}</li>
+            </ul>
+            <div class="staff-shift-close-nav">
+              <.link navigate={~p"/staff"} class="staff-shell-tool">Back to Home</.link>
+            </div>
+          </section>
+
+          <section
+            :if={!@blocked?}
             class="staff-shift-close-cash"
             id="staff-shift-close-cash"
             aria-label="Cash settled"
@@ -207,6 +303,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
           </section>
 
           <form
+            :if={!@blocked?}
             id="staff-shift-close-form"
             phx-change="validate"
             phx-submit="prepare_close"
@@ -277,6 +374,9 @@ defmodule EspresoWeb.StaffShiftCloseLive do
               <p class="staff-shift-close-confirm-title">Record today’s close?</p>
               <p class="staff-shift-close-confirm-copy">
                 This will seal today’s recorded paid sales and save the cash count you entered.
+                <span :if={barista?(@current_user)}>
+                  Your staff shift will also end (Time Out).
+                </span>
               </p>
               <p class="staff-shift-close-confirm-cash" id="staff-shift-close-confirm-cash">
                 <%= if String.trim(@counted_cash || "") == "" do %>
@@ -322,20 +422,79 @@ defmodule EspresoWeb.StaffShiftCloseLive do
   end
 
   defp assign_close_state(socket) do
+    user = socket.assigns.current_user
     breakdown = Orders.todays_paid_breakdown()
     close = Shifts.get_todays_close()
+    already_closed? = not is_nil(close)
+
+    {blocked?, block_reason, other_names, staff_shift_ended?} =
+      cond do
+        already_closed? ->
+          ended? =
+            barista?(user) and
+              match?(%{end_reason: "shift_close"}, latest_closed_shift(user))
+
+          {false, nil, [], ended?}
+
+        true ->
+          case Shifts.close_eligibility(user) do
+            :ok ->
+              {false, nil, [], false}
+
+            {:error, :other_staff_active} ->
+              {true, :other_staff_active, other_active_names(user), false}
+
+            {:error, :not_on_shift} ->
+              {true, :not_on_shift, [], false}
+
+            {:error, :unauthorized} ->
+              {true, :unauthorized, [], false}
+          end
+      end
 
     socket
     |> assign(:page_title, "Close shift")
     |> assign(:breakdown, breakdown)
     |> assign(:via_rows, Orders.paid_via_rows(breakdown))
     |> assign(:close, close)
-    |> assign(:already_closed?, not is_nil(close))
+    |> assign(:already_closed?, already_closed?)
+    |> assign(:blocked?, blocked?)
+    |> assign(:block_reason, block_reason)
+    |> assign(:other_active_names, other_names)
+    |> assign(:staff_shift_ended?, staff_shift_ended?)
     |> assign(:counted_cash, "")
     |> assign(:notes, "")
     |> assign(:confirming?, false)
     |> assign(:form_error, nil)
   end
+
+  defp latest_closed_shift(%User{id: user_id}) do
+    case StaffShifts.list_shifts_for_user(user_id, limit: 1) do
+      [shift | _] -> shift
+      _ -> nil
+    end
+  end
+
+  defp other_active_names(%User{id: user_id}) do
+    StaffShifts.list_open_shifts()
+    |> Enum.reject(&(&1.user_id == user_id))
+    |> Enum.map(fn shift ->
+      case shift.user do
+        %{name: name} when is_binary(name) and name != "" -> name
+        _ -> "Staff ##{shift.user_id}"
+      end
+    end)
+  end
+
+  defp other_staff_message,
+    do:
+      "Another staff member is still on shift. They need to Time Out before you can Close Shift."
+
+  defp close_success_flash(true), do: "Shift close recorded. Your staff shift has ended."
+  defp close_success_flash(false), do: "Shift close recorded"
+
+  defp barista?(%User{role: "barista"}), do: true
+  defp barista?(_), do: false
 
   defp close_changeset_error(_changeset),
     do: "Could not record shift close. Check the amounts and try again."

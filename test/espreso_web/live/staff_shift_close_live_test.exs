@@ -6,7 +6,10 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
   alias Espreso.Accounts
   alias Espreso.Menu
   alias Espreso.Orders
+  alias Espreso.Repo
   alias Espreso.Shifts
+  alias Espreso.StaffShifts
+  alias Espreso.StaffShifts.StaffShift
 
   setup %{conn: conn} do
     {:ok, manager} =
@@ -54,6 +57,7 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     assert has_element?(view, "#staff-shift-close-system", "₱215")
     assert has_element?(view, "#staff-shift-close-prepare", "Record close")
     refute has_element?(view, "#staff-shift-close-confirm")
+    refute has_element?(view, "#staff-shift-close-timed-out")
 
     view
     |> form("#staff-shift-close-form", %{close: %{counted_cash: "80", notes: "Balanced"}})
@@ -88,6 +92,7 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
              "View Transactions"
            )
 
+    refute has_element?(view, "#staff-shift-close-logout")
     refute has_element?(view, "#staff-shift-close-prepare")
     refute has_element?(view, "#staff-shift-close-submit")
 
@@ -97,6 +102,7 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     assert Decimal.equal?(close.system_total, Decimal.new("215"))
     assert close.system_count == 2
     assert Decimal.equal?(close.counted_cash, Decimal.new("80"))
+    assert StaffShifts.list_shifts_for_user(manager.id) == []
   end
 
   test "closed state shows sealed snapshot not later live totals", %{conn: conn, manager: manager} do
@@ -154,7 +160,7 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     assert has_element?(view, "#staff-shift-close-confirm-cash", "No drawer cash count entered.")
   end
 
-  test "barista cannot open close shift", %{conn: conn} do
+  test "last-active barista can access and complete close with Time Out", %{conn: conn} do
     {:ok, barista} =
       Accounts.register_user(%{
         name: "Mia",
@@ -163,11 +169,95 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
         role: "barista"
       })
 
+    assert {:ok, open} = StaffShifts.open_shift_for_login(barista)
+
     barista_conn =
       conn
       |> Phoenix.ConnTest.init_test_session(%{})
       |> Plug.Conn.put_session(:user_id, barista.id)
 
-    assert {:error, {:redirect, %{to: "/orders"}}} = live(barista_conn, ~p"/staff/close")
+    {:ok, view, _html} = live(barista_conn, ~p"/staff/close")
+
+    assert has_element?(view, "#staff-shift-close-status", "Open")
+    refute has_element?(view, "#staff-shift-close-blocked")
+
+    view
+    |> form("#staff-shift-close-form", %{close: %{counted_cash: "40", notes: ""}})
+    |> render_submit()
+
+    assert has_element?(view, "#staff-shift-close-confirm", "Your staff shift will also end")
+
+    view
+    |> element("#staff-shift-close-submit")
+    |> render_click()
+
+    assert has_element?(view, "#staff-shift-close-status", "Shift closed")
+    assert has_element?(view, "#staff-shift-close-timed-out")
+    assert has_element?(view, "#staff-shift-close-logout", "Log out")
+    refute has_element?(view, "#staff-shift-close-done a[href='/dashboard']")
+
+    closed = Repo.get!(StaffShift, open.id)
+    assert closed.end_reason == "shift_close"
+    assert %Shifts.ShiftClose{} = Shifts.get_todays_close()
+    assert is_nil(StaffShifts.get_open_shift(barista))
+  end
+
+  test "non-last-active barista sees blocked state", %{conn: conn} do
+    {:ok, a} =
+      Accounts.register_user(%{
+        name: "Alex",
+        email: "alex-close-#{System.unique_integer([:positive])}@test.local",
+        password: "password123",
+        role: "barista"
+      })
+
+    {:ok, b} =
+      Accounts.register_user(%{
+        name: "Bea",
+        email: "bea-close-#{System.unique_integer([:positive])}@test.local",
+        password: "password123",
+        role: "barista"
+      })
+
+    assert {:ok, _} = StaffShifts.open_shift_for_login(a)
+    assert {:ok, _} = StaffShifts.open_shift_for_login(b)
+
+    a_conn =
+      conn
+      |> Phoenix.ConnTest.init_test_session(%{})
+      |> Plug.Conn.put_session(:user_id, a.id)
+
+    {:ok, view, _html} = live(a_conn, ~p"/staff/close")
+
+    assert has_element?(view, "#staff-shift-close-status", "Waiting on staff")
+    assert has_element?(view, "#staff-shift-close-blocked")
+
+    assert has_element?(
+             view,
+             "#staff-shift-close-blocked-copy",
+             "Another staff member is still on shift"
+           )
+
+    assert has_element?(view, "#staff-shift-close-blocked-staff", "Bea")
+    refute has_element?(view, "#staff-shift-close-form")
+    assert is_nil(Shifts.get_todays_close())
+  end
+
+  test "owner can open close shift", %{conn: conn} do
+    {:ok, owner} =
+      Accounts.register_user(%{
+        name: "Owner",
+        email: "owner-close-#{System.unique_integer([:positive])}@test.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    owner_conn =
+      conn
+      |> Phoenix.ConnTest.init_test_session(%{})
+      |> Plug.Conn.put_session(:user_id, owner.id)
+
+    {:ok, view, _html} = live(owner_conn, ~p"/staff/close")
+    assert has_element?(view, "#staff-shift-close-prepare", "Record close")
   end
 end

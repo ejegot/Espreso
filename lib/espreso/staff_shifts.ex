@@ -3,6 +3,9 @@ defmodule Espreso.StaffShifts do
   Employee attendance shifts (Time In / Time Out).
 
   Browser login opens a shift; explicit logout closes it.
+  A successful shop-day Close Shift may also end the closing barista's shift
+  with `end_reason: "shift_close"`.
+
   Separate from shop-day `Espreso.Shifts` / `ShiftClose`.
   """
 
@@ -23,6 +26,53 @@ defmodule Espreso.StaffShifts do
     |> where([s], s.user_id == ^user_id and is_nil(s.ended_at))
     |> Repo.one()
   end
+
+  @doc """
+  All currently open staff shifts (`ended_at` is nil), ordered by id.
+
+  Used for last-active Close Shift eligibility. Optional `:lock` loads rows
+  with `FOR UPDATE` (call inside a transaction).
+  """
+  def list_open_shifts(opts \\ []) when is_list(opts) do
+    query =
+      StaffShift
+      |> where([s], is_nil(s.ended_at))
+      |> order_by([s], asc: s.id)
+      |> preload(:user)
+
+    query =
+      if Keyword.get(opts, :lock, false) do
+        lock(query, "FOR UPDATE")
+      else
+        query
+      end
+
+    Repo.all(query)
+  end
+
+  @doc """
+  Whether a barista is the sole open StaffShift (last active staff).
+
+  Returns `:ok`, `{:error, :not_on_shift}`, or `{:error, :other_staff_active}`.
+  """
+  def last_active_closer_status(%User{role: "barista", active: true} = user) do
+    opens = list_open_shifts()
+    classify_last_active(user.id, opens)
+  end
+
+  def last_active_closer_status(_), do: {:error, :not_on_shift}
+
+  @doc false
+  def assert_last_active_closer!(%User{role: "barista", active: true} = user) do
+    opens = list_open_shifts(lock: true)
+
+    case classify_last_active(user.id, opens) do
+      :ok -> :ok
+      {:error, reason} -> Repo.rollback(reason)
+    end
+  end
+
+  def assert_last_active_closer!(_user), do: Repo.rollback(:not_on_shift)
 
   @doc """
   Lists attendance shifts for one employee, newest first.
@@ -117,31 +167,62 @@ defmodule Espreso.StaffShifts do
   was no open shift.
   """
   def close_shift_for_logout(user_id) when is_integer(user_id) do
-    now = utc_now()
+    close_open_shift(user_id, utc_now(), "logout")
+  end
 
+  @doc """
+  Ends the employee's open staff shift after a successful shop-day ShiftClose.
+
+  `ended_at` should be the ShiftClose `closed_at` timestamp.
+  Returns `{:ok, shift}`, `{:ok, :none}` when there was no open shift, or
+  `{:error, reason}`.
+  """
+  def close_shift_for_shift_close(user_id, %DateTime{} = ended_at) when is_integer(user_id) do
+    close_open_shift(user_id, DateTime.truncate(ended_at, :second), "shift_close")
+  end
+
+  defp close_open_shift(user_id, ended_at, end_reason) do
     result =
       Repo.transaction(fn ->
-        lock_user!(user_id)
-
-        case get_open_shift_for_update(user_id) do
-          %StaffShift{} = open ->
-            open
-            |> StaffShift.close_changeset(%{ended_at: now, end_reason: "logout"})
-            |> Repo.update()
-            |> case do
-              {:ok, shift} -> shift
-              {:error, changeset} -> Repo.rollback(changeset)
-            end
-
-          nil ->
-            :none
-        end
+        do_close_open_shift!(user_id, ended_at, end_reason)
       end)
 
     case result do
       {:ok, %StaffShift{} = shift} -> {:ok, shift}
       {:ok, :none} -> {:ok, :none}
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # Must run inside an open Repo transaction (nested savepoint is fine).
+  @doc false
+  def do_close_open_shift!(user_id, %DateTime{} = ended_at, end_reason)
+      when is_integer(user_id) and is_binary(end_reason) do
+    lock_user!(user_id)
+
+    case get_open_shift_for_update(user_id) do
+      %StaffShift{} = open ->
+        open
+        |> StaffShift.close_changeset(%{ended_at: ended_at, end_reason: end_reason})
+        |> Repo.update()
+        |> case do
+          {:ok, shift} -> shift
+          {:error, changeset} -> Repo.rollback(changeset)
+        end
+
+      nil ->
+        :none
+    end
+  end
+
+  defp classify_last_active(user_id, opens) do
+    own? = Enum.any?(opens, &(&1.user_id == user_id))
+    others? = Enum.any?(opens, &(&1.user_id != user_id))
+
+    cond do
+      not own? -> {:error, :not_on_shift}
+      others? -> {:error, :other_staff_active}
+      true -> :ok
     end
   end
 
