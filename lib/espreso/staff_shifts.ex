@@ -9,6 +9,7 @@ defmodule Espreso.StaffShifts do
   import Ecto.Query
 
   alias Espreso.Accounts.User
+  alias Espreso.Orders
   alias Espreso.Repo
   alias Espreso.StaffShifts.StaffShift
 
@@ -36,6 +37,29 @@ defmodule Espreso.StaffShifts do
     |> where([s], s.user_id == ^user_id)
     |> order_by([s], desc: s.started_at, desc: s.id)
     |> limit(^limit)
+    |> Repo.all()
+  end
+
+  @doc """
+  Lists all employee staff shifts that overlap an Asia/Manila shop day.
+
+  Uses `Orders.shop_day_bounds_utc/1`. Open shifts first, then newest
+  `started_at`. Preloads `:user`.
+  """
+  def list_shifts_for_shop_day(%Date{} = shop_date) do
+    {day_start, day_end} = Orders.shop_day_bounds_utc(shop_date)
+
+    StaffShift
+    |> where(
+      [s],
+      s.started_at < ^day_end and (is_nil(s.ended_at) or s.ended_at > ^day_start)
+    )
+    |> order_by([s],
+      asc: fragment("CASE WHEN ? IS NULL THEN 0 ELSE 1 END", s.ended_at),
+      desc: s.started_at,
+      desc: s.id
+    )
+    |> preload(:user)
     |> Repo.all()
   end
 

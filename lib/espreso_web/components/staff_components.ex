@@ -283,6 +283,13 @@ defmodule EspresoWeb.StaffComponents do
         show?: Authorization.can?(user, :reports)
       },
       %{
+        key: :attendance,
+        label: "Staff attendance",
+        icon: "hero-user-group",
+        path: ~p"/staff/attendance",
+        show?: Authorization.can?(user, :reports)
+      },
+      %{
         key: :availability,
         label: "Availability",
         icon: "hero-cube",

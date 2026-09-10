@@ -4,6 +4,7 @@ defmodule Espreso.StaffShiftsTest do
   import Ecto.Query
 
   alias Espreso.Accounts
+  alias Espreso.Orders
   alias Espreso.Repo
   alias Espreso.StaffShifts
   alias Espreso.StaffShifts.StaffShift
@@ -198,6 +199,158 @@ defmodule Espreso.StaffShiftsTest do
       assert hd(user_shifts).user_id == user.id
       assert hd(other_shifts).user_id == other.id
     end
+  end
+
+  describe "list_shifts_for_shop_day/1" do
+    setup do
+      shop_date = ~D[2026-09-10]
+      {day_start, day_end} = Orders.shop_day_bounds_utc(shop_date)
+
+      employees =
+        for {name, email} <- [
+              {"Ana Attendance", "ana.attendance@test.local"},
+              {"Ben Attendance", "ben.attendance@test.local"},
+              {"Cara Attendance", "cara.attendance@test.local"},
+              {"Dan Attendance", "dan.attendance@test.local"},
+              {"Eve Attendance", "eve.attendance@test.local"},
+              {"Fay Attendance", "fay.attendance@test.local"}
+            ] do
+          {:ok, user} =
+            Accounts.register_user(%{
+              name: name,
+              email: email,
+              password: "password123",
+              role: "barista"
+            })
+
+          user
+        end
+
+      [ana, ben, cara, dan, eve, fay] = employees
+
+      %{
+        shop_date: shop_date,
+        day_start: day_start,
+        day_end: day_end,
+        ana: ana,
+        ben: ben,
+        cara: cara,
+        dan: dan,
+        eve: eve,
+        fay: fay
+      }
+    end
+
+    test "includes overlapping shifts and excludes shifts outside the shop day", %{
+      shop_date: shop_date,
+      day_start: day_start,
+      day_end: day_end,
+      ana: ana,
+      ben: ben,
+      cara: cara,
+      dan: dan,
+      eve: eve,
+      fay: fay
+    } do
+      open_today = insert_open_shift!(ana, DateTime.add(day_start, 2 * 3600, :second))
+
+      closed_today =
+        insert_shift!(
+          ben,
+          DateTime.add(day_start, 3 * 3600, :second),
+          DateTime.add(day_start, 8 * 3600, :second)
+        )
+
+      overnight_open = insert_open_shift!(cara, DateTime.add(day_start, -3 * 3600, :second))
+
+      overlap_start =
+        insert_shift!(
+          dan,
+          DateTime.add(day_start, -3600, :second),
+          DateTime.add(day_start, 1800, :second)
+        )
+
+      overlap_end =
+        insert_shift!(
+          eve,
+          DateTime.add(day_end, -1800, :second),
+          DateTime.add(day_end, 3600, :second)
+        )
+
+      before_day =
+        insert_shift!(
+          fay,
+          DateTime.add(day_start, -5 * 3600, :second),
+          DateTime.add(day_start, -60, :second)
+        )
+
+      after_day =
+        insert_shift!(
+          fay,
+          day_end,
+          DateTime.add(day_end, 2 * 3600, :second)
+        )
+
+      shifts = StaffShifts.list_shifts_for_shop_day(shop_date)
+      ids = Enum.map(shifts, & &1.id)
+
+      assert open_today.id in ids
+      assert closed_today.id in ids
+      assert overnight_open.id in ids
+      assert overlap_start.id in ids
+      assert overlap_end.id in ids
+      refute before_day.id in ids
+      refute after_day.id in ids
+
+      assert Enum.all?(shifts, &Ecto.assoc_loaded?(&1.user))
+      assert Enum.map(shifts, & &1.user.name) |> Enum.any?(&(&1 == "Ana Attendance"))
+
+      {opens, closeds} = Enum.split_with(shifts, &is_nil(&1.ended_at))
+      assert length(opens) == 2
+
+      assert Enum.map(opens, & &1.id) ==
+               opens
+               |> Enum.sort_by(&{&1.started_at, &1.id}, :desc)
+               |> Enum.map(& &1.id)
+
+      assert hd(shifts).id in Enum.map(opens, & &1.id)
+
+      closed_ids = Enum.map(closeds, & &1.id)
+
+      assert closed_ids ==
+               closeds
+               |> Enum.sort_by(&{&1.started_at, &1.id}, :desc)
+               |> Enum.map(& &1.id)
+    end
+
+    test "orders open shifts before closed shifts", %{
+      shop_date: shop_date,
+      day_start: day_start,
+      ana: ana,
+      ben: ben
+    } do
+      closed =
+        insert_shift!(
+          ben,
+          DateTime.add(day_start, 5 * 3600, :second),
+          DateTime.add(day_start, 6 * 3600, :second)
+        )
+
+      open = insert_open_shift!(ana, DateTime.add(day_start, 1 * 3600, :second))
+
+      [first | rest] = StaffShifts.list_shifts_for_shop_day(shop_date)
+      assert first.id == open.id
+      assert Enum.any?(rest, &(&1.id == closed.id))
+    end
+  end
+
+  defp insert_open_shift!(user, started_at) do
+    {:ok, shift} =
+      %StaffShift{}
+      |> StaffShift.open_changeset(%{user_id: user.id, started_at: started_at})
+      |> Repo.insert()
+
+    shift
   end
 
   defp insert_shift!(user, started_at, ended_at, end_reason \\ "logout") do
