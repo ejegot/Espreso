@@ -5,6 +5,11 @@ defmodule EspresoWeb.StaffAuthTest do
 
   alias Espreso.Accounts
   alias Espreso.Auth.PinAttemptLimiter
+  alias Espreso.StaffShifts
+  alias Espreso.StaffShifts.StaffShift
+  alias Espreso.Repo
+
+  import Ecto.Query
 
   setup do
     PinAttemptLimiter.reset!()
@@ -836,6 +841,194 @@ defmodule EspresoWeb.StaffAuthTest do
 
     assert Phoenix.Flash.get(limited.assigns.flash, :error) ==
              "Too many attempts. Please wait a moment before trying again."
+  end
+
+  describe "staff shift attendance on browser auth" do
+    test "successful pin login opens exactly one staff shift", %{conn: conn, barista: barista} do
+      assert {:ok, _} = Accounts.set_pin(barista, "4321")
+
+      conn =
+        post(conn, ~p"/session/pin", %{
+          "user_id" => barista.id,
+          "pin" => "4321"
+        })
+
+      assert redirected_to(conn) == ~p"/orders"
+      assert get_session(conn, :user_id) == barista.id
+
+      open = StaffShifts.get_open_shift(barista)
+      assert %StaffShift{} = open
+      assert open.user_id == barista.id
+      assert is_nil(open.ended_at)
+      assert shift_count(barista.id) == 1
+    end
+
+    test "failed pin login creates no staff shift", %{conn: conn, barista: barista} do
+      assert {:ok, _} = Accounts.set_pin(barista, "4321")
+
+      conn =
+        post(conn, ~p"/session/pin", %{
+          "user_id" => barista.id,
+          "pin" => "9999"
+        })
+
+      assert redirected_to(conn) == ~p"/login"
+      assert is_nil(get_session(conn, :user_id))
+      assert shift_count(barista.id) == 0
+    end
+
+    test "inactive pin login creates no staff shift", %{conn: conn} do
+      {:ok, inactive} =
+        Accounts.register_user(%{
+          name: "Inactive Pin",
+          email: "inactive.pin.auth@test.local",
+          password: "password123",
+          role: "barista"
+        })
+
+      assert {:ok, _} = Accounts.set_pin(inactive, "4321")
+      assert {:ok, _} = Accounts.update_user(inactive, %{active: false})
+
+      conn =
+        post(conn, ~p"/session/pin", %{
+          "user_id" => inactive.id,
+          "pin" => "4321"
+        })
+
+      assert redirected_to(conn) == ~p"/login"
+      assert is_nil(get_session(conn, :user_id))
+      assert shift_count(inactive.id) == 0
+    end
+
+    test "successful email login opens exactly one staff shift", %{conn: conn, barista: barista} do
+      conn =
+        post(conn, ~p"/session", %{
+          "user" => %{"email" => barista.email, "password" => "password123"}
+        })
+
+      assert redirected_to(conn) == ~p"/orders"
+      assert get_session(conn, :user_id) == barista.id
+
+      open = StaffShifts.get_open_shift(barista)
+      assert %StaffShift{} = open
+      assert is_nil(open.ended_at)
+      assert shift_count(barista.id) == 1
+    end
+
+    test "failed password login creates no staff shift", %{conn: conn, barista: barista} do
+      conn =
+        post(conn, ~p"/session", %{
+          "user" => %{"email" => barista.email, "password" => "wrong-password"}
+        })
+
+      assert redirected_to(conn) == ~p"/login"
+      assert is_nil(get_session(conn, :user_id))
+      assert shift_count(barista.id) == 0
+    end
+
+    test "login with existing open shift auto-closes and opens one new shift", %{
+      conn: conn,
+      barista: barista
+    } do
+      assert {:ok, _} = Accounts.set_pin(barista, "4321")
+      assert {:ok, first} = StaffShifts.open_shift_for_login(barista)
+
+      conn =
+        post(conn, ~p"/session/pin", %{
+          "user_id" => barista.id,
+          "pin" => "4321"
+        })
+
+      assert redirected_to(conn) == ~p"/orders"
+
+      first = Repo.get!(StaffShift, first.id)
+      assert first.end_reason == "auto_close"
+      assert %DateTime{} = first.ended_at
+
+      open = StaffShifts.get_open_shift(barista)
+      assert open.id != first.id
+      assert is_nil(open.ended_at)
+      assert shift_count(barista.id) == 2
+      assert open_shift_count(barista.id) == 1
+    end
+
+    test "explicit logout closes open staff shift", %{conn: conn, barista: barista} do
+      assert {:ok, _} = Accounts.set_pin(barista, "4321")
+
+      logged_in =
+        post(conn, ~p"/session/pin", %{
+          "user_id" => barista.id,
+          "pin" => "4321"
+        })
+
+      assert %StaffShift{} = StaffShifts.get_open_shift(barista)
+
+      logged_out = delete(recycle(logged_in), ~p"/logout")
+      assert redirected_to(logged_out) == ~p"/login"
+      assert is_nil(get_session(logged_out, :user_id))
+
+      assert is_nil(StaffShifts.get_open_shift(barista))
+
+      [closed] =
+        StaffShift
+        |> where([s], s.user_id == ^barista.id)
+        |> Repo.all()
+
+      assert closed.end_reason == "logout"
+      assert %DateTime{} = closed.ended_at
+    end
+
+    test "logout with no open shift still succeeds", %{conn: conn, barista: barista} do
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> put_session(:user_id, barista.id)
+
+      logged_out = delete(conn, ~p"/logout")
+      assert redirected_to(logged_out) == ~p"/login"
+      assert is_nil(get_session(logged_out, :user_id))
+      assert shift_count(barista.id) == 0
+    end
+
+    test "LiveView mount and navigation do not create another staff shift", %{
+      conn: conn,
+      barista: barista
+    } do
+      assert {:ok, _} = Accounts.set_pin(barista, "4321")
+
+      logged_in =
+        post(conn, ~p"/session/pin", %{
+          "user_id" => barista.id,
+          "pin" => "4321"
+        })
+
+      assert open_shift_count(barista.id) == 1
+      open_before = StaffShifts.get_open_shift(barista)
+
+      {:ok, _view, _html} = live(recycle(logged_in), ~p"/orders")
+      assert open_shift_count(barista.id) == 1
+      assert StaffShifts.get_open_shift(barista).id == open_before.id
+
+      {:ok, _view, _html} = live(recycle(logged_in), ~p"/pos")
+      assert open_shift_count(barista.id) == 1
+      assert StaffShifts.get_open_shift(barista).id == open_before.id
+
+      {:ok, _view, _html} = live(recycle(logged_in), ~p"/staff")
+      assert open_shift_count(barista.id) == 1
+      assert shift_count(barista.id) == 1
+    end
+  end
+
+  defp shift_count(user_id) do
+    StaffShift
+    |> where([s], s.user_id == ^user_id)
+    |> Repo.aggregate(:count, :id)
+  end
+
+  defp open_shift_count(user_id) do
+    StaffShift
+    |> where([s], s.user_id == ^user_id and is_nil(s.ended_at))
+    |> Repo.aggregate(:count, :id)
   end
 
   defp log_in(conn, user) do
