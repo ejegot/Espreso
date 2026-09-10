@@ -22,7 +22,8 @@ defmodule EspresoWeb.StaffHomeLive do
 
   @impl true
   def handle_event("printer_test_print", _params, socket) do
-    {:noreply, assign(socket, :printer_note, printer_action_note(Printer.test_print(), "Test print"))}
+    {:noreply,
+     assign(socket, :printer_note, printer_action_note(Printer.test_print(), "Test print"))}
   end
 
   def handle_event("printer_open_drawer", _params, socket) do
@@ -44,11 +45,12 @@ defmodule EspresoWeb.StaffHomeLive do
       <main class="staff-home-main staff-home-hub staff-home-desk" id="staff-home-desk">
         <header class="staff-home-desk-head">
           <div class="staff-home-desk-copy">
-            <p class="staff-home-desk-eyebrow">Shift desk</p>
+            <p class="staff-home-brand">ELIlai Kafe</p>
+            <p class="staff-home-desk-eyebrow">Home</p>
             <h2 class="staff-home-desk-title">
-              {@current_user.name}
-              <span class="staff-home-desk-role">{User.role_label(@current_user.role)}</span>
+              Welcome back, {@current_user.name}
             </h2>
+            <p class="staff-home-desk-role">{User.role_label(@current_user.role)}</p>
           </div>
           <div class="staff-home-desk-status" id="staff-home-shop-status">
             <span class="staff-home-status-dot" aria-hidden="true"></span>
@@ -65,10 +67,7 @@ defmodule EspresoWeb.StaffHomeLive do
           >
             <div class="staff-home-hero-top">
               <span class="staff-home-card-eyebrow">{item.eyebrow}</span>
-              <span
-                :if={is_integer(item[:count]) and item.count > 0}
-                class="staff-home-hero-count"
-              >
+              <span :if={is_integer(item[:count]) and item.count > 0} class="staff-home-hero-count">
                 {item.count}
               </span>
             </div>
@@ -78,18 +77,10 @@ defmodule EspresoWeb.StaffHomeLive do
           </.link>
         </section>
 
-        <section
-          class="staff-home-today"
-          id="staff-home-today"
-          aria-label="Today"
-        >
+        <section class="staff-home-today" id="staff-home-today" aria-label="Today">
           <div class="staff-home-today-head">
             <p class="staff-home-today-eyebrow">Today</p>
-            <p
-              :if={@shift_close}
-              class="staff-home-today-closed"
-              id="staff-home-shift-closed"
-            >
+            <p :if={@shift_close} class="staff-home-today-closed" id="staff-home-shift-closed">
               Closed · {Shifts.format_closed_at(@shift_close.closed_at)}
               <span :if={@shift_close.closed_by_user}>
                 by {@shift_close.closed_by_user.name}
@@ -108,11 +99,7 @@ defmodule EspresoWeb.StaffHomeLive do
               </p>
             </div>
 
-            <ul
-              :if={@breakdown}
-              class="staff-paid-breakdown"
-              id="staff-home-paid-breakdown"
-            >
+            <ul :if={@breakdown} class="staff-paid-breakdown" id="staff-home-paid-breakdown">
               <li :for={row <- @via_rows} class="staff-paid-breakdown-row">
                 <span class="staff-paid-breakdown-label">{row.label}</span>
                 <span class="staff-paid-breakdown-total">{Menu.format_price(row.total)}</span>
@@ -128,11 +115,7 @@ defmodule EspresoWeb.StaffHomeLive do
           <% end %>
         </section>
 
-        <section
-          :if={@secondary != []}
-          class="staff-home-secondary"
-          aria-label="More tools"
-        >
+        <section :if={@secondary != []} class="staff-home-secondary" aria-label="Shortcuts">
           <.link
             :for={item <- @secondary}
             navigate={item.path}
@@ -141,10 +124,7 @@ defmodule EspresoWeb.StaffHomeLive do
           >
             <span class="staff-home-tool-label">
               {item.title}
-              <span
-                :if={is_integer(item[:count]) and item.count > 0}
-                class="staff-home-inline-count"
-              >
+              <span :if={is_integer(item[:count]) and item.count > 0} class="staff-home-inline-count">
                 {item.count}
               </span>
             </span>
@@ -182,7 +162,11 @@ defmodule EspresoWeb.StaffHomeLive do
               Open kaha
             </button>
           </div>
-          <p :if={@printer_note} class="staff-home-today-meta staff-home-printer-note" id="staff-printer-note">
+          <p
+            :if={@printer_note}
+            class="staff-home-today-meta staff-home-printer-note"
+            id="staff-printer-note"
+          >
             {@printer_note}
           </p>
         </section>

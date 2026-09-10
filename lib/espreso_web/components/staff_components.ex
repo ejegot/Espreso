@@ -125,6 +125,7 @@ defmodule EspresoWeb.StaffComponents do
           <div class={["staff-shell-bar", @current == :orders && "staff-shell-bar--orders"]}>
             <%= if @current == :orders do %>
               <div class="staff-shell-heading staff-shell-heading--orders">
+                <p class="staff-shell-brand-label">ELIlai Kafe</p>
                 <h1 class="staff-shell-title staff-shell-orders-title">{@page_title}</h1>
               </div>
 
@@ -158,6 +159,7 @@ defmodule EspresoWeb.StaffComponents do
                   height="1024"
                 />
                 <div class="staff-shell-heading">
+                  <p class="staff-shell-brand-label">ELIlai Kafe</p>
                   <h1 class="staff-shell-title">{@page_title}</h1>
                   <p class="staff-shell-user">
                     {@current_user.name} · {User.role_label(@current_user.role)}
@@ -175,7 +177,7 @@ defmodule EspresoWeb.StaffComponents do
             <% end %>
           </div>
 
-          <nav class="staff-shell-nav" aria-label="Staff">
+          <nav class="staff-shell-nav" aria-label="ELIlai Kafe">
             <.link
               :for={item <- @primary_nav}
               navigate={item.path}
@@ -265,6 +267,13 @@ defmodule EspresoWeb.StaffComponents do
         icon: "hero-chart-bar",
         path: ~p"/dashboard",
         show?: user.role in ["manager", "owner"]
+      },
+      %{
+        key: :close,
+        label: "Close shift",
+        icon: "hero-lock-closed",
+        path: ~p"/staff/close",
+        show?: Authorization.can?(user, :reports)
       },
       %{
         key: :availability,

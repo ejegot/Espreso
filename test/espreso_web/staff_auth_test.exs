@@ -466,17 +466,21 @@ defmodule EspresoWeb.StaffAuthTest do
   } do
     {:ok, barista_view, _html} = live(log_in(conn, barista), ~p"/staff")
     assert has_element?(barista_view, ".staff-shell-title", "Home")
+    assert has_element?(barista_view, ".staff-home-brand", "ELIlai Kafe")
     assert has_element?(barista_view, "#staff-home-orders", "Orders")
     assert has_element?(barista_view, "#staff-home-pos", "POS")
     refute has_element?(barista_view, "#staff-home-dashboard")
+    refute has_element?(barista_view, "#staff-nav-close")
 
     {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/staff")
     assert has_element?(manager_view, "#staff-home-dashboard", "Dashboard")
     assert has_element?(manager_view, "#staff-home-availability", "Availability")
+    assert has_element?(manager_view, "#staff-nav-close", "Close shift")
 
     {:ok, owner_view, _html} = live(log_in(conn, owner), ~p"/staff")
     assert has_element?(owner_view, "#staff-home-staff", "Staff")
     assert has_element?(owner_view, "#staff-home-settings", "Settings")
+    assert has_element?(owner_view, "#staff-nav-close", "Close shift")
   end
 
   test "orders shell is active for barista with Orders and POS only", %{

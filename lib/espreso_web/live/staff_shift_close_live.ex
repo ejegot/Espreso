@@ -60,7 +60,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.staff_shell current={:home} current_user={@current_user} page_title="Close shift">
+    <.staff_shell current={:close} current_user={@current_user} page_title="Close shift">
       <main class="staff-home-main staff-shift-close" id="staff-shift-close">
         <header class="staff-shift-close-head">
           <p class="staff-home-desk-eyebrow">End of day</p>
@@ -95,7 +95,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
             <p class="staff-shift-close-done-badge">Closed</p>
             <p class="staff-shift-close-done-copy">
               {Shifts.format_closed_at(@close.closed_at)}
-              <span :if={@close.closed_by_user}> by {@close.closed_by_user.name}</span>
+              <span :if={@close.closed_by_user}>by {@close.closed_by_user.name}</span>
             </p>
             <p :if={@close.counted_cash} class="staff-shift-close-done-cash">
               Counted cash · {Menu.format_price(@close.counted_cash)}
@@ -162,5 +162,6 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     |> assign(:form_error, nil)
   end
 
-  defp close_changeset_error(_changeset), do: "Could not record shift close. Check the amounts and try again."
+  defp close_changeset_error(_changeset),
+    do: "Could not record shift close. Check the amounts and try again."
 end

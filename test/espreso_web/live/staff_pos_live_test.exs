@@ -852,12 +852,15 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     assert has_element?(view, "#pos-cash-exact[data-dismiss-keyboard]", "Exact")
     refute has_element?(view, "#pos-cash-preset-100")
+
     assert has_element?(
              view,
              ~s(#pos-cash-preset-200[data-dismiss-keyboard][aria-label*="₱200"])
            )
+
     assert has_element?(view, "#pos-cash-preset-500[data-dismiss-keyboard]")
     assert has_element?(view, "#pos-cash-preset-1000[data-dismiss-keyboard]")
+
     assert has_element?(
              view,
              "#pos-confirm-cash[disabled][data-dismiss-keyboard]",
@@ -1880,7 +1883,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
     barista: barista
   } do
     {:ok, home, html} = live(log_in(conn, barista), ~p"/staff")
-    assert html =~ "Shift desk"
+    assert html =~ "ELIlai Kafe"
+    assert html =~ "Welcome back"
     assert has_element?(home, "#staff-home-orders", "Orders")
     assert has_element?(home, "#staff-home-pos", "POS")
     assert has_element?(home, "#staff-home-unpaid", "Unpaid")
