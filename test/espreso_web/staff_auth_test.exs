@@ -1017,6 +1017,56 @@ defmodule EspresoWeb.StaffAuthTest do
       assert open_shift_count(barista.id) == 1
       assert shift_count(barista.id) == 1
     end
+
+    test "manager and owner login does not open a staff shift", %{
+      conn: conn,
+      manager: manager,
+      owner: owner
+    } do
+      assert {:ok, _} = Accounts.set_pin(manager, "5678")
+      assert {:ok, _} = Accounts.set_pin(owner, "9012")
+
+      manager_conn =
+        post(conn, ~p"/session/pin", %{
+          "user_id" => manager.id,
+          "pin" => "5678"
+        })
+
+      assert redirected_to(manager_conn) == ~p"/dashboard"
+      assert get_session(manager_conn, :user_id) == manager.id
+      assert shift_count(manager.id) == 0
+      assert is_nil(StaffShifts.get_open_shift(manager))
+
+      owner_conn =
+        post(recycle(conn), ~p"/session", %{
+          "user" => %{"email" => owner.email, "password" => "password123"}
+        })
+
+      assert redirected_to(owner_conn) == ~p"/dashboard"
+      assert get_session(owner_conn, :user_id) == owner.id
+      assert shift_count(owner.id) == 0
+      assert is_nil(StaffShifts.get_open_shift(owner))
+    end
+
+    test "manager and owner logout does not create or close a staff shift", %{
+      conn: conn,
+      manager: manager,
+      owner: owner
+    } do
+      for user <- [manager, owner] do
+        logged_in =
+          conn
+          |> init_test_session(%{})
+          |> put_session(:user_id, user.id)
+
+        assert shift_count(user.id) == 0
+
+        logged_out = delete(logged_in, ~p"/logout")
+        assert redirected_to(logged_out) == ~p"/login"
+        assert is_nil(get_session(logged_out, :user_id))
+        assert shift_count(user.id) == 0
+      end
+    end
   end
 
   defp shift_count(user_id) do

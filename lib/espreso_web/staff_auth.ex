@@ -17,8 +17,8 @@ defmodule EspresoWeb.StaffAuth do
   alias Espreso.StaffShifts
 
   def log_in_user(conn, user, params \\ %{}) do
-    case StaffShifts.open_shift_for_login(user) do
-      {:ok, _shift} ->
+    case maybe_open_staff_shift(user) do
+      :ok ->
         user_return_to = get_session(conn, :user_return_to) || signed_in_path(user)
 
         conn
@@ -42,13 +42,7 @@ defmodule EspresoWeb.StaffAuth do
         :ok
 
       user_id ->
-        case StaffShifts.close_shift_for_logout(user_id) do
-          {:ok, _} ->
-            :ok
-
-          {:error, reason} ->
-            Logger.error("staff shift close failed for user_id=#{user_id}: #{inspect(reason)}")
-        end
+        maybe_close_staff_shift(user_id)
     end
 
     conn
@@ -146,6 +140,22 @@ defmodule EspresoWeb.StaffAuth do
     on_mount({:ensure_permission, :user_management}, %{}, session, socket)
   end
 
+  def on_mount(:ensure_barista, _params, session, socket) do
+    socket = mount_current_user(socket, session)
+    user = socket.assigns.current_user
+
+    if barista?(user) do
+      {:cont, socket}
+    else
+      socket =
+        socket
+        |> Phoenix.LiveView.put_flash(:error, "You don’t have permission to do that.")
+        |> Phoenix.LiveView.redirect(to: home_path(user))
+
+      {:halt, socket}
+    end
+  end
+
   def on_mount(:redirect_if_authenticated, _params, session, socket) do
     socket = mount_current_user(socket, session)
 
@@ -190,4 +200,35 @@ defmodule EspresoWeb.StaffAuth do
   def home_path(_), do: ~p"/login"
 
   defp signed_in_path(user), do: home_path(user)
+
+  # Employee StaffShift Time In/Out is barista-only. Manager/owner login and logout
+  # must not create or close attendance shifts.
+  defp maybe_open_staff_shift(%User{role: "barista"} = user) do
+    case StaffShifts.open_shift_for_login(user) do
+      {:ok, _shift} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp maybe_open_staff_shift(%User{}), do: :ok
+  defp maybe_open_staff_shift(_), do: :ok
+
+  defp maybe_close_staff_shift(user_id) when is_integer(user_id) do
+    case Accounts.get_user(user_id) do
+      %User{role: "barista"} ->
+        case StaffShifts.close_shift_for_logout(user_id) do
+          {:ok, _} ->
+            :ok
+
+          {:error, reason} ->
+            Logger.error("staff shift close failed for user_id=#{user_id}: #{inspect(reason)}")
+        end
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp barista?(%User{role: "barista", active: true}), do: true
+  defp barista?(_), do: false
 end

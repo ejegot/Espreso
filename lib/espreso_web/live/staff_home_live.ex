@@ -250,7 +250,7 @@ defmodule EspresoWeb.StaffHomeLive do
         body: "Time In, Time Out & sales",
         path: ~p"/staff/shifts",
         count: nil,
-        show?: Authorization.can?(user, :orders)
+        show?: user.role == "barista"
       }
     ]
 
