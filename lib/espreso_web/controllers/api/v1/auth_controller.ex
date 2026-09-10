@@ -3,22 +3,41 @@ defmodule EspresoWeb.Api.V1.AuthController do
 
   alias Espreso.Accounts
   alias Espreso.Accounts.Token
+  alias Espreso.Auth.PinAttemptLimiter
   alias EspresoWeb.Api.JSON
+  alias EspresoWeb.ClientIP
 
   action_fallback EspresoWeb.Api.V1.FallbackController
 
   def pin(conn, %{"user_id" => user_id, "pin" => pin}) when is_binary(pin) do
-    with user_id when is_integer(user_id) <- parse_id(user_id),
-         {:ok, user} <- Accounts.verify_pin(user_id, pin),
-         {:ok, tokens} <- Token.issue_token_pair(user) do
-      json(conn, auth_payload(tokens, user))
+    pin = String.trim(pin)
+
+    if pin == "" do
+      {:error, :invalid_credentials}
     else
-      :error -> {:error, :invalid_credentials}
-      {:error, :invalid_pin} -> {:error, :invalid_credentials}
-      {:error, :inactive} -> {:error, :invalid_credentials}
-      {:error, :pin_not_set} -> {:error, :invalid_credentials}
-      {:error, :not_found} -> {:error, :invalid_credentials}
-      _ -> {:error, :invalid_credentials}
+      with user_id when is_integer(user_id) <- parse_id(user_id),
+           ip = ClientIP.from_conn(conn),
+           :ok <- PinAttemptLimiter.check(user_id, ip) do
+        case Accounts.verify_pin(user_id, pin) do
+          {:ok, user} ->
+            PinAttemptLimiter.record_success(user_id, ip)
+
+            case Token.issue_token_pair(user) do
+              {:ok, tokens} -> json(conn, auth_payload(tokens, user))
+              {:error, _} -> {:error, :invalid_credentials}
+            end
+
+          {:error, _} ->
+            PinAttemptLimiter.record_failure(user_id, ip)
+            {:error, :invalid_credentials}
+        end
+      else
+        :error ->
+          {:error, :invalid_credentials}
+
+        {:error, :rate_limited} ->
+          {:error, :too_many_attempts}
+      end
     end
   end
 
