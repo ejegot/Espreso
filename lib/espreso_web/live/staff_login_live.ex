@@ -2,7 +2,6 @@ defmodule EspresoWeb.StaffLoginLive do
   use EspresoWeb, :live_view
 
   alias Espreso.Accounts
-  alias Espreso.Accounts.User
 
   @pin_max 6
   @pin_display 4
@@ -156,7 +155,7 @@ defmodule EspresoWeb.StaffLoginLive do
       <main class="staff-auth-panel">
         <div class={[
           "staff-auth-panel-inner staff-auth-panel-inner--login",
-          @login_mode == :email && "staff-auth-panel-inner--owner"
+          @login_mode == :email && "staff-auth-panel-inner--recovery"
         ]}>
           <header class="staff-auth-brand">
             <img
@@ -180,7 +179,7 @@ defmodule EspresoWeb.StaffLoginLive do
 
           <div :if={@login_mode == :pin} id="staff-pin-login" class="staff-pin-login">
             <p :if={@roster == []} class="staff-pin-empty" id="staff-pin-roster-empty">
-              No staff PINs configured yet. Use owner login below.
+              No PINs configured. Ask an owner to set staff PINs.
             </p>
 
             <div :if={@roster != []} class="staff-pin-shell">
@@ -192,7 +191,7 @@ defmodule EspresoWeb.StaffLoginLive do
                     type="search"
                     name="q"
                     value={@roster_query}
-                    placeholder="Choose your name…"
+                    placeholder="Search your name…"
                     phx-focus="open_roster"
                     phx-change="search_staff"
                     phx-debounce="100"
@@ -202,6 +201,7 @@ defmodule EspresoWeb.StaffLoginLive do
                     aria-expanded={to_string(@roster_open)}
                     aria-controls="staff-roster-dropdown"
                     aria-autocomplete="list"
+                    aria-label="Search your name"
                     role="combobox"
                   />
                   <span class="staff-pin-search-chevron" aria-hidden="true">▾</span>
@@ -212,10 +212,10 @@ defmodule EspresoWeb.StaffLoginLive do
                   class="staff-pin-dropdown"
                   id="staff-roster-dropdown"
                   role="listbox"
-                  aria-label="Staff on shift"
+                  aria-label="Team members"
                 >
                   <p :if={@filtered_roster == []} class="staff-pin-dropdown-empty">
-                    No match for “{@roster_query}”.
+                    No matching team members.
                   </p>
                   <button
                     :for={member <- @filtered_roster}
@@ -235,14 +235,12 @@ defmodule EspresoWeb.StaffLoginLive do
                     </span>
                     <span class="staff-pin-dropdown-copy">
                       <span class="staff-pin-dropdown-name">{member.name}</span>
-                      <span class="staff-pin-dropdown-role">{User.role_label(member.role)}</span>
                     </span>
                   </button>
                 </div>
 
-                <p :if={@selected_staff} class="staff-pin-selected-meta">
-                  Signed in as <strong>{@selected_staff.name}</strong>
-                  · {User.role_label(@selected_staff.role)}
+                <p :if={@selected_staff} class="staff-pin-selected-meta" id="staff-pin-selected">
+                  Selected <strong>{@selected_staff.name}</strong>
                 </p>
               </div>
 
@@ -257,7 +255,10 @@ defmodule EspresoWeb.StaffLoginLive do
                 <input type="hidden" name="pin" value={@pin} />
 
                 <p :if={!@pin_ready?} class="staff-pin-hint" id="staff-pin-select-hint">
-                  Pick your name above, then enter your PIN.
+                  Select your name first.
+                </p>
+                <p :if={@pin_ready?} class="staff-pin-hint" id="staff-pin-enter-hint">
+                  Enter your PIN.
                 </p>
 
                 <div class="staff-pin-display" aria-live="polite" aria-label="PIN entry">
@@ -314,7 +315,7 @@ defmodule EspresoWeb.StaffLoginLive do
                   class="staff-auth-submit staff-auth-submit--shift"
                   disabled={!@pin_ready? or String.length(@pin) < 4}
                 >
-                  Start Shift
+                  Sign In
                 </button>
               </form>
             </div>
@@ -325,7 +326,7 @@ defmodule EspresoWeb.StaffLoginLive do
             for={@form}
             action={~p"/session"}
             method="post"
-            class="staff-auth-form-v2 staff-auth-form-v2--owner"
+            class="staff-auth-form-v2 staff-auth-form-v2--recovery"
             id="staff-login-form"
           >
             <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
@@ -381,26 +382,24 @@ defmodule EspresoWeb.StaffLoginLive do
               :if={@login_mode == :email}
               type="button"
               class="staff-auth-mode-link"
+              id="staff-auth-back-to-pin"
               phx-click="show_pin_login"
             >
-              ← Staff shift login
+              ← Back to sign in
             </button>
             <button
               :if={@login_mode == :pin}
               type="button"
-              class="staff-auth-mode-link"
+              class="staff-auth-mode-link staff-auth-mode-link--recovery"
+              id="staff-auth-account-recovery"
               phx-click="show_email_login"
             >
-              Owner / manager email login →
+              Account recovery
             </button>
           </div>
 
-          <p class="staff-auth-switch">
-            Don’t have an account? <.link navigate={~p"/register"}>Sign Up</.link>
-          </p>
-
-          <p class="staff-auth-site-link">
-            <.link navigate={~p"/"}>← Back to CoffeeSpot</.link>
+          <p class="staff-auth-switch staff-auth-switch--quiet">
+            Need an account? <.link navigate={~p"/register"}>Register</.link>
           </p>
         </div>
       </main>
@@ -408,11 +407,11 @@ defmodule EspresoWeb.StaffLoginLive do
     """
   end
 
-  defp login_title(:pin), do: "Employee login"
-  defp login_title(:email), do: "Owner login"
+  defp login_title(:pin), do: "Welcome back"
+  defp login_title(:email), do: "Account recovery"
 
-  defp login_subtitle(:pin), do: "Choose your account to start your shift."
-  defp login_subtitle(:email), do: "Email and password for owners and managers."
+  defp login_subtitle(:pin), do: "Select your name, then enter your PIN."
+  defp login_subtitle(:email), do: "Use email and password if you cannot sign in with a PIN."
 
   defp filter_roster(roster, query) when is_binary(query) do
     needle =
@@ -424,8 +423,7 @@ defmodule EspresoWeb.StaffLoginLive do
       roster
     else
       Enum.filter(roster, fn member ->
-        String.contains?(String.downcase(member.name), needle) or
-          String.contains?(String.downcase(User.role_label(member.role)), needle)
+        String.contains?(String.downcase(member.name), needle)
       end)
     end
   end

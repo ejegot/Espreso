@@ -91,7 +91,7 @@ defmodule EspresoWeb.StaffAuthTest do
       |> follow_redirect(conn, ~p"/login")
 
     html = html_response(conn, 200)
-    assert html =~ "Employee login"
+    assert html =~ "Welcome back"
     assert html =~ "Account created"
 
     conn =
@@ -576,25 +576,54 @@ defmodule EspresoWeb.StaffAuthTest do
       })
 
     assert redirected_to(conn) == ~p"/login"
-    assert Phoenix.Flash.get(conn.assigns.flash, :error)
+    assert Phoenix.Flash.get(conn.assigns.flash, :error) == "Incorrect PIN. Try again."
   end
 
-  test "login page shows staff pin grid when pins configured", %{conn: conn, barista: barista} do
+  test "unified login shows ELIlai branding and pin flow without role selector", %{
+    conn: conn,
+    barista: barista
+  } do
     assert {:ok, _} = Accounts.set_pin(barista, "4321")
 
     {:ok, view, html} = live(conn, ~p"/login")
-    assert html =~ "Employee login"
-    assert html =~ "Choose your account to start your shift"
+    assert html =~ "Welcome back"
+    assert html =~ "Select your name, then enter your PIN."
+    assert html =~ "ELIlai Kafe"
+
+    assert has_element?(
+             view,
+             "img.staff-auth-logo[src='/images/elilai-kafe/elilai-kafe-logo.jpg']"
+           )
+
     assert has_element?(view, "#staff-pin-login")
     assert has_element?(view, "#staff-roster-search")
+    assert has_element?(view, "#staff-auth-account-recovery", "Account recovery")
+    assert has_element?(view, ".staff-auth-switch--quiet a[href='/register']", "Register")
+
+    refute html =~ "Employee login"
+    refute html =~ "Owner login"
+    refute html =~ "Manager Login"
+    refute html =~ "Start Shift"
+    refute html =~ "Owner / manager email login"
+    refute has_element?(view, "select[name='role']")
+    refute has_element?(view, "#staff-login-form")
 
     view |> element("#staff-roster-search") |> render_change(%{"q" => ""})
 
-    assert has_element?(view, "#staff-roster-dropdown #staff-pin-user-#{barista.id}", barista.name)
-    assert has_element?(view, "#staff-pin-form button.staff-auth-submit--shift", "Start Shift")
+    assert has_element?(
+             view,
+             "#staff-roster-dropdown #staff-pin-user-#{barista.id}",
+             barista.name
+           )
+
+    assert has_element?(view, "#staff-pin-form button.staff-auth-submit--shift", "Sign In")
   end
 
-  test "staff login search filters roster", %{conn: conn, barista: barista, manager: manager} do
+  test "staff login search filters roster and empty search copy", %{
+    conn: conn,
+    barista: barista,
+    manager: manager
+  } do
     assert {:ok, _} = Accounts.set_pin(barista, "4321")
     assert {:ok, _} = Accounts.set_pin(manager, "5678")
 
@@ -611,9 +640,16 @@ defmodule EspresoWeb.StaffAuthTest do
 
     assert has_element?(view, "#staff-roster-dropdown #staff-pin-user-#{barista.id}")
     refute has_element?(view, "#staff-roster-dropdown #staff-pin-user-#{manager.id}")
+
+    html =
+      view
+      |> element("#staff-roster-search")
+      |> render_change(%{"q" => "zzz-no-match"})
+
+    assert html =~ "No matching team members."
   end
 
-  test "staff pin login selects user and submits start shift", %{conn: conn, barista: barista} do
+  test "staff pin login selects user and enables sign in", %{conn: conn, barista: barista} do
     assert {:ok, _} = Accounts.set_pin(barista, "4321")
 
     {:ok, view, _html} = live(conn, ~p"/login")
@@ -621,12 +657,79 @@ defmodule EspresoWeb.StaffAuthTest do
     view |> element("#staff-roster-search") |> render_change(%{"q" => ""})
     view |> element("#staff-pin-user-#{barista.id}") |> render_click()
 
+    assert has_element?(view, "#staff-pin-selected", barista.name)
+    assert has_element?(view, "#staff-pin-enter-hint", "Enter your PIN.")
+
     for digit <- ~w(4 3 2 1) do
       view |> element("button[phx-value-digit=\"#{digit}\"]") |> render_click()
     end
 
     assert has_element?(view, ".staff-pin-dot.is-filled")
-    refute has_element?(view, "#staff-pin-form button[disabled]")
+    refute has_element?(view, "#staff-pin-form button.staff-auth-submit--shift[disabled]")
+  end
+
+  test "account recovery reveals email password form", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/login")
+
+    view |> element("#staff-auth-account-recovery") |> render_click()
+
+    assert has_element?(view, "h1.staff-auth-title", "Account recovery")
+    assert has_element?(view, "#staff-login-form")
+    assert has_element?(view, "#staff-auth-back-to-pin", "Back to sign in")
+    refute has_element?(view, "#staff-pin-login")
+  end
+
+  test "empty pin roster shows owner pin setup message", %{conn: conn} do
+    {:ok, view, html} = live(conn, ~p"/login")
+
+    assert html =~ "No PINs configured. Ask an owner to set staff PINs."
+    assert has_element?(view, "#staff-pin-roster-empty")
+  end
+
+  test "pin login preserves manager and owner destinations", %{
+    conn: conn,
+    manager: manager,
+    owner: owner
+  } do
+    assert {:ok, _} = Accounts.set_pin(manager, "5678")
+    assert {:ok, _} = Accounts.set_pin(owner, "9012")
+
+    manager_conn =
+      post(conn, ~p"/session/pin", %{
+        "user_id" => manager.id,
+        "pin" => "5678"
+      })
+
+    assert redirected_to(manager_conn) == ~p"/dashboard"
+    assert get_session(manager_conn, :user_id) == manager.id
+
+    owner_conn =
+      post(recycle(conn), ~p"/session/pin", %{
+        "user_id" => owner.id,
+        "pin" => "9012"
+      })
+
+    assert redirected_to(owner_conn) == ~p"/dashboard"
+    assert get_session(owner_conn, :user_id) == owner.id
+  end
+
+  test "logout returns to unified login", %{conn: conn, barista: barista} do
+    assert {:ok, _} = Accounts.set_pin(barista, "4321")
+
+    logged_in =
+      post(conn, ~p"/session/pin", %{
+        "user_id" => barista.id,
+        "pin" => "4321"
+      })
+
+    assert redirected_to(logged_in) == ~p"/orders"
+
+    logged_out = delete(recycle(logged_in), ~p"/logout")
+    assert redirected_to(logged_out) == ~p"/login"
+
+    {:ok, _view, html} = live(recycle(logged_out), ~p"/login")
+    assert html =~ "Welcome back"
+    assert html =~ "Select your name, then enter your PIN."
   end
 
   defp log_in(conn, user) do
