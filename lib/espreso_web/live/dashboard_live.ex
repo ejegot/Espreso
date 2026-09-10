@@ -24,17 +24,62 @@ defmodule EspresoWeb.DashboardLive do
   def render(assigns) do
     ~H"""
     <.staff_shell current={:dashboard} current_user={@current_user} page_title="Dashboard">
-      <main class="staff-home-main">
-        <p class="staff-home-lede">
-          {dashboard_lede(@current_user.role)}
-        </p>
+      <main class="staff-home-main dashboard-page" id="staff-dashboard">
+        <header class="dashboard-head">
+          <p class="staff-home-lede dashboard-lede">
+            {dashboard_lede(@current_user.role)}
+          </p>
+        </header>
 
-        <div class="staff-home-grid" id="dashboard-panels">
+        <section
+          :if={show_money?(@current_user.role)}
+          class="dashboard-primary"
+          id="dashboard-primary"
+          aria-label="Today’s paid sales"
+        >
+          <div
+            class="staff-home-card dashboard-card-metric-panel dashboard-hero-sales"
+            id="dashboard-panel-sales"
+          >
+            <span class="staff-home-card-eyebrow">Today</span>
+            <span class="staff-home-card-title">Paid today</span>
+            <span class="staff-home-card-body dashboard-card-metric">
+              {sales_body(@sales_overview)}
+            </span>
+          </div>
+
+          <section
+            id="dashboard-paid-breakdown"
+            class="staff-home-card dashboard-paid-breakdown-panel"
+            aria-label="Payment methods"
+          >
+            <span class="staff-home-card-eyebrow">Settled today</span>
+            <span class="staff-home-card-title">Payment methods</span>
+            <p class="staff-home-card-body dashboard-paid-breakdown-note">
+              Breakdown of today’s paid sales by method.
+            </p>
+            <ul class="staff-paid-breakdown">
+              <li :for={row <- @via_rows} class="staff-paid-breakdown-row">
+                <span class="staff-paid-breakdown-label">{row.label}</span>
+                <span class="staff-paid-breakdown-total">{Menu.format_price(row.total)}</span>
+                <span class="staff-paid-breakdown-count">{row.count}</span>
+              </li>
+            </ul>
+            <.link navigate={~p"/staff/close"} class="staff-shell-tool dashboard-close-link">
+              Close shift
+            </.link>
+          </section>
+        </section>
+
+        <div
+          :if={show_money?(@current_user.role)}
+          class="staff-home-grid dashboard-panels"
+          id="dashboard-panels"
+        >
           <%= for panel <-
                 panels_for(
                   @current_user.role,
                   @order_overview,
-                  @sales_overview,
                   @popular_products,
                   @reports_overview
                 ) do %>
@@ -42,7 +87,12 @@ defmodule EspresoWeb.DashboardLive do
               <% :link -> %>
                 <.link
                   navigate={panel.to}
-                  class={["staff-home-card", "dashboard-card-link", panel[:class]]}
+                  class={[
+                    "staff-home-card",
+                    "dashboard-card-link",
+                    panel[:class],
+                    panel[:emphasis] && "dashboard-card-link--attention"
+                  ]}
                   id={"dashboard-panel-#{panel.id}"}
                 >
                   <span class="staff-home-card-eyebrow">{panel.eyebrow}</span>
@@ -51,7 +101,10 @@ defmodule EspresoWeb.DashboardLive do
                 </.link>
               <% :metric -> %>
                 <div
-                  class="staff-home-card dashboard-card-metric-panel"
+                  class={[
+                    "staff-home-card dashboard-card-metric-panel",
+                    panel[:secondary] && "dashboard-card-secondary"
+                  ]}
                   id={"dashboard-panel-#{panel.id}"}
                 >
                   <span class="staff-home-card-eyebrow">{panel.eyebrow}</span>
@@ -60,7 +113,10 @@ defmodule EspresoWeb.DashboardLive do
                 </div>
               <% :list -> %>
                 <div
-                  class="staff-home-card dashboard-card-metric-panel"
+                  class={[
+                    "staff-home-card dashboard-card-metric-panel",
+                    panel[:secondary] && "dashboard-card-secondary"
+                  ]}
                   id={"dashboard-panel-#{panel.id}"}
                 >
                   <span class="staff-home-card-eyebrow">{panel.eyebrow}</span>
@@ -75,50 +131,25 @@ defmodule EspresoWeb.DashboardLive do
                     </li>
                   </ul>
                 </div>
-              <% :placeholder -> %>
-                <div
-                  class="staff-home-card staff-home-card-soon dashboard-card-soon"
-                  id={"dashboard-panel-#{panel.id}"}
-                >
-                  <span class="staff-home-soon-pill">Coming soon</span>
-                  <span class="staff-home-card-eyebrow">{panel.eyebrow}</span>
-                  <span class="staff-home-card-title">{panel.title}</span>
-                  <span class="staff-home-card-body">{panel.body}</span>
-                </div>
             <% end %>
           <% end %>
         </div>
-
-        <section
-          :if={show_money?(@current_user.role)}
-          id="dashboard-paid-breakdown"
-          class="staff-home-card dashboard-paid-breakdown-panel"
-          aria-label="Today by payment"
-        >
-          <span class="staff-home-card-eyebrow">Today</span>
-          <span class="staff-home-card-title">Today by payment</span>
-          <p class="staff-home-card-body dashboard-card-metric">
-            {Menu.format_price(@paid_breakdown.total)} · {@paid_breakdown.count} paid orders
-          </p>
-          <ul class="staff-paid-breakdown">
-            <li :for={row <- @via_rows} class="staff-paid-breakdown-row">
-              <span class="staff-paid-breakdown-label">{row.label}</span>
-              <span class="staff-paid-breakdown-total">{Menu.format_price(row.total)}</span>
-              <span class="staff-paid-breakdown-count">{row.count}</span>
-            </li>
-          </ul>
-          <.link navigate={~p"/staff/close"} class="staff-shell-tool dashboard-close-link">
-            Close shift
-          </.link>
-        </section>
 
         <section
           id="dashboard-todays-orders-preview"
           class="staff-orders-section dashboard-todays-preview"
         >
           <div class="dashboard-todays-preview-head">
-            <h2>Today’s Orders</h2>
-            <.link navigate={~p"/orders"} class="staff-shell-tool">Open order queue</.link>
+            <div>
+              <p class="dashboard-todays-preview-eyebrow">Order queue</p>
+              <h2>Today’s Orders</h2>
+              <p class="dashboard-todays-preview-note">
+                Live kitchen work lives on Orders — this is a quick glance only.
+              </p>
+            </div>
+            <.link navigate={~p"/orders"} class="staff-shell-tool" id="dashboard-open-orders">
+              Open order queue
+            </.link>
           </div>
 
           <p :if={@todays_orders == []} class="staff-empty">No orders yet today.</p>
@@ -153,27 +184,25 @@ defmodule EspresoWeb.DashboardLive do
     """
   end
 
-  defp dashboard_lede("owner"), do: "Shop overview — sales, team, and settings."
-  defp dashboard_lede("manager"), do: "Day-to-day operations — orders, availability, and reports."
+  defp dashboard_lede("owner"),
+    do: "Today’s management snapshot — paid sales, attention, and shortcuts."
+
+  defp dashboard_lede("manager"),
+    do: "Today’s management snapshot — paid sales, attention, and shortcuts."
+
   defp dashboard_lede(_), do: "Your shift overview — today’s orders."
 
   defp show_money?(role) when role in ["manager", "owner"], do: true
   defp show_money?(_), do: false
 
-  defp panels_for("owner", overview, sales, popular, reports) do
+  defp panels_for("owner", overview, popular, reports) do
     [
-      sales_panel(sales),
       orders_panel(overview),
-      popular_products_panel(popular),
-      reports_panel(reports),
+      transactions_panel(),
+      close_shift_panel(),
       availability_panel(),
-      %{
-        kind: :placeholder,
-        id: "staff-activity",
-        eyebrow: "Team",
-        title: "Staff Activity",
-        body: "Coming soon"
-      },
+      reports_panel(reports),
+      popular_products_panel(popular),
       %{
         kind: :link,
         id: "users",
@@ -195,16 +224,17 @@ defmodule EspresoWeb.DashboardLive do
     ]
   end
 
-  defp panels_for("manager", overview, sales, _popular, reports) do
+  defp panels_for("manager", overview, _popular, reports) do
     [
-      sales_panel(sales),
       orders_panel(overview),
+      transactions_panel(),
+      close_shift_panel(),
       availability_panel(),
       reports_panel(reports)
     ]
   end
 
-  defp panels_for(_staff, _overview, _sales, _popular, _reports), do: []
+  defp panels_for(_staff, _overview, _popular, _reports), do: []
 
   defp availability_panel do
     %{
@@ -212,19 +242,33 @@ defmodule EspresoWeb.DashboardLive do
       id: "availability",
       eyebrow: "Menu",
       title: "Availability",
-      body: "86 sold-out items and restore them.",
+      body: "Mark items sold out or available.",
       to: ~p"/admin/availability",
       class: nil
     }
   end
 
-  defp sales_panel(sales) do
+  defp transactions_panel do
     %{
-      kind: :metric,
-      id: "sales",
-      eyebrow: "Today",
-      title: "Sales",
-      body: sales_body(sales)
+      kind: :link,
+      id: "transactions",
+      eyebrow: "Receipts",
+      title: "Transactions",
+      body: "Paid receipt history and reprints.",
+      to: ~p"/transactions",
+      class: nil
+    }
+  end
+
+  defp close_shift_panel do
+    %{
+      kind: :link,
+      id: "close-shift",
+      eyebrow: "Shift",
+      title: "Close shift",
+      body: "Reconcile counted cash and close the shop day.",
+      to: ~p"/staff/close",
+      class: nil
     }
   end
 
@@ -238,7 +282,8 @@ defmodule EspresoWeb.DashboardLive do
       id: "reports",
       eyebrow: "Last 7 days",
       title: "Reports",
-      body: reports_body(reports)
+      body: reports_body(reports),
+      secondary: true
     }
   end
 
@@ -255,7 +300,8 @@ defmodule EspresoWeb.DashboardLive do
       eyebrow: "Menu",
       title: "Popular Products",
       items: popular,
-      empty_body: "No paid product sales today."
+      empty_body: "No paid product sales today.",
+      secondary: true
     }
   end
 
@@ -263,11 +309,12 @@ defmodule EspresoWeb.DashboardLive do
     %{
       kind: :link,
       id: "orders",
-      eyebrow: "Kitchen",
+      eyebrow: "Attention",
       title: "Orders",
       body: orders_body(overview),
       to: ~p"/orders",
-      class: nil
+      class: nil,
+      emphasis: true
     }
   end
 
