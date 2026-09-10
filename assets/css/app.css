@@ -3444,8 +3444,8 @@ body:has(.menu-page-locked) {
 .staff-home-desk {
   width: min(calc(100% - 1.5rem), 52rem) !important;
   display: grid;
-  gap: 0.55rem;
-  padding: 0.55rem 0 1.25rem !important;
+  gap: 0.7rem;
+  padding: 0.7rem 0 1.35rem !important;
 }
 
 .staff-home-desk-head {
@@ -3454,44 +3454,50 @@ body:has(.menu-page-locked) {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem 0.85rem;
-  padding: 0.55rem 0.7rem;
-  border: 1px solid var(--cs-line, rgba(56, 32, 16, 0.12));
-  border-radius: var(--cs-radius-panel, 0.65rem);
-  background: var(--cs-panel, #fffdfa);
-  box-shadow: var(--cs-shadow, 0 10px 28px rgba(56, 32, 16, 0.06));
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--cs-line, rgba(57, 67, 49, 0.14));
+  border-radius: var(--cs-radius-panel, 0.75rem);
+  background: var(--cs-panel, #fffef9);
+  box-shadow: var(--cs-shadow, 0 10px 28px rgba(57, 67, 49, 0.08));
 }
 
 .staff-home-desk-copy {
   min-width: 0;
 }
 
-.staff-home-desk-eyebrow {
-  margin: 0 0 0.1rem;
-  color: var(--cs-beige, #b0a098);
-  font-size: 0.58rem;
+.staff-home-brand {
+  margin: 0 0 0.15rem;
+  color: var(--elilai-forest, #394331);
+  font-size: 0.68rem;
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.staff-home-desk-eyebrow {
+  margin: 0 0 0.2rem;
+  color: var(--cs-beige, color-mix(in srgb, #394331 48%, #f4efe3));
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .staff-home-desk-title {
   margin: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.35rem 0.55rem;
-  color: var(--cs-brown, #382010);
+  color: var(--cs-brown, #394331);
   font-family: "DM Sans", system-ui, sans-serif;
-  font-size: 1.05rem;
+  font-size: clamp(1.05rem, 2.8vw, 1.25rem);
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.2;
 }
 
 .staff-home-desk-role {
-  color: var(--cs-beige, #b0a098);
-  font-size: 0.74rem;
-  font-weight: 700;
+  margin: 0.2rem 0 0;
+  color: var(--cs-beige, color-mix(in srgb, #394331 48%, #f4efe3));
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
 .staff-home-desk-lede {
@@ -3503,12 +3509,12 @@ body:has(.menu-page-locked) {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  min-height: 1.85rem;
-  padding: 0.2rem 0.55rem;
-  border: 1px solid var(--cs-line, rgba(56, 32, 16, 0.12));
-  border-radius: var(--cs-radius-control, 0.3rem);
+  min-height: 2rem;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--cs-line, rgba(57, 67, 49, 0.14));
+  border-radius: 999px;
   background: #fff;
-  color: var(--cs-brown, #382010);
+  color: var(--cs-brown, #394331);
   font-size: 0.72rem;
   font-weight: 700;
 }
@@ -3536,15 +3542,16 @@ body:has(.menu-page-locked) {
   display: grid;
   gap: 0.22rem;
   align-content: start;
-  min-height: 7.25rem;
-  padding: 0.75rem 0.8rem 0.7rem;
-  border: 1px solid var(--cs-line, rgba(56, 32, 16, 0.12));
-  border-radius: var(--cs-radius-panel, 0.65rem);
-  background: var(--cs-panel, #fffdfa);
+  min-height: 7.5rem;
+  padding: 0.85rem 0.9rem 0.8rem;
+  border: 1px solid var(--cs-line, rgba(57, 67, 49, 0.14));
+  border-radius: var(--cs-radius-panel, 0.75rem);
+  background: var(--cs-panel, #fffef9);
   color: inherit;
   text-decoration: none;
-  box-shadow: var(--cs-shadow, 0 10px 28px rgba(56, 32, 16, 0.06));
+  box-shadow: var(--cs-shadow, 0 10px 28px rgba(57, 67, 49, 0.08));
   transition: border-color 0.12s ease, transform 0.08s ease;
+  touch-action: manipulation;
 }
 
 .staff-home-hero-tile:hover,
@@ -3668,7 +3675,7 @@ body:has(.menu-page-locked) {
 }
 
 .staff-home-tool-link--close {
-  border-color: color-mix(in srgb, #f85020 22%, rgba(56, 32, 16, 0.12));
+  border-color: color-mix(in srgb, var(--elilai-forest, #394331) 22%, rgba(57, 67, 49, 0.12));
 }
 
 .staff-home-tool-label {
@@ -3950,8 +3957,8 @@ body:has(.menu-page-locked) {
   min-height: 3rem;
   border: 0;
   border-radius: 0.85rem;
-  background: #f85020;
-  color: #fff;
+  background: #394331;
+  color: #f4efe3;
   font-size: 1rem;
   font-weight: 800;
   cursor: pointer;
@@ -4509,25 +4516,32 @@ a.staff-home-card:focus-visible {
   background: #eef8ee;
 }
 
-/* —— Staff POS P3 (tablet counter, Beans & Bills–inspired polish) —— */
-.staff-pos-page {
-  --cs-brown: #382010;
-  --cs-orange: #f85020;
-  --cs-beige: #b0a098;
-  --cs-cream: #faf7f4;
-  --cs-surface: #ffffff;
-  --cs-panel: #fffdfa;
-  --cs-line: rgba(56, 32, 16, 0.12);
-  --cs-shadow: 0 10px 28px rgba(56, 32, 16, 0.06);
+/* —— Staff POS (tablet counter) —— */
+/* Keep layout; inherit ELIlai tokens from .staff-app (no CoffeeSpot orange). */
+.staff-app .staff-pos-page {
+  --cs-brown: var(--elilai-forest, #394331);
+  --cs-orange: var(--elilai-forest, #394331);
+  --cs-beige: color-mix(in srgb, var(--elilai-forest, #394331) 48%, var(--elilai-ivory, #f4efe3));
+  --cs-cream: var(--elilai-ivory, #f4efe3);
+  --cs-surface: #fffef9;
+  --cs-panel: #fffef9;
+  --cs-line: color-mix(in srgb, var(--elilai-forest, #394331) 14%, transparent);
+  --cs-shadow: 0 10px 28px color-mix(in srgb, var(--elilai-forest, #394331) 8%, transparent);
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   color: var(--cs-brown);
-  background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--cs-orange) 5%, transparent), transparent 42%),
-    linear-gradient(180deg, var(--cs-cream) 0%, #fff 100%);
+  background: linear-gradient(180deg, var(--cs-cream) 0%, #fffef9 100%);
+}
+
+.staff-pos-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .staff-app:has(.staff-pos-shell-root) {
@@ -4624,8 +4638,8 @@ a.staff-home-card:focus-visible {
   align-items: center;
   justify-content: center;
   border-radius: 0.8rem;
-  background: color-mix(in srgb, #f85020 14%, #fff);
-  color: #f85020;
+  background: color-mix(in srgb, var(--cs-orange) 14%, #fff);
+  color: var(--cs-orange);
   font-size: 0.95rem;
   font-weight: 800;
 }
@@ -4665,9 +4679,9 @@ a.staff-home-card:focus-visible {
 
 .staff-pos-rail-more[open] .staff-pos-rail-more-summary,
 .staff-pos-rail-more.is-active .staff-pos-rail-more-summary {
-  border-color: color-mix(in srgb, #f85020 35%, transparent);
-  background: color-mix(in srgb, #f85020 10%, #fff);
-  color: #f85020;
+  border-color: color-mix(in srgb, var(--cs-orange) 35%, transparent);
+  background: color-mix(in srgb, var(--cs-orange) 10%, #fff);
+  color: var(--cs-orange);
 }
 
 .staff-pos-rail-more-panel {
@@ -4707,8 +4721,8 @@ a.staff-home-card:focus-visible {
 .staff-pos-rail-more-link:hover,
 .staff-pos-rail-more-link:focus-visible,
 .staff-pos-rail-more-link.is-active {
-  background: color-mix(in srgb, #f85020 9%, #fff);
-  color: #f85020;
+  background: color-mix(in srgb, var(--cs-orange) 9%, #fff);
+  color: var(--cs-orange);
   outline: none;
 }
 
@@ -4747,9 +4761,9 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-rail-link.is-active {
-  border-color: color-mix(in srgb, #f85020 35%, transparent);
-  background: color-mix(in srgb, #f85020 10%, #fff);
-  color: #f85020;
+  border-color: color-mix(in srgb, var(--cs-orange) 35%, transparent);
+  background: color-mix(in srgb, var(--cs-orange) 10%, #fff);
+  color: var(--cs-orange);
 }
 
 .staff-pos-rail--icons .staff-pos-rail-link.is-active::before {
@@ -4760,7 +4774,7 @@ a.staff-home-card:focus-visible {
   bottom: 0.55rem;
   width: 0.22rem;
   border-radius: 999px;
-  background: #f85020;
+  background: var(--cs-orange);
 }
 
 .staff-pos-rail-footer {
@@ -4795,8 +4809,8 @@ a.staff-home-card:focus-visible {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: color-mix(in srgb, #f85020 12%, #fff);
-  color: #f85020;
+  background: color-mix(in srgb, var(--cs-orange) 12%, #fff);
+  color: var(--cs-orange);
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -5452,8 +5466,8 @@ a.staff-home-card:focus-visible {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: color-mix(in srgb, #f85020 14%, #fff);
-  color: #f85020;
+  background: color-mix(in srgb, var(--cs-orange) 14%, #fff);
+  color: var(--cs-orange);
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -7383,17 +7397,20 @@ a.staff-home-card:focus-visible {
 }
 
 /* —— Staff UX V3.1 shared shell —— */
+/* Employee-scoped ELIlai tokens. Customer pages do not use .staff-app. */
 .staff-app {
-  --cs-orange: #f85020;
-  --cs-brown: #382010;
-  --cs-beige: #b0a098;
-  --cs-cream: #faf7f4;
-  --cs-surface: #ffffff;
-  --cs-panel: #fffdfa;
-  --cs-line: rgba(56, 32, 16, 0.12);
-  --cs-shadow: 0 10px 28px rgba(56, 32, 16, 0.06);
-  --cs-radius-panel: 0.65rem;
-  --cs-radius-control: 0.3rem;
+  --elilai-forest: #394331;
+  --elilai-ivory: #f4efe3;
+  --cs-orange: var(--elilai-forest);
+  --cs-brown: var(--elilai-forest);
+  --cs-beige: color-mix(in srgb, var(--elilai-forest) 48%, var(--elilai-ivory));
+  --cs-cream: var(--elilai-ivory);
+  --cs-surface: #fffef9;
+  --cs-panel: #fffef9;
+  --cs-line: color-mix(in srgb, var(--elilai-forest) 14%, transparent);
+  --cs-shadow: 0 10px 28px color-mix(in srgb, var(--elilai-forest) 8%, transparent);
+  --cs-radius-panel: 0.75rem;
+  --cs-radius-control: 0.4rem;
   min-height: 100vh;
   background: var(--cs-cream);
   color: var(--cs-brown);
@@ -7414,7 +7431,7 @@ a.staff-home-card:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 0.35rem 0.55rem;
-  padding: 0.38rem 0.7rem 0.22rem;
+  padding: 0.42rem 0.75rem 0.2rem;
 }
 
 .staff-shell-brand {
@@ -7426,12 +7443,21 @@ a.staff-home-card:focus-visible {
   text-transform: uppercase;
 }
 
+.staff-shell-brand-label {
+  margin: 0 0 0.05rem;
+  color: var(--cs-beige);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
 .staff-shell-brand-logo {
   display: block;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.55rem;
+  height: 2.55rem;
   object-fit: contain;
-  border-radius: 0.4rem;
+  border-radius: 0.35rem;
 }
 
 .staff-shell-brand-block {
@@ -7779,11 +7805,11 @@ a.staff-home-card:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 1.95rem;
-  padding: 0.26rem 0.7rem;
-  border-radius: var(--cs-radius-control);
+  min-height: 2.15rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
   color: var(--cs-brown);
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
@@ -7791,13 +7817,13 @@ a.staff-home-card:focus-visible {
 
 .staff-shell-nav-link:hover,
 .staff-shell-nav-link:focus-visible {
-  background: color-mix(in srgb, var(--cs-beige) 22%, #fff);
+  background: color-mix(in srgb, var(--elilai-forest) 8%, var(--elilai-ivory));
   outline: none;
 }
 
 .staff-shell-nav-link.is-active {
-  background: var(--cs-orange);
-  color: #fff;
+  background: var(--elilai-forest);
+  color: var(--elilai-ivory);
 }
 
 .staff-shell-more {
@@ -7810,11 +7836,11 @@ a.staff-home-card:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 1.95rem;
-  padding: 0.26rem 0.7rem;
-  border-radius: var(--cs-radius-control);
+  min-height: 2.15rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
   color: var(--cs-brown);
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
   user-select: none;
@@ -7928,17 +7954,18 @@ a.staff-home-card:focus-visible {
 }
 
 /* —— Staff Orders KDS workboard (tablet-first) —— */
+.staff-app .staff-orders-page,
 .staff-orders-page {
-  --cs-brown: #382010;
-  --cs-orange: #f85020;
-  --cs-beige: #b0a098;
-  --cs-cream: #faf7f4;
-  --cs-surface: #ffffff;
-  --cs-panel: #fffdfa;
-  --cs-line: rgba(56, 32, 16, 0.14);
-  --cs-shadow: 0 10px 28px rgba(56, 32, 16, 0.06);
-  --cs-radius-panel: 0.65rem;
-  --cs-radius-control: 0.3rem;
+  --cs-brown: #394331;
+  --cs-orange: #394331;
+  --cs-beige: color-mix(in srgb, #394331 48%, #f4efe3);
+  --cs-cream: #f4efe3;
+  --cs-surface: #fffef9;
+  --cs-panel: #fffef9;
+  --cs-line: color-mix(in srgb, #394331 14%, transparent);
+  --cs-shadow: 0 10px 28px color-mix(in srgb, #394331 8%, transparent);
+  --cs-radius-panel: 0.75rem;
+  --cs-radius-control: 0.4rem;
   color: var(--cs-brown);
 }
 
@@ -13487,8 +13514,8 @@ body:has(.home-page-landing) {
 .order-page .order-progress-step.is-current .order-progress-marker {
   border-color: #f85020;
   border-width: 2px;
-  background: color-mix(in srgb, #f85020 14%, #fff);
-  color: #f85020;
+  background: color-mix(in srgb, var(--cs-orange) 14%, #fff);
+  color: var(--cs-orange);
   font-weight: 700;
   box-shadow: inset 0 0 0 1px #f85020;
 }
@@ -16843,8 +16870,8 @@ html:not(.page-is-loading) .brune-top {
   height: 1.65rem;
   padding: 0 0.35rem;
   border-radius: 999px;
-  background: color-mix(in srgb, #f85020 14%, #fff);
-  color: #f85020;
+  background: color-mix(in srgb, var(--cs-orange) 14%, #fff);
+  color: var(--cs-orange);
   font-size: 0.78rem;
   font-weight: 700;
   line-height: 1;
@@ -17015,8 +17042,8 @@ html:not(.page-is-loading) .brune-top {
 
 .menu-live-root .menu-qty button:active:not(:disabled) {
   transform: scale(0.92);
-  background: color-mix(in srgb, #f85020 14%, #fff);
-  color: #f85020;
+  background: color-mix(in srgb, var(--cs-orange) 14%, #fff);
+  color: var(--cs-orange);
 }
 
 .menu-live-root .menu-buy-now,
