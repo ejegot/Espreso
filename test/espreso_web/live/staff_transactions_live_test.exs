@@ -36,25 +36,41 @@ defmodule EspresoWeb.StaffTransactionsLiveTest do
 
     assert has_element?(view, "#staff-transactions")
     assert has_element?(view, "#staff-nav-transactions.is-active", "Transactions")
-    assert has_element?(view, "#transactions-count", "1 paid transactions")
+    assert has_element?(view, "#transactions-scope", "Paid receipts for")
+    assert has_element?(view, "#transactions-count", "1 paid receipts")
     refute has_element?(view, "#transactions-summary")
+    assert has_element?(view, "#transactions-filters", "Order status")
+    assert has_element?(view, "#transactions-filters", "Settled via")
     assert has_element?(view, "#transaction-#{order.id}", order.number)
+    assert has_element?(view, "#transaction-#{order.id}", "Cash")
+    assert has_element?(view, "#transaction-#{order.id}", "₱75")
 
     view |> element("#transaction-#{order.id}") |> render_click()
 
     assert has_element?(view, "#transaction-detail", order.number)
     assert has_element?(view, "#transaction-detail", "Daily Receipt")
     assert has_element?(view, "#transaction-detail", "Mia Transactions")
+    assert has_element?(view, "#transaction-detail", "Order status")
+    assert has_element?(view, "#transaction-detail", "Settled via")
+    assert has_element?(view, "#transaction-detail", "Takeout")
     assert has_element?(view, "#transaction-detail", "Cash received")
     assert has_element?(view, "#transaction-detail", "₱100")
     assert has_element?(view, "#transaction-detail", "Change")
     assert has_element?(view, "#transaction-detail", "₱25")
+    assert has_element?(view, "#transaction-view-orders", "View on Orders")
 
     view
     |> form("#transactions-filters", %{"filters" => %{"payment" => "gcash"}})
     |> render_change()
 
-    assert has_element?(view, "#transactions-empty", "No paid transactions found")
+    assert has_element?(view, "#transactions-empty", "No paid receipts found")
+
+    assert has_element?(
+             view,
+             "#transactions-empty",
+             "Unpaid orders and payment exceptions are handled in Orders."
+           )
+
     refute has_element?(view, "#transaction-detail")
   end
 
@@ -67,7 +83,7 @@ defmodule EspresoWeb.StaffTransactionsLiveTest do
     {:ok, view, _html} = live(log_in(conn, manager), ~p"/transactions")
 
     assert has_element?(view, "#transactions-summary", "₱75")
-    assert has_element?(view, "#transactions-summary", "1 transactions")
+    assert has_element?(view, "#transactions-summary", "1 receipts")
     assert has_element?(view, "#transactions-breakdown", "Cash")
     assert has_element?(view, "#transactions-breakdown", "₱75")
   end
