@@ -123,6 +123,10 @@ defmodule EspresoWeb.Router do
       live "/orders", StaffOrdersLive
       live "/pos", StaffPosLive
       live "/transactions", StaffTransactionsLive
+    end
+
+    live_session :barista_shifts,
+      on_mount: [{EspresoWeb.StaffAuth, :ensure_barista}] do
       live "/staff/shifts", StaffMyShiftsLive
     end
   end

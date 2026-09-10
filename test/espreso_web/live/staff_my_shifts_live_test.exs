@@ -44,25 +44,41 @@ defmodule EspresoWeb.StaffMyShiftsLiveTest do
     assert {:error, {:redirect, %{to: "/login"}}} = live(conn, ~p"/staff/shifts")
   end
 
-  test "barista, manager, and owner can open my shifts", %{
+  test "barista can open my shifts; manager and owner cannot", %{
     conn: conn,
     barista: barista,
     manager: manager,
     owner: owner
   } do
-    for user <- [barista, manager, owner] do
-      {:ok, view, _html} = live(log_in(conn, user), ~p"/staff/shifts")
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/staff/shifts")
+    assert has_element?(view, "#staff-my-shifts")
+    assert has_element?(view, ".staff-shell-title", "My shifts")
+    assert has_element?(view, "#staff-nav-my_shifts", "My shifts")
 
-      assert has_element?(view, "#staff-my-shifts")
-      assert has_element?(view, ".staff-shell-title", "My shifts")
-      assert has_element?(view, "#staff-nav-my_shifts", "My shifts")
-    end
+    assert {:error, {:redirect, %{to: "/dashboard"}}} =
+             live(log_in(conn, manager), ~p"/staff/shifts")
+
+    assert {:error, {:redirect, %{to: "/dashboard"}}} =
+             live(log_in(conn, owner), ~p"/staff/shifts")
   end
 
-  test "home discovery tile and more nav link to my shifts", %{conn: conn, barista: barista} do
+  test "home discovery tile and more nav link to my shifts for barista only", %{
+    conn: conn,
+    barista: barista,
+    manager: manager,
+    owner: owner
+  } do
     {:ok, home, _html} = live(log_in(conn, barista), ~p"/staff")
     assert has_element?(home, "#staff-home-my-shifts", "My shifts")
     assert has_element?(home, "#staff-nav-my_shifts", "My shifts")
+
+    {:ok, manager_home, _html} = live(log_in(conn, manager), ~p"/staff")
+    refute has_element?(manager_home, "#staff-home-my-shifts")
+    refute has_element?(manager_home, "#staff-nav-my_shifts")
+
+    {:ok, owner_home, _html} = live(log_in(conn, owner), ~p"/staff")
+    refute has_element?(owner_home, "#staff-home-my-shifts")
+    refute has_element?(owner_home, "#staff-nav-my_shifts")
   end
 
   test "shows empty state when employee has no shifts", %{conn: conn, barista: barista} do
