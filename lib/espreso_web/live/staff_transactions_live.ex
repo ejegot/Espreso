@@ -112,20 +112,22 @@ defmodule EspresoWeb.StaffTransactionsLive do
       <main class="staff-transactions" id="staff-transactions">
         <header class="staff-transactions-head">
           <div>
-            <p class="staff-transactions-eyebrow">Receipt history</p>
-            <h2>Daily transactions</h2>
-            <p>Paid receipts for {format_shop_date(@filters.date)}</p>
+            <p class="staff-transactions-eyebrow">Paid receipts</p>
+            <h2>Transactions</h2>
+            <p id="transactions-scope">
+              Paid receipts for {format_shop_date(@filters.date)}
+            </p>
           </div>
 
           <%= if @show_totals? do %>
             <section class="staff-transactions-summary" id="transactions-summary" aria-label="Totals">
               <span>Paid total</span>
               <strong>{Menu.format_price(@summary.total)}</strong>
-              <small>{@summary.count} transactions</small>
+              <small>{@summary.count} receipts</small>
             </section>
           <% else %>
             <p class="staff-transactions-count" id="transactions-count">
-              {@summary.count} paid transactions
+              {@summary.count} paid receipts
             </p>
           <% end %>
         </header>
@@ -165,7 +167,7 @@ defmodule EspresoWeb.StaffTransactionsLive do
             </select>
           </label>
           <label>
-            <span>Status</span>
+            <span>Order status</span>
             <select name="filters[status]" id="transactions-status">
               <option value="all" selected={@filters.status == "all"}>All statuses</option>
               <option
@@ -178,7 +180,7 @@ defmodule EspresoWeb.StaffTransactionsLive do
             </select>
           </label>
           <label>
-            <span>Source</span>
+            <span>Settled via</span>
             <select name="filters[source]" id="transactions-source">
               <option value="all" selected={@filters.source == "all"}>All sources</option>
               <option
@@ -212,12 +214,12 @@ defmodule EspresoWeb.StaffTransactionsLive do
         </p>
 
         <div class={["staff-transactions-workspace", @selected_transaction && "has-detail"]}>
-          <section class="staff-transactions-list" id="transactions-list" aria-label="Transactions">
+          <section class="staff-transactions-list" id="transactions-list" aria-label="Paid receipts">
             <div class="staff-transactions-list-head" aria-hidden="true">
+              <span>Total</span>
+              <span>Payment</span>
               <span>Time / receipt</span>
               <span>Customer</span>
-              <span>Payment</span>
-              <span>Total</span>
             </div>
 
             <button
@@ -231,18 +233,26 @@ defmodule EspresoWeb.StaffTransactionsLive do
               phx-click="select_transaction"
               phx-value-id={order.id}
             >
+              <strong class="staff-transaction-total">{Menu.format_price(order.total)}</strong>
+              <span class={[
+                "staff-transaction-payment",
+                "staff-transaction-payment--#{order.paid_via || "other"}"
+              ]}>
+                {Orders.paid_via_label(order.paid_via)}
+              </span>
               <span class="staff-transaction-receipt">
                 <strong>{format_shop_time(order.settled_at)}</strong>
                 <small>{order.number}</small>
               </span>
               <span class="staff-transaction-customer">{order.customer_name || "Walk-in"}</span>
-              <span class="staff-transaction-payment">{Orders.paid_via_label(order.paid_via)}</span>
-              <strong class="staff-transaction-total">{Menu.format_price(order.total)}</strong>
             </button>
 
             <div :if={@transactions == []} class="staff-transactions-empty" id="transactions-empty">
-              <strong>No paid transactions found</strong>
+              <strong>No paid receipts found</strong>
               <span>Try another date or clear the filters.</span>
+              <span class="staff-transactions-empty-hint">
+                Unpaid orders and payment exceptions are handled in Orders.
+              </span>
             </div>
           </section>
 
@@ -261,32 +271,70 @@ defmodule EspresoWeb.StaffTransactionsLive do
               </button>
             </header>
 
-            <dl class="staff-transaction-meta">
-              <div>
-                <dt>Settled</dt>
-                <dd>{format_shop_datetime(@selected_transaction.settled_at)}</dd>
-              </div>
-              <div>
-                <dt>Customer</dt>
-                <dd>{@selected_transaction.customer_name || "Walk-in"}</dd>
-              </div>
-              <div>
-                <dt>Payment</dt>
-                <dd>{Orders.paid_via_label(@selected_transaction.paid_via)}</dd>
-              </div>
-              <div>
-                <dt>Status</dt>
-                <dd>{Orders.status_label(@selected_transaction.status)}</dd>
-              </div>
-              <div>
-                <dt>Source</dt>
-                <dd>{source_label(@selected_transaction.settlement_source)}</dd>
-              </div>
-              <div>
-                <dt>Settled by</dt>
-                <dd>{settled_by_name(@selected_transaction)}</dd>
-              </div>
-            </dl>
+            <section class="staff-transaction-section staff-transaction-section--payment">
+              <h4 class="staff-transaction-section-title">Payment</h4>
+              <dl class="staff-transaction-meta staff-transaction-meta--payment">
+                <div>
+                  <dt>Payment</dt>
+                  <dd class={[
+                    "staff-transaction-payment",
+                    "staff-transaction-payment--#{@selected_transaction.paid_via || "other"}"
+                  ]}>
+                    {Orders.paid_via_label(@selected_transaction.paid_via)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Settled</dt>
+                  <dd>{format_shop_datetime(@selected_transaction.settled_at)}</dd>
+                </div>
+                <div>
+                  <dt>Settled via</dt>
+                  <dd>{source_label(@selected_transaction.settlement_source)}</dd>
+                </div>
+                <div>
+                  <dt>Settled by</dt>
+                  <dd>{settled_by_name(@selected_transaction)}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <div class="staff-transaction-money">
+              <p class="staff-transaction-money-total">
+                <span>Total</span>
+                <strong>{Menu.format_price(@selected_transaction.total)}</strong>
+              </p>
+              <p :if={@selected_transaction.cash_tendered} class="staff-transaction-money-cash">
+                <span>Cash received</span>
+                <strong>{Menu.format_price(@selected_transaction.cash_tendered)}</strong>
+              </p>
+              <p :if={@selected_transaction.change_due} class="staff-transaction-money-change">
+                <span>Change</span>
+                <strong>{Menu.format_price(@selected_transaction.change_due)}</strong>
+              </p>
+            </div>
+
+            <section class="staff-transaction-section staff-transaction-section--order">
+              <h4 class="staff-transaction-section-title">Order</h4>
+              <dl class="staff-transaction-meta staff-transaction-meta--order">
+                <div>
+                  <dt>Customer</dt>
+                  <dd>{@selected_transaction.customer_name || "Walk-in"}</dd>
+                </div>
+                <div>
+                  <dt>Order status</dt>
+                  <dd>{Orders.status_label(@selected_transaction.status)}</dd>
+                </div>
+                <div :if={fulfillment_label(@selected_transaction)}>
+                  <dt>Fulfillment</dt>
+                  <dd>
+                    {fulfillment_label(@selected_transaction)}
+                    <span :if={table_label(@selected_transaction)}>
+                      · {table_label(@selected_transaction)}
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+            </section>
 
             <ul class="staff-transaction-items">
               <li :for={item <- @selected_transaction.items}>
@@ -295,29 +343,26 @@ defmodule EspresoWeb.StaffTransactionsLive do
               </li>
             </ul>
 
-            <div class="staff-transaction-money">
-              <p>
-                <span>Total</span><strong>{Menu.format_price(@selected_transaction.total)}</strong>
-              </p>
-              <p :if={@selected_transaction.cash_tendered}>
-                <span>Cash received</span><strong>{Menu.format_price(@selected_transaction.cash_tendered)}</strong>
-              </p>
-              <p :if={@selected_transaction.change_due}>
-                <span>Change</span><strong>{Menu.format_price(@selected_transaction.change_due)}</strong>
-              </p>
+            <div class="staff-transaction-actions">
+              <button
+                :if={@selected_transaction.status in @reprintable_statuses}
+                type="button"
+                class="staff-transaction-reprint"
+                id="transaction-open-reprint"
+                phx-click="open_reprint"
+                phx-value-id={@selected_transaction.id}
+                disabled={!@printer_enabled?}
+              >
+                {if @printer_enabled?, do: "Reprint receipt", else: "Printer disabled"}
+              </button>
+              <.link
+                navigate={~p"/orders"}
+                class="staff-transaction-orders-link"
+                id="transaction-view-orders"
+              >
+                View on Orders
+              </.link>
             </div>
-
-            <button
-              :if={@selected_transaction.status in @reprintable_statuses}
-              type="button"
-              class="staff-transaction-reprint"
-              id="transaction-open-reprint"
-              phx-click="open_reprint"
-              phx-value-id={@selected_transaction.id}
-              disabled={!@printer_enabled?}
-            >
-              {if @printer_enabled?, do: "Reprint receipt", else: "Printer disabled"}
-            </button>
           </aside>
         </div>
 
@@ -427,6 +472,19 @@ defmodule EspresoWeb.StaffTransactionsLive do
   defp source_label("legacy"), do: "Legacy"
   defp source_label("manual"), do: "Manual"
   defp source_label(_), do: "Not recorded"
+
+  defp fulfillment_label(%Order{fulfillment: "dine_in"}), do: "Dine-in"
+  defp fulfillment_label(%Order{fulfillment: "pickup"}), do: "Takeout"
+  defp fulfillment_label(_), do: nil
+
+  defp table_label(%Order{table_number: n}) when is_binary(n) do
+    case String.trim(n) do
+      "" -> nil
+      trimmed -> "Table ##{trimmed}"
+    end
+  end
+
+  defp table_label(_), do: nil
 
   defp format_shop_date(%Date{} = date), do: Calendar.strftime(date, "%B %-d, %Y")
 
