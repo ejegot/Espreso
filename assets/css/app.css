@@ -7830,6 +7830,389 @@ a.staff-home-card:focus-visible {
   width: min(calc(100% - 2rem), 40rem);
 }
 
+/* —— Staff Team / PIN management (Owner) —— */
+.staff-team-page {
+  --team-forest: var(--elilai-forest, #394331);
+  --team-ivory: var(--elilai-ivory, #f4efe3);
+  --team-ink: var(--team-forest);
+  --team-muted: color-mix(in srgb, var(--team-forest) 55%, var(--team-ivory));
+  --team-line: color-mix(in srgb, var(--team-forest) 14%, transparent);
+  width: min(calc(100% - 1.5rem), 48rem);
+  margin-inline: auto;
+  padding: 0.75rem 0 1.35rem;
+  color: var(--team-ink);
+}
+
+.staff-team-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.staff-team-eyebrow {
+  margin: 0;
+  color: var(--team-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.staff-team-title {
+  margin: 0.15rem 0 0;
+  color: var(--team-forest);
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: clamp(1.35rem, 3vw, 1.7rem);
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.staff-team-lede {
+  margin: 0.35rem 0 0;
+  max-width: 28rem;
+  color: var(--team-muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.staff-team-add-toggle,
+.staff-team-btn {
+  min-height: 2.5rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--team-line);
+  border-radius: 0.75rem;
+  background: #fff;
+  color: var(--team-forest);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.staff-team-add-toggle {
+  background: var(--team-forest);
+  border-color: var(--team-forest);
+  color: var(--team-ivory);
+}
+
+.staff-team-btn--primary {
+  background: var(--team-forest);
+  border-color: var(--team-forest);
+  color: var(--team-ivory);
+}
+
+.staff-team-btn--danger {
+  background: #b42318;
+  border-color: #b42318;
+  color: #fff;
+}
+
+.staff-team-btn:disabled,
+.staff-team-add-toggle:disabled {
+  opacity: 0.72;
+  cursor: wait;
+}
+
+.staff-team-note {
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--team-forest) 18%, transparent);
+  border-radius: var(--cs-radius-panel, 0.65rem);
+  background: color-mix(in srgb, var(--team-forest) 7%, #fff);
+  color: var(--team-forest);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.staff-team-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-bottom: 0.85rem;
+}
+
+.staff-team-summary-item {
+  padding: 0.55rem 0.45rem;
+  border: 1px solid var(--team-line);
+  border-radius: var(--cs-radius-panel, 0.65rem);
+  background: color-mix(in srgb, var(--team-ivory) 60%, #fff);
+  text-align: center;
+}
+
+.staff-team-summary-value {
+  margin: 0;
+  color: var(--team-forest);
+  font-size: 1.15rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.staff-team-summary-label {
+  margin: 0.2rem 0 0;
+  color: var(--team-muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.staff-team-roster,
+.staff-team-add {
+  margin-bottom: 1rem;
+}
+
+.staff-team-roster-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
+.staff-team-section-title {
+  margin: 0;
+  color: var(--team-forest);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.staff-team-section-hint {
+  margin: 0.2rem 0 0;
+  color: var(--team-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.staff-team-empty {
+  margin: 0 0 0.75rem;
+  padding: 0.9rem 1rem;
+  border: 1px dashed var(--team-line);
+  border-radius: var(--cs-radius-panel, 0.65rem);
+  background: color-mix(in srgb, var(--team-ivory) 45%, #fff);
+  color: var(--team-muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.staff-team-card {
+  margin-bottom: 0.65rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--team-line);
+  border-radius: var(--cs-radius-panel, 0.65rem);
+  background: #fff;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--team-forest) 6%, transparent);
+}
+
+.staff-team-card--disabled {
+  background: color-mix(in srgb, var(--team-ivory) 70%, #fff);
+  opacity: 0.96;
+}
+
+.staff-team-card.is-editing {
+  border-color: color-mix(in srgb, var(--team-forest) 28%, transparent);
+}
+
+.staff-team-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.65rem 1rem;
+}
+
+.staff-team-card-name {
+  margin: 0;
+  color: var(--team-forest);
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.staff-team-card-email {
+  margin: 0.15rem 0 0;
+  color: var(--team-muted);
+  font-size: 0.84rem;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.staff-team-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.staff-team-role,
+.staff-team-status,
+.staff-team-pin {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.55rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.staff-team-role {
+  background: color-mix(in srgb, var(--team-forest) 10%, #fff);
+  color: var(--team-forest);
+}
+
+.staff-team-role--owner {
+  background: color-mix(in srgb, var(--team-forest) 16%, #fff);
+}
+
+.staff-team-status--active {
+  background: color-mix(in srgb, #2f7a33 12%, #fff);
+  color: #2f7a33;
+}
+
+.staff-team-status--disabled {
+  background: color-mix(in srgb, #b42318 10%, #fff);
+  color: #b42318;
+}
+
+.staff-team-pin--set {
+  background: color-mix(in srgb, var(--team-forest) 8%, var(--team-ivory));
+  color: var(--team-forest);
+}
+
+.staff-team-pin--none {
+  background: transparent;
+  border: 1px solid var(--team-line);
+  color: var(--team-muted);
+  font-weight: 700;
+}
+
+.staff-team-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.7rem;
+}
+
+.staff-team-edit,
+.staff-team-pin-form,
+.staff-team-confirm {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--team-line);
+}
+
+.staff-team-form {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.staff-team-edit-group {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.staff-team-edit-label,
+.staff-team-pin-label {
+  margin: 0;
+  color: var(--team-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.staff-team-input {
+  width: 100%;
+  min-height: 2.65rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--team-line);
+  border-radius: 0.75rem;
+  background: #fff;
+  color: var(--team-ink);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.staff-team-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--team-forest) 42%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--team-forest) 12%, transparent);
+}
+
+.staff-team-add {
+  padding: 0.9rem 0.95rem;
+  border: 1px solid var(--team-line);
+  border-radius: var(--cs-radius-panel, 0.65rem);
+  background: color-mix(in srgb, var(--team-ivory) 55%, #fff);
+}
+
+.staff-team-confirm {
+  padding: 0.75rem 0.85rem;
+  border: 1px solid color-mix(in srgb, #b42318 22%, transparent);
+  border-radius: var(--cs-radius-panel, 0.65rem);
+  background: color-mix(in srgb, #b42318 5%, #fff);
+}
+
+.staff-team-confirm-title {
+  margin: 0;
+  color: var(--team-forest);
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.staff-team-confirm-copy {
+  margin: 0.3rem 0 0;
+  color: var(--team-muted);
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+@media (max-width: 520px) {
+  .staff-team-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-height: 560px) {
+  .staff-team-page {
+    padding-block: 0.4rem 0.85rem;
+  }
+
+  .staff-team-head,
+  .staff-team-summary {
+    margin-bottom: 0.5rem;
+  }
+
+  .staff-team-card {
+    padding: 0.65rem 0.75rem;
+    margin-bottom: 0.45rem;
+  }
+
+  .staff-team-summary-item {
+    padding: 0.4rem 0.3rem;
+  }
+
+  .staff-team-add {
+    padding: 0.65rem 0.75rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .staff-team-page {
+    width: min(calc(100% - 2rem), 52rem);
+  }
+}
+
 .staff-login-back {
   margin: 1.25rem 0 0;
   text-align: center;
