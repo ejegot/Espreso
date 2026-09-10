@@ -3,6 +3,7 @@ defmodule EspresoWeb.StaffHomeLive do
 
   alias Espreso.Accounts.Authorization
   alias Espreso.Accounts.User
+  alias Espreso.CashOuts
   alias Espreso.Menu
   alias Espreso.Orders
   alias Espreso.Printer
@@ -251,6 +252,14 @@ defmodule EspresoWeb.StaffHomeLive do
         path: ~p"/staff/shifts",
         count: nil,
         show?: user.role == "barista"
+      },
+      %{
+        id: "cash-out",
+        title: "Cash Out",
+        body: "Drawer expense for the shop",
+        path: ~p"/staff/cash-out",
+        count: nil,
+        show?: CashOuts.can_access?(user)
       },
       %{
         id: "close",

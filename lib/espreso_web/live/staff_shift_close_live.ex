@@ -3,6 +3,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
 
   alias Espreso.Accounts.Authorization
   alias Espreso.Accounts.User
+  alias Espreso.CashOuts
   alias Espreso.Menu
   alias Espreso.Orders
   alias Espreso.Shifts
@@ -202,6 +203,36 @@ defmodule EspresoWeb.StaffShiftCloseLive do
               <p class="staff-shift-close-section-hint">Cash payments sealed in this close.</p>
             </div>
 
+            <section
+              class="staff-shift-close-cash-outs"
+              id="staff-shift-close-sealed-cash-outs"
+              aria-label="Cash outs"
+            >
+              <p class="staff-shift-close-section-label">Cash Outs</p>
+              <p class="staff-shift-close-cash-value" id="staff-shift-close-sealed-cash-out-total">
+                {Menu.format_price(@cash_out_total)}
+              </p>
+              <p class="staff-shift-close-section-hint">
+                Drawer withdrawals recorded for this shop day (non-voided).
+              </p>
+              <ul
+                :if={@cash_outs != []}
+                class="staff-shift-close-cash-out-list"
+                id="staff-shift-close-sealed-cash-out-list"
+              >
+                <li :for={entry <- @cash_outs} class="staff-shift-close-cash-out-row">
+                  <span class="staff-shift-close-cash-out-amount">
+                    {Menu.format_price(entry.amount)}
+                  </span>
+                  <span class="staff-shift-close-cash-out-category">{entry.category}</span>
+                  <span :if={entry.note} class="staff-shift-close-cash-out-note">{entry.note}</span>
+                </li>
+              </ul>
+              <p :if={@cash_outs == []} class="staff-shift-close-section-hint">
+                No Cash Outs recorded for this shop day.
+              </p>
+            </section>
+
             <div class="staff-shift-close-counted-display" id="staff-shift-close-sealed-counted">
               <p class="staff-shift-close-section-label">Counted drawer cash</p>
               <%= if @close.counted_cash do %>
@@ -300,6 +331,37 @@ defmodule EspresoWeb.StaffShiftCloseLive do
             <p class="staff-shift-close-section-label">Cash settled</p>
             <p class="staff-shift-close-cash-value">{Menu.format_price(@cash_total)}</p>
             <p class="staff-shift-close-section-hint">Cash payments recorded as paid today.</p>
+          </section>
+
+          <section
+            :if={!@blocked?}
+            class="staff-shift-close-cash-outs"
+            id="staff-shift-close-cash-outs"
+            aria-label="Cash outs"
+          >
+            <p class="staff-shift-close-section-label">Cash Outs</p>
+            <p class="staff-shift-close-cash-value" id="staff-shift-close-cash-out-total">
+              {Menu.format_price(@cash_out_total)}
+            </p>
+            <p class="staff-shift-close-section-hint">
+              Drawer withdrawals recorded today (non-voided).
+            </p>
+            <ul
+              :if={@cash_outs != []}
+              class="staff-shift-close-cash-out-list"
+              id="staff-shift-close-cash-out-list"
+            >
+              <li :for={entry <- @cash_outs} class="staff-shift-close-cash-out-row">
+                <span class="staff-shift-close-cash-out-amount">
+                  {Menu.format_price(entry.amount)}
+                </span>
+                <span class="staff-shift-close-cash-out-category">{entry.category}</span>
+                <span :if={entry.note} class="staff-shift-close-cash-out-note">{entry.note}</span>
+              </li>
+            </ul>
+            <p :if={@cash_outs == []} class="staff-shift-close-section-hint">
+              No Cash Outs recorded today.
+            </p>
           </section>
 
           <form
@@ -426,6 +488,9 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     breakdown = Orders.todays_paid_breakdown()
     close = Shifts.get_todays_close()
     already_closed? = not is_nil(close)
+    shop_date = if close, do: close.shop_date, else: breakdown.shop_date
+    cash_outs = CashOuts.list_recorded_for_shop_date(shop_date)
+    cash_out_total = CashOuts.total_for_shop_date(shop_date)
 
     {blocked?, block_reason, other_names, staff_shift_ended?} =
       cond do
@@ -462,6 +527,8 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     |> assign(:block_reason, block_reason)
     |> assign(:other_active_names, other_names)
     |> assign(:staff_shift_ended?, staff_shift_ended?)
+    |> assign(:cash_outs, cash_outs)
+    |> assign(:cash_out_total, cash_out_total)
     |> assign(:counted_cash, "")
     |> assign(:notes, "")
     |> assign(:confirming?, false)
