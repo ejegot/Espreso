@@ -2,6 +2,8 @@ defmodule EspresoWeb.UserSessionController do
   use EspresoWeb, :controller
 
   alias Espreso.Accounts
+  alias Espreso.Auth.PinAttemptLimiter
+  alias EspresoWeb.ClientIP
   alias EspresoWeb.StaffAuth
 
   def create(conn, %{"user" => user_params}) do
@@ -29,16 +31,30 @@ defmodule EspresoWeb.UserSessionController do
       |> put_flash(:error, "Enter your PIN.")
       |> redirect(to: ~p"/login")
     else
-      case Accounts.verify_pin(user_id, pin) do
-        {:ok, user} ->
-          conn
-          |> put_flash(:info, "Welcome back, #{user.name}.")
-          |> StaffAuth.log_in_user(user, %{})
+      ip = ClientIP.from_conn(conn)
 
-        {:error, _} ->
+      case PinAttemptLimiter.check(user_id, ip) do
+        {:error, :rate_limited} ->
           conn
-          |> put_flash(:error, "Incorrect PIN. Try again.")
+          |> put_flash(:error, "Too many attempts. Please wait a moment before trying again.")
           |> redirect(to: ~p"/login")
+
+        :ok ->
+          case Accounts.verify_pin(user_id, pin) do
+            {:ok, user} ->
+              PinAttemptLimiter.record_success(user_id, ip)
+
+              conn
+              |> put_flash(:info, "Welcome back, #{user.name}.")
+              |> StaffAuth.log_in_user(user, %{})
+
+            {:error, _} ->
+              PinAttemptLimiter.record_failure(user_id, ip)
+
+              conn
+              |> put_flash(:error, "Incorrect PIN. Try again.")
+              |> redirect(to: ~p"/login")
+          end
       end
     end
   end

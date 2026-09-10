@@ -4,8 +4,11 @@ defmodule EspresoWeb.StaffAuthTest do
   import Phoenix.LiveViewTest
 
   alias Espreso.Accounts
+  alias Espreso.Auth.PinAttemptLimiter
 
   setup do
+    PinAttemptLimiter.reset!()
+
     {:ok, owner} =
       Accounts.register_user(%{
         name: "Owner",
@@ -730,6 +733,81 @@ defmodule EspresoWeb.StaffAuthTest do
     {:ok, _view, html} = live(recycle(logged_out), ~p"/login")
     assert html =~ "Welcome back"
     assert html =~ "Select your name, then enter your PIN."
+  end
+
+  test "repeated wrong pins trigger cooldown without locking other staff", %{
+    conn: conn,
+    barista: barista,
+    manager: manager
+  } do
+    assert {:ok, _} = Accounts.set_pin(barista, "4321")
+    assert {:ok, _} = Accounts.set_pin(manager, "5678")
+
+    Enum.each(1..5, fn _ ->
+      conn =
+        post(recycle(conn), ~p"/session/pin", %{
+          "user_id" => barista.id,
+          "pin" => "0000"
+        })
+
+      assert redirected_to(conn) == ~p"/login"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) == "Incorrect PIN. Try again."
+    end)
+
+    limited =
+      post(recycle(conn), ~p"/session/pin", %{
+        "user_id" => barista.id,
+        "pin" => "0000"
+      })
+
+    assert redirected_to(limited) == ~p"/login"
+
+    assert Phoenix.Flash.get(limited.assigns.flash, :error) ==
+             "Too many attempts. Please wait a moment before trying again."
+
+    other =
+      post(recycle(conn), ~p"/session/pin", %{
+        "user_id" => manager.id,
+        "pin" => "5678"
+      })
+
+    assert redirected_to(other) == ~p"/dashboard"
+    assert get_session(other, :user_id) == manager.id
+  end
+
+  test "successful pin login resets user throttle state", %{conn: conn, barista: barista} do
+    assert {:ok, _} = Accounts.set_pin(barista, "4321")
+
+    Enum.each(1..4, fn _ ->
+      post(recycle(conn), ~p"/session/pin", %{
+        "user_id" => barista.id,
+        "pin" => "0000"
+      })
+    end)
+
+    ok =
+      post(recycle(conn), ~p"/session/pin", %{
+        "user_id" => barista.id,
+        "pin" => "4321"
+      })
+
+    assert redirected_to(ok) == ~p"/orders"
+
+    Enum.each(1..5, fn _ ->
+      post(recycle(conn), ~p"/session/pin", %{
+        "user_id" => barista.id,
+        "pin" => "0000"
+      })
+    end)
+
+    limited =
+      post(recycle(conn), ~p"/session/pin", %{
+        "user_id" => barista.id,
+        "pin" => "1111"
+      })
+
+    assert Phoenix.Flash.get(limited.assigns.flash, :error) ==
+             "Too many attempts. Please wait a moment before trying again."
   end
 
   defp log_in(conn, user) do

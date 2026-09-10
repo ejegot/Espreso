@@ -13,6 +13,12 @@ defmodule EspresoWeb.Api.V1.FallbackController do
     |> json(%{error: "invalid_credentials"})
   end
 
+  def call(conn, {:error, :too_many_attempts}) do
+    conn
+    |> put_status(:too_many_requests)
+    |> json(%{error: "too_many_attempts"})
+  end
+
   def call(conn, {:error, :invalid_token}) do
     conn
     |> put_status(:unauthorized)
