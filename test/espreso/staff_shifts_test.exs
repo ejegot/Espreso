@@ -138,4 +138,76 @@ defmodule Espreso.StaffShiftsTest do
       assert open_count == 1
     end
   end
+
+  describe "list_shifts_for_user/2" do
+    test "returns only the requested user's shifts, newest first", %{user: user} do
+      {:ok, other} =
+        Accounts.register_user(%{
+          name: "Other Staff",
+          email: "other.list.shifts@test.local",
+          password: "password123",
+          role: "barista"
+        })
+
+      older =
+        insert_shift!(user, ~U[2026-09-09 01:00:00Z], ~U[2026-09-09 09:00:00Z])
+
+      newer_closed =
+        insert_shift!(user, ~U[2026-09-10 01:00:00Z], ~U[2026-09-10 05:00:00Z])
+
+      {:ok, open} = StaffShifts.open_shift_for_login(user)
+      {:ok, _other_open} = StaffShifts.open_shift_for_login(other)
+
+      shifts = StaffShifts.list_shifts_for_user(user.id)
+
+      assert Enum.map(shifts, & &1.id) == [open.id, newer_closed.id, older.id]
+      assert Enum.all?(shifts, &(&1.user_id == user.id))
+      assert Enum.any?(shifts, &is_nil(&1.ended_at))
+      assert Enum.count(shifts, &(&1.ended_at != nil)) == 2
+    end
+
+    test "respects limit option", %{user: user} do
+      for hour <- 1..5 do
+        start = DateTime.new!(~D[2026-09-08], Time.new!(hour, 0, 0), "Etc/UTC")
+        ended = DateTime.add(start, 3600, :second)
+
+        insert_shift!(user, start, ended)
+      end
+
+      assert length(StaffShifts.list_shifts_for_user(user.id, limit: 2)) == 2
+      assert length(StaffShifts.list_shifts_for_user(user.id, limit: 100)) == 5
+    end
+
+    test "isolates multiple users", %{user: user} do
+      {:ok, other} =
+        Accounts.register_user(%{
+          name: "Isolated Staff",
+          email: "isolated.list.shifts@test.local",
+          password: "password123",
+          role: "barista"
+        })
+
+      insert_shift!(user, ~U[2026-09-10 01:00:00Z], ~U[2026-09-10 02:00:00Z])
+      insert_shift!(other, ~U[2026-09-10 03:00:00Z], ~U[2026-09-10 04:00:00Z])
+
+      user_shifts = StaffShifts.list_shifts_for_user(user.id)
+      other_shifts = StaffShifts.list_shifts_for_user(other.id)
+
+      assert length(user_shifts) == 1
+      assert length(other_shifts) == 1
+      assert hd(user_shifts).user_id == user.id
+      assert hd(other_shifts).user_id == other.id
+    end
+  end
+
+  defp insert_shift!(user, started_at, ended_at, end_reason \\ "logout") do
+    {:ok, shift} =
+      %StaffShift{}
+      |> StaffShift.open_changeset(%{user_id: user.id, started_at: started_at})
+      |> Repo.insert()
+
+    shift
+    |> StaffShift.close_changeset(%{ended_at: ended_at, end_reason: end_reason})
+    |> Repo.update!()
+  end
 end

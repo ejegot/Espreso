@@ -19690,3 +19690,120 @@ a.brune-contact-value:focus-visible {
     max-height: none;
   }
 }
+
+/* —— Staff My Shifts (PASS 5D) —— */
+.staff-my-shifts {
+  --my-shift-forest: var(--elilai-forest, #394331);
+  --my-shift-ivory: var(--elilai-ivory, #f4efe3);
+  --my-shift-muted: color-mix(in srgb, var(--my-shift-forest) 58%, #fff);
+  display: grid;
+  gap: 1.1rem;
+  padding: 1rem 1rem 1.75rem;
+  max-width: 40rem;
+}
+
+.staff-my-shifts-head {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.staff-my-shifts-eyebrow,
+.staff-my-shifts-section-label {
+  margin: 0;
+  color: var(--my-shift-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.staff-my-shifts-head h2 {
+  margin: 0;
+  color: var(--my-shift-forest);
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(1.55rem, 3vw, 1.9rem);
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+.staff-my-shifts-head > div > p:last-child {
+  margin: 0.15rem 0 0;
+  color: var(--my-shift-muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.staff-my-shifts-current,
+.staff-my-shifts-history {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.staff-my-shift-card,
+.staff-my-shift-row {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid color-mix(in srgb, var(--my-shift-forest) 14%, transparent);
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--my-shift-ivory) 55%, #fff);
+}
+
+.staff-my-shift-card--open {
+  border-color: color-mix(in srgb, var(--my-shift-forest) 28%, transparent);
+  background: color-mix(in srgb, var(--my-shift-ivory) 78%, #fff);
+}
+
+.staff-my-shift-when {
+  margin: 0;
+  color: var(--my-shift-forest);
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.staff-my-shift-sales {
+  margin: 0;
+  color: var(--my-shift-muted);
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.staff-my-shift-open-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.15rem;
+  vertical-align: 0.05em;
+}
+
+.staff-my-shifts-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.staff-my-shifts-empty {
+  display: grid;
+  gap: 0.28rem;
+  justify-items: center;
+  padding: 2.25rem 1rem;
+  color: var(--my-shift-muted);
+  text-align: center;
+}
+
+.staff-my-shifts-empty strong {
+  color: var(--my-shift-forest);
+}
+
+.staff-my-shifts-empty-hint {
+  margin: 0;
+  max-width: 22rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+@media (min-width: 720px) {
+  .staff-my-shifts {
+    padding: 1.25rem 1.35rem 2rem;
+  }
+}
