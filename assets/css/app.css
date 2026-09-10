@@ -4024,6 +4024,51 @@ body:has(.menu-page-locked) {
   color: #2f7a33;
 }
 
+.staff-shift-close-status--blocked {
+  background: color-mix(in srgb, #b54708 12%, #fff);
+  color: #9a3412;
+}
+
+.staff-shift-close-blocked {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.95rem;
+  border: 1px solid color-mix(in srgb, #b54708 28%, transparent);
+  border-radius: var(--cs-radius-panel, 0.65rem);
+  background: color-mix(in srgb, #b54708 6%, #fff);
+}
+
+.staff-shift-close-blocked-title {
+  margin: 0;
+  color: #9a3412;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.staff-shift-close-blocked-copy,
+.staff-shift-close-blocked-list {
+  margin: 0;
+  color: var(--close-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.staff-shift-close-blocked-list {
+  padding-left: 1.1rem;
+}
+
+.staff-shift-close-timed-out {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, var(--close-forest) 8%, #fff);
+  color: var(--close-forest);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .staff-shift-close-lede {
   margin: 0.55rem 0 0 !important;
   max-width: 36rem;

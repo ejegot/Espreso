@@ -381,6 +381,23 @@ defmodule Espreso.OrdersStaffSalesTest do
                total: Decimal.new("150")
              }
     end
+
+    test "sales window ends at shift_close timestamp; later settlements excluded", %{
+      employee_a: employee_a
+    } do
+      started = ~U[2026-09-10 01:00:00Z]
+      closed_at = ~U[2026-09-10 10:00:00Z]
+      shift = insert_shift!(employee_a, started, closed_at, "shift_close")
+
+      create_paid_pos!(employee_a, settled_at: ~U[2026-09-10 09:00:00Z], price: "100")
+      create_paid_pos!(employee_a, settled_at: closed_at, price: "50")
+      create_paid_pos!(employee_a, settled_at: ~U[2026-09-10 10:00:01Z], price: "999")
+
+      assert Orders.sales_summary_for_staff_shift(shift) == %{
+               order_count: 1,
+               total: Decimal.new("100")
+             }
+    end
   end
 
   defp pos_lines(price) do

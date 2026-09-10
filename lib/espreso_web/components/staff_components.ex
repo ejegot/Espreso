@@ -280,7 +280,7 @@ defmodule EspresoWeb.StaffComponents do
         label: "Close shift",
         icon: "hero-lock-closed",
         path: ~p"/staff/close",
-        show?: Authorization.can?(user, :reports)
+        show?: Espreso.Shifts.can_access_close?(user)
       },
       %{
         key: :attendance,
