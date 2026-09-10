@@ -255,6 +255,8 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     assert has_element?(view, "#orders-cash-tender-feedback", "Exact")
     assert has_element?(view, "#orders-cash-tender-feedback", "₱0")
+    assert has_element?(view, "#orders-cash-exact.staff-pos-cash-exact.is-selected")
+    assert has_element?(view, "#orders-confirm-cash.staff-pos-cash-confirm.is-ready")
 
     view |> element("#orders-cash-preset-200") |> render_click()
     assert has_element?(view, ~s(#orders-cash-tendered[value="200.00"]))
@@ -1179,6 +1181,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert has_element?(view, "#{detail_id(order.id)} .staff-order-note-label", "NOTE")
     assert has_element?(view, "#{detail_id(order.id)} .staff-order-notes", "Less sugar")
     assert has_element?(view, "#{detail_id(order.id)} .staff-order-meta", "Dine-in")
+    assert has_element?(view, "#order-table-new-#{order.id}.staff-order-table", "Table #5")
     assert has_element?(view, "#{detail_id(order.id)} .staff-order-items", "12oz")
 
     assert has_element?(
@@ -1188,6 +1191,42 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
            )
 
     refute has_element?(view, "#order-prepare-#{order.id}")
+  end
+
+  test "table number appears on tickets when present and is omitted when absent", %{conn: conn} do
+    {:ok, with_table} =
+      Orders.create_order(
+        [%{name: "Americano", size: "12oz", quantity: 1, price: Decimal.new("120")}],
+        %{
+          customer_name: "Table Guest",
+          fulfillment: :dine_in,
+          table_number: "12",
+          payment_method: :counter,
+          payment_intent: :cash
+        }
+      )
+
+    {:ok, without_table} =
+      Orders.create_order(
+        [%{name: "Americano", size: "12oz", quantity: 1, price: Decimal.new("120")}],
+        %{
+          customer_name: "No Table Guest",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_intent: :cash
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+
+    assert has_element?(
+             view,
+             "#order-table-new-#{with_table.id}.staff-order-table",
+             "Table #12"
+           )
+
+    refute has_element?(view, "#order-table-new-#{without_table.id}")
+    refute has_element?(view, "#order-card-new-#{without_table.id} .staff-order-table")
   end
 
   test "Ready lane keeps more than 10 ready orders visible", %{conn: conn} do

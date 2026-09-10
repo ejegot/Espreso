@@ -731,6 +731,13 @@ defmodule EspresoWeb.StaffOrdersLive do
                 </p>
                 <span class="staff-order-unpaid-sep" aria-hidden="true">·</span>
                 <p class="staff-order-meta">
+                  <span
+                    :if={table_label(order)}
+                    class="staff-order-table staff-order-table--drawer"
+                    id={"unpaid-table-#{order.id}"}
+                  >
+                    {table_label(order)}
+                  </span>
                   <span class={"staff-badge staff-badge--#{order.status}"}>
                     {Orders.status_label(order.status)}
                   </span>
@@ -833,15 +840,20 @@ defmodule EspresoWeb.StaffOrdersLive do
     source = source_badge(assigns.order)
     note = order_note(assigns.order)
     status = assigns.order.status
+    table = table_label(assigns.order)
 
     assigns =
       assigns
       |> assign(:source_label, source.label)
       |> assign(:source_class, source.class)
       |> assign(:note, note)
+      |> assign(:table_label, table)
       |> assign(:arrived?, freshly_received?(assigns.order, assigns.age_now))
       |> assign(:compact?, status in ["preparing", "ready"])
       |> assign(:handoff?, status == "ready")
+      |> assign(:needs_pay?, needs_payment_actions?(assigns.order))
+      |> assign(:awaiting_pay?, assigns.order.payment_status == "awaiting_payment")
+      |> assign(:paid?, assigns.order.payment_status == "paid")
 
     ~H"""
     <article
@@ -849,6 +861,10 @@ defmodule EspresoWeb.StaffOrdersLive do
         "staff-order-card",
         "staff-order-ticket",
         "staff-order-ticket--#{@order.status}",
+        "staff-order-ticket--pay-#{@order.payment_status}",
+        @needs_pay? && "staff-order-ticket--needs-pay",
+        @awaiting_pay? && "staff-order-ticket--awaiting-pay",
+        @paid? && "staff-order-ticket--paid",
         @compact? && "staff-order-ticket--compact",
         @handoff? && "staff-order-ticket--handoff",
         @arrived? && "staff-order-card--arrived"
@@ -862,6 +878,9 @@ defmodule EspresoWeb.StaffOrdersLive do
             id={"order-source-#{@lane}-#{@order.id}"}
           >
             {@source_label}
+          </span>
+          <span :if={@table_label} class="staff-order-table" id={"order-table-#{@lane}-#{@order.id}"}>
+            {@table_label}
           </span>
         </div>
 
@@ -890,7 +909,16 @@ defmodule EspresoWeb.StaffOrdersLive do
           <p class="staff-order-notes">{@note}</p>
         </div>
 
-        <p class="staff-order-meta">{fulfillment_short(@order)}</p>
+        <p class="staff-order-meta">
+          <span class="staff-order-fulfillment">{fulfillment_short(@order)}</span>
+          <span
+            :if={@compact? and @table_label}
+            class="staff-order-table staff-order-table--meta"
+            id={"order-table-#{@lane}-#{@order.id}"}
+          >
+            {@table_label}
+          </span>
+        </p>
 
         <div class="staff-order-ticket-foot">
           <div class="staff-order-pay">
@@ -909,7 +937,14 @@ defmodule EspresoWeb.StaffOrdersLive do
       </div>
 
       <div class="staff-order-actions">
-        <div :if={needs_payment_actions?(@order)} class="staff-order-pay-actions">
+        <div
+          :if={@needs_pay?}
+          class={[
+            "staff-order-pay-actions",
+            "staff-order-pay-actions--primary",
+            @awaiting_pay? && "staff-order-pay-actions--waiting"
+          ]}
+        >
           <p :if={waiting_for_online_payment?(@order)} class="staff-order-payment-waiting">
             Waiting for online payment
           </p>
@@ -921,38 +956,47 @@ defmodule EspresoWeb.StaffOrdersLive do
           })}
         </div>
 
-        <button
-          :if={@order.status == "received" and not Orders.unpaid?(@order)}
-          type="button"
-          class="staff-action staff-action-primary"
-          id={"order-prepare-#{@order.id}"}
-          phx-click="set_status"
-          phx-value-id={@order.id}
-          phx-value-status="preparing"
+        <div
+          :if={
+            (@order.status == "received" and not Orders.unpaid?(@order)) or
+              (@order.status == "preparing" and not Orders.unpaid?(@order)) or
+              (@order.status == "ready" and not Orders.unpaid?(@order))
+          }
+          class="staff-order-kitchen-actions"
         >
-          Prepare
-        </button>
-        <button
-          :if={@order.status == "preparing" and not Orders.unpaid?(@order)}
-          type="button"
-          class="staff-action staff-action-primary"
-          id={"order-ready-#{@order.id}"}
-          phx-click="set_status"
-          phx-value-id={@order.id}
-          phx-value-status="ready"
-        >
-          Ready
-        </button>
-        <button
-          :if={@order.status == "ready" and not Orders.unpaid?(@order)}
-          type="button"
-          class="staff-action staff-action-primary staff-action-complete"
-          id={"ready-complete-#{@order.id}"}
-          phx-click="complete_order"
-          phx-value-id={@order.id}
-        >
-          Picked up
-        </button>
+          <button
+            :if={@order.status == "received" and not Orders.unpaid?(@order)}
+            type="button"
+            class="staff-action staff-action-primary"
+            id={"order-prepare-#{@order.id}"}
+            phx-click="set_status"
+            phx-value-id={@order.id}
+            phx-value-status="preparing"
+          >
+            Prepare
+          </button>
+          <button
+            :if={@order.status == "preparing" and not Orders.unpaid?(@order)}
+            type="button"
+            class="staff-action staff-action-primary"
+            id={"order-ready-#{@order.id}"}
+            phx-click="set_status"
+            phx-value-id={@order.id}
+            phx-value-status="ready"
+          >
+            Ready
+          </button>
+          <button
+            :if={@order.status == "ready" and not Orders.unpaid?(@order)}
+            type="button"
+            class="staff-action staff-action-primary staff-action-complete"
+            id={"ready-complete-#{@order.id}"}
+            phx-click="complete_order"
+            phx-value-id={@order.id}
+          >
+            Picked up
+          </button>
+        </div>
 
         <div
           :if={show_cancel_action?(@order) or ticket_overflow_actions?(@order)}
@@ -1320,6 +1364,10 @@ defmodule EspresoWeb.StaffOrdersLive do
             <button
               type="button"
               id="orders-cash-exact"
+              class={[
+                "staff-pos-cash-exact",
+                match?({:exact, _, _}, @tender_state) && "is-selected"
+              ]}
               phx-click="order_cash_exact"
               aria-label="Set cash received to the exact order total"
               data-dismiss-keyboard
@@ -1379,7 +1427,10 @@ defmodule EspresoWeb.StaffOrdersLive do
             </button>
             <button
               type="submit"
-              class="staff-action staff-action-primary"
+              class={[
+                "staff-action staff-action-primary staff-pos-cash-confirm",
+                @confirm_enabled? && is_binary(@mark_paid_permit) && "is-ready"
+              ]}
               id="orders-confirm-cash"
               disabled={!@confirm_enabled? or not is_binary(@mark_paid_permit)}
               phx-disable-with="Processing…"
@@ -1709,6 +1760,15 @@ defmodule EspresoWeb.StaffOrdersLive do
   defp fulfillment_short(%{fulfillment: "dine_in"}), do: "Dine-in"
   defp fulfillment_short(%{fulfillment: "pickup"}), do: "Takeout"
   defp fulfillment_short(_), do: "Order"
+
+  defp table_label(%{table_number: n}) when is_binary(n) do
+    case String.trim(n) do
+      "" -> nil
+      trimmed -> "Table ##{trimmed}"
+    end
+  end
+
+  defp table_label(_), do: nil
 
   defp show_customer_name?(%{customer_name: name}) when is_binary(name) do
     trimmed = String.trim(name)
