@@ -83,9 +83,15 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
       |> Plug.Conn.put_session(:user_id, manager.id)
 
     {:ok, view, _html} = live(manager_conn, ~p"/dashboard")
-    assert has_element?(view, "#dashboard-paid-breakdown", "Today by payment")
+    assert has_element?(view, "#dashboard-paid-breakdown", "Payment methods")
     assert has_element?(view, "#dashboard-paid-breakdown", "Maya")
     assert has_element?(view, "#dashboard-paid-breakdown", "₱95")
     assert has_element?(view, "#dashboard-paid-breakdown a", "Close shift")
+
+    assert has_element?(
+             view,
+             "#dashboard-panel-transactions[href='/transactions']",
+             "Transactions"
+           )
   end
 end
