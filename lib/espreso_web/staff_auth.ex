@@ -9,21 +9,48 @@ defmodule EspresoWeb.StaffAuth do
   import Plug.Conn
   import Phoenix.Controller
 
+  require Logger
+
   alias Espreso.Accounts
   alias Espreso.Accounts.Authorization
   alias Espreso.Accounts.User
+  alias Espreso.StaffShifts
 
   def log_in_user(conn, user, params \\ %{}) do
-    user_return_to = get_session(conn, :user_return_to) || signed_in_path(user)
+    case StaffShifts.open_shift_for_login(user) do
+      {:ok, _shift} ->
+        user_return_to = get_session(conn, :user_return_to) || signed_in_path(user)
 
-    conn
-    |> renew_session()
-    |> put_session(:user_id, user.id)
-    |> delete_session(:user_return_to)
-    |> redirect(to: params["redirect_to"] || user_return_to)
+        conn
+        |> renew_session()
+        |> put_session(:user_id, user.id)
+        |> delete_session(:user_return_to)
+        |> redirect(to: params["redirect_to"] || user_return_to)
+
+      {:error, reason} ->
+        Logger.error("staff shift open failed for user_id=#{user.id}: #{inspect(reason)}")
+
+        conn
+        |> put_flash(:error, "Unable to start your shift. Please try again.")
+        |> redirect(to: ~p"/login")
+    end
   end
 
   def log_out_user(conn) do
+    case get_session(conn, :user_id) do
+      nil ->
+        :ok
+
+      user_id ->
+        case StaffShifts.close_shift_for_logout(user_id) do
+          {:ok, _} ->
+            :ok
+
+          {:error, reason} ->
+            Logger.error("staff shift close failed for user_id=#{user_id}: #{inspect(reason)}")
+        end
+    end
+
     conn
     |> renew_session()
     |> delete_session(:user_id)
