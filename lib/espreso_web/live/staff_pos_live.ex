@@ -202,7 +202,11 @@ defmodule EspresoWeb.StaffPosLive do
     {:noreply, socket}
   end
 
-  def handle_event("select_card_size", %{"product-id" => product_id, "price-id" => price_id}, socket) do
+  def handle_event(
+        "select_card_size",
+        %{"product-id" => product_id, "price-id" => price_id},
+        socket
+      ) do
     product_id = String.to_integer(product_id)
     price_id = String.to_integer(price_id)
 
@@ -263,9 +267,14 @@ defmodule EspresoWeb.StaffPosLive do
   def handle_event("dec", %{"key" => key}, socket) do
     socket =
       case Enum.find(socket.assigns.cart, &(&1.key == key)) do
-        %{quantity: 1} -> remove_cart_line(socket, key)
-        %{} -> socket |> clear_cart_undo() |> assign(:cart, update_qty(socket.assigns.cart, key, -1))
-        nil -> socket
+        %{quantity: 1} ->
+          remove_cart_line(socket, key)
+
+        %{} ->
+          socket |> clear_cart_undo() |> assign(:cart, update_qty(socket.assigns.cart, key, -1))
+
+        nil ->
+          socket
       end
 
     {:noreply, socket}
@@ -471,7 +480,11 @@ defmodule EspresoWeb.StaffPosLive do
 
               :invalid ->
                 {:noreply,
-                 assign(socket, :cash_tender_error, "Enter a valid cash amount with up to 2 decimal places.")}
+                 assign(
+                   socket,
+                   :cash_tender_error,
+                   "Enter a valid cash amount with up to 2 decimal places."
+                 )}
             end
         end
     end
@@ -656,13 +669,15 @@ defmodule EspresoWeb.StaffPosLive do
 
               <div class="staff-pos-products staff-pos-products--rows" id="pos-products">
                 <article
-                  :for={{product, img} <-
-                    product_cards(
-                      @categories,
-                      @selected_category,
-                      @menu_filter,
-                      @search
-                    )}
+                  :for={
+                    {product, img} <-
+                      product_cards(
+                        @categories,
+                        @selected_category,
+                        @menu_filter,
+                        @search
+                      )
+                  }
                   class={[
                     "staff-pos-product-card",
                     @added_product_id == product.id && "is-added"
@@ -785,8 +800,9 @@ defmodule EspresoWeb.StaffPosLive do
                   </p>
                   <p class="staff-order-number">{@last_order.number}</p>
                   <p class="staff-order-meta">
-                    {Orders.status_label(@last_order.status)} · {@last_order.customer_name}
-                    · {Orders.payment_label(@last_order)}
+                    {Orders.status_label(@last_order.status)} · {@last_order.customer_name} · {Orders.payment_label(
+                      @last_order
+                    )}
                   </p>
                   <p
                     :if={@print_note}
@@ -844,305 +860,285 @@ defmodule EspresoWeb.StaffPosLive do
                   </div>
                 </div>
               <% else %>
-                <form
-                  class="staff-pos-order-form"
-                  id="pos-order-form"
-                  phx-submit="place_order"
-                >
-                <div class="staff-pos-ticket-head">
-                  <div class="staff-pos-staff" id="pos-staff">
-                    <div class="staff-pos-staff-avatar" aria-hidden="true">
-                      {staff_initials(@current_user.name)}
+                <form class="staff-pos-order-form" id="pos-order-form" phx-submit="place_order">
+                  <div class="staff-pos-ticket-head">
+                    <div class="staff-pos-ticket-title-row">
+                      <h2>Cart</h2>
+                      <div class="staff-pos-ticket-title-actions">
+                        <span :if={cart_item_count(@cart) > 0} class="staff-pos-cart-count">
+                          {cart_item_count(@cart)} items
+                        </span>
+                        <button
+                          :if={@cart != []}
+                          type="button"
+                          class="staff-pos-clear-ticket"
+                          id="pos-clear-ticket"
+                          phx-click="clear_ticket"
+                        >
+                          Clear Ticket
+                        </button>
+                      </div>
                     </div>
-                    <div class="staff-pos-staff-copy">
-                      <p class="staff-pos-staff-name">{@current_user.name}</p>
-                      <p class="staff-pos-staff-meta">{@current_user.email}</p>
-                    </div>
-                  </div>
 
-                  <div class="staff-pos-ticket-title-row">
-                    <h2>Cart</h2>
-                    <div class="staff-pos-ticket-title-actions">
-                      <span :if={cart_item_count(@cart) > 0} class="staff-pos-cart-count">
-                        {cart_item_count(@cart)} items
-                      </span>
+                    <div
+                      class="staff-pos-fulfillment staff-pos-fulfillment--pills"
+                      id="pos-fulfillment"
+                      role="radiogroup"
+                      aria-label="Fulfillment"
+                    >
                       <button
-                        :if={@cart != []}
                         type="button"
-                        class="staff-pos-clear-ticket"
-                        id="pos-clear-ticket"
-                        phx-click="clear_ticket"
+                        class={["staff-pos-fulfill-chip", @fulfillment == :dine_in && "is-active"]}
+                        id="pos-fulfillment-dine-in"
+                        phx-click="set_fulfillment"
+                        phx-value-fulfillment="dine_in"
+                        aria-pressed={to_string(@fulfillment == :dine_in)}
                       >
-                        Clear Ticket
+                        Dine-in
+                      </button>
+                      <button
+                        type="button"
+                        class={["staff-pos-fulfill-chip", @fulfillment == :pickup && "is-active"]}
+                        id="pos-fulfillment-pickup"
+                        phx-click="set_fulfillment"
+                        phx-value-fulfillment="pickup"
+                        aria-pressed={to_string(@fulfillment == :pickup)}
+                      >
+                        Takeout
                       </button>
                     </div>
+
+                    <label class="staff-pos-field" for="pos-customer-name">
+                      <span class="staff-pos-field-label">Name</span>
+                      <input
+                        type="text"
+                        class="staff-pos-field-input"
+                        id="pos-customer-name"
+                        name="customer_name"
+                        value={@customer_name}
+                        phx-change="set_customer_name"
+                        phx-debounce="300"
+                        autocomplete="off"
+                        maxlength="60"
+                        placeholder="Walk-in"
+                      />
+                    </label>
+
+                    <button
+                      :if={@cart != [] or @notes_open? or order_note(%{notes: @notes}) != nil}
+                      type="button"
+                      class="staff-pos-notes-toggle"
+                      id="pos-notes-toggle"
+                      phx-click="toggle_notes"
+                      aria-expanded={to_string(@notes_open? or order_note(%{notes: @notes}) != nil)}
+                    >
+                      {if @notes_open? or order_note(%{notes: @notes}),
+                        do: "Notes ▴",
+                        else: "Notes ▾"}
+                    </button>
+                    <label
+                      :if={@notes_open? or order_note(%{notes: @notes}) != nil}
+                      class="staff-pos-field staff-pos-field--notes"
+                      for="pos-notes"
+                    >
+                      <textarea
+                        class="staff-pos-field-textarea"
+                        id="pos-notes"
+                        name="notes"
+                        phx-change="set_notes"
+                        phx-debounce="300"
+                        rows="2"
+                        placeholder="Less ice, oat milk…"
+                      >{@notes}</textarea>
+                    </label>
                   </div>
 
-                  <div
-                    class="staff-pos-fulfillment staff-pos-fulfillment--pills"
-                    id="pos-fulfillment"
-                    role="radiogroup"
-                    aria-label="Fulfillment"
-                  >
-                    <button
-                      type="button"
-                      class={["staff-pos-fulfill-chip", @fulfillment == :dine_in && "is-active"]}
-                      id="pos-fulfillment-dine-in"
-                      phx-click="set_fulfillment"
-                      phx-value-fulfillment="dine_in"
-                      aria-pressed={to_string(@fulfillment == :dine_in)}
-                    >
-                      Dine-in
-                    </button>
-                    <button
-                      type="button"
-                      class={["staff-pos-fulfill-chip", @fulfillment == :pickup && "is-active"]}
-                      id="pos-fulfillment-pickup"
-                      phx-click="set_fulfillment"
-                      phx-value-fulfillment="pickup"
-                      aria-pressed={to_string(@fulfillment == :pickup)}
-                    >
-                      Takeout
+                  <div :if={@cart_undo} class="staff-pos-cart-undo" id="pos-cart-undo" role="status">
+                    <span>{cart_undo_label(@cart_undo)}</span>
+                    <button type="button" id="pos-cart-undo-action" phx-click="undo_cart">
+                      Undo
                     </button>
                   </div>
 
-                  <label class="staff-pos-field" for="pos-customer-name">
-                    <span class="staff-pos-field-label">Name</span>
-                    <input
-                      type="text"
-                      class="staff-pos-field-input"
-                      id="pos-customer-name"
-                      name="customer_name"
-                      value={@customer_name}
-                      phx-change="set_customer_name"
-                      phx-debounce="300"
-                      autocomplete="off"
-                      maxlength="60"
-                      placeholder="Walk-in"
-                    />
-                  </label>
+                  <div class="staff-pos-ticket-body">
+                    <p :if={@cart == []} class="staff-empty" id="pos-cart-empty">No items yet.</p>
 
-                  <button
-                    :if={
-                      @cart != [] or @notes_open? or order_note(%{notes: @notes}) != nil
-                    }
-                    type="button"
-                    class="staff-pos-notes-toggle"
-                    id="pos-notes-toggle"
-                    phx-click="toggle_notes"
-                    aria-expanded={to_string(@notes_open? or order_note(%{notes: @notes}) != nil)}
-                  >
-                    {if @notes_open? or order_note(%{notes: @notes}),
-                      do: "Notes ▴",
-                      else: "Notes ▾"}
-                  </button>
-                  <label
-                    :if={@notes_open? or order_note(%{notes: @notes}) != nil}
-                    class="staff-pos-field staff-pos-field--notes"
-                    for="pos-notes"
-                  >
-                    <textarea
-                      class="staff-pos-field-textarea"
-                      id="pos-notes"
-                      name="notes"
-                      phx-change="set_notes"
-                      phx-debounce="300"
-                      rows="2"
-                      placeholder="Less ice, oat milk…"
-                    >{@notes}</textarea>
-                  </label>
-                </div>
-
-                <div :if={@cart_undo} class="staff-pos-cart-undo" id="pos-cart-undo" role="status">
-                  <span>{cart_undo_label(@cart_undo)}</span>
-                  <button type="button" id="pos-cart-undo-action" phx-click="undo_cart">
-                    Undo
-                  </button>
-                </div>
-
-                <div class="staff-pos-ticket-body">
-                  <p :if={@cart == []} class="staff-empty" id="pos-cart-empty">No items yet.</p>
-
-                  <ul class="staff-pos-cart" id="pos-cart-lines">
-                    <li :for={line <- @cart} class="staff-pos-cart-line" id={"pos-line-#{line.key}"}>
-                      <div class="staff-pos-cart-thumb" aria-hidden="true">
-                        <img
-                          :if={line[:image]}
-                          src={line.image}
-                          alt=""
-                          class="staff-pos-cart-thumb-img"
-                          loading="lazy"
-                        />
-                      </div>
-                      <div class="staff-pos-cart-main">
-                        <div class="staff-pos-cart-copy">
-                          <p class="staff-pos-cart-name">{line.name}</p>
-                          <%= if length(cart_variant_options(@categories, line)) > 1 do %>
-                            <button
-                              type="button"
-                              class="staff-pos-cart-variant-trigger"
-                              id={"pos-cart-variant-trigger-#{line.key}"}
-                              phx-click="toggle_cart_variant"
-                              phx-value-key={line.key}
-                              aria-expanded={to_string(@variant_editor_key == line.key)}
-                              aria-controls={"pos-cart-variant-chooser-#{line.key}"}
-                              aria-label={"Change #{line.name} size, currently #{size_label(line.size)}"}
-                            >
-                              {size_label(line.size)} <span aria-hidden="true">▾</span>
-                            </button>
-                          <% else %>
-                            <p class="staff-pos-cart-size">{size_label(line.size)}</p>
-                          <% end %>
-                          <p class="staff-pos-cart-amount">
-                            {Menu.format_price(Decimal.mult(line.price, line.quantity))}
-                          </p>
+                    <ul class="staff-pos-cart" id="pos-cart-lines">
+                      <li :for={line <- @cart} class="staff-pos-cart-line" id={"pos-line-#{line.key}"}>
+                        <div class="staff-pos-cart-thumb" aria-hidden="true">
+                          <img
+                            :if={line[:image]}
+                            src={line.image}
+                            alt=""
+                            class="staff-pos-cart-thumb-img"
+                            loading="lazy"
+                          />
                         </div>
-                        <div class="staff-pos-cart-actions">
-                          <div class="staff-pos-qty-controls">
+                        <div class="staff-pos-cart-main">
+                          <div class="staff-pos-cart-copy">
+                            <p class="staff-pos-cart-name">{line.name}</p>
+                            <%= if length(cart_variant_options(@categories, line)) > 1 do %>
+                              <button
+                                type="button"
+                                class="staff-pos-cart-variant-trigger"
+                                id={"pos-cart-variant-trigger-#{line.key}"}
+                                phx-click="toggle_cart_variant"
+                                phx-value-key={line.key}
+                                aria-expanded={to_string(@variant_editor_key == line.key)}
+                                aria-controls={"pos-cart-variant-chooser-#{line.key}"}
+                                aria-label={"Change #{line.name} size, currently #{size_label(line.size)}"}
+                              >
+                                {size_label(line.size)} <span aria-hidden="true">▾</span>
+                              </button>
+                            <% else %>
+                              <p class="staff-pos-cart-size">{size_label(line.size)}</p>
+                            <% end %>
+                            <p class="staff-pos-cart-amount">
+                              {Menu.format_price(Decimal.mult(line.price, line.quantity))}
+                            </p>
+                          </div>
+                          <div class="staff-pos-cart-actions">
+                            <div class="staff-pos-qty-controls">
+                              <button
+                                type="button"
+                                class="staff-pos-qty-btn"
+                                phx-click="dec"
+                                phx-value-key={line.key}
+                                aria-label={"Decrease #{line.name}"}
+                              >
+                                −
+                              </button>
+                              <span class="staff-pos-qty">{line.quantity}</span>
+                              <button
+                                type="button"
+                                class="staff-pos-qty-btn staff-pos-qty-btn--plus"
+                                phx-click="inc"
+                                phx-value-key={line.key}
+                                aria-label={"Increase #{line.name}"}
+                              >
+                                +
+                              </button>
+                            </div>
                             <button
                               type="button"
-                              class="staff-pos-qty-btn"
-                              phx-click="dec"
+                              class="staff-pos-remove"
+                              phx-click="remove"
                               phx-value-key={line.key}
-                              aria-label={"Decrease #{line.name}"}
+                              aria-label={"Remove #{line.name}"}
+                              title="Remove"
                             >
-                              −
-                            </button>
-                            <span class="staff-pos-qty">{line.quantity}</span>
-                            <button
-                              type="button"
-                              class="staff-pos-qty-btn staff-pos-qty-btn--plus"
-                              phx-click="inc"
-                              phx-value-key={line.key}
-                              aria-label={"Increase #{line.name}"}
-                            >
-                              +
+                              ×
                             </button>
                           </div>
-                          <button
-                            type="button"
-                            class="staff-pos-remove"
-                            phx-click="remove"
-                            phx-value-key={line.key}
-                            aria-label={"Remove #{line.name}"}
-                            title="Remove"
+                          <div
+                            :if={@variant_editor_key == line.key}
+                            class="staff-pos-cart-variant-chooser"
+                            id={"pos-cart-variant-chooser-#{line.key}"}
+                            role="group"
+                            aria-label={"Choose size for #{line.name}"}
                           >
-                            ×
-                          </button>
+                            <button
+                              :for={price <- cart_variant_options(@categories, line)}
+                              type="button"
+                              class={[
+                                "staff-pos-cart-variant-option",
+                                price.id == line.price_id && "is-active"
+                              ]}
+                              id={"pos-cart-variant-#{line.key}-#{price.id}"}
+                              phx-click="change_cart_variant"
+                              phx-value-key={line.key}
+                              phx-value-price-id={price.id}
+                              aria-pressed={to_string(price.id == line.price_id)}
+                            >
+                              {size_label(price.size)} · {Menu.format_price(price.price)}
+                            </button>
+                          </div>
                         </div>
-                        <div
-                          :if={@variant_editor_key == line.key}
-                          class="staff-pos-cart-variant-chooser"
-                          id={"pos-cart-variant-chooser-#{line.key}"}
-                          role="group"
-                          aria-label={"Choose size for #{line.name}"}
-                        >
-                          <button
-                            :for={price <- cart_variant_options(@categories, line)}
-                            type="button"
-                            class={[
-                              "staff-pos-cart-variant-option",
-                              price.id == line.price_id && "is-active"
-                            ]}
-                            id={"pos-cart-variant-#{line.key}-#{price.id}"}
-                            phx-click="change_cart_variant"
-                            phx-value-key={line.key}
-                            phx-value-price-id={price.id}
-                            aria-pressed={to_string(price.id == line.price_id)}
-                          >
-                            {size_label(price.size)} · {Menu.format_price(price.price)}
-                          </button>
-                        </div>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div class="staff-pos-ticket-footer">
+                    <div class="staff-pos-totals">
+                      <div class="staff-pos-total-row staff-pos-total-row--grand">
+                        <span>Total</span>
+                        <span id="pos-total">{Menu.format_price(cart_total(@cart))}</span>
                       </div>
-                    </li>
-                  </ul>
-                </div>
-
-                <div class="staff-pos-ticket-footer">
-                  <div class="staff-pos-totals">
-                    <div class="staff-pos-total-row">
-                      <span>Items</span>
-                      <span>{Menu.format_price(cart_total(@cart))}</span>
                     </div>
-                    <div class="staff-pos-total-row staff-pos-total-row--grand">
-                      <span>Total</span>
-                      <span id="pos-total">{Menu.format_price(cart_total(@cart))}</span>
+
+                    <p class="staff-pos-section-label">Payment method</p>
+                    <div
+                      class="staff-pos-payment staff-pos-tender staff-pos-tender--methods"
+                      id="pos-payment-methods"
+                      role="radiogroup"
+                      aria-label="Payment method"
+                    >
+                      <button
+                        type="button"
+                        class={[
+                          "staff-pos-pay-chip",
+                          @payment_choice == :paid and @paid_via == "cash" && "is-active"
+                        ]}
+                        id="pos-pay-cash"
+                        phx-click="set_payment_method"
+                        phx-value-method="cash"
+                        aria-pressed={to_string(@payment_choice == :paid and @paid_via == "cash")}
+                      >
+                        Cash
+                      </button>
+                      <button
+                        type="button"
+                        class={[
+                          "staff-pos-pay-chip",
+                          @payment_choice == :paid and @paid_via == "gcash" && "is-active"
+                        ]}
+                        id="pos-pay-gcash"
+                        phx-click="set_payment_method"
+                        phx-value-method="gcash"
+                        aria-pressed={to_string(@payment_choice == :paid and @paid_via == "gcash")}
+                        aria-describedby={
+                          if @payment_choice == :paid and @paid_via == "gcash",
+                            do: "pos-gcash-confirmation-cue",
+                            else: nil
+                        }
+                      >
+                        GCash
+                      </button>
                     </div>
-                  </div>
 
-                  <p class="staff-pos-section-label">Payment method</p>
-                  <div
-                    class="staff-pos-payment staff-pos-tender staff-pos-tender--methods"
-                    id="pos-payment-methods"
-                    role="radiogroup"
-                    aria-label="Payment method"
-                  >
-                    <button
-                      type="button"
-                      class={[
-                        "staff-pos-pay-chip",
-                        @payment_choice == :paid and @paid_via == "cash" && "is-active"
-                      ]}
-                      id="pos-pay-cash"
-                      phx-click="set_payment_method"
-                      phx-value-method="cash"
-                      aria-pressed={to_string(@payment_choice == :paid and @paid_via == "cash")}
+                    <p
+                      :if={@payment_choice == :paid and @paid_via == "gcash"}
+                      class="staff-pos-payment-cue"
+                      id="pos-gcash-confirmation-cue"
                     >
-                      Cash
-                    </button>
-                    <button
-                      type="button"
-                      class={[
-                        "staff-pos-pay-chip",
-                        @payment_choice == :paid and @paid_via == "gcash" && "is-active"
-                      ]}
-                      id="pos-pay-gcash"
-                      phx-click="set_payment_method"
-                      phx-value-method="gcash"
-                      aria-pressed={to_string(@payment_choice == :paid and @paid_via == "gcash")}
-                      aria-describedby={
-                        if @payment_choice == :paid and @paid_via == "gcash",
-                          do: "pos-gcash-confirmation-cue",
-                          else: nil
-                      }
+                      Confirm payment was received before processing.
+                    </p>
+
+                    <p
+                      :if={@submission_error}
+                      class="staff-pos-flash"
+                      id="pos-submission-error"
+                      role="alert"
                     >
-                      GCash
+                      {@submission_error}
+                    </p>
+
+                    <button
+                      type="submit"
+                      class={[
+                        "staff-pos-place",
+                        (@cart == [] or @placing_order?) && "is-disabled"
+                      ]}
+                      id="pos-place-order"
+                      disabled={@cart == [] or @placing_order?}
+                    >
+                      <%= if @payment_choice == :paid and @paid_via == "gcash" do %>
+                        Confirm GCash &amp; Process
+                      <% else %>
+                        Process Cash Order
+                      <% end %>
                     </button>
                   </div>
-
-                  <p
-                    :if={@payment_choice == :paid and @paid_via == "gcash"}
-                    class="staff-pos-payment-cue"
-                    id="pos-gcash-confirmation-cue"
-                  >
-                    Confirm payment was received before processing.
-                  </p>
-
-                  <p
-                    :if={@submission_error}
-                    class="staff-pos-flash"
-                    id="pos-submission-error"
-                    role="alert"
-                  >
-                    {@submission_error}
-                  </p>
-
-                  <button
-                    type="submit"
-                    class={[
-                      "staff-pos-place",
-                      (@cart == [] or @placing_order?) && "is-disabled"
-                    ]}
-                    id="pos-place-order"
-                    disabled={@cart == [] or @placing_order?}
-                  >
-                    <%= if @payment_choice == :paid and @paid_via == "gcash" do %>
-                      Confirm GCash &amp; Process
-                    <% else %>
-                      Process Cash Order
-                    <% end %>
-                  </button>
-                </div>
                 </form>
               <% end %>
             </aside>
@@ -1174,11 +1170,7 @@ defmodule EspresoWeb.StaffPosLive do
       |> assign(:confirm_enabled?, cash_tender_valid?(tender_state))
 
     ~H"""
-    <.modal
-      id="cash-tender-modal"
-      show={true}
-      on_cancel={JS.push("cancel_cash_tender")}
-    >
+    <.modal id="cash-tender-modal" show={true} on_cancel={JS.push("cancel_cash_tender")}>
       <div class="staff-pos-cash-modal">
         <header class="staff-pos-cash-modal-head">
           <p class="staff-pos-cash-modal-eyebrow">Cash payment</p>
@@ -1600,7 +1592,8 @@ defmodule EspresoWeb.StaffPosLive do
   defp sweets_product?(_), do: false
 
   defp product_cards(categories, selected, filter, search) do
-    Enum.map(visible_product_entries(categories, selected, filter, search), fn {category_name, product} ->
+    Enum.map(visible_product_entries(categories, selected, filter, search), fn {category_name,
+                                                                                product} ->
       {product, Menu.product_image_meta(category_name || "", product.name)}
     end)
   end
@@ -1713,7 +1706,8 @@ defmodule EspresoWeb.StaffPosLive do
     with prices when length(prices) > 1 <-
            cart_variant_options(socket.assigns.categories, source),
          %{} = target_price <- Enum.find(prices, &(&1.id == price_id)),
-         {:ok, cart} <- replace_or_merge_cart_variant(socket.assigns.cart, source_key, target_price) do
+         {:ok, cart} <-
+           replace_or_merge_cart_variant(socket.assigns.cart, source_key, target_price) do
       draft = ticket_draft(socket.assigns)
 
       socket
@@ -1826,7 +1820,8 @@ defmodule EspresoWeb.StaffPosLive do
     Enum.reduce(cart, 0, fn line, acc -> acc + line.quantity end)
   end
 
-  defp unavailable_error([name]), do: "#{name} is no longer available. Remove it or choose something else."
+  defp unavailable_error([name]),
+    do: "#{name} is no longer available. Remove it or choose something else."
 
   defp unavailable_error(names) when is_list(names) do
     "#{Enum.join(names, ", ")} are no longer available. Remove them or choose something else."
@@ -2036,21 +2031,6 @@ defmodule EspresoWeb.StaffPosLive do
     |> Enum.map(&Decimal.new/1)
     |> Enum.filter(&(Decimal.compare(&1, total) in [:eq, :gt]))
   end
-
-  defp staff_initials(name) when is_binary(name) do
-    name
-    |> String.trim()
-    |> String.split(~r/\s+/, trim: true)
-    |> Enum.take(2)
-    |> Enum.map(fn part -> part |> String.first() |> to_string() |> String.upcase() end)
-    |> Enum.join()
-    |> case do
-      "" -> "CS"
-      initials -> initials
-    end
-  end
-
-  defp staff_initials(_), do: "CS"
 
   defp new_print_retry_token do
     Integer.to_string(System.unique_integer([:positive]))
