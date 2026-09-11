@@ -1,6 +1,8 @@
 defmodule EspresoWeb.StaffPosLive do
   use EspresoWeb, :live_view
 
+  alias Espreso.Customers
+  alias Espreso.Loyalty
   alias Espreso.Menu
   alias Espreso.Orders
   alias Espreso.Printer
@@ -25,6 +27,15 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:search, "")
      |> assign(:cart, [])
      |> assign(:customer_name, "Walk-in")
+     |> assign(:loyalty_phone, "")
+     |> assign(:loyalty_customer, nil)
+     |> assign(:loyalty_error, nil)
+     |> assign(:redeem_open?, false)
+     |> assign(:redeem_category, "HOT")
+     |> assign(:redeem_price_id, nil)
+     |> assign(:redeem_quote, nil)
+     |> assign(:redeem_error, nil)
+     |> assign(:redeeming?, false)
      |> assign(:notes, "")
      |> assign(:fulfillment, :pickup)
      |> assign(:table_number, "")
@@ -34,6 +45,8 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:cash_tender_open?, false)
      |> assign(:cash_tender_error, nil)
      |> assign(:cash_tender_token, nil)
+     |> assign(:cash_tender_purpose, :order)
+     |> assign(:cash_tender_total, nil)
      |> assign(:last_cash_change, nil)
      |> assign(:print_failed?, false)
      |> assign(:print_retry_token, nil)
@@ -100,6 +113,14 @@ defmodule EspresoWeb.StaffPosLive do
              "clear_ticket",
              "undo_cart",
              "set_customer_name",
+             "set_loyalty_phone",
+             "lookup_loyalty",
+             "clear_loyalty",
+             "open_redeem",
+             "close_redeem",
+             "set_redeem_category",
+             "select_redeem_price",
+             "confirm_redeem",
              "set_notes",
              "set_fulfillment",
              "set_payment_method",
@@ -338,6 +359,124 @@ defmodule EspresoWeb.StaffPosLive do
     {:noreply, assign(socket, :customer_name, String.trim(name))}
   end
 
+  def handle_event("set_loyalty_phone", %{"loyalty_phone" => phone}, socket) do
+    {:noreply,
+     socket
+     |> assign(:loyalty_phone, phone)
+     |> assign(:loyalty_error, nil)}
+  end
+
+  def handle_event("lookup_loyalty", _params, socket) do
+    phone = socket.assigns.loyalty_phone
+    name = String.trim(socket.assigns.customer_name)
+
+    name_opts =
+      if name != "" and name != "Walk-in", do: %{name: name}, else: %{}
+
+    case Customers.find_or_create_by_phone(phone, name_opts) do
+      {:ok, customer} ->
+        socket =
+          socket
+          |> assign(:loyalty_customer, customer)
+          |> assign(:loyalty_phone, customer.phone_e164)
+          |> assign(:loyalty_error, nil)
+          |> maybe_fill_name_from_customer(customer)
+
+        {:noreply, socket}
+
+      {:error, :invalid_phone} ->
+        {:noreply, assign(socket, :loyalty_error, "Enter a valid PH mobile number.")}
+
+      {:error, %Ecto.Changeset{}} ->
+        {:noreply, assign(socket, :loyalty_error, "Could not save customer. Try again.")}
+    end
+  end
+
+  def handle_event("clear_loyalty", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:loyalty_customer, nil)
+     |> assign(:loyalty_phone, "")
+     |> assign(:loyalty_error, nil)
+     |> close_redeem()}
+  end
+
+  def handle_event("open_redeem", _params, socket) do
+    customer = socket.assigns.loyalty_customer
+
+    cond do
+      is_nil(customer) ->
+        {:noreply, assign(socket, :loyalty_error, "Look up a customer first.")}
+
+      customer.points_balance < Loyalty.redeem_cost() ->
+        {:noreply,
+         assign(socket, :redeem_error, "Need #{Loyalty.redeem_cost()} points to redeem.")}
+
+      true ->
+        {:noreply,
+         socket
+         |> assign(:redeem_open?, true)
+         |> assign(:redeem_category, "HOT")
+         |> assign(:redeem_price_id, nil)
+         |> assign(:redeem_quote, nil)
+         |> assign(:redeem_error, nil)}
+    end
+  end
+
+  def handle_event("close_redeem", _params, socket) do
+    {:noreply, close_redeem(socket)}
+  end
+
+  def handle_event("set_redeem_category", %{"category" => category}, socket)
+      when category in ["HOT", "COLD"] do
+    {:noreply,
+     socket
+     |> assign(:redeem_category, category)
+     |> assign(:redeem_price_id, nil)
+     |> assign(:redeem_quote, nil)
+     |> assign(:redeem_error, nil)}
+  end
+
+  def handle_event("select_redeem_price", %{"price_id" => price_id}, socket) do
+    case Integer.parse(to_string(price_id)) do
+      {id, ""} ->
+        case Loyalty.quote_reward(id) do
+          {:ok, quote} ->
+            {:noreply,
+             socket
+             |> assign(:redeem_price_id, id)
+             |> assign(:redeem_quote, quote)
+             |> assign(:redeem_error, nil)}
+
+          {:error, _} ->
+            {:noreply,
+             socket
+             |> assign(:redeem_price_id, nil)
+             |> assign(:redeem_quote, nil)
+             |> assign(:redeem_error, "Choose a HOT or iced coffee (no Frappe).")}
+        end
+
+      _ ->
+        {:noreply, assign(socket, :redeem_error, "Invalid selection.")}
+    end
+  end
+
+  def handle_event("confirm_redeem", _params, socket) do
+    customer = socket.assigns.loyalty_customer
+    quote = socket.assigns.redeem_quote
+
+    cond do
+      socket.assigns.redeeming? ->
+        {:noreply, socket}
+
+      is_nil(customer) or is_nil(quote) ->
+        {:noreply, assign(socket, :redeem_error, "Select a reward coffee first.")}
+
+      true ->
+        do_confirm_redeem(socket, customer, quote)
+    end
+  end
+
   def handle_event("set_notes", %{"notes" => notes}, socket) do
     {:noreply, assign(socket, :notes, notes)}
   end
@@ -394,7 +533,7 @@ defmodule EspresoWeb.StaffPosLive do
   def handle_event("set_cash_tendered", _params, socket), do: {:noreply, socket}
 
   def handle_event("cash_exact", _params, %{assigns: %{cash_tender_open?: true}} = socket) do
-    total = cart_total(socket.assigns.cart) |> Decimal.round(2) |> Decimal.to_string(:normal)
+    total = cash_due_total(socket) |> Decimal.round(2) |> Decimal.to_string(:normal)
 
     {:noreply,
      socket
@@ -433,6 +572,8 @@ defmodule EspresoWeb.StaffPosLive do
     tendered = Map.get(params, "cash_tendered", socket.assigns.cash_tendered)
     token = Map.get(params, "cash_tender_token")
     socket = assign(socket, :cash_tendered, String.trim(to_string(tendered)))
+    purpose = socket.assigns[:cash_tender_purpose] || :order
+    due = cash_due_total(socket)
 
     cond do
       not socket.assigns.cash_tender_open? ->
@@ -444,8 +585,44 @@ defmodule EspresoWeb.StaffPosLive do
       socket.assigns.payment_choice != :paid or socket.assigns.paid_via != "cash" ->
         {:noreply, assign(socket, :cash_tender_error, "Cash payment is no longer selected.")}
 
-      socket.assigns.placing_order? ->
+      socket.assigns.placing_order? or socket.assigns.redeeming? ->
         {:noreply, socket}
+
+      purpose == :redeem ->
+        case cash_tender_state(socket.assigns.cash_tendered, due) do
+          {:exact, _tendered, _change} ->
+            socket
+            |> consume_cash_tender()
+            |> then(fn s ->
+              do_confirm_redeem(s, s.assigns.loyalty_customer, s.assigns.redeem_quote)
+            end)
+
+          {:change, _tendered, _change} ->
+            socket
+            |> consume_cash_tender()
+            |> then(fn s ->
+              do_confirm_redeem(s, s.assigns.loyalty_customer, s.assigns.redeem_quote)
+            end)
+
+          {:short, _tendered, needed} ->
+            {:noreply,
+             assign(
+               socket,
+               :cash_tender_error,
+               "Cash received is short by #{Menu.format_price(needed)}."
+             )}
+
+          :blank ->
+            {:noreply, assign(socket, :cash_tender_error, "Enter the cash received.")}
+
+          :invalid ->
+            {:noreply,
+             assign(
+               socket,
+               :cash_tender_error,
+               "Enter a valid cash amount with up to 2 decimal places."
+             )}
+        end
 
       true ->
         case order_preflight(socket) do
@@ -456,7 +633,7 @@ defmodule EspresoWeb.StaffPosLive do
             {:noreply, assign(socket, :cash_tender_error, message)}
 
           :ok ->
-            case cash_tender_state(socket.assigns.cash_tendered, cart_total(socket.assigns.cart)) do
+            case cash_tender_state(socket.assigns.cash_tendered, due) do
               {:exact, _tendered, _change} ->
                 socket
                 |> consume_cash_tender()
@@ -924,6 +1101,127 @@ defmodule EspresoWeb.StaffPosLive do
                       />
                     </label>
 
+                    <div class="staff-pos-field" id="pos-loyalty">
+                      <span class="staff-pos-field-label">Loyalty phone (optional)</span>
+                      <div class="staff-pos-loyalty-row">
+                        <input
+                          type="tel"
+                          class="staff-pos-field-input"
+                          id="pos-loyalty-phone"
+                          name="loyalty_phone"
+                          value={@loyalty_phone}
+                          phx-change="set_loyalty_phone"
+                          phx-debounce="300"
+                          autocomplete="tel"
+                          inputmode="tel"
+                          placeholder="09XXXXXXXXX"
+                        />
+                        <button
+                          type="button"
+                          class="staff-pos-fulfill-chip"
+                          id="pos-loyalty-lookup"
+                          phx-click="lookup_loyalty"
+                        >
+                          Find
+                        </button>
+                        <button
+                          :if={@loyalty_customer}
+                          type="button"
+                          class="staff-pos-fulfill-chip"
+                          id="pos-loyalty-clear"
+                          phx-click="clear_loyalty"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <p
+                        :if={@loyalty_error}
+                        class="staff-pos-submission-error"
+                        id="pos-loyalty-error"
+                      >
+                        {@loyalty_error}
+                      </p>
+                      <p :if={@loyalty_customer} class="staff-pos-field-hint" id="pos-loyalty-status">
+                        {@loyalty_customer.phone_e164} · {@loyalty_customer.points_balance} pts
+                        <%= if @loyalty_customer.points_balance >= 10 do %>
+                          · ready to redeem
+                        <% end %>
+                      </p>
+                      <button
+                        :if={@loyalty_customer && @loyalty_customer.points_balance >= 10}
+                        type="button"
+                        class="staff-pos-fulfill-chip"
+                        id="pos-loyalty-redeem"
+                        phx-click="open_redeem"
+                      >
+                        Redeem reward
+                      </button>
+                    </div>
+
+                    <div :if={@redeem_open?} class="staff-pos-redeem" id="pos-redeem-panel">
+                      <div class="staff-pos-fulfillment staff-pos-fulfillment--pills">
+                        <button
+                          type="button"
+                          class={["staff-pos-fulfill-chip", @redeem_category == "HOT" && "is-active"]}
+                          phx-click="set_redeem_category"
+                          phx-value-category="HOT"
+                        >
+                          Hot
+                        </button>
+                        <button
+                          type="button"
+                          class={["staff-pos-fulfill-chip", @redeem_category == "COLD" && "is-active"]}
+                          phx-click="set_redeem_category"
+                          phx-value-category="COLD"
+                        >
+                          Iced
+                        </button>
+                        <button type="button" class="staff-pos-fulfill-chip" phx-click="close_redeem">
+                          Cancel
+                        </button>
+                      </div>
+
+                      <div class="staff-pos-redeem-list" id="pos-redeem-list">
+                        <%= for category <- Loyalty.list_reward_menu(),
+                                category.name == @redeem_category,
+                                product <- category.products,
+                                price <- product.product_prices do %>
+                          <button
+                            type="button"
+                            class={[
+                              "staff-pos-fulfill-chip",
+                              @redeem_price_id == price.id && "is-active"
+                            ]}
+                            id={"pos-redeem-price-#{price.id}"}
+                            phx-click="select_redeem_price"
+                            phx-value-price_id={price.id}
+                          >
+                            {product.name}
+                            <%= if price.size do %>
+                              · {price.size}
+                            <% end %>
+                            · {Menu.format_price(price.price)}
+                          </button>
+                        <% end %>
+                      </div>
+
+                      <p :if={@redeem_quote} class="staff-pos-field-hint" id="pos-redeem-quote">
+                        Free base {Menu.format_price(@redeem_quote.base_price)} · Pay upgrade {Menu.format_price(
+                          @redeem_quote.upgrade_amount
+                        )} · Uses 10 pts
+                      </p>
+                      <p :if={@redeem_error} class="staff-pos-submission-error">{@redeem_error}</p>
+                      <button
+                        type="button"
+                        class="staff-pos-fulfill-chip is-active"
+                        id="pos-redeem-confirm"
+                        phx-click="confirm_redeem"
+                        disabled={is_nil(@redeem_quote) or @redeeming?}
+                      >
+                        Confirm redeem
+                      </button>
+                    </div>
+
                     <button
                       :if={@cart != [] or @notes_open? or order_note(%{notes: @notes}) != nil}
                       type="button"
@@ -1159,7 +1457,7 @@ defmodule EspresoWeb.StaffPosLive do
   end
 
   defp cash_tender_modal(assigns) do
-    total = cart_total(assigns.cart) |> Decimal.round(2)
+    total = cash_due_total_from_assigns(assigns) |> Decimal.round(2)
     tender_state = cash_tender_state(assigns.cash_tendered, total)
 
     assigns =
@@ -1288,6 +1586,120 @@ defmodule EspresoWeb.StaffPosLive do
     """
   end
 
+  defp do_confirm_redeem(socket, customer, quote) do
+    socket = assign(socket, :redeeming?, true)
+    paid? = socket.assigns.payment_choice == :paid
+    paid_via = if paid?, do: socket.assigns.paid_via, else: nil
+    {tendered, change} = cash_amounts(socket)
+    amount_due = quote.amount_due
+
+    if paid? and paid_via == "cash" and Decimal.compare(amount_due, 0) == :gt and is_nil(tendered) do
+      {:noreply,
+       socket
+       |> assign(:redeeming?, false)
+       |> open_cash_tender(:redeem, amount_due)}
+    else
+      attrs =
+        %{
+          customer_name: String.trim(socket.assigns.customer_name),
+          notes: blank_notes(socket.assigns.notes),
+          fulfillment: socket.assigns.fulfillment,
+          table_number: nil,
+          payment_method: :counter,
+          payment_status: socket.assigns.payment_choice,
+          paid_via: paid_via,
+          source: :pos,
+          settled_by_user_id: socket.assigns.current_user.id,
+          settlement_source: :pos
+        }
+        |> maybe_put_cash_settlement(tendered)
+
+      case Loyalty.redeem_at_pos(customer.id, quote.selected_price.id, attrs) do
+        {:ok, %{order: order, customer: updated_customer}} ->
+          print_result =
+            if paid? do
+              opts =
+                [staff_name: socket.assigns.current_user.name] ++
+                  if(tendered, do: [cash_tendered: tendered, change: change], else: [])
+
+              Printer.after_paid(order, order.paid_via || paid_via || "cash", opts)
+            else
+              :disabled
+            end
+
+          {note, failed?, note_error?} =
+            print_note_result(print_result, order.paid_via || paid_via)
+
+          cash_change = if(change, do: %{tendered: tendered, change: change})
+
+          flash =
+            "Redeemed · #{order.number} · #{updated_customer.points_balance} pts left" <>
+              if(note, do: " · #{note}", else: "")
+
+          socket =
+            socket
+            |> assign(:loyalty_customer, updated_customer)
+            |> assign(:redeeming?, false)
+            |> close_redeem()
+            |> consume_cash_tender()
+            |> assign(:last_cash_change, cash_change)
+            |> assign(:print_note, note)
+            |> assign(:print_failed?, failed?)
+            |> assign(:print_note_error?, note_error?)
+            |> assign(:categories, Menu.list_menu())
+
+          socket =
+            if failed? do
+              socket
+              |> assign(:last_order, order)
+              |> clear_place_flash()
+            else
+              socket
+              |> assign(:last_order, nil)
+              |> put_place_flash(flash)
+            end
+
+          {:noreply, socket}
+
+        {:error, :insufficient_points} ->
+          {:noreply,
+           socket
+           |> assign(:redeeming?, false)
+           |> assign(:redeem_error, "Not enough points.")}
+
+        {:error, :ineligible_product} ->
+          {:noreply,
+           socket
+           |> assign(:redeeming?, false)
+           |> assign(:redeem_error, "That drink is not eligible.")}
+
+        {:error, _} ->
+          {:noreply,
+           socket
+           |> assign(:redeeming?, false)
+           |> assign(:redeem_error, "Could not redeem. Try again.")}
+      end
+    end
+  end
+
+  defp maybe_fill_name_from_customer(socket, customer) do
+    name = String.trim(socket.assigns.customer_name)
+
+    if is_binary(customer.name) and (name == "" or name == "Walk-in") do
+      assign(socket, :customer_name, customer.name)
+    else
+      socket
+    end
+  end
+
+  defp close_redeem(socket) do
+    socket
+    |> assign(:redeem_open?, false)
+    |> assign(:redeem_price_id, nil)
+    |> assign(:redeem_quote, nil)
+    |> assign(:redeem_error, nil)
+  end
+
   defp create_pos_order(socket) do
     case order_preflight(socket) do
       :ignore ->
@@ -1328,6 +1740,7 @@ defmodule EspresoWeb.StaffPosLive do
           |> maybe_put_cash_settlement(tendered)
           |> Map.put(:settled_by_user_id, socket.assigns.current_user.id)
           |> Map.put(:settlement_source, :pos)
+          |> maybe_put_customer_id(socket.assigns.loyalty_customer)
 
         socket = assign(socket, :placing_order?, true)
 
@@ -1349,6 +1762,12 @@ defmodule EspresoWeb.StaffPosLive do
 
             cash_change = if(change, do: %{tendered: tendered, change: change})
 
+            loyalty_customer =
+              case socket.assigns.loyalty_customer do
+                %{id: id} -> Customers.get_customer(id)
+                _ -> nil
+              end
+
             socket =
               socket
               |> clear_cart_undo()
@@ -1360,11 +1779,16 @@ defmodule EspresoWeb.StaffPosLive do
               |> assign(:payment_choice, :paid)
               |> assign(:paid_via, "cash")
               |> assign(:customer_name, "Walk-in")
+              |> assign(:loyalty_customer, loyalty_customer)
+              |> assign(:loyalty_phone, (loyalty_customer && loyalty_customer.phone_e164) || "")
+              |> assign(:loyalty_error, nil)
               |> assign(:variant_editor_key, nil)
               |> assign(:cash_tender_open?, false)
               |> assign(:cash_tendered, "")
               |> assign(:cash_tender_error, nil)
               |> assign(:cash_tender_token, nil)
+              |> assign(:cash_tender_purpose, :order)
+              |> assign(:cash_tender_total, nil)
               |> assign(:fulfillment, :pickup)
               |> assign(:table_number, "")
               |> assign(:placing_order?, false)
@@ -1441,12 +1865,16 @@ defmodule EspresoWeb.StaffPosLive do
     end
   end
 
-  defp open_cash_tender(socket) do
+  defp open_cash_tender(socket), do: open_cash_tender(socket, :order, nil)
+
+  defp open_cash_tender(socket, purpose, total) do
     socket
     |> assign(:cash_tender_open?, true)
     |> assign(:cash_tendered, "")
     |> assign(:cash_tender_error, nil)
     |> assign(:cash_tender_token, Integer.to_string(System.unique_integer([:positive])))
+    |> assign(:cash_tender_purpose, purpose)
+    |> assign(:cash_tender_total, total)
     |> assign(:error, nil)
   end
 
@@ -1456,6 +1884,8 @@ defmodule EspresoWeb.StaffPosLive do
     |> assign(:cash_tendered, "")
     |> assign(:cash_tender_error, nil)
     |> assign(:cash_tender_token, nil)
+    |> assign(:cash_tender_purpose, :order)
+    |> assign(:cash_tender_total, nil)
   end
 
   defp consume_cash_tender(socket) do
@@ -1464,6 +1894,20 @@ defmodule EspresoWeb.StaffPosLive do
     |> assign(:cash_tender_error, nil)
     |> assign(:cash_tender_token, nil)
   end
+
+  defp cash_due_total(socket), do: cash_due_total_from_assigns(socket.assigns)
+
+  defp cash_due_total_from_assigns(assigns) do
+    case assigns[:cash_tender_total] do
+      %Decimal{} = total -> total
+      _ -> cart_total(assigns.cart)
+    end
+  end
+
+  defp maybe_put_customer_id(attrs, %{id: id}) when is_integer(id),
+    do: Map.put(attrs, :customer_id, id)
+
+  defp maybe_put_customer_id(attrs, _), do: attrs
 
   defp default_pos_category(categories) do
     cond do
@@ -1853,6 +2297,10 @@ defmodule EspresoWeb.StaffPosLive do
     |> assign(:table_number, "")
     |> assign(:placing_order?, false)
     |> assign(:customer_name, "Walk-in")
+    |> assign(:loyalty_phone, "")
+    |> assign(:loyalty_customer, nil)
+    |> assign(:loyalty_error, nil)
+    |> close_redeem()
     |> assign(:notes, "")
     |> assign(:notes_open?, false)
   end
@@ -2009,14 +2457,14 @@ defmodule EspresoWeb.StaffPosLive do
   defp cash_short?(socket) do
     match?(
       {:short, _tendered, _needed},
-      cash_tender_state(socket.assigns.cash_tendered, cart_total(socket.assigns.cart))
+      cash_tender_state(socket.assigns.cash_tendered, cash_due_total(socket))
     )
   end
 
   defp cash_amounts(socket) do
     if socket.assigns.payment_choice == :paid and socket.assigns.paid_via == "cash" and
          not cash_short?(socket) do
-      case cash_tender_state(socket.assigns.cash_tendered, cart_total(socket.assigns.cart)) do
+      case cash_tender_state(socket.assigns.cash_tendered, cash_due_total(socket)) do
         {:exact, tendered, change} -> {tendered, change}
         {:change, tendered, change} -> {tendered, change}
         _ -> {nil, nil}

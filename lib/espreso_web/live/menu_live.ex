@@ -2,6 +2,7 @@ defmodule EspresoWeb.MenuLive do
   use EspresoWeb, :live_view
 
   alias Espreso.CoffeeSpot
+  alias Espreso.Customers
   alias Espreso.Menu
   alias Espreso.Orders
   alias Espreso.BusinessSettings
@@ -38,6 +39,7 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:fulfillment_touched?, false)
      |> assign(:table_number, "")
      |> assign(:customer_name, "")
+     |> assign(:loyalty_phone, "")
      |> assign(:notes, "")
      |> assign(:checkout_errors, %{})
      |> assign(:payment_method, :counter)
@@ -283,11 +285,13 @@ defmodule EspresoWeb.MenuLive do
   def handle_event("update_checkout", params, socket) do
     name = Map.get(params, "customer_name", socket.assigns.customer_name)
     table = Map.get(params, "table_number", socket.assigns.table_number)
+    phone = Map.get(params, "loyalty_phone", socket.assigns.loyalty_phone)
 
     {:noreply,
      socket
      |> assign(:customer_name, name)
      |> assign(:table_number, table)
+     |> assign(:loyalty_phone, phone)
      |> assign(:checkout_errors, %{})}
   end
 
@@ -625,10 +629,7 @@ defmodule EspresoWeb.MenuLive do
             </a>
           </section>
 
-          <section
-            class="menu-qr-visit-block menu-qr-visit-socials"
-            aria-label="Social"
-          >
+          <section class="menu-qr-visit-block menu-qr-visit-socials" aria-label="Social">
             <a
               :for={link <- CoffeeSpot.social_links()}
               href={link.href}
@@ -685,11 +686,7 @@ defmodule EspresoWeb.MenuLive do
                 >
                   {cart_count(@cart)}
                 </span>
-                <span
-                  :if={@bag_add_delta}
-                  class="menu-qr-bag-plus"
-                  aria-hidden="true"
-                >
+                <span :if={@bag_add_delta} class="menu-qr-bag-plus" aria-hidden="true">
                   +{@bag_add_delta}
                 </span>
               </button>
@@ -722,11 +719,7 @@ defmodule EspresoWeb.MenuLive do
                   <.icon name="hero-magnifying-glass" class="menu-qr-chrome-icon" />
                 </button>
 
-                <form
-                  class="menu-qr-search-inline-form"
-                  phx-change="search"
-                  phx-submit="search"
-                >
+                <form class="menu-qr-search-inline-form" phx-change="search" phx-submit="search">
                   <div class="menu-qr-search-inline-wrap">
                     <span class="menu-qr-search-inline-icon" aria-hidden="true">
                       <.icon name="hero-magnifying-glass" class="menu-qr-search-inline-glyph" />
@@ -767,12 +760,8 @@ defmodule EspresoWeb.MenuLive do
                   "menu-craving-chip",
                   chip_active?(chip, @selected_category, @menu_filter) && "is-active"
                 ]}
-                aria-pressed={
-                  to_string(chip_active?(chip, @selected_category, @menu_filter))
-                }
-                aria-current={
-                  if(chip_active?(chip, @selected_category, @menu_filter), do: "true")
-                }
+                aria-pressed={to_string(chip_active?(chip, @selected_category, @menu_filter))}
+                aria-current={if(chip_active?(chip, @selected_category, @menu_filter), do: "true")}
                 aria-label={
                   craving_chip_aria_label(
                     chip,
@@ -804,9 +793,7 @@ defmodule EspresoWeb.MenuLive do
         <section class="brune-menu-shell" id="menu">
           <div class="brune-menu-body" id="menu-items">
             <div
-              :if={
-                visible_categories(@categories, @selected_category, @search, @menu_filter) == []
-              }
+              :if={visible_categories(@categories, @selected_category, @search, @menu_filter) == []}
               id="menu-filter-empty"
               class="menu-filter-empty"
             >
@@ -1026,12 +1013,7 @@ defmodule EspresoWeb.MenuLive do
         </aside>
       </div>
 
-      <div
-        :if={@menu_stage == :menu && @toast}
-        class="menu-toast"
-        role="status"
-        aria-live="polite"
-      >
+      <div :if={@menu_stage == :menu && @toast} class="menu-toast" role="status" aria-live="polite">
         {@toast}
       </div>
 
@@ -1074,7 +1056,11 @@ defmodule EspresoWeb.MenuLive do
 
       <div
         :if={@menu_stage == :menu && @basket_open?}
-        class={["menu-basket-layer", "menu-basket-layer--fullscreen", @basket_closing? && "is-closing"]}
+        class={[
+          "menu-basket-layer",
+          "menu-basket-layer--fullscreen",
+          @basket_closing? && "is-closing"
+        ]}
         id="menu-basket"
         phx-window-keydown="close_basket"
         phx-key="Escape"
@@ -1109,7 +1095,10 @@ defmodule EspresoWeb.MenuLive do
               <.icon name="hero-arrow-left" class="menu-qr-chrome-icon" />
             </button>
 
-            <h2 id="menu-basket-title" class="menu-basket-title menu-qr-chrome-brand menu-qr-top-brand">
+            <h2
+              id="menu-basket-title"
+              class="menu-basket-title menu-qr-chrome-brand menu-qr-top-brand"
+            >
               Your order
             </h2>
 
@@ -1215,7 +1204,11 @@ defmodule EspresoWeb.MenuLive do
                         Takeout
                       </button>
                     </div>
-                    <p :if={@fulfillment == :pickup} class="menu-checkout-hint" id="checkout-pickup-hint">
+                    <p
+                      :if={@fulfillment == :pickup}
+                      class="menu-checkout-hint"
+                      id="checkout-pickup-hint"
+                    >
                       Takeout — pick up at the counter when ready.
                     </p>
                   </fieldset>
@@ -1235,6 +1228,26 @@ defmodule EspresoWeb.MenuLive do
                     />
                     <p :if={@checkout_errors[:customer_name]} class="menu-checkout-error">
                       {@checkout_errors[:customer_name]}
+                    </p>
+                  </div>
+
+                  <div class="menu-checkout-field">
+                    <label class="menu-checkout-label" for="checkout-loyalty-phone">
+                      Loyalty phone <span class="menu-checkout-optional">(optional)</span>
+                    </label>
+                    <input
+                      id="checkout-loyalty-phone"
+                      type="tel"
+                      name="loyalty_phone"
+                      value={@loyalty_phone}
+                      placeholder="09XXXXXXXXX for points"
+                      autocomplete="tel"
+                      inputmode="tel"
+                      class={["menu-checkout-input", @checkout_errors[:loyalty_phone] && "is-error"]}
+                      phx-debounce="200"
+                    />
+                    <p :if={@checkout_errors[:loyalty_phone]} class="menu-checkout-error">
+                      {@checkout_errors[:loyalty_phone]}
                     </p>
                   </div>
 
@@ -1419,10 +1432,7 @@ defmodule EspresoWeb.MenuLive do
                       order.total
                     )}
                   </p>
-                  <.link
-                    navigate={~p"/order/#{order.number}"}
-                    class="menu-my-orders-view"
-                  >
+                  <.link navigate={~p"/order/#{order.number}"} class="menu-my-orders-view">
                     View Order
                   </.link>
                 </li>
@@ -1459,10 +1469,7 @@ defmodule EspresoWeb.MenuLive do
                       order.total
                     )}
                   </p>
-                  <.link
-                    navigate={~p"/order/#{order.number}"}
-                    class="menu-my-orders-view"
-                  >
+                  <.link navigate={~p"/order/#{order.number}"} class="menu-my-orders-view">
                     View Order
                   </.link>
                 </li>
@@ -1996,6 +2003,7 @@ defmodule EspresoWeb.MenuLive do
     do: true
 
   defp my_order_unpaid?(_), do: false
+
   defp sanitize_restored_cart(%{"cart" => lines}, categories) when is_list(lines) do
     lines
     |> Enum.flat_map(&sanitize_restored_line(&1, categories))
@@ -2386,9 +2394,14 @@ defmodule EspresoWeb.MenuLive do
     if connected?(socket) do
       chip_id =
         case parse_menu_filter(Map.get(params, "filter")) do
-          :matcha -> "menu-craving-chip-matcha"
-          :sweets -> "menu-craving-chip-sweets"
-          nil -> chip_id_for_category(Map.get(params, "category") || socket.assigns.selected_category)
+          :matcha ->
+            "menu-craving-chip-matcha"
+
+          :sweets ->
+            "menu-craving-chip-sweets"
+
+          nil ->
+            chip_id_for_category(Map.get(params, "category") || socket.assigns.selected_category)
         end
 
       socket =
@@ -2414,7 +2427,9 @@ defmodule EspresoWeb.MenuLive do
   defp valid_category(_categories, "ALL"), do: "ALL"
 
   defp valid_category(categories, category) when is_binary(category) do
-    if Enum.any?(categories, &(&1.name == category)), do: category, else: default_category(categories)
+    if Enum.any?(categories, &(&1.name == category)),
+      do: category,
+      else: default_category(categories)
   end
 
   defp valid_category(categories, _category), do: default_category(categories)
@@ -2567,7 +2582,8 @@ defmodule EspresoWeb.MenuLive do
     end)
   end
 
-  defp unavailable_toast([name]), do: "#{name} is no longer available. Update your order and try again."
+  defp unavailable_toast([name]),
+    do: "#{name} is no longer available. Update your order and try again."
 
   defp unavailable_toast(names) when is_list(names) do
     "#{Enum.join(names, ", ")} are no longer available. Update your order and try again."
@@ -2576,9 +2592,15 @@ defmodule EspresoWeb.MenuLive do
   defp place_counter_order(socket) do
     socket = assign(socket, :placing_order?, true)
 
-    case Orders.create_order(socket.assigns.cart, order_attrs(socket, :counter)) do
+    case resolve_loyalty_and_create(socket, :counter) do
       {:ok, order} ->
         {:noreply, finalize_counter_order(socket, order)}
+
+      {:error, :invalid_phone} ->
+        {:noreply,
+         socket
+         |> assign(:placing_order?, false)
+         |> assign(:checkout_errors, %{loyalty_phone: "Enter a valid PH mobile number"})}
 
       {:error, {:unavailable, names}} ->
         {:noreply, order_failure(socket, unavailable_toast(names))}
@@ -2597,9 +2619,15 @@ defmodule EspresoWeb.MenuLive do
   defp place_qrph_order(socket, _channel) do
     socket = assign(socket, :placing_order?, true)
 
-    case Orders.create_order(socket.assigns.cart, order_attrs(socket, :online)) do
+    case resolve_loyalty_and_create(socket, :online) do
       {:ok, order} ->
         {:noreply, finalize_counter_order(socket, order)}
+
+      {:error, :invalid_phone} ->
+        {:noreply,
+         socket
+         |> assign(:placing_order?, false)
+         |> assign(:checkout_errors, %{loyalty_phone: "Enter a valid PH mobile number"})}
 
       {:error, {:unavailable, names}} ->
         {:noreply, order_failure(socket, unavailable_toast(names))}
@@ -2618,9 +2646,15 @@ defmodule EspresoWeb.MenuLive do
   defp place_online_order(socket, channel) do
     socket = assign(socket, :placing_order?, true)
 
-    case Orders.create_order(socket.assigns.cart, order_attrs(socket, :online)) do
+    case resolve_loyalty_and_create(socket, :online) do
       {:ok, order} ->
         finish_online_checkout(socket, order, channel)
+
+      {:error, :invalid_phone} ->
+        {:noreply,
+         socket
+         |> assign(:placing_order?, false)
+         |> assign(:checkout_errors, %{loyalty_phone: "Enter a valid PH mobile number"})}
 
       {:error, {:unavailable, names}} ->
         {:noreply, order_failure(socket, unavailable_toast(names))}
@@ -2633,6 +2667,28 @@ defmodule EspresoWeb.MenuLive do
 
       {:error, _} ->
         {:noreply, order_failure(socket, "Could not place order — try again")}
+    end
+  end
+
+  defp resolve_loyalty_and_create(socket, payment_method) do
+    attrs = order_attrs(socket, payment_method)
+    phone = socket.assigns.loyalty_phone |> to_string() |> String.trim()
+
+    cond do
+      phone == "" ->
+        Orders.create_order(socket.assigns.cart, attrs)
+
+      true ->
+        case Customers.find_or_create_by_phone(phone, %{name: socket.assigns.customer_name}) do
+          {:ok, customer} ->
+            Orders.create_order(socket.assigns.cart, Map.put(attrs, :customer_id, customer.id))
+
+          {:error, :invalid_phone} ->
+            {:error, :invalid_phone}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
     end
   end
 
@@ -2749,11 +2805,13 @@ defmodule EspresoWeb.MenuLive do
   defp checkout_button_label(:gcash, false, _mode), do: "Continue to GCash"
   defp checkout_button_label(:maya, false, _mode), do: "Continue to Maya"
 
-  defp resolve_payment_method("gcash", mode, true, _maya) when mode in ["paymongo", "qrph_manual"],
-    do: :gcash
+  defp resolve_payment_method("gcash", mode, true, _maya)
+       when mode in ["paymongo", "qrph_manual"],
+       do: :gcash
 
-  defp resolve_payment_method("maya", mode, _gcash, true) when mode in ["paymongo", "qrph_manual"],
-    do: :maya
+  defp resolve_payment_method("maya", mode, _gcash, true)
+       when mode in ["paymongo", "qrph_manual"],
+       do: :maya
 
   defp resolve_payment_method(_, _, _, _), do: :counter
 

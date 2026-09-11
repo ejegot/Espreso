@@ -7116,6 +7116,39 @@ a.staff-home-card:focus-visible {
   border-color: color-mix(in srgb, var(--cs-orange) 40%, var(--cs-line));
 }
 
+.staff-pos-page .staff-pos-loyalty-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.staff-pos-page .staff-pos-loyalty-row .staff-pos-field-input {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+
+.staff-pos-page .staff-pos-field-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--cs-brown) 70%, transparent);
+}
+
+.staff-pos-page .staff-pos-redeem {
+  margin-top: 0.55rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.staff-pos-page .staff-pos-redeem-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  max-height: 9rem;
+  overflow: auto;
+}
+
 .staff-pos-page .staff-pos-ticket-body {
   flex: 1 1 auto;
   min-height: 0;

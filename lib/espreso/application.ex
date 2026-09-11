@@ -17,6 +17,7 @@ defmodule Espreso.Application do
       # Start a worker by calling: Espreso.Worker.start_link(arg)
       # {Espreso.Worker, arg},
       Espreso.PhysicalActionCoordinator,
+      Espreso.Loyalty.EarnReconciler,
       Espreso.Auth.PinAttemptLimiter,
       # Start to serve requests, typically the last entry
       EspresoWeb.Endpoint

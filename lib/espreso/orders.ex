@@ -4,9 +4,11 @@ defmodule Espreso.Orders do
   """
 
   import Ecto.Query
+  require Logger
 
   alias Espreso.Repo
   alias Espreso.BusinessSettings
+  alias Espreso.Loyalty
   alias Espreso.Orders.{Order, OrderItem, PaymentReconciliation}
   alias Espreso.Menu
   alias Espreso.Menu.ProductPrice
@@ -28,8 +30,12 @@ defmodule Espreso.Orders do
   `attrs` — `:customer_name`, `:fulfillment` (`:dine_in` | `:pickup` or strings),
   `:table_number`, `:notes`, `:payment_method` (`:counter` | `:online`),
   `:source` (`:customer` | `:pos` or strings; default `"customer"`),
+  optional `:customer_id`, optional `:loyalty_free_amount_centavos` (default 0),
   optional `:payment_status` (`:unpaid` | `:awaiting_payment` | `:paid`) — `:paid` only
   allowed with `:counter` (POS pay-at-create). Online uses shop `payments_mode`.
+  optional `:skip_loyalty_earn` — when true, caller owns loyalty earning (redemption Multi).
+  optional `:skip_authoritative_prices` — when true, POS catalog price lock is skipped
+  (loyalty reward lines charge upgrade-only amounts).
 
   Rejects the whole order with `{:error, {:unavailable, names}}` when any
   referenced product is unavailable (application-level check).
@@ -119,6 +125,16 @@ defmodule Espreso.Orders do
            build_settlement_attrs(payment_status, paid_via, total, attrs,
              default_source: if(source == "pos", do: "pos", else: "manual")
            ) do
+      customer_id = Map.get(attrs, :customer_id) || Map.get(attrs, "customer_id")
+
+      loyalty_free =
+        case Map.get(attrs, :loyalty_free_amount_centavos) ||
+               Map.get(attrs, "loyalty_free_amount_centavos") do
+          nil -> 0
+          n when is_integer(n) and n >= 0 -> n
+          other -> Loyalty.to_centavos(other)
+        end
+
       order_attrs =
         %{
           number: generate_order_number(),
@@ -132,13 +148,27 @@ defmodule Espreso.Orders do
           payment_intent: payment_intent,
           source: source,
           status: if(payment_status == "paid", do: "preparing", else: "received"),
-          total: total
+          total: total,
+          customer_id: customer_id,
+          loyalty_free_amount_centavos: loyalty_free
         }
         |> Map.merge(settlement_attrs)
 
+      skip_prices? =
+        Map.get(attrs, :skip_authoritative_prices) == true or
+          Map.get(attrs, "skip_authoritative_prices") == true
+
+      skip_earn? =
+        Map.get(attrs, :skip_loyalty_earn) == true or
+          Map.get(attrs, "skip_loyalty_earn") == true
+
       Ecto.Multi.new()
       |> Ecto.Multi.run(:prices, fn repo, _changes ->
-        validate_authoritative_prices(repo, lines, source)
+        if skip_prices? do
+          {:ok, :skipped}
+        else
+          validate_authoritative_prices(repo, lines, source)
+        end
       end)
       |> Ecto.Multi.insert(:order, Order.changeset(%Order{}, order_attrs))
       |> Ecto.Multi.run(:items, fn repo, %{order: order} ->
@@ -165,7 +195,16 @@ defmodule Espreso.Orders do
       |> Repo.transaction()
       |> case do
         {:ok, %{order: order, items: items}} ->
-          broadcast({:ok, %{order | items: items}})
+          order = %{order | items: items}
+
+          _ =
+            if payment_status == "paid" and not skip_earn? do
+              attempt_loyalty_earn(order)
+            else
+              {:ok, :skipped}
+            end
+
+          broadcast({:ok, order})
 
         {:error, :order, changeset, _} ->
           if unique_number_conflict?(changeset) and attempt < @order_number_max_attempts do
@@ -926,6 +965,9 @@ defmodule Espreso.Orders do
         {:error, :cancelled}
 
       %Order{payment_status: "paid"} = current ->
+        # Best-effort loyalty retry for staff already-paid replays (same as
+        # do_apply_paid count=0 / PayMongo duplicate path). Never affects paid status.
+        _ = attempt_loyalty_earn(current)
         {:ok, :already_paid, current}
 
       %Order{payment_method: "online", payment_status: "awaiting_payment"} = current ->
@@ -1374,6 +1416,26 @@ defmodule Espreso.Orders do
 
   defp broadcast(other), do: other
 
+  # Loyalty is a side-effect of payment truth. Failures must not undo paid status.
+  # Pending work is durable as: paid + customer_id + no earn ledger row.
+  defp attempt_loyalty_earn(%Order{} = order) do
+    case Loyalty.ensure_earn_for_paid_order(order) do
+      {:ok, result} ->
+        {:ok, result}
+
+      {:error, reason} ->
+        Logger.warning(
+          "loyalty earn deferred order_id=#{order.id} customer_id=#{inspect(order.customer_id)} reason=#{inspect(reason)}"
+        )
+
+        if is_integer(order.customer_id) do
+          Espreso.Loyalty.EarnReconciler.nudge(order.id)
+        end
+
+        {:error, reason}
+    end
+  end
+
   defp apply_paid(%Order{} = order, paid_via, settlement_context, opts) do
     with {:ok, paid_via} <- normalize_paid_via_value(paid_via),
          :ok <-
@@ -1444,6 +1506,7 @@ defmodule Espreso.Orders do
     case count do
       1 ->
         order = Repo.get!(Order, order_id)
+        _ = attempt_loyalty_earn(order)
 
         case broadcast({:ok, order}) do
           {:ok, broadcasted} -> {:ok, :transitioned, broadcasted}
@@ -1455,6 +1518,8 @@ defmodule Espreso.Orders do
             {:error, :not_found}
 
           %Order{payment_status: "paid"} = order ->
+            # Safe retry path for loyalty that failed after a prior successful pay.
+            _ = attempt_loyalty_earn(order)
             {:ok, :already_paid, order}
 
           %Order{status: "cancelled"} ->
