@@ -49,3 +49,6 @@ config :espreso, Espreso.Printer,
   host: nil,
   port: 9100,
   timeout_ms: 1_000
+
+# Loyalty earn retries are driven explicitly in tests (nudge / reconcile_now).
+config :espreso, Espreso.Loyalty.EarnReconciler, enabled: false

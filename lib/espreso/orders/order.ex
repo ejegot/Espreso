@@ -3,6 +3,7 @@ defmodule Espreso.Orders.Order do
   import Ecto.Changeset
 
   alias Espreso.Accounts.User
+  alias Espreso.Customers.Customer
   alias Espreso.Orders.OrderItem
 
   @statuses ~w(received preparing ready completed cancelled)
@@ -34,8 +35,11 @@ defmodule Espreso.Orders.Order do
     field :change_due, :decimal
     field :settlement_time_estimated, :boolean, default: false
 
+    field :loyalty_free_amount_centavos, :integer, default: 0
+
     has_many :items, OrderItem
     belongs_to :settled_by_user, User
+    belongs_to :customer, Customer
 
     timestamps(type: :utc_datetime)
   end
@@ -70,7 +74,9 @@ defmodule Espreso.Orders.Order do
       :settlement_source,
       :cash_tendered,
       :change_due,
-      :settlement_time_estimated
+      :settlement_time_estimated,
+      :customer_id,
+      :loyalty_free_amount_centavos
     ])
     |> validate_required([
       :customer_name,
@@ -83,6 +89,7 @@ defmodule Espreso.Orders.Order do
     ])
     |> update_change(:customer_name, &String.trim/1)
     |> validate_length(:customer_name, min: 2, max: 60)
+    |> validate_number(:loyalty_free_amount_centavos, greater_than_or_equal_to: 0)
     |> validate_inclusion(:fulfillment, @fulfillments)
     |> validate_inclusion(:status, @statuses)
     |> validate_inclusion(:payment_method, @payment_methods)
@@ -97,6 +104,10 @@ defmodule Espreso.Orders.Order do
     |> validate_number(:change_due, greater_than_or_equal_to: 0)
     |> unique_constraint(:number)
     |> foreign_key_constraint(:settled_by_user_id)
+    |> foreign_key_constraint(:customer_id)
+    |> check_constraint(:loyalty_free_amount_centavos,
+      name: :orders_loyalty_free_amount_nonnegative
+    )
     |> check_constraint(:settled_at, name: :paid_orders_have_settlement_time)
     |> check_constraint(:settlement_source, name: :paid_orders_have_settlement_source)
     |> check_constraint(:cash_tendered, name: :cash_tendered_is_nonnegative)
