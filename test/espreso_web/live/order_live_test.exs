@@ -510,6 +510,179 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, "#order-confirm-recap .order-confirm-recap-total", "₱95")
   end
 
+  test "anonymous order does not show ELIlai Rewards", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Walk-in",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    assert is_nil(order.customer_id)
+    {:ok, view, _html} = live(conn, ~p"/order/#{order.number}")
+    assert has_element?(view, "#order-status-message")
+    refute has_element?(view, "#order-elilai-rewards")
+  end
+
+  test "linked unpaid order shows phone-linked rewards copy", %{conn: conn} do
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09176660001", %{name: "Linked"})
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Linked",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          customer_id: customer.id
+        }
+      )
+
+    {:ok, view, html} = live(conn, ~p"/order/#{order.number}")
+    assert has_element?(view, "#order-elilai-rewards", "ELIlai Rewards")
+    assert has_element?(view, "#order-elilai-rewards-body", "Your phone is linked")
+    refute html =~ "points earned"
+    refute html =~ "Reward available"
+    refute has_element?(view, "#order-elilai-redeem")
+    refute html =~ customer.phone_e164
+  end
+
+  test "paid earned order shows points, balance, and progress to redeem_cost", %{conn: conn} do
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09176660002", %{name: "Earned"})
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Item", size: nil, quantity: 1, price: Decimal.new("400")}],
+        %{
+          customer_name: "Earned",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_status: :paid,
+          paid_via: "cash",
+          customer_id: customer.id,
+          skip_authoritative_prices: true
+        }
+      )
+
+    assert {:earned, points, balance} = Espreso.Loyalty.earn_outcome_for_order(order)
+    assert points == 2
+    assert balance == 2
+    more = max(Espreso.Loyalty.redeem_cost() - balance, 0)
+
+    {:ok, view, html} = live(conn, ~p"/order/#{order.number}")
+    assert has_element?(view, "#order-elilai-rewards-body", "+#{points} points earned")
+    assert has_element?(view, "#order-elilai-rewards-body", "#{balance} pts balance")
+    assert has_element?(view, "#order-elilai-rewards-meta", "#{more} more")
+    refute html =~ "Reward available"
+    refute has_element?(view, "button", "Redeem")
+  end
+
+  test "paid eligible balance shows counter reward message without redeem control", %{conn: conn} do
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09176660003", %{name: "Eligible"})
+
+    customer =
+      customer
+      |> Ecto.Changeset.change(%{points_balance: Espreso.Loyalty.redeem_cost() + 3})
+      |> Espreso.Repo.update!()
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Item", size: nil, quantity: 1, price: Decimal.new("200")}],
+        %{
+          customer_name: "Eligible",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_status: :paid,
+          paid_via: "cash",
+          customer_id: customer.id,
+          skip_authoritative_prices: true
+        }
+      )
+
+    assert {:earned, _points, balance} = Espreso.Loyalty.earn_outcome_for_order(order)
+    assert balance >= Espreso.Loyalty.redeem_cost()
+
+    {:ok, view, html} = live(conn, ~p"/order/#{order.number}")
+    assert has_element?(view, "#order-elilai-rewards-body", "Reward available")
+    assert has_element?(view, "#order-elilai-rewards-meta", "at the counter")
+    assert has_element?(view, "#order-elilai-rewards-meta", "HOT or COLD")
+    refute has_element?(view, "#order-elilai-redeem")
+    refute html =~ "phx-click=\"redeem"
+    refute html =~ "Redeem reward"
+  end
+
+  test "paid pending earn shows deferred loyalty copy without invented points", %{conn: conn} do
+    previous = Application.get_env(:espreso, :loyalty_earn_barrier)
+
+    on_exit(fn ->
+      if previous do
+        Application.put_env(:espreso, :loyalty_earn_barrier, previous)
+      else
+        Application.delete_env(:espreso, :loyalty_earn_barrier)
+      end
+    end)
+
+    Application.put_env(:espreso, :loyalty_earn_barrier, fn -> {:error, :forced_failure} end)
+
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09176660004", %{name: "Pending"})
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Item", size: nil, quantity: 1, price: Decimal.new("200")}],
+        %{
+          customer_name: "Pending",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_status: :paid,
+          paid_via: "cash",
+          customer_id: customer.id,
+          skip_authoritative_prices: true
+        }
+      )
+
+    assert Espreso.Loyalty.earn_outcome_for_order(order) == :pending
+
+    {:ok, view, html} = live(conn, ~p"/order/#{order.number}")
+
+    assert has_element?(
+             view,
+             "#order-elilai-rewards-body",
+             "loyalty points will be added shortly"
+           )
+
+    refute html =~ "points earned"
+    refute html =~ "pts balance"
+    refute html =~ "Reward available"
+  end
+
+  test "confirm page shows linked rewards for unpaid customer order", %{conn: conn} do
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09176660005", %{name: "Confirm"})
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Confirm",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          customer_id: customer.id
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/order/#{order.number}?confirm=1")
+    assert has_element?(view, "#order-confirm")
+    assert has_element?(view, "#order-elilai-rewards", "ELIlai Rewards")
+    assert has_element?(view, "#order-elilai-rewards-body", "after payment")
+  end
+
   defp set_payments_mode!(mode) do
     setting = Espreso.BusinessSettings.get()
 

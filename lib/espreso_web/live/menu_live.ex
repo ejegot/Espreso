@@ -3,6 +3,7 @@ defmodule EspresoWeb.MenuLive do
 
   alias Espreso.CoffeeSpot
   alias Espreso.Customers
+  alias Espreso.Loyalty
   alias Espreso.Menu
   alias Espreso.Orders
   alias Espreso.BusinessSettings
@@ -46,7 +47,9 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:payment_touched?, false)
      |> assign(:placing_order?, false)
      |> assign(:my_orders, [])
-     |> assign(:my_orders_open?, false), layout: false}
+     |> assign(:my_orders_open?, false)
+     |> assign(:my_orders_tab, :orders)
+     |> assign(:my_orders_rewards, %{kind: :anonymous}), layout: false}
   end
 
   @impl true
@@ -388,12 +391,32 @@ defmodule EspresoWeb.MenuLive do
     {:noreply, maybe_restore_my_orders(socket, %{"numbers" => [number]})}
   end
 
-  def handle_event("toggle_my_orders", _params, socket) do
-    {:noreply, assign(socket, :my_orders_open?, !socket.assigns.my_orders_open?)}
+  def handle_event("toggle_my_orders", params, socket) do
+    open_my_orders(socket, Map.get(params, "tab", "orders"))
+  end
+
+  def handle_event("open_my_orders", params, socket) do
+    open_my_orders(socket, Map.get(params, "tab", "orders"))
   end
 
   def handle_event("close_my_orders", _params, socket) do
-    {:noreply, assign(socket, :my_orders_open?, false)}
+    {:noreply,
+     socket
+     |> assign(:my_orders_open?, false)
+     |> assign(:my_orders_tab, :orders)}
+  end
+
+  def handle_event("set_my_orders_tab", %{"tab" => tab}, socket) do
+    tab = my_orders_tab(tab)
+
+    socket =
+      if tab == :rewards do
+        refresh_my_orders_rewards(socket)
+      else
+        socket
+      end
+
+    {:noreply, assign(socket, :my_orders_tab, tab)}
   end
 
   @impl true
@@ -1017,27 +1040,61 @@ defmodule EspresoWeb.MenuLive do
         {@toast}
       </div>
 
-      <button
+      <nav
         :if={
           @menu_stage == :menu &&
             show_floating_my_orders?(@my_orders, @my_orders_open?, @basket_open?, @detail)
         }
-        type="button"
-        id="menu-qr-my-orders"
-        class={[
-          "menu-qr-my-orders",
-          my_orders_trigger_status?(@my_orders) && "menu-qr-my-orders--status"
-        ]}
-        phx-click="toggle_my_orders"
-        aria-expanded={to_string(@my_orders_open?)}
-        aria-controls="menu-my-orders-panel"
-        aria-label={my_orders_trigger_aria(@my_orders)}
+        id="menu-qr-customer-nav"
+        class="menu-qr-customer-nav"
+        aria-label="Orders and Rewards"
       >
-        <span class="menu-qr-my-orders-icon" aria-hidden="true">
-          <.icon name="hero-clipboard-document-list" class="menu-qr-my-orders-icon-glyph" />
-        </span>
-        <span class="menu-qr-my-orders-label">{my_orders_trigger_label(@my_orders)}</span>
-      </button>
+        <button
+          type="button"
+          id="menu-qr-my-orders"
+          class={[
+            "menu-qr-customer-nav-btn",
+            "menu-qr-my-orders",
+            my_orders_trigger_status?(@my_orders) && "menu-qr-my-orders--status"
+          ]}
+          phx-click="open_my_orders"
+          phx-value-tab="orders"
+          aria-expanded={to_string(@my_orders_open? and @my_orders_tab == :orders)}
+          aria-controls="menu-my-orders-panel"
+          aria-label={my_orders_trigger_aria(@my_orders)}
+        >
+          <span class="menu-qr-customer-nav-icon" aria-hidden="true">
+            <.icon name="hero-shopping-bag" class="menu-qr-customer-nav-icon-glyph" />
+          </span>
+          <span class="menu-qr-customer-nav-label">Orders</span>
+        </button>
+
+        <button
+          type="button"
+          id="menu-qr-rewards"
+          class={[
+            "menu-qr-customer-nav-btn",
+            "menu-qr-rewards",
+            rewards_available?(@my_orders_rewards) && "menu-qr-rewards--available"
+          ]}
+          phx-click="open_my_orders"
+          phx-value-tab="rewards"
+          aria-expanded={to_string(@my_orders_open? and @my_orders_tab == :rewards)}
+          aria-controls="menu-my-orders-panel"
+          aria-label={rewards_trigger_aria(@my_orders_rewards)}
+        >
+          <span class="menu-qr-customer-nav-icon" aria-hidden="true">
+            <.icon name="hero-gift" class="menu-qr-customer-nav-icon-glyph" />
+          </span>
+          <span class="menu-qr-customer-nav-label">Rewards</span>
+          <span
+            :if={rewards_available?(@my_orders_rewards)}
+            class="menu-qr-rewards-badge"
+            aria-hidden="true"
+          >
+          </span>
+        </button>
+      </nav>
 
       <button
         :if={@menu_stage == :menu && show_floating_bag?(@cart, @basket_open?, @detail)}
@@ -1389,99 +1446,203 @@ defmodule EspresoWeb.MenuLive do
           <header class="menu-my-orders-header">
             <div>
               <p class="menu-my-orders-eyebrow">CoffeeSpot</p>
-              <h2 id="menu-my-orders-title">My Orders</h2>
+              <h2 id="menu-my-orders-title">
+                <%= if @my_orders_tab == :rewards do %>
+                  ELIlai Rewards
+                <% else %>
+                  My Orders
+                <% end %>
+              </h2>
             </div>
             <button
               type="button"
               class="menu-my-orders-close"
               phx-click="close_my_orders"
-              aria-label="Close my orders"
+              aria-label={
+                if(@my_orders_tab == :rewards, do: "Close rewards", else: "Close my orders")
+              }
             >
               Close
             </button>
           </header>
 
           <div class="menu-my-orders-body">
-            <section
-              :if={active_my_orders(@my_orders) != []}
-              class="menu-my-orders-section"
-              aria-labelledby="menu-my-orders-active-heading"
-            >
-              <h3 id="menu-my-orders-active-heading" class="menu-my-orders-section-title">
-                Active
-              </h3>
-              <ul class="menu-my-orders-list">
-                <li
-                  :for={order <- active_my_orders(@my_orders)}
-                  id={"menu-my-order-#{order.number}"}
-                  class="menu-my-orders-card"
-                  data-status={order.status}
-                  data-payment-status={order.payment_status}
-                >
-                  <div class="menu-my-orders-card-top">
-                    <p class="menu-my-orders-number">{order.number}</p>
-                    <p class={[
-                      "menu-my-orders-status",
-                      my_order_status_class(order)
-                    ]}>
-                      {customer_my_order_status_label(order)}
+            <div :if={@my_orders_tab == :orders} id="menu-my-orders-orders">
+              <section
+                :if={active_my_orders(@my_orders) != []}
+                class="menu-my-orders-section"
+                aria-labelledby="menu-my-orders-active-heading"
+              >
+                <h3 id="menu-my-orders-active-heading" class="menu-my-orders-section-title">
+                  Active
+                </h3>
+                <ul class="menu-my-orders-list">
+                  <li
+                    :for={order <- active_my_orders(@my_orders)}
+                    id={"menu-my-order-#{order.number}"}
+                    class="menu-my-orders-card"
+                    data-status={order.status}
+                    data-payment-status={order.payment_status}
+                  >
+                    <div class="menu-my-orders-card-top">
+                      <p class="menu-my-orders-number">{order.number}</p>
+                      <p class={[
+                        "menu-my-orders-status",
+                        my_order_status_class(order)
+                      ]}>
+                        {customer_my_order_status_label(order)}
+                      </p>
+                    </div>
+                    <p class="menu-my-orders-meta">
+                      {order.item_count} {if order.item_count == 1, do: "item", else: "items"} · {Menu.format_price(
+                        order.total
+                      )}
                     </p>
-                  </div>
-                  <p class="menu-my-orders-meta">
-                    {order.item_count} {if order.item_count == 1, do: "item", else: "items"} · {Menu.format_price(
-                      order.total
-                    )}
-                  </p>
-                  <.link navigate={~p"/order/#{order.number}"} class="menu-my-orders-view">
-                    View Order
-                  </.link>
-                </li>
-              </ul>
-            </section>
+                    <.link navigate={~p"/order/#{order.number}"} class="menu-my-orders-view">
+                      View Order
+                    </.link>
+                  </li>
+                </ul>
+              </section>
+
+              <section
+                :if={history_my_orders(@my_orders) != []}
+                class="menu-my-orders-section"
+                aria-labelledby="menu-my-orders-history-heading"
+              >
+                <h3 id="menu-my-orders-history-heading" class="menu-my-orders-section-title">
+                  History
+                </h3>
+                <ul class="menu-my-orders-list">
+                  <li
+                    :for={order <- history_my_orders(@my_orders)}
+                    id={"menu-my-order-#{order.number}"}
+                    class="menu-my-orders-card menu-my-orders-card--history"
+                    data-status={order.status}
+                  >
+                    <div class="menu-my-orders-card-top">
+                      <p class="menu-my-orders-number">{order.number}</p>
+                      <p class={[
+                        "menu-my-orders-status",
+                        my_order_status_class(order)
+                      ]}>
+                        {customer_my_order_status_label(order)}
+                      </p>
+                    </div>
+                    <p class="menu-my-orders-when">{my_order_history_when(order)}</p>
+                    <p class="menu-my-orders-meta">
+                      {order.item_count} {if order.item_count == 1, do: "item", else: "items"} · {Menu.format_price(
+                        order.total
+                      )}
+                    </p>
+                    <.link navigate={~p"/order/#{order.number}"} class="menu-my-orders-view">
+                      View Order
+                    </.link>
+                  </li>
+                </ul>
+              </section>
+
+              <p
+                :if={active_my_orders(@my_orders) == [] and history_my_orders(@my_orders) == []}
+                class="menu-my-orders-empty"
+              >
+                No orders to show right now.
+              </p>
+            </div>
 
             <section
-              :if={history_my_orders(@my_orders) != []}
-              class="menu-my-orders-section"
-              aria-labelledby="menu-my-orders-history-heading"
+              :if={@my_orders_tab == :rewards}
+              id="menu-my-orders-rewards"
+              class="menu-my-orders-rewards"
+              aria-labelledby="menu-my-orders-title"
             >
-              <h3 id="menu-my-orders-history-heading" class="menu-my-orders-section-title">
-                History
-              </h3>
-              <ul class="menu-my-orders-list">
-                <li
-                  :for={order <- history_my_orders(@my_orders)}
-                  id={"menu-my-order-#{order.number}"}
-                  class="menu-my-orders-card menu-my-orders-card--history"
-                  data-status={order.status}
-                >
-                  <div class="menu-my-orders-card-top">
-                    <p class="menu-my-orders-number">{order.number}</p>
-                    <p class={[
-                      "menu-my-orders-status",
-                      my_order_status_class(order)
-                    ]}>
-                      {customer_my_order_status_label(order)}
+              <%= case @my_orders_rewards do %>
+                <% %{kind: :anonymous} -> %>
+                  <div class="menu-my-orders-rewards-card menu-my-orders-rewards-card--note">
+                    <p class="menu-my-orders-rewards-note" id="menu-my-orders-rewards-note">
+                      Add your loyalty phone on your next order to see Rewards here.
                     </p>
                   </div>
-                  <p class="menu-my-orders-when">{my_order_history_when(order)}</p>
-                  <p class="menu-my-orders-meta">
-                    {order.item_count} {if order.item_count == 1, do: "item", else: "items"} · {Menu.format_price(
-                      order.total
-                    )}
-                  </p>
-                  <.link navigate={~p"/order/#{order.number}"} class="menu-my-orders-view">
-                    View Order
-                  </.link>
-                </li>
-              </ul>
-            </section>
+                <% %{kind: :ambiguous} -> %>
+                  <div class="menu-my-orders-rewards-card menu-my-orders-rewards-card--note">
+                    <p class="menu-my-orders-rewards-note" id="menu-my-orders-rewards-note">
+                      Rewards are unavailable for these orders.
+                    </p>
+                  </div>
+                <% %{kind: :ready} = rewards -> %>
+                  <div class="menu-my-orders-rewards-card">
+                    <p class="menu-my-orders-rewards-balance" id="menu-my-orders-rewards-balance">
+                      <strong>{rewards.balance}</strong>
+                      {points_label(rewards.balance)}
+                    </p>
 
-            <p
-              :if={active_my_orders(@my_orders) == [] and history_my_orders(@my_orders) == []}
-              class="menu-my-orders-empty"
-            >
-              No orders to show right now.
-            </p>
+                    <%= if rewards.eligible? do %>
+                      <div
+                        class="menu-my-orders-rewards-unlocked"
+                        id="menu-my-orders-rewards-unlocked"
+                      >
+                        <p class="menu-my-orders-rewards-status" id="menu-my-orders-rewards-status">
+                          <span class="menu-my-orders-rewards-status-icon" aria-hidden="true">
+                            <.icon name="hero-gift" class="menu-my-orders-rewards-status-glyph" />
+                          </span>
+                          Reward Unlocked
+                        </p>
+                        <p class="menu-my-orders-rewards-reward" id="menu-my-orders-rewards-reward">
+                          1 Free Hot or Cold Coffee
+                        </p>
+                        <p class="menu-my-orders-rewards-note" id="menu-my-orders-rewards-hint">
+                          Redeem at the counter.
+                        </p>
+                      </div>
+                    <% else %>
+                      <div
+                        class="menu-my-orders-rewards-progress-block"
+                        id="menu-my-orders-rewards-progress-block"
+                      >
+                        <p class="menu-my-orders-rewards-ratio" id="menu-my-orders-rewards-ratio">
+                          {min(rewards.balance, rewards.cost)} / {rewards.cost} points
+                        </p>
+                        <div
+                          class="menu-my-orders-rewards-meter"
+                          role="progressbar"
+                          aria-valuemin="0"
+                          aria-valuemax={rewards.cost}
+                          aria-valuenow={min(rewards.balance, rewards.cost)}
+                          aria-label={"#{min(rewards.balance, rewards.cost)} of #{rewards.cost} points toward a free coffee"}
+                        >
+                          <div
+                            class="menu-my-orders-rewards-meter-fill"
+                            style={"width: #{rewards_progress_pct(rewards.balance, rewards.cost)}%"}
+                          >
+                          </div>
+                        </div>
+                        <p class="menu-my-orders-rewards-note" id="menu-my-orders-rewards-progress">
+                          {rewards.more} more {points_word(rewards.more)} to unlock your free coffee.
+                        </p>
+                        <p class="menu-my-orders-rewards-earn" id="menu-my-orders-rewards-earn">
+                          Earn 1 point for every ₱{loyalty_earn_pesos()} paid.
+                        </p>
+                      </div>
+                    <% end %>
+                  </div>
+
+                  <div
+                    :if={rewards.activity != []}
+                    class="menu-my-orders-rewards-activity"
+                    id="menu-my-orders-rewards-activity"
+                  >
+                    <h4 class="menu-my-orders-rewards-activity-title">Recent activity</h4>
+                    <ul class="menu-my-orders-rewards-activity-list">
+                      <li
+                        :for={entry <- rewards.activity}
+                        class="menu-my-orders-rewards-activity-item"
+                      >
+                        {my_orders_activity_label(entry)}
+                      </li>
+                    </ul>
+                  </div>
+              <% end %>
+            </section>
           </div>
         </aside>
       </div>
@@ -1784,6 +1945,8 @@ defmodule EspresoWeb.MenuLive do
       socket
       |> assign(:my_orders, [])
       |> assign(:my_orders_open?, false)
+      |> assign(:my_orders_tab, :orders)
+      |> assign(:my_orders_rewards, %{kind: :anonymous})
   end
 
   defp extract_my_order_numbers(%{"numbers" => numbers}) when is_list(numbers), do: numbers
@@ -1808,6 +1971,7 @@ defmodule EspresoWeb.MenuLive do
     socket
     |> assign(:my_orders, visible)
     |> push_event("sync_my_orders", %{numbers: Enum.map(visible, & &1.number)})
+    |> refresh_my_orders_rewards()
   end
 
   defp remember_my_order(socket, order) do
@@ -1824,7 +1988,9 @@ defmodule EspresoWeb.MenuLive do
       |> Enum.reject(&(&1.status == "cancelled"))
       |> Enum.take(20)
 
-    assign(socket, :my_orders, my_orders)
+    socket
+    |> assign(:my_orders, my_orders)
+    |> refresh_my_orders_rewards()
   end
 
   defp update_my_order_summary(socket, existing, order) do
@@ -1834,7 +2000,8 @@ defmodule EspresoWeb.MenuLive do
         payment_status: order.payment_status || existing.payment_status,
         payment_method: order.payment_method || existing.payment_method,
         total: order.total || existing.total,
-        inserted_at: order.inserted_at || existing.inserted_at
+        inserted_at: order.inserted_at || existing.inserted_at,
+        customer_id: Map.get(order, :customer_id) || existing[:customer_id]
     }
 
     my_orders =
@@ -1844,7 +2011,9 @@ defmodule EspresoWeb.MenuLive do
       end)
       |> Enum.reject(&(&1.status == "cancelled"))
 
-    assign(socket, :my_orders, my_orders)
+    socket
+    |> assign(:my_orders, my_orders)
+    |> refresh_my_orders_rewards()
   end
 
   defp subscribe_my_orders(socket, summaries) do
@@ -1875,9 +2044,112 @@ defmodule EspresoWeb.MenuLive do
       payment_method: order.payment_method,
       item_count: item_count,
       total: order.total,
-      inserted_at: order.inserted_at
+      inserted_at: order.inserted_at,
+      customer_id: order.customer_id
     }
   end
+
+  defp refresh_my_orders_rewards(socket) do
+    assign(socket, :my_orders_rewards, resolve_my_orders_rewards(socket.assigns.my_orders))
+  end
+
+  defp resolve_my_orders_rewards(summaries) when is_list(summaries) do
+    customer_ids =
+      summaries
+      |> Enum.map(&Map.get(&1, :customer_id))
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    case customer_ids do
+      [] ->
+        %{kind: :anonymous}
+
+      [customer_id] ->
+        case Customers.get_customer(customer_id) do
+          %Espreso.Customers.Customer{} = customer ->
+            order_ids = MapSet.new(Enum.map(summaries, & &1.id))
+            cost = Loyalty.redeem_cost()
+            balance = customer.points_balance
+
+            activity =
+              customer_id
+              |> Loyalty.list_activity_for_customer(limit: 30)
+              |> Enum.filter(
+                &(is_integer(&1.order_id) and MapSet.member?(order_ids, &1.order_id))
+              )
+              |> Enum.take(5)
+              |> Enum.map(&my_orders_activity_entry/1)
+
+            %{
+              kind: :ready,
+              balance: balance,
+              cost: cost,
+              eligible?: balance >= cost,
+              more: max(cost - balance, 0),
+              activity: activity
+            }
+
+          _ ->
+            %{kind: :anonymous}
+        end
+
+      _ ->
+        %{kind: :ambiguous}
+    end
+  end
+
+  defp resolve_my_orders_rewards(_), do: %{kind: :anonymous}
+
+  defp my_orders_activity_entry(entry) do
+    number =
+      case entry.order do
+        %{number: number} when is_binary(number) -> number
+        _ -> nil
+      end
+
+    %{kind: entry.kind, points: entry.points, order_number: number}
+  end
+
+  defp my_orders_activity_label(%{kind: "earn", points: points, order_number: number})
+       when is_integer(points) and is_binary(number) do
+    "+#{points} #{points_word(points)} · Order #{number}"
+  end
+
+  defp my_orders_activity_label(%{kind: "earn", points: points}) when is_integer(points) do
+    "+#{points} #{points_word(points)}"
+  end
+
+  defp my_orders_activity_label(%{kind: "redeem", order_number: number})
+       when is_binary(number) do
+    "Reward redeemed · Order #{number}"
+  end
+
+  defp my_orders_activity_label(%{kind: "redeem"}) do
+    "Reward redeemed"
+  end
+
+  defp my_orders_activity_label(_), do: "Loyalty activity"
+
+  defp points_word(1), do: "point"
+  defp points_word(_), do: "points"
+
+  defp points_label(1), do: "Point"
+  defp points_label(_), do: "Points"
+
+  defp loyalty_earn_pesos do
+    div(Loyalty.point_threshold_centavos(), 100)
+  end
+
+  defp rewards_progress_pct(balance, cost)
+       when is_integer(balance) and is_integer(cost) and cost > 0 do
+    balance
+    |> min(cost)
+    |> max(0)
+    |> Kernel.*(100)
+    |> div(cost)
+  end
+
+  defp rewards_progress_pct(_, _), do: 0
 
   defp active_my_orders(orders) do
     ready = Enum.filter(orders, &(&1.status == "ready"))
@@ -1929,30 +2201,26 @@ defmodule EspresoWeb.MenuLive do
     "#{month} #{day}, #{year}"
   end
 
-  defp my_orders_trigger_label(orders) do
-    active = active_my_orders(orders)
-    count = length(active)
+  defp open_my_orders(socket, tab) do
+    tab = my_orders_tab(tab)
 
-    cond do
-      Enum.any?(active, &(&1.status == "ready")) ->
-        "#{my_orders_title(count)} · Ready"
-
-      Enum.any?(active, &(&1.status == "preparing")) ->
-        "#{my_orders_title(count)} · Preparing"
-
-      Enum.any?(active, &my_order_unpaid?/1) ->
-        "#{my_orders_title(count)} · Pay"
-
-      active != [] ->
-        if count == 1, do: "My Order", else: "My Orders · #{count} active"
-
-      true ->
-        "My Orders"
+    if socket.assigns.my_orders_open? and socket.assigns.my_orders_tab == tab do
+      {:noreply,
+       socket
+       |> assign(:my_orders_open?, false)
+       |> assign(:my_orders_tab, :orders)}
+    else
+      {:noreply,
+       socket
+       |> assign(:my_orders_open?, true)
+       |> assign(:my_orders_tab, tab)
+       |> refresh_my_orders_rewards()}
     end
   end
 
-  defp my_orders_title(1), do: "My Order"
-  defp my_orders_title(_), do: "My Orders"
+  defp my_orders_tab("rewards"), do: :rewards
+  defp my_orders_tab(:rewards), do: :rewards
+  defp my_orders_tab(_), do: :orders
 
   defp my_orders_trigger_status?(orders) do
     active = active_my_orders(orders)
@@ -1965,9 +2233,24 @@ defmodule EspresoWeb.MenuLive do
   defp my_orders_trigger_aria(orders) do
     active_count = length(active_my_orders(orders))
     history_count = length(history_my_orders(orders))
-    label = my_orders_trigger_label(orders)
 
-    "#{label}, #{active_count} active, #{history_count} in history"
+    status =
+      cond do
+        Enum.any?(active_my_orders(orders), &(&1.status == "ready")) -> "ready"
+        Enum.any?(active_my_orders(orders), &(&1.status == "preparing")) -> "preparing"
+        Enum.any?(active_my_orders(orders), &my_order_unpaid?/1) -> "payment needed"
+        true -> nil
+      end
+
+    base = "Orders, #{active_count} active, #{history_count} in history"
+    if status, do: "#{base}, #{status}", else: base
+  end
+
+  defp rewards_available?(%{kind: :ready, eligible?: true}), do: true
+  defp rewards_available?(_), do: false
+
+  defp rewards_trigger_aria(rewards) do
+    if rewards_available?(rewards), do: "Rewards, reward available", else: "Rewards"
   end
 
   defp show_floating_my_orders?(my_orders, my_orders_open?, basket_open?, detail) do
