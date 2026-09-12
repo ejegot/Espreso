@@ -41,6 +41,8 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:table_number, "")
      |> assign(:customer_name, "")
      |> assign(:loyalty_phone, "")
+     |> assign(:rewards_phone, "")
+     |> assign(:rewards_remembered_phone, nil)
      |> assign(:notes, "")
      |> assign(:checkout_errors, %{})
      |> assign(:payment_method, :counter)
@@ -49,7 +51,7 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:my_orders, [])
      |> assign(:my_orders_open?, false)
      |> assign(:my_orders_tab, :orders)
-     |> assign(:my_orders_rewards, %{kind: :anonymous}), layout: false}
+     |> assign(:my_orders_rewards, %{kind: :prompt}), layout: false}
   end
 
   @impl true
@@ -391,6 +393,13 @@ defmodule EspresoWeb.MenuLive do
     {:noreply, maybe_restore_my_orders(socket, %{"numbers" => [number]})}
   end
 
+  def handle_event("restore_loyalty_phone", params, socket) do
+    phone =
+      Map.get(params, "phone") || Map.get(params, :phone) || ""
+
+    {:noreply, apply_restored_loyalty_phone(socket, phone)}
+  end
+
   def handle_event("toggle_my_orders", params, socket) do
     open_my_orders(socket, Map.get(params, "tab", "orders"))
   end
@@ -417,6 +426,39 @@ defmodule EspresoWeb.MenuLive do
       end
 
     {:noreply, assign(socket, :my_orders_tab, tab)}
+  end
+
+  def handle_event("update_rewards_phone", params, socket) do
+    phone = Map.get(params, "rewards_phone", socket.assigns.rewards_phone)
+
+    {:noreply,
+     socket
+     |> assign(:rewards_phone, phone)
+     |> then(fn s ->
+       case s.assigns.my_orders_rewards do
+         %{kind: :not_found} -> assign(s, :my_orders_rewards, %{kind: :prompt})
+         _ -> s
+       end
+     end)}
+  end
+
+  def handle_event("lookup_rewards", params, socket) do
+    phone =
+      Map.get(params, "rewards_phone") ||
+        Map.get(params, "loyalty_phone") ||
+        socket.assigns.rewards_phone
+
+    {:noreply, lookup_rewards_phone(socket, phone)}
+  end
+
+  def handle_event("clear_rewards_phone", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:rewards_phone, "")
+     |> assign(:rewards_remembered_phone, nil)
+     |> assign(:my_orders_rewards, %{kind: :prompt})
+     |> push_event("clear_loyalty_phone", %{})
+     |> refresh_my_orders_rewards()}
   end
 
   @impl true
@@ -1043,13 +1085,14 @@ defmodule EspresoWeb.MenuLive do
       <nav
         :if={
           @menu_stage == :menu &&
-            show_floating_my_orders?(@my_orders, @my_orders_open?, @basket_open?, @detail)
+            show_floating_customer_nav?(@my_orders, @my_orders_open?, @basket_open?, @detail)
         }
         id="menu-qr-customer-nav"
         class="menu-qr-customer-nav"
         aria-label="Orders and Rewards"
       >
         <button
+          :if={show_floating_orders?(@my_orders, @my_orders_open?, @basket_open?, @detail)}
           type="button"
           id="menu-qr-my-orders"
           class={[
@@ -1070,6 +1113,7 @@ defmodule EspresoWeb.MenuLive do
         </button>
 
         <button
+          :if={show_floating_rewards?(@my_orders_open?, @basket_open?, @detail)}
           type="button"
           id="menu-qr-rewards"
           class={[
@@ -1423,7 +1467,10 @@ defmodule EspresoWeb.MenuLive do
       </div>
 
       <div
-        :if={@menu_stage == :menu && @my_orders_open? && @my_orders != []}
+        :if={
+          @menu_stage == :menu && @my_orders_open? &&
+            (@my_orders_tab == :rewards or @my_orders != [])
+        }
         id="menu-my-orders"
         class="menu-my-orders-layer"
         phx-window-keydown="close_my_orders"
@@ -1557,11 +1604,77 @@ defmodule EspresoWeb.MenuLive do
               aria-labelledby="menu-my-orders-title"
             >
               <%= case @my_orders_rewards do %>
-                <% %{kind: :anonymous} -> %>
-                  <div class="menu-my-orders-rewards-card menu-my-orders-rewards-card--note">
+                <% %{kind: kind} when kind in [:prompt, :anonymous] -> %>
+                  <div
+                    class="menu-my-orders-rewards-card menu-my-orders-rewards-card--note"
+                    id="menu-rewards-phone-entry"
+                  >
                     <p class="menu-my-orders-rewards-note" id="menu-my-orders-rewards-note">
-                      Add your loyalty phone on your next order to see Rewards here.
+                      Enter your loyalty phone to see your points.
                     </p>
+                    <form
+                      id="menu-rewards-phone-form"
+                      phx-change="update_rewards_phone"
+                      phx-submit="lookup_rewards"
+                      class="menu-rewards-phone-form"
+                    >
+                      <label class="menu-checkout-label" for="menu-rewards-phone-input">
+                        Loyalty phone
+                      </label>
+                      <input
+                        id="menu-rewards-phone-input"
+                        type="tel"
+                        name="rewards_phone"
+                        value={@rewards_phone}
+                        placeholder="09XXXXXXXXX"
+                        autocomplete="tel"
+                        inputmode="tel"
+                        class="menu-checkout-input"
+                      />
+                      <button
+                        type="submit"
+                        id="menu-rewards-phone-submit"
+                        class="menu-rewards-phone-submit"
+                      >
+                        Find
+                      </button>
+                    </form>
+                  </div>
+                <% %{kind: :not_found} -> %>
+                  <div
+                    class="menu-my-orders-rewards-card menu-my-orders-rewards-card--note"
+                    id="menu-rewards-not-found"
+                  >
+                    <p class="menu-my-orders-rewards-note" id="menu-my-orders-rewards-note">
+                      No rewards account found for that number. Check the phone and try again.
+                    </p>
+                    <form
+                      id="menu-rewards-phone-form"
+                      phx-change="update_rewards_phone"
+                      phx-submit="lookup_rewards"
+                      class="menu-rewards-phone-form"
+                    >
+                      <label class="menu-checkout-label" for="menu-rewards-phone-input">
+                        Loyalty phone
+                      </label>
+                      <input
+                        id="menu-rewards-phone-input"
+                        type="tel"
+                        name="rewards_phone"
+                        value={@rewards_phone}
+                        placeholder="09XXXXXXXXX"
+                        autocomplete="tel"
+                        inputmode="tel"
+                        class="menu-checkout-input"
+                      />
+                      <button
+                        type="submit"
+                        id="menu-rewards-phone-submit"
+                        class="menu-rewards-phone-submit"
+                      >
+                        Find
+                      </button>
+                    </form>
                   </div>
                 <% %{kind: :ambiguous} -> %>
                   <div class="menu-my-orders-rewards-card menu-my-orders-rewards-card--note">
@@ -1571,59 +1684,76 @@ defmodule EspresoWeb.MenuLive do
                   </div>
                 <% %{kind: :ready} = rewards -> %>
                   <div class="menu-my-orders-rewards-card">
+                    <p class="menu-my-orders-rewards-eyebrow" id="menu-my-orders-rewards-current">
+                      Current points
+                    </p>
                     <p class="menu-my-orders-rewards-balance" id="menu-my-orders-rewards-balance">
-                      <strong>{rewards.balance}</strong>
-                      {points_label(rewards.balance)}
+                      <strong>{rewards.balance}</strong> / {rewards.cost} points
                     </p>
 
-                    <%= if rewards.eligible? do %>
+                    <div
+                      class="menu-my-orders-rewards-progress-block"
+                      id="menu-my-orders-rewards-progress-block"
+                    >
+                      <p class="menu-my-orders-rewards-ratio" id="menu-my-orders-rewards-ratio">
+                        {min(rewards.balance, rewards.cost)} / {rewards.cost}
+                      </p>
                       <div
-                        class="menu-my-orders-rewards-unlocked"
-                        id="menu-my-orders-rewards-unlocked"
+                        class="menu-my-orders-rewards-meter"
+                        role="progressbar"
+                        aria-valuemin="0"
+                        aria-valuemax={rewards.cost}
+                        aria-valuenow={min(rewards.balance, rewards.cost)}
+                        aria-label={"#{min(rewards.balance, rewards.cost)} of #{rewards.cost} points toward a free coffee"}
                       >
-                        <p class="menu-my-orders-rewards-status" id="menu-my-orders-rewards-status">
-                          <span class="menu-my-orders-rewards-status-icon" aria-hidden="true">
-                            <.icon name="hero-gift" class="menu-my-orders-rewards-status-glyph" />
-                          </span>
-                          Reward Unlocked
-                        </p>
-                        <p class="menu-my-orders-rewards-reward" id="menu-my-orders-rewards-reward">
-                          1 Free Hot or Cold Coffee
-                        </p>
-                        <p class="menu-my-orders-rewards-note" id="menu-my-orders-rewards-hint">
-                          Redeem at the counter.
-                        </p>
-                      </div>
-                    <% else %>
-                      <div
-                        class="menu-my-orders-rewards-progress-block"
-                        id="menu-my-orders-rewards-progress-block"
-                      >
-                        <p class="menu-my-orders-rewards-ratio" id="menu-my-orders-rewards-ratio">
-                          {min(rewards.balance, rewards.cost)} / {rewards.cost} points
-                        </p>
                         <div
-                          class="menu-my-orders-rewards-meter"
-                          role="progressbar"
-                          aria-valuemin="0"
-                          aria-valuemax={rewards.cost}
-                          aria-valuenow={min(rewards.balance, rewards.cost)}
-                          aria-label={"#{min(rewards.balance, rewards.cost)} of #{rewards.cost} points toward a free coffee"}
+                          class="menu-my-orders-rewards-meter-fill"
+                          style={"width: #{rewards_progress_pct(rewards.balance, rewards.cost)}%"}
                         >
-                          <div
-                            class="menu-my-orders-rewards-meter-fill"
-                            style={"width: #{rewards_progress_pct(rewards.balance, rewards.cost)}%"}
-                          >
-                          </div>
                         </div>
+                      </div>
+
+                      <%= if rewards.eligible? do %>
+                        <div
+                          class="menu-my-orders-rewards-unlocked"
+                          id="menu-my-orders-rewards-unlocked"
+                        >
+                          <p class="menu-my-orders-rewards-status" id="menu-my-orders-rewards-status">
+                            <span class="menu-my-orders-rewards-status-icon" aria-hidden="true">
+                              <.icon name="hero-gift" class="menu-my-orders-rewards-status-glyph" />
+                            </span>
+                            Reward Unlocked
+                          </p>
+                          <p class="menu-my-orders-rewards-reward" id="menu-my-orders-rewards-reward">
+                            1 Free Hot or Cold Coffee
+                          </p>
+                          <p class="menu-my-orders-rewards-note" id="menu-my-orders-rewards-hint">
+                            Redeem at the counter.
+                          </p>
+                        </div>
+                      <% else %>
                         <p class="menu-my-orders-rewards-note" id="menu-my-orders-rewards-progress">
-                          {rewards.more} more {points_word(rewards.more)} to unlock your free coffee.
+                          <%= if rewards.balance == 0 do %>
+                            Keep earning to unlock your free coffee.
+                          <% else %>
+                            {rewards.more} more {points_word(rewards.more)} to unlock your free coffee.
+                          <% end %>
                         </p>
                         <p class="menu-my-orders-rewards-earn" id="menu-my-orders-rewards-earn">
                           Earn 1 point for every ₱{loyalty_earn_pesos()} paid.
                         </p>
-                      </div>
-                    <% end %>
+                      <% end %>
+                    </div>
+
+                    <button
+                      :if={rewards[:source] == :phone}
+                      type="button"
+                      id="menu-rewards-clear-phone"
+                      class="menu-rewards-clear-phone"
+                      phx-click="clear_rewards_phone"
+                    >
+                      Use a different phone
+                    </button>
                   </div>
 
                   <div
@@ -1635,9 +1765,21 @@ defmodule EspresoWeb.MenuLive do
                     <ul class="menu-my-orders-rewards-activity-list">
                       <li
                         :for={entry <- rewards.activity}
-                        class="menu-my-orders-rewards-activity-item"
+                        class={[
+                          "menu-my-orders-rewards-activity-item",
+                          "menu-rewards-activity-item",
+                          "menu-rewards-activity-item--#{entry.kind}"
+                        ]}
+                        data-kind={entry.kind}
                       >
-                        {my_orders_activity_label(entry)}
+                        <p class="menu-rewards-activity-title">{entry.title}</p>
+                        <p :if={entry.points_line} class="menu-rewards-activity-points">
+                          {entry.points_line}
+                        </p>
+                        <p class="menu-rewards-activity-detail">{entry.detail}</p>
+                        <p :if={entry.when != ""} class="menu-rewards-activity-when">
+                          {entry.when}
+                        </p>
                       </li>
                     </ul>
                   </div>
@@ -1946,7 +2088,7 @@ defmodule EspresoWeb.MenuLive do
       |> assign(:my_orders, [])
       |> assign(:my_orders_open?, false)
       |> assign(:my_orders_tab, :orders)
-      |> assign(:my_orders_rewards, %{kind: :anonymous})
+      |> assign(:my_orders_rewards, %{kind: :prompt})
   end
 
   defp extract_my_order_numbers(%{"numbers" => numbers}) when is_list(numbers), do: numbers
@@ -1956,6 +2098,69 @@ defmodule EspresoWeb.MenuLive do
   defp extract_my_order_numbers(%{number: number}), do: [number]
 
   defp extract_my_order_numbers(_), do: []
+
+  defp apply_restored_loyalty_phone(socket, raw) do
+    phone = raw |> to_string() |> String.trim()
+
+    case Customers.normalize_phone(phone) do
+      {:ok, normalized} ->
+        socket
+        |> assign(:rewards_remembered_phone, normalized)
+        |> assign(:rewards_phone, normalized)
+        |> refresh_my_orders_rewards()
+
+      {:error, _} ->
+        socket
+        |> assign(:rewards_remembered_phone, nil)
+        |> push_event("clear_loyalty_phone", %{})
+        |> refresh_my_orders_rewards()
+    end
+  end
+
+  defp lookup_rewards_phone(socket, raw) do
+    phone = raw |> to_string() |> String.trim()
+
+    case Customers.get_by_phone(phone) do
+      {:ok, customer} ->
+        socket
+        |> assign(:rewards_phone, customer.phone_e164)
+        |> assign(:rewards_remembered_phone, customer.phone_e164)
+        |> assign(:my_orders_rewards, ready_rewards(customer, source: :phone))
+        |> push_event("persist_loyalty_phone", %{phone: customer.phone_e164})
+        |> then(fn s ->
+          # Restored-order customer still wins if present.
+          refresh_my_orders_rewards(s)
+        end)
+
+      {:error, :not_found} ->
+        socket
+        |> assign(:rewards_phone, phone)
+        |> assign(:my_orders_rewards, %{kind: :not_found})
+
+      {:error, :invalid_phone} ->
+        socket
+        |> assign(:rewards_phone, phone)
+        |> assign(:my_orders_rewards, %{kind: :not_found})
+    end
+  end
+
+  defp maybe_persist_loyalty_phone(socket, order) do
+    case Map.get(order, :customer_id) do
+      id when is_integer(id) ->
+        case Customers.get_customer(id) do
+          %Espreso.Customers.Customer{phone_e164: phone} when is_binary(phone) and phone != "" ->
+            socket
+            |> assign(:rewards_remembered_phone, phone)
+            |> push_event("persist_loyalty_phone", %{phone: phone})
+
+          _ ->
+            socket
+        end
+
+      _ ->
+        socket
+    end
+  end
 
   defp load_my_orders(socket, numbers) do
     orders = Orders.list_orders_by_numbers(numbers)
@@ -2050,10 +2255,14 @@ defmodule EspresoWeb.MenuLive do
   end
 
   defp refresh_my_orders_rewards(socket) do
-    assign(socket, :my_orders_rewards, resolve_my_orders_rewards(socket.assigns.my_orders))
+    assign(
+      socket,
+      :my_orders_rewards,
+      resolve_my_orders_rewards(socket.assigns.my_orders, socket.assigns.rewards_remembered_phone)
+    )
   end
 
-  defp resolve_my_orders_rewards(summaries) when is_list(summaries) do
+  defp resolve_my_orders_rewards(summaries, remembered_phone) when is_list(summaries) do
     customer_ids =
       summaries
       |> Enum.map(&Map.get(&1, :customer_id))
@@ -2062,35 +2271,15 @@ defmodule EspresoWeb.MenuLive do
 
     case customer_ids do
       [] ->
-        %{kind: :anonymous}
+        resolve_rewards_from_remembered_phone(remembered_phone)
 
       [customer_id] ->
         case Customers.get_customer(customer_id) do
           %Espreso.Customers.Customer{} = customer ->
-            order_ids = MapSet.new(Enum.map(summaries, & &1.id))
-            cost = Loyalty.redeem_cost()
-            balance = customer.points_balance
-
-            activity =
-              customer_id
-              |> Loyalty.list_activity_for_customer(limit: 30)
-              |> Enum.filter(
-                &(is_integer(&1.order_id) and MapSet.member?(order_ids, &1.order_id))
-              )
-              |> Enum.take(5)
-              |> Enum.map(&my_orders_activity_entry/1)
-
-            %{
-              kind: :ready,
-              balance: balance,
-              cost: cost,
-              eligible?: balance >= cost,
-              more: max(cost - balance, 0),
-              activity: activity
-            }
+            ready_rewards(customer, source: :orders)
 
           _ ->
-            %{kind: :anonymous}
+            resolve_rewards_from_remembered_phone(remembered_phone)
         end
 
       _ ->
@@ -2098,43 +2287,143 @@ defmodule EspresoWeb.MenuLive do
     end
   end
 
-  defp resolve_my_orders_rewards(_), do: %{kind: :anonymous}
+  defp resolve_my_orders_rewards(_, remembered_phone),
+    do: resolve_rewards_from_remembered_phone(remembered_phone)
 
-  defp my_orders_activity_entry(entry) do
-    number =
-      case entry.order do
-        %{number: number} when is_binary(number) -> number
-        _ -> nil
-      end
+  defp resolve_rewards_from_remembered_phone(phone)
+       when is_binary(phone) and phone != "" do
+    case Customers.get_by_phone(phone) do
+      {:ok, customer} ->
+        ready_rewards(customer, source: :phone)
 
-    %{kind: entry.kind, points: entry.points, order_number: number}
+      _ ->
+        %{kind: :prompt}
+    end
   end
 
-  defp my_orders_activity_label(%{kind: "earn", points: points, order_number: number})
-       when is_integer(points) and is_binary(number) do
-    "+#{points} #{points_word(points)} · Order #{number}"
+  defp resolve_rewards_from_remembered_phone(_), do: %{kind: :prompt}
+
+  defp ready_rewards(%Espreso.Customers.Customer{} = customer, opts) do
+    cost = Loyalty.redeem_cost()
+    balance = customer.points_balance
+    source = Keyword.get(opts, :source, :orders)
+
+    activity =
+      customer.id
+      |> Loyalty.list_activity_for_customer(limit: 5)
+      |> enrich_rewards_activity()
+
+    %{
+      kind: :ready,
+      balance: balance,
+      cost: cost,
+      eligible?: balance >= cost,
+      more: max(cost - balance, 0),
+      activity: activity,
+      source: source,
+      phone_e164: customer.phone_e164
+    }
   end
 
-  defp my_orders_activity_label(%{kind: "earn", points: points}) when is_integer(points) do
-    "+#{points} #{points_word(points)}"
+  defp enrich_rewards_activity(entries) when is_list(entries) do
+    product_ids =
+      entries
+      |> Enum.filter(&(&1.kind == "redeem"))
+      |> Enum.map(&redeem_product_id/1)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    products_by_id = load_reward_products(product_ids)
+
+    Enum.map(entries, &rewards_activity_entry(&1, products_by_id))
   end
 
-  defp my_orders_activity_label(%{kind: "redeem", order_number: number})
-       when is_binary(number) do
-    "Reward redeemed · Order #{number}"
+  defp enrich_rewards_activity(_), do: []
+
+  defp load_reward_products([]), do: %{}
+
+  defp load_reward_products(product_ids) do
+    import Ecto.Query
+
+    from(p in Espreso.Menu.Product,
+      where: p.id in ^product_ids,
+      preload: :category
+    )
+    |> Espreso.Repo.all()
+    |> Map.new(&{&1.id, &1})
   end
 
-  defp my_orders_activity_label(%{kind: "redeem"}) do
-    "Reward redeemed"
+  defp redeem_product_id(%{metadata: %{"product_id" => id}}) when is_integer(id), do: id
+
+  defp redeem_product_id(%{metadata: %{"product_id" => id}}) when is_binary(id) do
+    case Integer.parse(id) do
+      {n, ""} -> n
+      _ -> nil
+    end
   end
 
-  defp my_orders_activity_label(_), do: "Loyalty activity"
+  defp redeem_product_id(_), do: nil
+
+  defp rewards_activity_entry(%{kind: "earn", points: points} = entry, _products)
+       when is_integer(points) do
+    %{
+      kind: "earn",
+      title: "+#{points} #{points_word(points)}",
+      points_line: nil,
+      detail: "Purchase",
+      when: rewards_activity_when(entry.inserted_at)
+    }
+  end
+
+  defp rewards_activity_entry(%{kind: "redeem", points: points} = entry, products)
+       when is_integer(points) do
+    %{
+      kind: "redeem",
+      title: "Reward redeemed",
+      points_line: format_redeem_points_line(points),
+      detail: redeem_activity_detail(entry, products),
+      when: rewards_activity_when(entry.inserted_at)
+    }
+  end
+
+  defp rewards_activity_entry(_, _) do
+    %{kind: "other", title: "Loyalty activity", points_line: nil, detail: "", when: ""}
+  end
+
+  defp format_redeem_points_line(points) when is_integer(points) and points < 0 do
+    "−#{abs(points)} points"
+  end
+
+  defp format_redeem_points_line(points) when is_integer(points) do
+    "−#{points} points"
+  end
+
+  defp format_redeem_points_line(_), do: "−10 points"
+
+  defp redeem_activity_detail(entry, products) do
+    case Map.get(products, redeem_product_id(entry)) do
+      %{name: name, category: %{name: cat}} when cat in ["HOT", "COLD"] and is_binary(name) ->
+        "Free #{String.capitalize(String.downcase(cat))} · #{name}"
+
+      %{name: name} when is_binary(name) and name != "" ->
+        "Free #{name}"
+
+      _ ->
+        "Free Hot or Cold Coffee"
+    end
+  end
+
+  defp rewards_activity_when(%DateTime{} = at) do
+    manila = DateTime.add(at, 8 * 60 * 60, :second)
+    month = Calendar.strftime(manila, "%b")
+    "#{month} #{manila.day} · #{format_shop_time(manila)}"
+  end
+
+  defp rewards_activity_when(_), do: ""
 
   defp points_word(1), do: "point"
+  defp points_word(n) when is_integer(n) and n < 0, do: "points"
   defp points_word(_), do: "points"
-
-  defp points_label(1), do: "Point"
-  defp points_label(_), do: "Points"
 
   defp loyalty_earn_pesos do
     div(Loyalty.point_threshold_centavos(), 100)
@@ -2204,17 +2493,22 @@ defmodule EspresoWeb.MenuLive do
   defp open_my_orders(socket, tab) do
     tab = my_orders_tab(tab)
 
-    if socket.assigns.my_orders_open? and socket.assigns.my_orders_tab == tab do
-      {:noreply,
-       socket
-       |> assign(:my_orders_open?, false)
-       |> assign(:my_orders_tab, :orders)}
-    else
-      {:noreply,
-       socket
-       |> assign(:my_orders_open?, true)
-       |> assign(:my_orders_tab, tab)
-       |> refresh_my_orders_rewards()}
+    cond do
+      tab == :orders and socket.assigns.my_orders == [] ->
+        {:noreply, socket}
+
+      socket.assigns.my_orders_open? and socket.assigns.my_orders_tab == tab ->
+        {:noreply,
+         socket
+         |> assign(:my_orders_open?, false)
+         |> assign(:my_orders_tab, :orders)}
+
+      true ->
+        {:noreply,
+         socket
+         |> assign(:my_orders_open?, true)
+         |> assign(:my_orders_tab, tab)
+         |> refresh_my_orders_rewards()}
     end
   end
 
@@ -2253,8 +2547,17 @@ defmodule EspresoWeb.MenuLive do
     if rewards_available?(rewards), do: "Rewards, reward available", else: "Rewards"
   end
 
-  defp show_floating_my_orders?(my_orders, my_orders_open?, basket_open?, detail) do
+  defp show_floating_customer_nav?(my_orders, my_orders_open?, basket_open?, detail) do
+    show_floating_orders?(my_orders, my_orders_open?, basket_open?, detail) or
+      show_floating_rewards?(my_orders_open?, basket_open?, detail)
+  end
+
+  defp show_floating_orders?(my_orders, my_orders_open?, basket_open?, detail) do
     my_orders != [] and not my_orders_open? and not basket_open? and is_nil(detail)
+  end
+
+  defp show_floating_rewards?(my_orders_open?, basket_open?, detail) do
+    not my_orders_open? and not basket_open? and is_nil(detail)
   end
 
   # Customer-facing My Orders labels only — DB status remains unchanged.
@@ -2988,6 +3291,7 @@ defmodule EspresoWeb.MenuLive do
          |> assign(:placing_order?, false)
          |> assign(:checkout_errors, %{})
          |> remember_my_order(order)
+         |> maybe_persist_loyalty_phone(order)
          |> push_event("clear_persisted_cart", %{})
          |> push_event("persist_my_order", %{number: order.number})
          |> redirect(external: checkout_url)}
@@ -3036,6 +3340,7 @@ defmodule EspresoWeb.MenuLive do
     |> assign(:placing_order?, false)
     |> assign(:checkout_errors, %{})
     |> remember_my_order(order)
+    |> maybe_persist_loyalty_phone(order)
     |> push_event("clear_persisted_cart", %{})
     |> push_event("persist_my_order", %{number: order.number})
     |> push_navigate(to: ~p"/order/#{order.number}?confirm=1")

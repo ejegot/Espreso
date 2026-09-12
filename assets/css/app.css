@@ -13624,6 +13624,53 @@ body:has(.home-page-landing) {
   gap: 0;
 }
 
+.menu-rewards-phone-form {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.menu-rewards-phone-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.55rem;
+  margin: 0;
+  padding: 0.55rem 1rem;
+  border: 0;
+  border-radius: 999px;
+  background: #f85020;
+  color: #fff;
+  font: inherit;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.menu-rewards-phone-submit:active {
+  transform: translateY(1px);
+}
+
+.menu-rewards-clear-phone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, #382010 62%, transparent);
+  font: inherit;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.82rem;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 0.14em;
+  cursor: pointer;
+}
+
 .menu-my-orders-rewards-balance {
   margin: 0;
   color: #382010;
@@ -13748,10 +13795,51 @@ body:has(.home-page-landing) {
 }
 
 .menu-my-orders-rewards-activity-item {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, #382010 3.5%, #fff);
   color: color-mix(in srgb, #382010 78%, #b0a098);
   font-size: 0.84rem;
   font-weight: 600;
   line-height: 1.35;
+}
+
+.menu-rewards-activity-item--earn {
+  border-left: 3px solid color-mix(in srgb, #f85020 55%, #382010);
+}
+
+.menu-rewards-activity-item--redeem {
+  border-left: 3px solid color-mix(in srgb, #382010 35%, #b0a098);
+}
+
+.menu-rewards-activity-title {
+  margin: 0;
+  color: #382010;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.menu-rewards-activity-points {
+  margin: 0;
+  color: color-mix(in srgb, #382010 62%, #b0a098);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.menu-rewards-activity-detail {
+  margin: 0;
+  color: color-mix(in srgb, #382010 58%, #b0a098);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.menu-rewards-activity-when {
+  margin: 0.1rem 0 0;
+  color: color-mix(in srgb, #382010 45%, #b0a098);
+  font-size: 0.76rem;
+  font-weight: 600;
 }
 
 .menu-qr-chrome-bag {

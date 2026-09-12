@@ -166,6 +166,7 @@ Hooks.SmoothScroll = {
 
 const MENU_CART_STORAGE_KEY = "coffeespot.menu.cart.v1"
 const MY_ORDERS_STORAGE_KEY = "coffeespot.orders.v1"
+const LOYALTY_PHONE_STORAGE_KEY = "coffeespot.loyalty_phone.v1"
 const LEGACY_CURRENT_ORDER_STORAGE_KEY = "coffeespot.current_order.v1"
 const MY_ORDERS_MAX = 20
 const ORDER_NUMBER_PATTERN = /^CS-[2-9A-HJ-NP-Z]{6}$/
@@ -237,6 +238,40 @@ function appendMyOrderNumber(number) {
   const value = String(number).trim()
   const existing = readMyOrderNumbers().filter((n) => n !== value)
   return writeMyOrderNumbers([...existing, value])
+}
+
+function readLoyaltyPhone() {
+  try {
+    const raw = localStorage.getItem(LOYALTY_PHONE_STORAGE_KEY)
+    if (!raw) return ""
+    const parsed = JSON.parse(raw)
+    const phone = typeof parsed?.phone === "string" ? parsed.phone.trim() : ""
+    return phone
+  } catch (_error) {
+    return ""
+  }
+}
+
+function writeLoyaltyPhone(phone) {
+  try {
+    const value = typeof phone === "string" ? phone.trim() : ""
+    if (!value) {
+      localStorage.removeItem(LOYALTY_PHONE_STORAGE_KEY)
+      return ""
+    }
+    localStorage.setItem(LOYALTY_PHONE_STORAGE_KEY, JSON.stringify({phone: value}))
+    return value
+  } catch (_error) {
+    return ""
+  }
+}
+
+function clearLoyaltyPhone() {
+  try {
+    localStorage.removeItem(LOYALTY_PHONE_STORAGE_KEY)
+  } catch (_error) {
+    // no-op
+  }
 }
 
 Hooks.OrderConfirm = {
@@ -423,6 +458,8 @@ Hooks.MenuBrowse = {
     this.handleEvent("sync_my_orders", ({numbers}) => this.syncMyOrders(numbers))
     this.handleEvent("clear_my_orders", () => this.clearMyOrders())
     this.handleEvent("clear_current_order", () => this.clearMyOrders())
+    this.handleEvent("persist_loyalty_phone", ({phone}) => this.persistLoyaltyPhone(phone))
+    this.handleEvent("clear_loyalty_phone", () => this.clearLoyaltyPhoneStorage())
 
     this.onChipClick = (event) => {
       const chip = event.target.closest(".menu-craving-chip")
@@ -431,13 +468,19 @@ Hooks.MenuBrowse = {
 
     this.el.addEventListener("click", this.onChipClick)
     this.restorePersistedCart()
-    requestAnimationFrame(() => requestAnimationFrame(() => this.ensureMyOrdersRestored()))
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        this.ensureMyOrdersRestored()
+        this.ensureLoyaltyPhoneRestored()
+      })
+    )
     this.persistCartFromDom()
   },
 
   updated() {
     this.persistCartFromDom()
     this.ensureMyOrdersRestored()
+    this.ensureLoyaltyPhoneRestored()
   },
 
   destroyed() {
@@ -495,6 +538,28 @@ Hooks.MenuBrowse = {
     } catch (_error) {
       // no-op
     }
+  },
+
+  persistLoyaltyPhone(phone) {
+    writeLoyaltyPhone(phone)
+  },
+
+  clearLoyaltyPhoneStorage() {
+    clearLoyaltyPhone()
+  },
+
+  ensureLoyaltyPhoneRestored() {
+    if (this._loyaltyPhoneRestored) return
+    if (!this.el.querySelector("#menu-items")) return
+
+    const phone = readLoyaltyPhone()
+    if (!phone) {
+      this._loyaltyPhoneRestored = true
+      return
+    }
+
+    this._loyaltyPhoneRestored = true
+    this.pushEvent("restore_loyalty_phone", {phone})
   },
 
   ensureMyOrdersRestored() {
