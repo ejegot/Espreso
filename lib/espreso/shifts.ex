@@ -20,6 +20,8 @@ defmodule Espreso.Shifts do
   alias Espreso.StaffShifts
   alias Espreso.StaffShifts.StaffShift
 
+  @close_history_page_size 25
+
   @doc """
   Returns today's shift close for the current Asia/Manila shop date, if any.
   """
@@ -32,6 +34,78 @@ defmodule Espreso.Shifts do
     |> where([s], s.shop_date == ^shop_date)
     |> preload(:closed_by_user)
     |> Repo.one()
+  end
+
+  @doc """
+  Read-only Close Shift history, newest Manila `shop_date` first.
+
+  Because `shop_date` is unique, keyset pagination uses that date alone:
+  optional `:cursor` is a `%Date{}` and fetches rows with `shop_date < cursor`.
+
+  Optional `opts`:
+  - `:limit` — page size (default #{@close_history_page_size}, clamped 1..100)
+  - `:cursor` — last visible `shop_date` from the previous page
+
+  Returns `%{closes, has_next_page, next_cursor}`.
+  Does not recompute totals from orders — returns sealed snapshot rows as stored.
+  """
+  def list_close_history(opts \\ []) when is_list(opts) do
+    limit =
+      opts
+      |> Keyword.get(
+        :limit,
+        Application.get_env(:espreso, :close_history_page_size, @close_history_page_size)
+      )
+      |> close_history_page_limit()
+
+    cursor = normalize_close_history_cursor(Keyword.get(opts, :cursor))
+
+    query =
+      ShiftClose
+      |> apply_close_history_cursor(cursor)
+      |> order_by([s], desc: s.shop_date)
+      |> limit(^(limit + 1))
+      |> preload(:closed_by_user)
+
+    rows = Repo.all(query)
+    has_next_page? = length(rows) > limit
+    closes = Enum.take(rows, limit)
+
+    next_cursor =
+      if has_next_page? do
+        case List.last(closes) do
+          %ShiftClose{shop_date: %Date{} = shop_date} -> shop_date
+          _ -> nil
+        end
+      else
+        nil
+      end
+
+    %{
+      closes: closes,
+      has_next_page: has_next_page?,
+      next_cursor: next_cursor
+    }
+  end
+
+  defp close_history_page_limit(limit) when is_integer(limit) and limit > 0, do: min(limit, 100)
+  defp close_history_page_limit(_), do: @close_history_page_size
+
+  defp normalize_close_history_cursor(%Date{} = shop_date), do: shop_date
+
+  defp normalize_close_history_cursor(shop_date) when is_binary(shop_date) do
+    case Date.from_iso8601(shop_date) do
+      {:ok, date} -> date
+      _ -> nil
+    end
+  end
+
+  defp normalize_close_history_cursor(_), do: nil
+
+  defp apply_close_history_cursor(query, nil), do: query
+
+  defp apply_close_history_cursor(query, %Date{} = shop_date) do
+    from(s in query, where: s.shop_date < ^shop_date)
   end
 
   @doc """

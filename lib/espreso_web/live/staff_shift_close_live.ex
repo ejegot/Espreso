@@ -75,7 +75,8 @@ defmodule EspresoWeb.StaffShiftCloseLive do
            |> assign(:blocked?, false)
            |> assign(:staff_shift_ended?, staff_shift_ended?)
            |> assign(:confirming?, false)
-           |> assign(:form_error, nil)}
+           |> assign(:form_error, nil)
+           |> reset_close_history()}
 
         {:error, :already_closed} ->
           {:noreply,
@@ -84,7 +85,8 @@ defmodule EspresoWeb.StaffShiftCloseLive do
            |> assign(:already_closed?, true)
            |> assign(:blocked?, false)
            |> assign(:confirming?, false)
-           |> assign(:form_error, "Shift already closed for today.")}
+           |> assign(:form_error, "Shift already closed for today.")
+           |> reset_close_history()}
 
         {:error, :other_staff_active} ->
           {:noreply,
@@ -114,6 +116,10 @@ defmodule EspresoWeb.StaffShiftCloseLive do
            |> assign(:form_error, close_changeset_error(changeset))}
       end
     end
+  end
+
+  def handle_event("load_more_close_history", _params, socket) do
+    {:noreply, append_close_history(socket)}
   end
 
   @impl true
@@ -478,6 +484,83 @@ defmodule EspresoWeb.StaffShiftCloseLive do
             </button>
           </form>
         <% end %>
+
+        <section
+          class="staff-shift-close-history"
+          id="staff-shift-close-history"
+          aria-label="Close history"
+        >
+          <div class="staff-shift-close-history-head">
+            <p class="staff-shift-close-section-label">Close history</p>
+            <p class="staff-shift-close-section-hint">
+              Sealed shop-day snapshots, newest first.
+            </p>
+          </div>
+
+          <div
+            :if={@close_history == []}
+            class="staff-shift-close-history-empty"
+            id="staff-shift-close-history-empty"
+          >
+            <strong>No previous closes yet.</strong>
+            <p class="staff-shift-close-section-hint">
+              Past Close Shift seals will appear here.
+            </p>
+          </div>
+
+          <div
+            :if={@close_history != []}
+            class="staff-shift-close-history-list"
+            id="staff-shift-close-history-list"
+          >
+            <article
+              :for={entry <- @close_history}
+              class="staff-shift-close-history-row"
+              id={"staff-shift-close-history-#{Date.to_iso8601(entry.close.shop_date)}"}
+            >
+              <div class="staff-shift-close-history-row-main">
+                <p class="staff-shift-close-history-date">
+                  {Calendar.strftime(entry.close.shop_date, "%b %-d, %Y")}
+                </p>
+                <p class="staff-shift-close-history-meta">
+                  Closed {Shifts.format_closed_at(entry.close.closed_at)}
+                  <span :if={entry.close.closed_by_user}>
+                    · {entry.close.closed_by_user.name}
+                  </span>
+                </p>
+                <p class="staff-shift-close-history-totals">
+                  {Menu.format_price(entry.close.system_total)}
+                  <span>· {entry.close.system_count} orders</span>
+                </p>
+              </div>
+
+              <ul class="staff-paid-breakdown staff-shift-close-history-breakdown">
+                <li :for={row <- entry.via_rows} class="staff-paid-breakdown-row">
+                  <span class="staff-paid-breakdown-label">{row.label}</span>
+                  <span class="staff-paid-breakdown-total">{Menu.format_price(row.total)}</span>
+                  <span class="staff-paid-breakdown-count">{row.count}</span>
+                </li>
+              </ul>
+
+              <p :if={entry.close.counted_cash} class="staff-shift-close-history-counted">
+                Counted cash · {Menu.format_price(entry.close.counted_cash)}
+              </p>
+              <p :if={entry.close.notes} class="staff-shift-close-history-notes">
+                {entry.close.notes}
+              </p>
+            </article>
+          </div>
+
+          <button
+            :if={@close_history_has_next?}
+            type="button"
+            id="staff-shift-close-history-more"
+            class="staff-shift-close-history-more"
+            phx-click="load_more_close_history"
+          >
+            Load more
+          </button>
+        </section>
       </main>
     </.staff_shell>
     """
@@ -533,6 +616,40 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     |> assign(:notes, "")
     |> assign(:confirming?, false)
     |> assign(:form_error, nil)
+    |> reset_close_history()
+  end
+
+  defp reset_close_history(socket) do
+    %{closes: closes, has_next_page: has_next?, next_cursor: next_cursor} =
+      Shifts.list_close_history()
+
+    socket
+    |> assign(:close_history, Enum.map(closes, &history_entry/1))
+    |> assign(:close_history_has_next?, has_next?)
+    |> assign(:close_history_next_cursor, next_cursor)
+  end
+
+  defp append_close_history(socket) do
+    cursor = socket.assigns.close_history_next_cursor
+
+    if socket.assigns.close_history_has_next? and not is_nil(cursor) do
+      %{closes: closes, has_next_page: has_next?, next_cursor: next_cursor} =
+        Shifts.list_close_history(cursor: cursor)
+
+      socket
+      |> assign(
+        :close_history,
+        socket.assigns.close_history ++ Enum.map(closes, &history_entry/1)
+      )
+      |> assign(:close_history_has_next?, has_next?)
+      |> assign(:close_history_next_cursor, next_cursor)
+    else
+      socket
+    end
+  end
+
+  defp history_entry(close) do
+    %{close: close, via_rows: closed_via_rows(close)}
   end
 
   defp latest_closed_shift(%User{id: user_id}) do

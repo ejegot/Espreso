@@ -4378,6 +4378,95 @@ body:has(.menu-page-locked) {
   background: #fff;
 }
 
+.staff-shift-close-history {
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--close-line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.staff-shift-close-history-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.staff-shift-close-history-empty {
+  padding: 0.85rem 0;
+}
+
+.staff-shift-close-history-empty strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.staff-shift-close-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.staff-shift-close-history-row {
+  padding: 0.85rem 0.9rem;
+  border: 1px solid var(--close-line);
+  border-radius: var(--cs-radius-panel, 0.65rem);
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.staff-shift-close-history-date {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.staff-shift-close-history-meta,
+.staff-shift-close-history-totals,
+.staff-shift-close-history-counted,
+.staff-shift-close-history-notes {
+  margin: 0;
+  font-size: 0.88rem;
+  color: color-mix(in srgb, var(--close-ink, #1c1917) 72%, transparent);
+}
+
+.staff-shift-close-history-totals {
+  font-weight: 650;
+  color: var(--close-ink, #1c1917);
+}
+
+.staff-shift-close-history-totals span {
+  font-weight: 500;
+  color: color-mix(in srgb, var(--close-ink, #1c1917) 68%, transparent);
+}
+
+.staff-shift-close-history-breakdown {
+  margin: 0;
+}
+
+.staff-shift-close-history-more {
+  display: block;
+  width: 100%;
+  margin: 0.15rem 0 0;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--close-line);
+  border-radius: var(--cs-radius-panel, 0.65rem);
+  background: color-mix(in srgb, var(--close-ink, #1c1917) 3%, #fff);
+  color: var(--close-ink, #1c1917);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.staff-shift-close-history-more:hover,
+.staff-shift-close-history-more:focus-visible {
+  border-color: color-mix(in srgb, var(--close-ink, #1c1917) 28%, transparent);
+  outline: none;
+}
+
 @media (max-height: 560px) {
   .staff-shift-close {
     padding-block: 0.4rem 0.75rem;
