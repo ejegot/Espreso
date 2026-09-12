@@ -78,16 +78,14 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     conn = log_in(conn, barista)
     {:ok, view, _html} = live(conn, ~p"/pos")
+    assert has_element?(view, "#pos-loyalty-entry", "Add loyalty")
     refute has_element?(view, "#pos-loyalty-history")
 
-    view
-    |> element("#pos-loyalty-phone")
-    |> render_change(%{loyalty_phone: "09175550001"})
-
-    view |> element("#pos-loyalty-lookup") |> render_click()
+    view = find_loyalty(view, "09175550001")
 
     assert has_element?(view, "#pos-loyalty-status")
     assert has_element?(view, "#pos-loyalty-history", "View history")
+    assert has_element?(view, "#pos-loyalty-entry", "pts")
 
     {:ok, detail, _html} =
       view
@@ -104,15 +102,12 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
-    view
-    |> element("#pos-loyalty-phone")
-    |> render_change(%{loyalty_phone: "09175550002"})
-
-    view |> element("#pos-loyalty-lookup") |> render_click()
+    view = find_loyalty(view, "09175550002")
     assert has_element?(view, "#pos-loyalty-history")
 
     view |> element("#pos-loyalty-clear") |> render_click()
     refute has_element?(view, "#pos-loyalty-history")
+    assert has_element?(view, "#pos-loyalty-entry", "Add loyalty")
   end
 
   test "phone entered without Find blocks place and shows Find hint", %{
@@ -125,12 +120,21 @@ defmodule EspresoWeb.StaffPosLiveTest do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
     view |> element("#pos-product-#{espresso.id}") |> render_click()
 
+    view = open_loyalty(view)
+
     view
-    |> element("#pos-loyalty-phone")
-    |> render_change(%{loyalty_phone: "09175550011"})
+    |> form("#pos-loyalty-form", %{loyalty_phone: "09175550011"})
+    |> render_change()
 
     assert has_element?(view, "#pos-loyalty-find-hint", "Find this customer")
+    assert has_element?(view, "#pos-loyalty-entry", "Find needed")
     assert has_element?(view, "#pos-place-order[disabled]")
+
+    view |> element("#pos-loyalty-done") |> render_click()
+    refute has_element?(view, "#pos-loyalty-modal")
+    assert has_element?(view, "#pos-loyalty-find-hint", "Find this customer")
+    assert has_element?(view, "#pos-place-order[disabled]")
+    assert live_assigns(view).loyalty_phone =~ "09175550011"
 
     view |> render_click("place_order", %{})
 
@@ -152,6 +156,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
     view |> element("#pos-product-#{espresso.id}") |> render_click()
     refute has_element?(view, "#pos-loyalty-find-hint")
+    assert has_element?(view, "#pos-loyalty-entry", "Add loyalty")
 
     submit_order(view)
 
@@ -171,11 +176,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
     view |> element("#pos-product-#{espresso.id}") |> render_click()
 
-    view
-    |> element("#pos-loyalty-phone")
-    |> render_change(%{loyalty_phone: "09175550012"})
-
-    view |> element("#pos-loyalty-lookup") |> render_click()
+    view = find_loyalty(view, "09175550012")
     assert has_element?(view, "#pos-loyalty-status")
 
     submit_order(view)
@@ -184,6 +185,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert order.customer_id == customer.id
     refute has_element?(view, "#pos-loyalty-status")
     refute has_element?(view, "#pos-loyalty-history")
+    assert has_element?(view, "#pos-loyalty-entry", "Add loyalty")
     assert live_assigns(view).loyalty_customer == nil
     assert live_assigns(view).loyalty_phone == ""
   end
@@ -203,11 +205,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> element("#pos-product-#{americano.id}") |> render_click()
     view |> element("#pos-product-#{americano.id}") |> render_click()
 
-    view
-    |> element("#pos-loyalty-phone")
-    |> render_change(%{loyalty_phone: "09175550013"})
-
-    view |> element("#pos-loyalty-lookup") |> render_click()
+    _view = find_loyalty(view, "09175550013")
     submit_order(view)
 
     html = render(view)
@@ -246,11 +244,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> element("#pos-product-#{americano.id}") |> render_click()
     view |> element("#pos-product-#{americano.id}") |> render_click()
 
-    view
-    |> element("#pos-loyalty-phone")
-    |> render_change(%{loyalty_phone: "09175550014"})
-
-    view |> element("#pos-loyalty-lookup") |> render_click()
+    _view = find_loyalty(view, "09175550014")
     submit_order(view)
 
     assert [order] = Orders.list_active_orders()
@@ -276,14 +270,23 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
-    view
-    |> element("#pos-loyalty-phone")
-    |> render_change(%{loyalty_phone: "09175550015"})
+    view = find_loyalty(view, "09175550015")
 
-    view |> element("#pos-loyalty-lookup") |> render_click()
+    assert has_element?(view, "#pos-loyalty-entry", "Reward ready")
+    assert has_element?(view, "#pos-loyalty-status", "Reward ready")
+    assert has_element?(view, "#pos-loyalty-redeem", "Redeem Reward")
 
-    assert has_element?(view, "#pos-loyalty-status", "ready to redeem")
-    assert has_element?(view, "#pos-loyalty-redeem", "Redeem reward")
+    view |> element("#pos-loyalty-redeem") |> render_click()
+    assert has_element?(view, "#pos-loyalty-modal")
+    assert has_element?(view, "#pos-loyalty-panel[data-loyalty-state='redeem']")
+    assert has_element?(view, "#pos-loyalty-modal-title", "Redeem Reward")
+    refute has_element?(view, "#pos-redeem-modal")
+    refute has_element?(view, "#pos-loyalty-form")
+
+    view |> element("#pos-redeem-cancel") |> render_click()
+    assert has_element?(view, "#pos-loyalty-panel[data-loyalty-state='loyalty']")
+    assert has_element?(view, "#pos-loyalty-form")
+    assert has_element?(view, "#pos-loyalty-redeem", "Redeem Reward")
   end
 
   test "editing phone after Find clears resolved loyalty until Find again", %{
@@ -295,19 +298,89 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
-    view
-    |> element("#pos-loyalty-phone")
-    |> render_change(%{loyalty_phone: "09175550016"})
-
-    view |> element("#pos-loyalty-lookup") |> render_click()
+    view = find_loyalty(view, "09175550016")
     assert has_element?(view, "#pos-loyalty-status")
 
     view
-    |> element("#pos-loyalty-phone")
-    |> render_change(%{loyalty_phone: "09175550099"})
+    |> form("#pos-loyalty-form", %{loyalty_phone: "09175550099"})
+    |> render_change()
 
     refute has_element?(view, "#pos-loyalty-status")
     assert has_element?(view, "#pos-loyalty-find-hint")
+    assert has_element?(view, "#pos-loyalty-entry", "Find needed")
+  end
+
+  test "closing Loyalty modal preserves unresolved phone and Place gate", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+
+    view = open_loyalty(view)
+
+    view
+    |> form("#pos-loyalty-form", %{loyalty_phone: "09175550021"})
+    |> render_change()
+
+    view |> element("#pos-loyalty-done") |> render_click()
+
+    refute has_element?(view, "#pos-loyalty-modal")
+    assert live_assigns(view).loyalty_phone =~ "09175550021"
+    assert is_nil(live_assigns(view).loyalty_customer)
+    assert has_element?(view, "#pos-place-order[disabled]")
+    assert has_element?(view, "#pos-loyalty-entry.is-attention")
+  end
+
+  test "Find submit in Loyalty modal resolves customer without prior change flush", %{
+    conn: conn,
+    barista: barista
+  } do
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09175550022", %{name: "Modal Find"})
+
+    customer
+    |> Ecto.Changeset.change(%{points_balance: 4})
+    |> Repo.update!()
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view = open_loyalty(view)
+
+    # Submit carries the phone even if assigns were not updated yet.
+    view
+    |> form("#pos-loyalty-form", %{loyalty_phone: "09175550022"})
+    |> render_submit()
+
+    assert has_element?(view, "#pos-loyalty-status", "Modal Find")
+    assert has_element?(view, "#pos-loyalty-status", "4 points")
+    assert has_element?(view, "#pos-loyalty-entry", "4 pts")
+  end
+
+  test "invalid phone in Loyalty modal shows error", %{conn: conn, barista: barista} do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view = open_loyalty(view)
+
+    view
+    |> form("#pos-loyalty-form", %{loyalty_phone: "123"})
+    |> render_submit()
+
+    assert has_element?(view, "#pos-loyalty-error", "valid PH mobile")
+    refute has_element?(view, "#pos-loyalty-status")
+  end
+
+  test "Find creates a new loyalty customer from the modal", %{conn: conn, barista: barista} do
+    phone = "09175550023"
+    before = Repo.aggregate(Espreso.Customers.Customer, :count, :id)
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view = find_loyalty(view, phone)
+
+    assert has_element?(view, "#pos-loyalty-status", "0 points")
+    assert has_element?(view, "#pos-loyalty-panel[data-loyalty-state='loyalty']")
+    refute has_element?(view, "#pos-redeem-modal")
+    assert Repo.aggregate(Espreso.Customers.Customer, :count, :id) == before + 1
+    assert live_assigns(view).loyalty_customer.points_balance == 0
   end
 
   test "manager and owner can open POS", %{conn: conn, manager: manager, owner: owner} do
@@ -2140,6 +2213,21 @@ defmodule EspresoWeb.StaffPosLiveTest do
     conn
     |> Phoenix.ConnTest.init_test_session(%{})
     |> Plug.Conn.put_session(:user_id, user.id)
+  end
+
+  defp open_loyalty(view) do
+    view |> element("#pos-loyalty-entry") |> render_click()
+    view
+  end
+
+  defp find_loyalty(view, phone) do
+    view = open_loyalty(view)
+
+    view
+    |> form("#pos-loyalty-form", %{loyalty_phone: phone})
+    |> render_submit()
+
+    view
   end
 
   defp submit_order(view, params \\ %{}) do
