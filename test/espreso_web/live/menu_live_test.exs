@@ -2213,6 +2213,90 @@ defmodule EspresoWeb.MenuLiveTest do
     Enum.filter(Repo.all(Espreso.Orders.Order), &(&1.customer_name == name))
   end
 
+  defp earn_ledger_count(order_id) when is_integer(order_id) do
+    import Ecto.Query
+
+    Repo.aggregate(
+      from(e in Espreso.Loyalty.LedgerEntry,
+        where: e.order_id == ^order_id and e.kind == "earn"
+      ),
+      :count,
+      :id
+    )
+  end
+
+  test "/menu loyalty phone Counter order earns after Mark Paid and Rewards shows 1 point", %{
+    conn: conn
+  } do
+    cost = Espreso.Loyalty.redeem_cost()
+    phone = "09175559901"
+    customer_name = "QR Earn Guest"
+
+    set_payments_mode!("qrph_manual")
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view = enter_menu_browse(view)
+
+    # ₱75 × 3 = ₱225 ≥ ₱200 earn threshold
+    view = add_to_order(view, "Espresso")
+    view = add_to_order(view, "Espresso")
+    view = add_to_order(view, "Espresso")
+    view |> element("button.brune-icon-bag") |> render_click()
+
+    view
+    |> form("#menu-checkout-form", %{
+      customer_name: customer_name,
+      loyalty_phone: phone
+    })
+    |> render_change()
+
+    view |> element("#checkout-pay-counter") |> render_click()
+
+    {:ok, _order_view, _html} =
+      view
+      |> element("button.menu-basket-checkout", "Place order")
+      |> render_click()
+      |> follow_redirect(conn)
+
+    [order] = orders_named(customer_name)
+    assert order.source == "customer"
+    assert order.payment_method == "counter"
+    assert order.payment_status == "unpaid"
+    assert is_integer(order.customer_id)
+    assert Decimal.compare(order.total, Decimal.new("200")) != :lt
+
+    customer = Repo.get!(Espreso.Customers.Customer, order.customer_id)
+    assert customer.phone_e164 == "+639175559901"
+    assert customer.points_balance == 0
+    assert customer.spend_remainder_centavos == 0
+    assert earn_ledger_count(order.id) == 0
+
+    {:ok, rewards_view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    render_hook(rewards_view, "restore_my_orders", %{"numbers" => [order.number]})
+    rewards_view |> element("#menu-qr-rewards") |> render_click()
+    assert has_element?(rewards_view, "#menu-my-orders-rewards-balance", "0")
+    assert has_element?(rewards_view, "#menu-my-orders-rewards-ratio", "0 / #{cost}")
+    refute has_element?(rewards_view, "#menu-my-orders-rewards-unlocked")
+
+    assert {:ok, :transitioned, paid} =
+             Orders.mark_paid_with_transition(order, paid_via: "cash")
+
+    assert paid.payment_status == "paid"
+    assert paid.customer_id == order.customer_id
+
+    customer = Repo.get!(Espreso.Customers.Customer, order.customer_id)
+    assert customer.points_balance == 1
+    assert earn_ledger_count(paid.id) == 1
+    refute Espreso.Loyalty.earn_pending?(paid)
+
+    {:ok, rewards_view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    render_hook(rewards_view, "restore_my_orders", %{"numbers" => [paid.number]})
+    rewards_view |> element("#menu-qr-rewards") |> render_click()
+
+    assert has_element?(rewards_view, "#menu-my-orders-rewards-balance", "1")
+    assert has_element?(rewards_view, "#menu-my-orders-rewards-ratio", "1 / #{cost}")
+    refute has_element?(rewards_view, "#menu-my-orders-rewards-unlocked")
+  end
+
   test "/menu My Orders Rewards stays empty for anonymous-only orders", %{conn: conn} do
     {:ok, order} =
       Orders.create_order(

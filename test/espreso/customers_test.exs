@@ -50,5 +50,21 @@ defmodule Espreso.CustomersTest do
       assert {:ok, customer} = Customers.find_or_create_by_phone("09171110002")
       assert is_nil(customer.name)
     end
+
+    test "online and POS phone formats resolve to the same loyalty customer" do
+      # Online/QR path typically collects local PH mobile format.
+      assert {:ok, online} =
+               Customers.find_or_create_by_phone("09175559901", %{name: "Cross Channel"})
+
+      before_count = Repo.aggregate(Customer, :count, :id)
+
+      # POS Loyalty Find uses the same identity API with another valid representation.
+      assert {:ok, pos} = Customers.find_or_create_by_phone("+639175559901", %{})
+
+      assert pos.id == online.id
+      assert pos.phone_e164 == online.phone_e164
+      assert pos.phone_e164 == "+639175559901"
+      assert Repo.aggregate(Customer, :count, :id) == before_count
+    end
   end
 end

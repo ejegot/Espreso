@@ -289,6 +289,58 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-loyalty-redeem", "Redeem Reward")
   end
 
+  test "confirm redeem refreshes Loyalty points and clears reward-ready without a second modal",
+       %{
+         conn: conn,
+         barista: barista,
+         espresso: espresso
+       } do
+    cost = Espreso.Loyalty.redeem_cost()
+
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09175550017", %{name: "Redeem Refresh"})
+
+    customer
+    |> Ecto.Changeset.change(%{points_balance: cost})
+    |> Repo.update!()
+
+    price = hd(espresso.product_prices)
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view = find_loyalty(view, "09175550017")
+
+    assert has_element?(view, "#pos-loyalty-entry", "Reward ready")
+    assert has_element?(view, "#pos-loyalty-status", "Reward ready")
+    assert has_element?(view, "#pos-loyalty-status", "#{cost} points")
+
+    view |> element("#pos-loyalty-redeem") |> render_click()
+    assert has_element?(view, "#pos-loyalty-panel[data-loyalty-state='redeem']")
+    refute has_element?(view, "#pos-redeem-modal")
+
+    view |> element("#pos-redeem-price-#{price.id}") |> render_click()
+    view |> element("#pos-redeem-confirm") |> render_click()
+
+    # Back to Loyalty state in the same modal; no browser refresh required.
+    assert has_element?(view, "#pos-loyalty-modal")
+    assert has_element?(view, "#pos-loyalty-panel[data-loyalty-state='loyalty']")
+    assert has_element?(view, "#pos-loyalty-form")
+    refute has_element?(view, "#pos-redeem-modal")
+    refute has_element?(view, "#pos-loyalty-panel[data-loyalty-state='redeem']")
+
+    assert has_element?(view, "#pos-loyalty-status", "0 points")
+    assert has_element?(view, "#pos-loyalty-entry", "0 pts")
+    refute has_element?(view, "#pos-loyalty-status", "Reward ready")
+    refute has_element?(view, "#pos-loyalty-entry", "Reward ready")
+    refute has_element?(view, "#pos-loyalty-redeem")
+
+    html = render(view)
+    assert html =~ "pts left"
+    assert live_assigns(view).loyalty_customer.points_balance == 0
+
+    customer = Repo.get!(Espreso.Customers.Customer, customer.id)
+    assert customer.points_balance == 0
+  end
+
   test "editing phone after Find clears resolved loyalty until Find again", %{
     conn: conn,
     barista: barista
