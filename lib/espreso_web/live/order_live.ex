@@ -2,8 +2,10 @@ defmodule EspresoWeb.OrderLive do
   use EspresoWeb, :live_view
 
   alias Espreso.BusinessSettings
-  alias Espreso.Orders
+  alias Espreso.Loyalty
   alias Espreso.Menu
+  alias Espreso.Orders
+  alias Espreso.Orders.Order
 
   @impl true
   def mount(%{"number" => number}, _session, socket) do
@@ -112,7 +114,9 @@ defmodule EspresoWeb.OrderLive do
                 {confirm_lede(@order)}
               </p>
             <% end %>
-            <p class="order-number order-number--confirm" id="order-confirm-number">{@order.number}</p>
+            <p class="order-number order-number--confirm" id="order-confirm-number">
+              {@order.number}
+            </p>
           <% end %>
 
           <section
@@ -138,6 +142,8 @@ defmodule EspresoWeb.OrderLive do
               <dd>{Orders.format_total(@order)}</dd>
             </div>
           </dl>
+
+          <.elilai_rewards order={@order} />
 
           <div class="order-actions order-actions--confirm">
             <.link
@@ -245,6 +251,8 @@ defmodule EspresoWeb.OrderLive do
             </p>
           </div>
 
+          <.elilai_rewards order={@order} />
+
           <section id="order-receipt" class="order-receipt" aria-labelledby="order-receipt-title">
             <h2 id="order-receipt-title" class="order-receipt-title">Your order</h2>
 
@@ -325,7 +333,7 @@ defmodule EspresoWeb.OrderLive do
   defp page_title(order, _confirming?), do: "Order #{order.number}"
 
   defp confirm_payment_processing?(%{payment_method: "online", payment_status: "awaiting_payment"}),
-    do: false
+       do: false
 
   defp confirm_payment_processing?(%{payment_method: "online", payment_status: status})
        when status != "paid" do
@@ -334,7 +342,9 @@ defmodule EspresoWeb.OrderLive do
 
   defp confirm_payment_processing?(_order), do: false
 
-  defp show_qrph_payment?(%{payment_method: "online", payment_status: "awaiting_payment"}), do: true
+  defp show_qrph_payment?(%{payment_method: "online", payment_status: "awaiting_payment"}),
+    do: true
+
   defp show_qrph_payment?(_), do: false
 
   defp qrph_payment_section(assigns) do
@@ -531,4 +541,82 @@ defmodule EspresoWeb.OrderLive do
   defp tracker_sr_prefix("current"), do: "Current: "
   defp tracker_sr_prefix("upcoming"), do: "Upcoming: "
   defp tracker_sr_prefix(_), do: ""
+
+  attr :order, Order, required: true
+
+  defp elilai_rewards(assigns) do
+    assigns = assign(assigns, :rewards, guest_rewards(assigns.order))
+
+    ~H"""
+    <section
+      :if={@rewards}
+      id="order-elilai-rewards"
+      class="order-elilai-rewards"
+      aria-labelledby="order-elilai-rewards-title"
+    >
+      <h2 id="order-elilai-rewards-title" class="order-elilai-rewards-title">ELIlai Rewards</h2>
+
+      <%= case @rewards do %>
+        <% %{kind: :linked} -> %>
+          <p class="order-elilai-rewards-body" id="order-elilai-rewards-body">
+            Your phone is linked. Points will be added after payment.
+          </p>
+        <% %{kind: :pending} -> %>
+          <p class="order-elilai-rewards-body" id="order-elilai-rewards-body">
+            Payment complete · loyalty points will be added shortly.
+          </p>
+        <% %{kind: :earned, points: points, balance: balance, more: more} -> %>
+          <p class="order-elilai-rewards-body" id="order-elilai-rewards-body">
+            +{points} {points_word(points)} earned · {balance} pts balance
+          </p>
+          <p class="order-elilai-rewards-meta" id="order-elilai-rewards-meta">
+            {more} more {points_word(more)} to a free coffee.
+          </p>
+        <% %{kind: :eligible, balance: balance} -> %>
+          <p class="order-elilai-rewards-body" id="order-elilai-rewards-body">
+            Reward available
+          </p>
+          <p class="order-elilai-rewards-meta" id="order-elilai-rewards-meta">
+            You have {balance} pts. Redeem 1 free HOT or COLD coffee at the counter.
+          </p>
+      <% end %>
+    </section>
+    """
+  end
+
+  defp guest_rewards(%Order{customer_id: nil}), do: nil
+
+  defp guest_rewards(%Order{customer_id: customer_id, payment_status: "paid"} = order)
+       when is_integer(customer_id) do
+    case Loyalty.earn_outcome_for_order(order) do
+      {:earned, points, balance} ->
+        cost = Loyalty.redeem_cost()
+
+        if balance >= cost do
+          %{kind: :eligible, points: points, balance: balance}
+        else
+          %{
+            kind: :earned,
+            points: points,
+            balance: balance,
+            more: max(cost - balance, 0)
+          }
+        end
+
+      :pending ->
+        %{kind: :pending}
+
+      :none ->
+        nil
+    end
+  end
+
+  defp guest_rewards(%Order{customer_id: customer_id}) when is_integer(customer_id) do
+    %{kind: :linked}
+  end
+
+  defp guest_rewards(_), do: nil
+
+  defp points_word(1), do: "point"
+  defp points_word(_), do: "points"
 end

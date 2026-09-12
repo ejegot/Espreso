@@ -52,17 +52,21 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, ".menu-qr-landing-lede", "Browse the menu. Order from your table.")
     assert has_element?(view, "#menu-cta-view-menu", "Get Started")
     assert has_element?(view, "#menu-cta-visit-coffeespot", "See hours & directions")
+
     assert has_element?(
              view,
              ~s(.menu-qr-landing-photo--signature[src="/images/coffeespot/signature-pure-tableya-portrait.jpg"])
            )
+
     assert has_element?(view, ".menu-qr-landing-tradition", "More than a drink,")
     assert has_element?(view, ".menu-qr-landing-tradition", "A Filipino tradition.")
     assert has_element?(view, ".menu-qr-landing-tradition-mark")
+
     assert has_element?(
              view,
              ~s(.menu-qr-landing-photo--visit[src="/images/coffeespot/IMG_3497.jpg"])
            )
+
     assert has_element?(view, ".menu-qr-landing-dots [data-landing-dot='0']")
     assert has_element?(view, ".menu-qr-landing-dots [data-landing-dot='1']")
     refute has_element?(view, ".menu-qr-landing-footer")
@@ -367,11 +371,13 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, ".menu-qr-visit-title", "Visit CoffeeSpot")
     assert has_element?(view, ".menu-qr-visit-brand", "CoffeeSpot")
     assert has_element?(view, ".menu-qr-visit-place", "Lilac, Marikina")
+
     assert has_element?(
              view,
              ".menu-qr-visit-text",
              "84 Lilac St., Concepcion Dos, Marikina City, Philippines"
            )
+
     assert has_element?(view, "#menu-visit-maps", "Open in Maps")
     assert has_element?(view, ".menu-qr-visit-text", "Sun–Wed · 11:00 AM – 11:00 PM")
     assert has_element?(view, ".menu-qr-visit-text", "Thu · 11:00 AM – 12:00 AM")
@@ -481,7 +487,11 @@ defmodule EspresoWeb.MenuLiveTest do
     refute html =~ "+ Add"
     refute html =~ ">Add</button>"
     assert has_element?(view, "button.brune-menu-add--icon[aria-label='Add Espresso'] .hero-plus")
-    assert has_element?(view, "button.brune-menu-add--icon[aria-label='Add Americano'] .hero-plus")
+
+    assert has_element?(
+             view,
+             "button.brune-menu-add--icon[aria-label='Add Americano'] .hero-plus"
+           )
 
     add_button =
       view
@@ -512,10 +522,10 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, "#menu-qr-my-orders")
 
     view = enter_menu_browse(view)
-    assert has_element?(view, "#menu-qr-my-orders", "My Order · Pay")
+    assert has_element?(view, "#menu-qr-my-orders", "Orders")
 
     view |> element("#menu-craving-chip-COLD") |> render_click()
-    assert has_element?(view, "#menu-qr-my-orders", "My Order · Pay")
+    assert has_element?(view, "#menu-qr-my-orders", "Orders")
 
     view |> element("#menu-qr-my-orders") |> render_click()
     assert has_element?(view, "#menu-my-order-#{order.number}", order.number)
@@ -537,7 +547,7 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, "#menu-qr-my-orders")
 
     render_hook(view, "restore_my_orders", %{"numbers" => [order.number]})
-    assert has_element?(view, "#menu-qr-my-orders", "My Order · Pay")
+    assert has_element?(view, "#menu-qr-my-orders", "Orders")
   end
 
   test "/menu displays categories in order", %{conn: conn} do
@@ -553,12 +563,22 @@ defmodule EspresoWeb.MenuLiveTest do
       |> Floki.find("button.menu-craving-chip .menu-craving-label")
       |> Enum.map(fn node -> node |> Floki.text() |> String.trim() end)
 
-    assert labels == ["All", "Hot coffee", "Iced coffee", "Frappe", "Soda", "Food", "Matcha", "Sweets"]
+    assert labels == [
+             "All",
+             "Hot coffee",
+             "Iced coffee",
+             "Frappe",
+             "Soda",
+             "Food",
+             "Matcha",
+             "Sweets"
+           ]
+
     refute has_element?(view, ".brune-menu-tabs-line")
     refute has_element?(view, "#category-FOOD")
   end
 
-  test "/menu My Orders FAB uses dynamic inline labels", %{conn: conn} do
+  test "/menu floating Orders and Rewards nav uses short labels and icons", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
 
     {:ok, received} =
@@ -567,40 +587,57 @@ defmodule EspresoWeb.MenuLiveTest do
         %{customer_name: "One", fulfillment: :pickup, payment_method: :counter}
       )
 
-    {:ok, preparing} =
-      Orders.create_order(
-        [%{name: "Americano", size: "8oz", quantity: 1, price: Decimal.new("110")}],
-        %{customer_name: "Prep", fulfillment: :pickup, payment_method: :counter}
-      )
-
     {:ok, ready} =
       Orders.create_order(
         [%{name: "Hazelnut", size: "16oz", quantity: 1, price: Decimal.new("180")}],
         %{customer_name: "Ready", fulfillment: :pickup, payment_method: :counter}
       )
 
-    assert {:ok, _} = Orders.mark_paid(preparing)
-    assert {:ok, preparing} = Orders.update_status(preparing, "preparing")
     assert {:ok, _} = Orders.mark_paid(ready)
     assert {:ok, ready} = Orders.update_status(ready, "ready")
 
     render_hook(view, "restore_my_orders", %{"numbers" => [received.number]})
-    assert has_element?(view, "#menu-qr-my-orders", "My Order · Pay")
-    refute has_element?(view, ".menu-qr-my-orders-badge")
+    assert has_element?(view, "#menu-qr-customer-nav")
+    assert has_element?(view, "#menu-qr-my-orders", "Orders")
+    assert has_element?(view, "#menu-qr-rewards", "Rewards")
+    assert has_element?(view, "#menu-qr-my-orders .hero-shopping-bag")
+    assert has_element?(view, "#menu-qr-rewards .hero-gift")
+    refute render(view) =~ "My Order ·"
+    refute has_element?(view, "#menu-qr-my-orders", "My")
 
-    render_hook(view, "restore_my_orders", %{"numbers" => [preparing.number]})
-    assert has_element?(view, "#menu-qr-my-orders", "My Order · Preparing")
-
-    render_hook(view, "restore_my_orders", %{"numbers" => [ready.number]})
-    assert has_element?(view, "#menu-qr-my-orders", "My Order · Ready")
+    nav_html = view |> element("#menu-qr-customer-nav") |> render()
+    assert nav_html =~ "menu-qr-customer-nav"
+    assert nav_html =~ ~s(id="menu-qr-my-orders")
+    assert nav_html =~ ~s(id="menu-qr-rewards")
+    # Separate pills: each button carries its own surface styles (not one shared shell).
+    assert nav_html =~ "menu-qr-customer-nav-btn"
 
     render_hook(view, "restore_my_orders", %{
-      "numbers" => [received.number, preparing.number, ready.number]
+      "numbers" => [received.number, ready.number]
     })
 
-    assert has_element?(view, "#menu-qr-my-orders", "My Orders · Ready")
-    refute has_element?(view, ".menu-qr-my-orders-badge")
-    assert has_element?(view, "#menu-qr-my-orders .hero-clipboard-document-list")
+    assert has_element?(view, "#menu-qr-my-orders", "Orders")
+    assert has_element?(view, "#menu-qr-rewards", "Rewards")
+    assert has_element?(view, "#menu-qr-my-orders.menu-qr-my-orders--status")
+
+    view |> element("#menu-qr-rewards") |> render_click()
+    assert has_element?(view, "#menu-my-orders-panel")
+    assert has_element?(view, "#menu-my-orders-title", "ELIlai Rewards")
+    assert has_element?(view, "#menu-my-orders-rewards")
+    refute has_element?(view, "#menu-my-orders-tabs")
+    refute has_element?(view, "#menu-my-orders-tab-orders")
+    refute has_element?(view, "#menu-my-orders-tab-rewards")
+    refute has_element?(view, "#menu-my-orders-orders")
+    refute has_element?(view, "#menu-qr-customer-nav")
+
+    view |> element("button.menu-my-orders-close") |> render_click()
+    assert has_element?(view, "#menu-qr-customer-nav")
+    view |> element("#menu-qr-my-orders") |> render_click()
+    assert has_element?(view, "#menu-my-orders-title", "My Orders")
+    assert has_element?(view, "#menu-my-orders-orders")
+    refute has_element?(view, "#menu-my-orders-rewards")
+    refute has_element?(view, "#menu-my-orders-tab-orders")
+    refute has_element?(view, "#menu-my-orders-tab-rewards")
   end
 
   test "/menu All chip is first and shows multiple category sections", %{conn: conn, food: food} do
@@ -959,7 +996,13 @@ defmodule EspresoWeb.MenuLiveTest do
   end
 
   test "/menu shows product description in detail when present", %{conn: conn, hot: hot} do
-    insert_product!(hot, "Spanish Latte", true, [{"8oz", "160"}, {"12oz", "170"}], "Rich and creamy")
+    insert_product!(
+      hot,
+      "Spanish Latte",
+      true,
+      [{"8oz", "160"}, {"12oz", "170"}],
+      "Rich and creamy"
+    )
 
     {:ok, view, _html} = live(conn, ~p"/menu")
     view = enter_menu_browse(view)
@@ -1040,12 +1083,19 @@ defmodule EspresoWeb.MenuLiveTest do
 
     refute has_element?(view, "#menu-checkout-summary")
     refute has_element?(view, ".menu-checkout-payment .menu-checkout-option")
+
     assert has_element?(
              view,
              "button.menu-basket-checkout[data-dismiss-keyboard]",
              "Place order"
            )
-    assert has_element?(view, ".menu-checkout-payment-note", "Pay at the counter when your order is ready.")
+
+    assert has_element?(
+             view,
+             ".menu-checkout-payment-note",
+             "Pay at the counter when your order is ready."
+           )
+
     refute has_element?(view, ".menu-basket-submit-payment")
     refute has_element?(view, ".menu-basket-alt-label")
     refute has_element?(view, ".menu-basket-body .menu-basket-alt")
@@ -1157,7 +1207,13 @@ defmodule EspresoWeb.MenuLiveTest do
     view |> element("button.menu-checkout-option", "GCash") |> render_click()
     refute has_element?(view, ".menu-checkout-payment-info")
     refute has_element?(view, ".menu-basket-submit-payment")
-    assert has_element?(view, ".menu-checkout-payment-note", "Continue to PayMongo to complete payment.")
+
+    assert has_element?(
+             view,
+             ".menu-checkout-payment-note",
+             "Continue to PayMongo to complete payment."
+           )
+
     assert has_element?(view, "button.menu-basket-checkout", "Continue to GCash")
 
     assert {:error, {:redirect, %{to: checkout_url}}} =
@@ -1369,7 +1425,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
     render_hook(menu_view, "restore_my_orders", %{"numbers" => [order_number]})
 
-    assert has_element?(menu_view, "#menu-qr-my-orders", "My Order · Pay")
+    assert has_element?(menu_view, "#menu-qr-my-orders", "Orders")
     menu_view |> element("#menu-qr-my-orders") |> render_click()
     assert has_element?(menu_view, "#menu-my-orders-panel")
     assert has_element?(menu_view, "#menu-my-orders-active-heading", "Active")
@@ -1425,7 +1481,7 @@ defmodule EspresoWeb.MenuLiveTest do
       "numbers" => [first.number, second.number, third.number, first.number]
     })
 
-    assert has_element?(view, "#menu-qr-my-orders", "My Orders · Pay")
+    assert has_element?(view, "#menu-qr-my-orders", "Orders")
     view |> element("#menu-qr-my-orders") |> render_click()
 
     assert has_element?(view, "#menu-my-order-#{first.number}")
@@ -1450,7 +1506,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
     render_hook(view, "restore_my_orders", %{"numbers" => [order.number]})
 
-    assert has_element?(view, "#menu-qr-my-orders", "My Order · Pay")
+    assert has_element?(view, "#menu-qr-my-orders", "Orders")
     refute has_element?(view, "#menu-qr-sticky #menu-qr-my-orders")
 
     view |> element("#menu-qr-my-orders") |> render_click()
@@ -1458,7 +1514,7 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, "#menu-qr-my-orders")
 
     view |> element("button.menu-my-orders-close") |> render_click()
-    assert has_element?(view, "#menu-qr-my-orders", "My Order · Pay")
+    assert has_element?(view, "#menu-qr-my-orders", "Orders")
 
     view |> element("button[aria-label='Add Americano']") |> render_click()
     assert has_element?(view, "#menu-detail")
@@ -1466,7 +1522,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
     view |> element("button[aria-label='Back to menu']") |> render_click()
     Process.sleep(300)
-    assert has_element?(view, "#menu-qr-my-orders", "My Order · Pay")
+    assert has_element?(view, "#menu-qr-my-orders", "Orders")
 
     view = add_to_order(view, "Espresso")
     view |> element("button.brune-icon-bag") |> render_click()
@@ -1526,7 +1582,7 @@ defmodule EspresoWeb.MenuLiveTest do
       ]
     })
 
-    assert has_element?(view, "#menu-qr-my-orders", "My Orders · Ready")
+    assert has_element?(view, "#menu-qr-my-orders", "Orders")
     refute has_element?(view, ".menu-qr-my-orders-badge")
     refute has_element?(view, "#menu-qr-sticky #menu-qr-my-orders")
 
@@ -1653,7 +1709,7 @@ defmodule EspresoWeb.MenuLiveTest do
       )
 
     render_hook(view, "restore_current_order", %{"number" => order.number})
-    assert has_element?(view, "#menu-qr-my-orders", "My Order · Pay")
+    assert has_element?(view, "#menu-qr-my-orders", "Orders")
   end
 
   test "/menu confirmation page carries order number for client persistence", %{conn: conn} do
@@ -1728,7 +1784,12 @@ defmodule EspresoWeb.MenuLiveTest do
     view |> element("button.brune-icon-bag") |> render_click()
 
     assert has_element?(view, "#menu-basket-panel .menu-basket-body")
-    assert has_element?(view, "#menu-basket-panel .menu-basket-checkout-fields #menu-checkout-form")
+
+    assert has_element?(
+             view,
+             "#menu-basket-panel .menu-basket-checkout-fields #menu-checkout-form"
+           )
+
     refute has_element?(view, "#menu-basket-panel #menu-basket-submit")
     assert has_element?(view, "#menu-basket-submit.menu-basket-submit--floating")
     assert has_element?(view, "#menu-basket-submit .menu-basket-submit-row")
@@ -1745,7 +1806,12 @@ defmodule EspresoWeb.MenuLiveTest do
     view |> element("button.menu-checkout-option", "Takeout") |> render_click()
     refute has_element?(view, "#checkout-table")
     assert has_element?(view, "button.menu-checkout-option.is-active", "Takeout")
-    assert has_element?(view, "#checkout-pickup-hint", "Takeout — pick up at the counter when ready.")
+
+    assert has_element?(
+             view,
+             "#checkout-pickup-hint",
+             "Takeout — pick up at the counter when ready."
+           )
 
     view |> element("button.menu-basket-checkout", "Enter your details") |> render_click()
     assert has_element?(view, "#menu-checkout-summary", "Please enter your name.")
@@ -1846,7 +1912,9 @@ defmodule EspresoWeb.MenuLiveTest do
     view = add_to_order(view, "Espresso")
 
     assert has_element?(view, "#menu-floating-bag")
-    assert has_element?(view, "#menu-qr-my-orders", "My Order · Pay")
+    assert has_element?(view, "#menu-qr-customer-nav")
+    assert has_element?(view, "#menu-qr-my-orders", "Orders")
+    assert has_element?(view, "#menu-qr-rewards", "Rewards")
   end
 
   test "/menu floating bag is a single open_basket control", %{conn: conn} do
@@ -1917,7 +1985,10 @@ defmodule EspresoWeb.MenuLiveTest do
       |> element("#menu-basket")
       |> render()
 
-    assert html |> Floki.parse_fragment!() |> Floki.find(".menu-basket-line .menu-qty") |> length() == 1
+    assert html
+           |> Floki.parse_fragment!()
+           |> Floki.find(".menu-basket-line .menu-qty")
+           |> length() == 1
   end
 
   test "/menu item count uses total quantity for one product qty 2", %{conn: conn} do
@@ -2013,7 +2084,12 @@ defmodule EspresoWeb.MenuLiveTest do
     view = enter_menu_browse(view)
 
     assert has_element?(view, "button.brune-menu-add--icon[aria-label='Add Espresso'] .hero-plus")
-    assert has_element?(view, "button.brune-menu-add--icon[aria-label='Add Americano'] .hero-plus")
+
+    assert has_element?(
+             view,
+             "button.brune-menu-add--icon[aria-label='Add Americano'] .hero-plus"
+           )
+
     refute has_element?(view, "button.brune-menu-add--icon", "+ Add")
     refute has_element?(view, "button.brune-menu-add--icon", "Add")
 
@@ -2135,6 +2211,276 @@ defmodule EspresoWeb.MenuLiveTest do
 
   defp orders_named(name) do
     Enum.filter(Repo.all(Espreso.Orders.Order), &(&1.customer_name == name))
+  end
+
+  test "/menu My Orders Rewards stays empty for anonymous-only orders", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Anon", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    assert is_nil(order.customer_id)
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    render_hook(view, "restore_my_orders", %{"numbers" => [order.number]})
+    view |> element("#menu-qr-rewards") |> render_click()
+    assert has_element?(view, "#menu-my-orders-rewards-note", "loyalty phone")
+    refute has_element?(view, "#menu-my-orders-rewards-balance")
+    refute has_element?(view, "#menu-my-orders-rewards-ratio")
+    refute has_element?(view, "#menu-my-orders-rewards-unlocked")
+    refute render(view) =~ "0 Points"
+  end
+
+  test "/menu My Orders Rewards shows balance and progress below threshold", %{conn: conn} do
+    cost = Espreso.Loyalty.redeem_cost()
+    balance = 3
+    more = max(cost - balance, 0)
+    earn_pesos = div(Espreso.Loyalty.point_threshold_centavos(), 100)
+
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09177770001", %{name: "Reward Guest"})
+
+    customer =
+      customer
+      |> Ecto.Changeset.change(%{points_balance: balance})
+      |> Repo.update!()
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Reward Guest",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          customer_id: customer.id
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    render_hook(view, "restore_my_orders", %{"numbers" => [order.number]})
+    view |> element("#menu-qr-rewards") |> render_click()
+
+    html = render(view)
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "#{balance}")
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "Points")
+    assert has_element?(view, "#menu-my-orders-rewards-ratio", "#{balance} / #{cost}")
+    assert has_element?(view, "#menu-my-orders-rewards-progress", "#{more} more")
+    assert has_element?(view, "#menu-my-orders-rewards-earn", "₱#{earn_pesos}")
+    refute has_element?(view, "#menu-my-orders-rewards-unlocked")
+    refute html =~ customer.phone_e164
+    refute html =~ "Reward Guest"
+    refute has_element?(view, "button", "Redeem")
+  end
+
+  test "/menu My Orders Rewards shows zero-point progress without unlocked state", %{conn: conn} do
+    cost = Espreso.Loyalty.redeem_cost()
+
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09177770007", %{name: "Zero Guest"})
+
+    customer =
+      customer
+      |> Ecto.Changeset.change(%{points_balance: 0})
+      |> Repo.update!()
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Zero Guest",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          customer_id: customer.id
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    render_hook(view, "restore_my_orders", %{"numbers" => [order.number]})
+    view |> element("#menu-qr-rewards") |> render_click()
+
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "0")
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "Points")
+    assert has_element?(view, "#menu-my-orders-rewards-ratio", "0 / #{cost}")
+    assert has_element?(view, "#menu-my-orders-rewards-progress", "#{cost} more")
+    refute has_element?(view, "#menu-my-orders-rewards-unlocked")
+    refute has_element?(view, "#menu-my-orders-rewards-status", "Reward Unlocked")
+
+    progress =
+      view
+      |> element("#menu-my-orders-rewards-progress")
+      |> render()
+
+    assert progress =~ ~r/#{cost} more points? to unlock your free coffee/
+    refute progress =~ ~r/\b0 more points?\b/
+  end
+
+  test "/menu My Orders Rewards shows counter-only unlocked state without redeem control", %{
+    conn: conn
+  } do
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09177770002", %{name: "Eligible Guest"})
+
+    customer =
+      customer
+      |> Ecto.Changeset.change(%{points_balance: Espreso.Loyalty.redeem_cost()})
+      |> Repo.update!()
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Eligible Guest",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          customer_id: customer.id
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    render_hook(view, "restore_my_orders", %{"numbers" => [order.number]})
+    assert has_element?(view, "#menu-qr-rewards.menu-qr-rewards--available")
+    assert has_element?(view, ".menu-qr-rewards-badge")
+
+    view |> element("#menu-qr-rewards") |> render_click()
+
+    html = render(view)
+    assert has_element?(view, "#menu-my-orders-rewards-status", "Reward Unlocked")
+    assert has_element?(view, "#menu-my-orders-rewards-reward", "Hot or Cold")
+    assert has_element?(view, "#menu-my-orders-rewards-hint", "at the counter")
+    refute has_element?(view, "#menu-my-orders-rewards-progress")
+    refute has_element?(view, "#menu-my-orders-redeem")
+    refute html =~ "phx-click=\"redeem"
+    refute html =~ "Redeem reward"
+    refute has_element?(view, "button", "Redeem")
+  end
+
+  test "/menu My Orders Rewards hides balances when multiple customers are present", %{conn: conn} do
+    {:ok, a} = Espreso.Customers.find_or_create_by_phone("09177770003", %{name: "Guest A"})
+    {:ok, b} = Espreso.Customers.find_or_create_by_phone("09177770004", %{name: "Guest B"})
+
+    a = a |> Ecto.Changeset.change(%{points_balance: 12}) |> Repo.update!()
+    b = b |> Ecto.Changeset.change(%{points_balance: 8}) |> Repo.update!()
+
+    {:ok, order_a} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Guest A",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          customer_id: a.id
+        }
+      )
+
+    {:ok, order_b} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Guest B",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          customer_id: b.id
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+
+    render_hook(view, "restore_my_orders", %{
+      "numbers" => [order_a.number, order_b.number]
+    })
+
+    view |> element("#menu-qr-my-orders") |> render_click()
+    assert has_element?(view, "#menu-my-order-#{order_a.number}")
+    assert has_element?(view, "#menu-my-order-#{order_b.number}")
+
+    view |> element("button.menu-my-orders-close") |> render_click()
+    view |> element("#menu-qr-rewards") |> render_click()
+    assert has_element?(view, "#menu-my-orders-rewards-note", "unavailable")
+    refute has_element?(view, "#menu-my-orders-rewards-balance")
+    refute render(view) =~ "+63"
+  end
+
+  test "/menu My Orders Rewards resolves one customer even with an anonymous order present", %{
+    conn: conn
+  } do
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09177770005", %{name: "Only One"})
+
+    customer =
+      customer
+      |> Ecto.Changeset.change(%{points_balance: 5})
+      |> Repo.update!()
+
+    {:ok, linked} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Only One",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          customer_id: customer.id
+        }
+      )
+
+    {:ok, anonymous} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Walk-in", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+
+    render_hook(view, "restore_my_orders", %{
+      "numbers" => [linked.number, anonymous.number]
+    })
+
+    view |> element("#menu-qr-rewards") |> render_click()
+
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "5")
+    refute has_element?(view, "#menu-my-orders-rewards-note", "unavailable")
+  end
+
+  test "/menu My Orders Rewards activity only includes listed orders", %{conn: conn} do
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09177770006", %{name: "Activity"})
+
+    {:ok, listed} =
+      Orders.create_order(
+        [%{name: "Item", size: nil, quantity: 1, price: Decimal.new("200")}],
+        %{
+          customer_name: "Activity",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_status: :paid,
+          paid_via: "cash",
+          customer_id: customer.id,
+          skip_authoritative_prices: true
+        }
+      )
+
+    {:ok, other} =
+      Orders.create_order(
+        [%{name: "Item", size: nil, quantity: 1, price: Decimal.new("200")}],
+        %{
+          customer_name: "Activity",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_status: :paid,
+          paid_via: "cash",
+          customer_id: customer.id,
+          skip_authoritative_prices: true
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    render_hook(view, "restore_my_orders", %{"numbers" => [listed.number]})
+    view |> element("#menu-qr-rewards") |> render_click()
+
+    html = render(view)
+    assert has_element?(view, "#menu-my-orders-rewards-activity")
+    assert html =~ listed.number
+    refute html =~ other.number
   end
 
   defp set_payments_mode!(mode) do

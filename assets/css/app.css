@@ -12877,7 +12877,7 @@ body:has(.home-page-landing) {
   box-shadow: 0 0 0 1.5px var(--qr-chrome-bg);
 }
 
-.menu-qr-my-orders {
+.menu-qr-customer-nav {
   position: fixed;
   left: max(0.85rem, env(safe-area-inset-left, 0px));
   bottom: calc(0.85rem + env(safe-area-inset-bottom));
@@ -12885,11 +12885,22 @@ body:has(.home-page-landing) {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  width: auto;
   max-width: calc(100vw - 1.7rem);
-  min-height: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.menu-qr-customer-nav-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.45rem;
   margin: 0;
-  padding: 0.55rem 0.9rem;
+  padding: 0.45rem 0.85rem;
   border: 1px solid rgba(56, 32, 16, 0.1);
   border-radius: 999px;
   background: color-mix(in srgb, #faf7f4 92%, #fff);
@@ -12907,8 +12918,8 @@ body:has(.home-page-landing) {
     box-shadow 0.15s ease;
 }
 
-.menu-qr-my-orders:hover,
-.menu-qr-my-orders:focus-visible {
+.menu-qr-customer-nav-btn:hover,
+.menu-qr-customer-nav-btn:focus-visible {
   color: #382010;
   border-color: rgba(248, 80, 32, 0.28);
   background: color-mix(in srgb, #f85020 5%, #faf7f4);
@@ -12918,11 +12929,11 @@ body:has(.home-page-landing) {
   outline: none;
 }
 
-.menu-qr-my-orders--status .menu-qr-my-orders-label {
+.menu-qr-my-orders--status {
   color: color-mix(in srgb, #382010 82%, #f85020);
 }
 
-.menu-qr-my-orders-icon {
+.menu-qr-customer-nav-icon {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -12930,30 +12941,43 @@ body:has(.home-page-landing) {
   color: #f85020;
 }
 
-.menu-qr-my-orders-icon-glyph {
-  width: 1.1rem !important;
-  height: 1.1rem !important;
+.menu-qr-customer-nav-icon-glyph {
+  width: 1.05rem !important;
+  height: 1.05rem !important;
 }
 
-.menu-qr-my-orders-label {
+.menu-qr-customer-nav-label {
   min-width: 0;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.01em;
   line-height: 1.2;
   white-space: nowrap;
 }
 
-.menu-live-root:has(.menu-qr-my-orders) .brune-menu-shell {
+.menu-qr-rewards-badge {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.35rem;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #f85020;
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, #faf7f4 92%, #fff);
+}
+
+.menu-live-root:has(.menu-qr-customer-nav) .brune-menu-shell {
   padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
 }
 
-.menu-live-root:has(.menu-floating-bag) .menu-qr-my-orders {
+.menu-live-root:has(.menu-floating-bag) .menu-qr-customer-nav {
   bottom: calc(4.35rem + env(safe-area-inset-bottom));
   z-index: 38;
-  min-height: 2.35rem;
-  max-width: min(13rem, calc(100vw - 1.7rem));
-  padding: 0.4rem 0.7rem;
+}
+
+.menu-live-root:has(.menu-floating-bag) .menu-qr-customer-nav-btn {
+  min-height: 2.15rem;
+  padding: 0.35rem 0.7rem;
   border-color: rgba(56, 32, 16, 0.08);
   background: color-mix(in srgb, #faf7f4 88%, #fff);
   box-shadow:
@@ -12961,25 +12985,25 @@ body:has(.home-page-landing) {
     0 1px 3px rgba(56, 32, 16, 0.04);
 }
 
-.menu-live-root:has(.menu-floating-bag) .menu-qr-my-orders-label {
+.menu-live-root:has(.menu-floating-bag) .menu-qr-customer-nav-label {
   font-size: 0.72rem;
   font-weight: 600;
 }
 
-.menu-live-root:has(.menu-floating-bag) .menu-qr-my-orders-icon-glyph {
+.menu-live-root:has(.menu-floating-bag) .menu-qr-customer-nav-icon-glyph {
   width: 0.95rem !important;
   height: 0.95rem !important;
 }
 
-.menu-live-root:has(.menu-toast) .menu-qr-my-orders {
+.menu-live-root:has(.menu-toast) .menu-qr-customer-nav {
   bottom: calc(4.35rem + env(safe-area-inset-bottom));
 }
 
-.menu-live-root:has(.menu-toast):has(.menu-floating-bag) .menu-qr-my-orders {
+.menu-live-root:has(.menu-toast):has(.menu-floating-bag) .menu-qr-customer-nav {
   bottom: calc(8.35rem + env(safe-area-inset-bottom));
 }
 
-.menu-live-root:has(.menu-qr-my-orders):has(.menu-floating-bag) .brune-menu-shell {
+.menu-live-root:has(.menu-qr-customer-nav):has(.menu-floating-bag) .brune-menu-shell {
   padding-bottom: calc(8.75rem + env(safe-area-inset-bottom));
 }
 
@@ -13216,6 +13240,210 @@ body:has(.home-page-landing) {
   font-size: 0.9rem;
   line-height: 1.45;
   text-align: center;
+}
+
+.menu-my-orders-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  margin: 0 0 0.85rem;
+  padding: 0 0.15rem;
+}
+
+.menu-my-orders-tab {
+  min-height: 2.35rem;
+  margin: 0;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid rgba(56, 32, 16, 0.12);
+  border-radius: 999px;
+  background: transparent;
+  color: color-mix(in srgb, #382010 62%, #b0a098);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.menu-my-orders-tab.is-active {
+  border-color: color-mix(in srgb, #382010 28%, transparent);
+  background: color-mix(in srgb, #382010 8%, #fff);
+  color: #382010;
+}
+
+.menu-my-orders-rewards {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.menu-my-orders-rewards-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.menu-my-orders-rewards-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #f85020;
+}
+
+.menu-my-orders-rewards-header-icon {
+  width: 1.05rem !important;
+  height: 1.05rem !important;
+}
+
+.menu-my-orders-rewards-title {
+  margin: 0;
+  color: #382010;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.menu-my-orders-rewards-card {
+  display: grid;
+  gap: 0.7rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid rgba(56, 32, 16, 0.1);
+  border-radius: 1rem;
+  background: color-mix(in srgb, #faf7f4 88%, #fff);
+  box-shadow: 0 4px 14px rgba(56, 32, 16, 0.05);
+}
+
+.menu-my-orders-rewards-card--note {
+  gap: 0;
+}
+
+.menu-my-orders-rewards-balance {
+  margin: 0;
+  color: #382010;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.menu-my-orders-rewards-balance strong {
+  display: inline-block;
+  margin-right: 0.2rem;
+  font-family: "DM Sans", sans-serif;
+  font-size: 2.15rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  vertical-align: -0.08em;
+}
+
+.menu-my-orders-rewards-progress-block {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.menu-my-orders-rewards-ratio {
+  margin: 0;
+  color: color-mix(in srgb, #382010 70%, #b0a098);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.menu-my-orders-rewards-meter {
+  width: 100%;
+  height: 0.55rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, #382010 10%, #fff);
+}
+
+.menu-my-orders-rewards-meter-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: #f85020;
+  transition: width 0.2s ease;
+}
+
+.menu-my-orders-rewards-unlocked {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, #f85020 8%, #fff);
+  border: 1px solid color-mix(in srgb, #f85020 18%, transparent);
+}
+
+.menu-my-orders-rewards-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  color: #382010;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.menu-my-orders-rewards-status-icon {
+  display: inline-flex;
+  color: #f85020;
+}
+
+.menu-my-orders-rewards-status-glyph {
+  width: 1rem !important;
+  height: 1rem !important;
+}
+
+.menu-my-orders-rewards-reward {
+  margin: 0;
+  color: #382010;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.menu-my-orders-rewards-note {
+  margin: 0;
+  color: color-mix(in srgb, #382010 58%, #b0a098);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.menu-my-orders-rewards-earn {
+  margin: 0.1rem 0 0;
+  color: color-mix(in srgb, #382010 48%, #b0a098);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.menu-my-orders-rewards-activity {
+  margin-top: 0.1rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(56, 32, 16, 0.1);
+}
+
+.menu-my-orders-rewards-activity-title {
+  margin: 0 0 0.4rem;
+  color: color-mix(in srgb, #382010 55%, #b0a098);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.menu-my-orders-rewards-activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.menu-my-orders-rewards-activity-item {
+  color: color-mix(in srgb, #382010 78%, #b0a098);
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .menu-qr-chrome-bag {
@@ -18352,14 +18580,14 @@ html:not(.page-is-loading) .brune-top {
   opacity: 0.9;
 }
 
-.menu-live-root .menu-qr-my-orders {
+.menu-live-root .menu-qr-customer-nav-btn {
   transition:
     background var(--menu-motion-soft),
     box-shadow var(--menu-motion-soft),
     transform var(--menu-motion-press);
 }
 
-.menu-live-root .menu-qr-my-orders:active {
+.menu-live-root .menu-qr-customer-nav-btn:active {
   transform: scale(var(--menu-press-scale));
 }
 
@@ -18514,7 +18742,7 @@ html:not(.page-is-loading) .brune-top {
   .menu-live-root .menu-qr-visit-back:active,
   .menu-live-root .menu-qr-craving-option:active,
   .menu-live-root .menu-qr-chrome-back:active,
-  .menu-live-root .menu-qr-my-orders:active,
+  .menu-live-root .menu-qr-customer-nav-btn:active,
   .menu-live-root .brune-icon-btn:active,
   .menu-live-root .brune-search-btn:active,
   .menu-live-root .menu-size-pill:active,
@@ -20534,4 +20762,44 @@ a.brune-contact-value:focus-visible {
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 0.12em;
+}
+
+/* Guest ELIlai Rewards on /order/:number */
+.order-page .order-elilai-rewards {
+  margin: 0.85rem 0 0;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(56, 32, 16, 0.12);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, #faf7f4 70%, #fff);
+}
+
+.order-page .order-elilai-rewards-title {
+  margin: 0 0 0.3rem;
+  color: #382010;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.order-page .order-elilai-rewards-body,
+.order-page .order-elilai-rewards-meta {
+  margin: 0;
+  color: color-mix(in srgb, #382010 78%, #b0a098);
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.order-page .order-elilai-rewards-meta {
+  margin-top: 0.25rem;
+  color: color-mix(in srgb, #382010 58%, #b0a098);
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+
+.order-page .order-card--confirm .order-elilai-rewards {
+  margin: 0.9rem 0 0.15rem;
 }
