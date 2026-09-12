@@ -7116,16 +7116,55 @@ a.staff-home-card:focus-visible {
   border-color: color-mix(in srgb, var(--cs-orange) 40%, var(--cs-line));
 }
 
-.staff-pos-page .staff-pos-loyalty-row {
-  display: flex;
-  flex-wrap: wrap;
+.staff-pos-page .staff-pos-loyalty-entry-wrap {
+  display: grid;
   gap: 0.35rem;
-  align-items: center;
 }
 
-.staff-pos-page .staff-pos-loyalty-row .staff-pos-field-input {
-  flex: 1 1 8rem;
-  min-width: 0;
+.staff-pos-page .staff-pos-loyalty-entry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 2.4rem;
+  margin: 0;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--cs-line) 90%, transparent);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--cs-cream, #faf7f4) 70%, #fff);
+  color: color-mix(in srgb, var(--cs-brown) 82%, transparent);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.staff-pos-page .staff-pos-loyalty-entry:hover,
+.staff-pos-page .staff-pos-loyalty-entry:focus-visible {
+  border-color: color-mix(in srgb, var(--cs-orange) 40%, var(--cs-line));
+  color: var(--cs-brown);
+  outline: none;
+}
+
+.staff-pos-page .staff-pos-loyalty-entry.is-linked {
+  border-color: color-mix(in srgb, var(--cs-brown) 22%, var(--cs-line));
+  color: var(--cs-brown);
+}
+
+.staff-pos-page .staff-pos-loyalty-entry.is-ready {
+  border-color: color-mix(in srgb, var(--cs-orange) 45%, var(--cs-line));
+  background: color-mix(in srgb, var(--cs-orange) 8%, #fff);
+  color: var(--cs-brown);
+}
+
+.staff-pos-page .staff-pos-loyalty-entry.is-attention {
+  border-color: color-mix(in srgb, #b42318 35%, var(--cs-line));
+  color: color-mix(in srgb, #b42318 70%, var(--cs-brown));
 }
 
 .staff-pos-page .staff-pos-field-hint {
@@ -7135,18 +7174,287 @@ a.staff-home-card:focus-visible {
   color: color-mix(in srgb, var(--cs-brown) 70%, transparent);
 }
 
-.staff-pos-page .staff-pos-redeem {
-  margin-top: 0.55rem;
-  display: grid;
-  gap: 0.45rem;
+#pos-loyalty-modal {
+  z-index: 70;
 }
 
-.staff-pos-page .staff-pos-redeem-list {
+#pos-loyalty-modal-bg {
+  background: rgba(24, 16, 12, 0.46);
+}
+
+#pos-loyalty-modal-container {
+  width: min(100%, 23.5rem);
+  max-height: calc(100dvh - 2rem);
+  margin-inline: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0.95rem 1rem 1rem;
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  border: 1px solid var(--cs-line);
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(24, 16, 12, 0.2);
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-modal {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-modal-head {
+  display: grid;
+  gap: 0.15rem;
+  padding-right: 1.5rem;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-back {
+  justify-self: start;
+  margin: 0 0 0.1rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--cs-brown) 62%, transparent);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-back:hover,
+#pos-loyalty-modal .staff-pos-loyalty-back:focus-visible {
+  color: var(--cs-orange, #f85020);
+  outline: none;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-modal-head h2 {
+  margin: 0;
+  color: var(--cs-brown);
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-modal-head p {
+  margin: 0;
+  color: color-mix(in srgb, var(--cs-brown) 58%, transparent);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-form {
+  display: grid;
+  gap: 0.35rem;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-phone-label {
+  margin: 0;
+  color: color-mix(in srgb, var(--cs-brown) 68%, transparent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-lookup {
+  display: flex;
+  align-items: stretch;
+  min-height: 2.55rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--cs-line) 95%, transparent);
+  border-radius: 0.7rem;
+  background: #fff;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-phone-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border: 0;
+  background: transparent;
+  color: var(--cs-brown);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-phone-input:focus {
+  outline: none;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-lookup:focus-within {
+  border-color: color-mix(in srgb, var(--cs-orange) 45%, var(--cs-line));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cs-orange) 12%, transparent);
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-find {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 0.85rem;
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, var(--cs-line) 95%, transparent);
+  background: color-mix(in srgb, var(--cs-cream, #faf7f4) 80%, #fff);
+  color: var(--cs-brown);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-find:hover,
+#pos-loyalty-modal .staff-pos-loyalty-find:focus-visible {
+  background: color-mix(in srgb, var(--cs-orange) 10%, #fff);
+  color: var(--cs-brown);
+  outline: none;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-summary {
+  display: grid;
+  gap: 0.45rem;
+  padding-top: 0.15rem;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-summary-main {
+  display: grid;
+  gap: 0.1rem;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-summary-name {
+  margin: 0;
+  color: var(--cs-brown);
+  font-size: 0.98rem;
+  font-weight: 800;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-summary-points {
+  margin: 0;
+  color: color-mix(in srgb, var(--cs-brown) 72%, transparent);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-summary-ready {
+  margin: 0.15rem 0 0;
+  color: var(--cs-orange, #f85020);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-summary-meta {
   display: flex;
   flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-history,
+#pos-loyalty-modal .staff-pos-loyalty-clear {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--cs-brown) 62%, transparent);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+  cursor: pointer;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-history:hover,
+#pos-loyalty-modal .staff-pos-loyalty-clear:hover,
+#pos-loyalty-modal .staff-pos-loyalty-history:focus-visible,
+#pos-loyalty-modal .staff-pos-loyalty-clear:focus-visible {
+  color: var(--cs-orange, #f85020);
+  outline: none;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-modal-actions {
+  display: grid;
   gap: 0.35rem;
-  max-height: 9rem;
+  padding-top: 0.15rem;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-modal-actions .staff-pos-place {
+  min-height: 2.5rem;
+}
+
+#pos-loyalty-modal .staff-pos-redeem-temps {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+}
+
+#pos-loyalty-modal .staff-pos-redeem-temp {
+  min-height: 2.35rem;
+  margin: 0;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--cs-line) 95%, transparent);
+  border-radius: 0.65rem;
+  background: #fff;
+  color: color-mix(in srgb, var(--cs-brown) 70%, transparent);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+#pos-loyalty-modal .staff-pos-redeem-temp.is-active {
+  border-color: color-mix(in srgb, var(--cs-orange) 40%, var(--cs-line));
+  background: color-mix(in srgb, var(--cs-orange) 8%, #fff);
+  color: var(--cs-brown);
+}
+
+#pos-loyalty-modal .staff-pos-redeem-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  max-height: 12.5rem;
   overflow: auto;
+}
+
+#pos-loyalty-modal .staff-pos-redeem-choice {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 2.45rem;
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--cs-line) 95%, transparent);
+  border-radius: 0.65rem;
+  background: #fff;
+  color: var(--cs-brown);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+#pos-loyalty-modal .staff-pos-redeem-choice.is-active {
+  border-color: color-mix(in srgb, var(--cs-orange) 42%, var(--cs-line));
+  background: color-mix(in srgb, var(--cs-orange) 8%, #fff);
+}
+
+#pos-loyalty-modal .staff-pos-redeem-choice-name {
+  line-height: 1.25;
+}
+
+#pos-loyalty-modal .staff-pos-redeem-upgrade {
+  margin: 0;
+  color: var(--cs-brown);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+@media (min-width: 760px) {
+  #pos-loyalty-modal-container {
+    width: min(24.5rem, calc(100vw - 4rem));
+    padding: 1.05rem 1.1rem 1.1rem;
+  }
 }
 
 .staff-pos-page .staff-pos-ticket-body {

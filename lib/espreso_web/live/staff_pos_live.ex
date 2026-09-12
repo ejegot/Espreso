@@ -30,6 +30,7 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:loyalty_phone, "")
      |> assign(:loyalty_customer, nil)
      |> assign(:loyalty_error, nil)
+     |> assign(:loyalty_open?, false)
      |> assign(:redeem_open?, false)
      |> assign(:redeem_category, "HOT")
      |> assign(:redeem_price_id, nil)
@@ -113,6 +114,8 @@ defmodule EspresoWeb.StaffPosLive do
              "clear_ticket",
              "undo_cart",
              "set_customer_name",
+             "open_loyalty",
+             "close_loyalty",
              "set_loyalty_phone",
              "lookup_loyalty",
              "clear_loyalty",
@@ -359,7 +362,20 @@ defmodule EspresoWeb.StaffPosLive do
     {:noreply, assign(socket, :customer_name, String.trim(name))}
   end
 
-  def handle_event("set_loyalty_phone", %{"loyalty_phone" => phone}, socket) do
+  def handle_event("open_loyalty", _params, socket) do
+    {:noreply, assign(socket, :loyalty_open?, true)}
+  end
+
+  def handle_event("close_loyalty", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:loyalty_open?, false)
+     |> close_redeem()}
+  end
+
+  def handle_event("set_loyalty_phone", params, socket) do
+    phone = loyalty_phone_param(params)
+
     {:noreply,
      socket
      |> assign(:loyalty_phone, phone)
@@ -367,12 +383,24 @@ defmodule EspresoWeb.StaffPosLive do
      |> maybe_clear_stale_loyalty(phone)}
   end
 
-  def handle_event("lookup_loyalty", _params, socket) do
-    phone = socket.assigns.loyalty_phone
+  def handle_event("lookup_loyalty", params, socket) do
+    # Prefer submitted form value so Find works even if phx-change debounce
+    # has not flushed yet (modal form is outside the ticket order form).
+    phone =
+      case loyalty_phone_param(params) do
+        "" -> socket.assigns.loyalty_phone
+        phone -> phone
+      end
+
     name = String.trim(socket.assigns.customer_name)
 
     name_opts =
       if name != "" and name != "Walk-in", do: %{name: name}, else: %{}
+
+    socket =
+      socket
+      |> assign(:loyalty_phone, phone)
+      |> assign(:loyalty_error, nil)
 
     case Customers.find_or_create_by_phone(phone, name_opts) do
       {:ok, customer} ->
@@ -1102,46 +1130,25 @@ defmodule EspresoWeb.StaffPosLive do
                       />
                     </label>
 
-                    <div class="staff-pos-field" id="pos-loyalty">
-                      <span class="staff-pos-field-label">Loyalty phone (optional)</span>
-                      <div class="staff-pos-loyalty-row">
-                        <input
-                          type="tel"
-                          class="staff-pos-field-input"
-                          id="pos-loyalty-phone"
-                          name="loyalty_phone"
-                          value={@loyalty_phone}
-                          phx-change="set_loyalty_phone"
-                          phx-debounce="300"
-                          autocomplete="tel"
-                          inputmode="tel"
-                          placeholder="09XXXXXXXXX"
-                        />
-                        <button
-                          type="button"
-                          class="staff-pos-fulfill-chip"
-                          id="pos-loyalty-lookup"
-                          phx-click="lookup_loyalty"
-                        >
-                          Find
-                        </button>
-                        <button
-                          :if={@loyalty_customer}
-                          type="button"
-                          class="staff-pos-fulfill-chip"
-                          id="pos-loyalty-clear"
-                          phx-click="clear_loyalty"
-                        >
-                          Clear
-                        </button>
-                      </div>
-                      <p
-                        :if={@loyalty_error}
-                        class="staff-pos-submission-error"
-                        id="pos-loyalty-error"
+                    <div class="staff-pos-loyalty-entry-wrap" id="pos-loyalty">
+                      <button
+                        type="button"
+                        id="pos-loyalty-entry"
+                        class={[
+                          "staff-pos-loyalty-entry",
+                          @loyalty_customer && "is-linked",
+                          @loyalty_customer &&
+                            @loyalty_customer.points_balance >= Loyalty.redeem_cost() &&
+                            "is-ready",
+                          loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer) &&
+                            "is-attention"
+                        ]}
+                        phx-click="open_loyalty"
+                        aria-expanded={to_string(@loyalty_open?)}
+                        aria-controls="pos-loyalty-modal"
                       >
-                        {@loyalty_error}
-                      </p>
+                        {loyalty_entry_label(@loyalty_customer, @loyalty_phone)}
+                      </button>
                       <p
                         :if={loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)}
                         class="staff-pos-submission-error"
@@ -1149,96 +1156,6 @@ defmodule EspresoWeb.StaffPosLive do
                       >
                         Find this customer before placing the order.
                       </p>
-                      <p :if={@loyalty_customer} class="staff-pos-field-hint" id="pos-loyalty-status">
-                        {@loyalty_customer.phone_e164} · {@loyalty_customer.points_balance} pts
-                        <%= if @loyalty_customer.points_balance >= Loyalty.redeem_cost() do %>
-                          · ready to redeem
-                        <% end %>
-                        ·
-                        <.link
-                          navigate={~p"/customers/#{@loyalty_customer.id}"}
-                          class="staff-pos-loyalty-history"
-                          id="pos-loyalty-history"
-                        >
-                          View history
-                        </.link>
-                      </p>
-                      <button
-                        :if={
-                          @loyalty_customer &&
-                            @loyalty_customer.points_balance >= Loyalty.redeem_cost()
-                        }
-                        type="button"
-                        class="staff-pos-fulfill-chip"
-                        id="pos-loyalty-redeem"
-                        phx-click="open_redeem"
-                      >
-                        Redeem reward
-                      </button>
-                    </div>
-
-                    <div :if={@redeem_open?} class="staff-pos-redeem" id="pos-redeem-panel">
-                      <div class="staff-pos-fulfillment staff-pos-fulfillment--pills">
-                        <button
-                          type="button"
-                          class={["staff-pos-fulfill-chip", @redeem_category == "HOT" && "is-active"]}
-                          phx-click="set_redeem_category"
-                          phx-value-category="HOT"
-                        >
-                          Hot
-                        </button>
-                        <button
-                          type="button"
-                          class={["staff-pos-fulfill-chip", @redeem_category == "COLD" && "is-active"]}
-                          phx-click="set_redeem_category"
-                          phx-value-category="COLD"
-                        >
-                          Iced
-                        </button>
-                        <button type="button" class="staff-pos-fulfill-chip" phx-click="close_redeem">
-                          Cancel
-                        </button>
-                      </div>
-
-                      <div class="staff-pos-redeem-list" id="pos-redeem-list">
-                        <%= for category <- Loyalty.list_reward_menu(),
-                                category.name == @redeem_category,
-                                product <- category.products,
-                                price <- product.product_prices do %>
-                          <button
-                            type="button"
-                            class={[
-                              "staff-pos-fulfill-chip",
-                              @redeem_price_id == price.id && "is-active"
-                            ]}
-                            id={"pos-redeem-price-#{price.id}"}
-                            phx-click="select_redeem_price"
-                            phx-value-price_id={price.id}
-                          >
-                            {product.name}
-                            <%= if price.size do %>
-                              · {price.size}
-                            <% end %>
-                            · {Menu.format_price(price.price)}
-                          </button>
-                        <% end %>
-                      </div>
-
-                      <p :if={@redeem_quote} class="staff-pos-field-hint" id="pos-redeem-quote">
-                        Free base {Menu.format_price(@redeem_quote.base_price)} · Pay upgrade {Menu.format_price(
-                          @redeem_quote.upgrade_amount
-                        )} · Uses 10 pts
-                      </p>
-                      <p :if={@redeem_error} class="staff-pos-submission-error">{@redeem_error}</p>
-                      <button
-                        type="button"
-                        class="staff-pos-fulfill-chip is-active"
-                        id="pos-redeem-confirm"
-                        phx-click="confirm_redeem"
-                        disabled={is_nil(@redeem_quote) or @redeeming?}
-                      >
-                        Confirm redeem
-                      </button>
                     </div>
 
                     <button
@@ -1475,6 +1392,19 @@ defmodule EspresoWeb.StaffPosLive do
           cash_tender_token={@cash_tender_token}
           placing_order?={@placing_order?}
         />
+
+        <.loyalty_modal
+          :if={@loyalty_open? and not @cash_tender_open?}
+          redeem_open?={@redeem_open?}
+          loyalty_phone={@loyalty_phone}
+          loyalty_customer={@loyalty_customer}
+          loyalty_error={@loyalty_error}
+          redeem_category={@redeem_category}
+          redeem_price_id={@redeem_price_id}
+          redeem_quote={@redeem_quote}
+          redeem_error={@redeem_error}
+          redeeming?={@redeeming?}
+        />
       </div>
     </.staff_shell>
     """
@@ -1609,6 +1539,233 @@ defmodule EspresoWeb.StaffPosLive do
     </.modal>
     """
   end
+
+  defp loyalty_modal(assigns) do
+    ~H"""
+    <.modal id="pos-loyalty-modal" show={true} on_cancel={JS.push("close_loyalty")}>
+      <div
+        class={[
+          "staff-pos-loyalty-modal",
+          @redeem_open? && "is-redeem"
+        ]}
+        id="pos-loyalty-panel"
+        data-loyalty-state={if(@redeem_open?, do: "redeem", else: "loyalty")}
+      >
+        <%= if @redeem_open? do %>
+          <header class="staff-pos-loyalty-modal-head">
+            <button
+              type="button"
+              class="staff-pos-loyalty-back"
+              id="pos-redeem-back"
+              phx-click="close_redeem"
+            >
+              ← Loyalty
+            </button>
+            <h2 id="pos-loyalty-modal-title">Redeem Reward</h2>
+            <p id="pos-loyalty-modal-description">
+              1 free Hot or Cold coffee. Upgrades are charged when selected.
+            </p>
+          </header>
+
+          <div
+            class="staff-pos-redeem-temps"
+            id="pos-redeem-temps"
+            role="group"
+            aria-label="Temperature"
+          >
+            <button
+              type="button"
+              class={["staff-pos-redeem-temp", @redeem_category == "HOT" && "is-active"]}
+              phx-click="set_redeem_category"
+              phx-value-category="HOT"
+            >
+              HOT
+            </button>
+            <button
+              type="button"
+              class={["staff-pos-redeem-temp", @redeem_category == "COLD" && "is-active"]}
+              phx-click="set_redeem_category"
+              phx-value-category="COLD"
+            >
+              COLD
+            </button>
+          </div>
+
+          <div class="staff-pos-redeem-choices" id="pos-redeem-list">
+            <%= for category <- Loyalty.list_reward_menu(),
+                    category.name == @redeem_category,
+                    product <- category.products,
+                    price <- product.product_prices do %>
+              <button
+                type="button"
+                class={[
+                  "staff-pos-redeem-choice",
+                  @redeem_price_id == price.id && "is-active"
+                ]}
+                id={"pos-redeem-price-#{price.id}"}
+                phx-click="select_redeem_price"
+                phx-value-price_id={price.id}
+              >
+                <span class="staff-pos-redeem-choice-name">
+                  {product.name}
+                  <%= if price.size do %>
+                    · {price.size}
+                  <% end %>
+                </span>
+              </button>
+            <% end %>
+          </div>
+
+          <p
+            :if={redeem_upgrade?(@redeem_quote)}
+            class="staff-pos-redeem-upgrade"
+            id="pos-redeem-quote"
+          >
+            Upgrade +{Menu.format_price(@redeem_quote.upgrade_amount)}
+          </p>
+          <p :if={@redeem_error} class="staff-pos-submission-error" id="pos-redeem-error">
+            {@redeem_error}
+          </p>
+
+          <div class="staff-pos-loyalty-modal-actions">
+            <button
+              type="button"
+              class="staff-pos-place"
+              id="pos-redeem-confirm"
+              phx-click="confirm_redeem"
+              disabled={is_nil(@redeem_quote) or @redeeming?}
+            >
+              Confirm Redeem
+            </button>
+            <button
+              type="button"
+              class="staff-pos-place staff-pos-place--secondary"
+              id="pos-redeem-cancel"
+              phx-click="close_redeem"
+            >
+              Cancel
+            </button>
+          </div>
+        <% else %>
+          <header class="staff-pos-loyalty-modal-head">
+            <h2 id="pos-loyalty-modal-title">Loyalty</h2>
+            <p id="pos-loyalty-modal-description">
+              Link a customer phone to attach points or redeem a reward.
+            </p>
+          </header>
+
+          <form
+            id="pos-loyalty-form"
+            class="staff-pos-loyalty-form"
+            phx-change="set_loyalty_phone"
+            phx-submit="lookup_loyalty"
+          >
+            <label class="staff-pos-loyalty-phone-label" for="pos-loyalty-phone">Phone number</label>
+            <div class="staff-pos-loyalty-lookup" id="pos-loyalty-fields">
+              <input
+                type="tel"
+                class="staff-pos-loyalty-phone-input"
+                id="pos-loyalty-phone"
+                name="loyalty_phone"
+                value={@loyalty_phone}
+                phx-debounce="300"
+                autocomplete="tel"
+                inputmode="tel"
+                placeholder="09XXXXXXXXX"
+              />
+              <button type="submit" class="staff-pos-loyalty-find" id="pos-loyalty-lookup">
+                Find
+              </button>
+            </div>
+
+            <p :if={@loyalty_error} class="staff-pos-submission-error" id="pos-loyalty-error">
+              {@loyalty_error}
+            </p>
+            <p
+              :if={loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)}
+              class="staff-pos-submission-error"
+              id="pos-loyalty-modal-find-hint"
+            >
+              Find this customer before placing the order.
+            </p>
+          </form>
+
+          <div :if={@loyalty_customer} class="staff-pos-loyalty-summary" id="pos-loyalty-status">
+            <div class="staff-pos-loyalty-summary-main">
+              <p class="staff-pos-loyalty-summary-name">
+                {loyalty_customer_display_name(@loyalty_customer)}
+              </p>
+              <p class="staff-pos-loyalty-summary-points">
+                {loyalty_points_label(@loyalty_customer.points_balance)}
+              </p>
+              <p
+                :if={@loyalty_customer.points_balance >= Loyalty.redeem_cost()}
+                class="staff-pos-loyalty-summary-ready"
+              >
+                Reward ready
+              </p>
+            </div>
+
+            <div class="staff-pos-loyalty-summary-meta">
+              <.link
+                navigate={~p"/customers/#{@loyalty_customer.id}"}
+                class="staff-pos-loyalty-history"
+                id="pos-loyalty-history"
+              >
+                View history
+              </.link>
+              <button
+                type="button"
+                class="staff-pos-loyalty-clear"
+                id="pos-loyalty-clear"
+                phx-click="clear_loyalty"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <div class="staff-pos-loyalty-modal-actions">
+            <button
+              :if={@loyalty_customer && @loyalty_customer.points_balance >= Loyalty.redeem_cost()}
+              type="button"
+              class="staff-pos-place"
+              id="pos-loyalty-redeem"
+              phx-click="open_redeem"
+            >
+              Redeem Reward
+            </button>
+            <button
+              type="button"
+              class="staff-pos-place staff-pos-place--secondary"
+              id="pos-loyalty-done"
+              phx-click="close_loyalty"
+            >
+              Done
+            </button>
+          </div>
+        <% end %>
+      </div>
+    </.modal>
+    """
+  end
+
+  defp redeem_upgrade?(%{upgrade_amount: amount}) do
+    match?(%Decimal{}, amount) and Decimal.compare(amount, 0) == :gt
+  end
+
+  defp redeem_upgrade?(_), do: false
+
+  defp loyalty_points_label(1), do: "1 point"
+  defp loyalty_points_label(n) when is_integer(n), do: "#{n} points"
+  defp loyalty_points_label(_), do: "0 points"
+
+  defp loyalty_customer_display_name(%{name: name})
+       when is_binary(name) and name != "" and name != "Walk-in",
+       do: name
+
+  defp loyalty_customer_display_name(%{phone_e164: phone}) when is_binary(phone), do: phone
+  defp loyalty_customer_display_name(_), do: "Customer"
 
   defp do_confirm_redeem(socket, customer, quote) do
     socket = assign(socket, :redeeming?, true)
@@ -1916,7 +2073,36 @@ defmodule EspresoWeb.StaffPosLive do
     |> assign(:loyalty_customer, nil)
     |> assign(:loyalty_phone, "")
     |> assign(:loyalty_error, nil)
+    |> assign(:loyalty_open?, false)
     |> close_redeem()
+  end
+
+  defp loyalty_phone_param(params) when is_map(params) do
+    cond do
+      is_binary(params["loyalty_phone"]) -> params["loyalty_phone"]
+      is_binary(params[:loyalty_phone]) -> params[:loyalty_phone]
+      is_binary(params["value"]) -> params["value"]
+      true -> ""
+    end
+  end
+
+  defp loyalty_phone_param(_), do: ""
+
+  defp loyalty_entry_label(customer, phone) do
+    cond do
+      match?(%{points_balance: balance} when balance >= 0, customer) and
+          customer.points_balance >= Loyalty.redeem_cost() ->
+        "Loyalty · Reward ready"
+
+      match?(%{points_balance: _}, customer) ->
+        "Loyalty · #{customer.points_balance} pts"
+
+      loyalty_phone_unresolved?(phone, customer) ->
+        "Loyalty · Find needed"
+
+      true ->
+        "Loyalty · Add loyalty"
+    end
   end
 
   defp loyalty_place_note(%Espreso.Orders.Order{} = order) do
@@ -2369,6 +2555,7 @@ defmodule EspresoWeb.StaffPosLive do
     |> assign(:loyalty_phone, "")
     |> assign(:loyalty_customer, nil)
     |> assign(:loyalty_error, nil)
+    |> assign(:loyalty_open?, false)
     |> close_redeem()
     |> assign(:notes, "")
     |> assign(:notes_open?, false)
