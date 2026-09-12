@@ -707,16 +707,29 @@ defmodule Espreso.Orders do
   Newest first. Does not preload items.
   """
   def list_todays_unpaid do
-    today_start = shop_day_start_utc()
-
-    Order
-    |> where(
-      [o],
-      o.inserted_at >= ^today_start and o.payment_status in ^@unpaid_payment_statuses and
-        o.status in ^["received", "preparing", "ready", "completed"]
-    )
+    todays_unpaid_query()
     |> order_by([o], desc: o.inserted_at, desc: o.id)
     |> Repo.all()
+  end
+
+  @doc """
+  Count of today's unpaid orders (same filters as `list_todays_unpaid/0`).
+
+  Database aggregate only — does not load order rows.
+  """
+  def count_todays_unpaid do
+    todays_unpaid_query()
+    |> Repo.aggregate(:count, :id)
+  end
+
+  defp todays_unpaid_query do
+    today_start = shop_day_start_utc()
+
+    from(o in Order,
+      where:
+        o.inserted_at >= ^today_start and o.payment_status in ^@unpaid_payment_statuses and
+          o.status in ^["received", "preparing", "ready", "completed"]
+    )
   end
 
   @doc """

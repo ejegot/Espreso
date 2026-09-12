@@ -1902,6 +1902,9 @@ defmodule Espreso.OrdersTest do
     refute cancelled.id in unpaid_ids
     refute yesterday_unpaid.id in unpaid_ids
     refute Enum.any?(unpaid, &Ecto.assoc_loaded?(&1.items))
+
+    assert Orders.count_todays_unpaid() == length(unpaid)
+    assert Orders.count_todays_unpaid() == 4
   end
 
   describe "payment model layer 1" do
@@ -2214,8 +2217,11 @@ defmodule Espreso.OrdersTest do
           payment_method: :online
         })
 
-      unpaid_numbers = Orders.list_todays_unpaid() |> Enum.map(& &1.number)
+      unpaid = Orders.list_todays_unpaid()
+      unpaid_numbers = Enum.map(unpaid, & &1.number)
       assert order.number in unpaid_numbers
+      assert Orders.count_todays_unpaid() == length(unpaid)
+      assert Orders.count_todays_unpaid() >= 1
     end
   end
 
