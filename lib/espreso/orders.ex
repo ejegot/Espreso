@@ -19,6 +19,8 @@ defmodule Espreso.Orders do
   # CoffeeSpot shop calendar is Asia/Manila. Philippines Standard Time is UTC+8
   # year-round (no DST). Timestamps stay UTC in the DB; we only shift the day window.
   @shop_utc_offset_seconds 8 * 60 * 60
+  # Staff Orders reconciliation drawer — exception/audit rows, newest first.
+  @paymongo_reconciliation_list_limit 50
 
   @doc """
   Creates an order from cart lines and checkout attrs.
@@ -1133,11 +1135,16 @@ defmodule Espreso.Orders do
   end
 
   @doc """
-  Lists all open PayMongo payment reconciliation records, newest first.
+  Lists PayMongo payment reconciliation records for the Staff Orders drawer.
+
+  Newest first (`inserted_at`, then `id`). Hard-capped at
+  #{@paymongo_reconciliation_list_limit} rows — these are permanent exception/audit
+  records with no open/closed workflow.
   """
   def list_open_paymongo_reconciliations do
     PaymentReconciliation
-    |> order_by([r], desc: r.inserted_at)
+    |> order_by([r], desc: r.inserted_at, desc: r.id)
+    |> limit(@paymongo_reconciliation_list_limit)
     |> Repo.all()
   end
 
