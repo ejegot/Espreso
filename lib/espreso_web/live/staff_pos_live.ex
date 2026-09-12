@@ -363,7 +363,8 @@ defmodule EspresoWeb.StaffPosLive do
     {:noreply,
      socket
      |> assign(:loyalty_phone, phone)
-     |> assign(:loyalty_error, nil)}
+     |> assign(:loyalty_error, nil)
+     |> maybe_clear_stale_loyalty(phone)}
   end
 
   def handle_event("lookup_loyalty", _params, socket) do
@@ -1141,9 +1142,16 @@ defmodule EspresoWeb.StaffPosLive do
                       >
                         {@loyalty_error}
                       </p>
+                      <p
+                        :if={loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)}
+                        class="staff-pos-submission-error"
+                        id="pos-loyalty-find-hint"
+                      >
+                        Find this customer before placing the order.
+                      </p>
                       <p :if={@loyalty_customer} class="staff-pos-field-hint" id="pos-loyalty-status">
                         {@loyalty_customer.phone_e164} · {@loyalty_customer.points_balance} pts
-                        <%= if @loyalty_customer.points_balance >= 10 do %>
+                        <%= if @loyalty_customer.points_balance >= Loyalty.redeem_cost() do %>
                           · ready to redeem
                         <% end %>
                         ·
@@ -1156,7 +1164,10 @@ defmodule EspresoWeb.StaffPosLive do
                         </.link>
                       </p>
                       <button
-                        :if={@loyalty_customer && @loyalty_customer.points_balance >= 10}
+                        :if={
+                          @loyalty_customer &&
+                            @loyalty_customer.points_balance >= Loyalty.redeem_cost()
+                        }
                         type="button"
                         class="staff-pos-fulfill-chip"
                         id="pos-loyalty-redeem"
@@ -1433,10 +1444,15 @@ defmodule EspresoWeb.StaffPosLive do
                       type="submit"
                       class={[
                         "staff-pos-place",
-                        (@cart == [] or @placing_order?) && "is-disabled"
+                        (@cart == [] or @placing_order? or
+                           loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)) &&
+                          "is-disabled"
                       ]}
                       id="pos-place-order"
-                      disabled={@cart == [] or @placing_order?}
+                      disabled={
+                        @cart == [] or @placing_order? or
+                          loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)
+                      }
                     >
                       <%= if @payment_choice == :paid and @paid_via == "gcash" do %>
                         Confirm GCash &amp; Process
@@ -1647,6 +1663,8 @@ defmodule EspresoWeb.StaffPosLive do
           socket =
             socket
             |> assign(:loyalty_customer, updated_customer)
+            |> assign(:loyalty_phone, updated_customer.phone_e164)
+            |> assign(:loyalty_error, nil)
             |> assign(:redeeming?, false)
             |> close_redeem()
             |> consume_cash_tender()
@@ -1770,11 +1788,7 @@ defmodule EspresoWeb.StaffPosLive do
 
             cash_change = if(change, do: %{tendered: tendered, change: change})
 
-            loyalty_customer =
-              case socket.assigns.loyalty_customer do
-                %{id: id} -> Customers.get_customer(id)
-                _ -> nil
-              end
+            loyalty_note = loyalty_place_note(order)
 
             socket =
               socket
@@ -1787,9 +1801,7 @@ defmodule EspresoWeb.StaffPosLive do
               |> assign(:payment_choice, :paid)
               |> assign(:paid_via, "cash")
               |> assign(:customer_name, "Walk-in")
-              |> assign(:loyalty_customer, loyalty_customer)
-              |> assign(:loyalty_phone, (loyalty_customer && loyalty_customer.phone_e164) || "")
-              |> assign(:loyalty_error, nil)
+              |> clear_loyalty_identity()
               |> assign(:variant_editor_key, nil)
               |> assign(:cash_tender_open?, false)
               |> assign(:cash_tendered, "")
@@ -1815,7 +1827,7 @@ defmodule EspresoWeb.StaffPosLive do
                 |> assign(:last_order, order)
                 |> clear_place_flash()
               else
-                flash = place_flash_message(order, note, cash_change)
+                flash = place_flash_message(order, note, cash_change, loyalty_note)
 
                 socket
                 |> assign(:last_order, nil)
@@ -1868,10 +1880,59 @@ defmodule EspresoWeb.StaffPosLive do
           String.length(String.trim(socket.assigns.customer_name)) < 2 ->
         {:error, "Enter a customer name (at least 2 characters)."}
 
+      loyalty_phone_unresolved?(socket.assigns.loyalty_phone, socket.assigns.loyalty_customer) ->
+        {:error, "Find this customer before placing the order."}
+
       true ->
         :ok
     end
   end
+
+  defp loyalty_phone_unresolved?(phone, loyalty_customer) do
+    trimmed = phone |> to_string() |> String.trim()
+    trimmed != "" and is_nil(loyalty_customer)
+  end
+
+  defp maybe_clear_stale_loyalty(socket, phone) do
+    case socket.assigns.loyalty_customer do
+      %{phone_e164: e164} ->
+        case Customers.normalize_phone(phone) do
+          {:ok, ^e164} ->
+            socket
+
+          _ ->
+            socket
+            |> assign(:loyalty_customer, nil)
+            |> close_redeem()
+        end
+
+      _ ->
+        socket
+    end
+  end
+
+  defp clear_loyalty_identity(socket) do
+    socket
+    |> assign(:loyalty_customer, nil)
+    |> assign(:loyalty_phone, "")
+    |> assign(:loyalty_error, nil)
+    |> close_redeem()
+  end
+
+  defp loyalty_place_note(%Espreso.Orders.Order{} = order) do
+    case Loyalty.earn_outcome_for_order(order) do
+      {:earned, points, balance} when points > 0 ->
+        "+#{points} pts · #{balance} pts balance"
+
+      :pending ->
+        "Payment complete · loyalty points will be added shortly."
+
+      _ ->
+        nil
+    end
+  end
+
+  defp loyalty_place_note(_), do: nil
 
   defp open_cash_tender(socket), do: open_cash_tender(socket, :order, nil)
 
@@ -2384,12 +2445,13 @@ defmodule EspresoWeb.StaffPosLive do
   defp cart_undo_label(%{kind: :variant}), do: "Size changed"
   defp cart_undo_label(_undo), do: "Item removed"
 
-  defp place_flash_message(order, print_note, cash_change) do
+  defp place_flash_message(order, print_note, cash_change, loyalty_note) do
     base =
       "#{order.number} · #{order.customer_name} · #{Orders.status_label(order.status)} · #{Orders.payment_label(order)}"
 
     extras =
       [
+        loyalty_note,
         print_note,
         if(cash_change,
           do: "Cash received #{Menu.format_price(cash_change.tendered)}",
