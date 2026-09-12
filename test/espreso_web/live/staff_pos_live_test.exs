@@ -115,6 +115,201 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute has_element?(view, "#pos-loyalty-history")
   end
 
+  test "phone entered without Find blocks place and shows Find hint", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    before = Repo.aggregate(Espreso.Orders.Order, :count, :id)
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+
+    view
+    |> element("#pos-loyalty-phone")
+    |> render_change(%{loyalty_phone: "09175550011"})
+
+    assert has_element?(view, "#pos-loyalty-find-hint", "Find this customer")
+    assert has_element?(view, "#pos-place-order[disabled]")
+
+    view |> render_click("place_order", %{})
+
+    assert has_element?(
+             view,
+             "#pos-submission-error",
+             "Find this customer before placing the order."
+           )
+
+    assert Repo.aggregate(Espreso.Orders.Order, :count, :id) == before
+    refute has_element?(view, "#pos-loyalty-status")
+  end
+
+  test "blank loyalty phone still places walk-in order", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    refute has_element?(view, "#pos-loyalty-find-hint")
+
+    submit_order(view)
+
+    assert [order] = Orders.list_active_orders()
+    assert is_nil(order.customer_id)
+    refute has_element?(view, "#pos-loyalty-status")
+  end
+
+  test "Find then Place attaches customer_id and clears loyalty for next ticket", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09175550012", %{name: "Attach"})
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+
+    view
+    |> element("#pos-loyalty-phone")
+    |> render_change(%{loyalty_phone: "09175550012"})
+
+    view |> element("#pos-loyalty-lookup") |> render_click()
+    assert has_element?(view, "#pos-loyalty-status")
+
+    submit_order(view)
+
+    assert [order] = Orders.list_active_orders()
+    assert order.customer_id == customer.id
+    refute has_element?(view, "#pos-loyalty-status")
+    refute has_element?(view, "#pos-loyalty-history")
+    assert live_assigns(view).loyalty_customer == nil
+    assert live_assigns(view).loyalty_phone == ""
+  end
+
+  test "successful paid loyalty earn shows points feedback", %{
+    conn: conn,
+    barista: barista,
+    americano: americano
+  } do
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09175550013", %{name: "EarnFlash"})
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
+    view |> element("#pos-size-#{price_12.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+
+    view
+    |> element("#pos-loyalty-phone")
+    |> render_change(%{loyalty_phone: "09175550013"})
+
+    view |> element("#pos-loyalty-lookup") |> render_click()
+    submit_order(view)
+
+    html = render(view)
+    assert html =~ "+1 pts"
+    assert html =~ "1 pts balance"
+
+    customer = Repo.get!(Espreso.Customers.Customer, customer.id)
+    assert customer.points_balance == 1
+    refute has_element?(view, "#pos-loyalty-status")
+  end
+
+  test "deferred loyalty earn keeps payment and shows pending note", %{
+    conn: conn,
+    barista: barista,
+    americano: americano
+  } do
+    previous = Application.get_env(:espreso, :loyalty_earn_barrier)
+
+    on_exit(fn ->
+      if previous do
+        Application.put_env(:espreso, :loyalty_earn_barrier, previous)
+      else
+        Application.delete_env(:espreso, :loyalty_earn_barrier)
+      end
+    end)
+
+    Application.put_env(:espreso, :loyalty_earn_barrier, fn -> {:error, :forced_failure} end)
+
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09175550014", %{name: "Deferred"})
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
+    view |> element("#pos-size-#{price_12.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+    view |> element("#pos-product-#{americano.id}") |> render_click()
+
+    view
+    |> element("#pos-loyalty-phone")
+    |> render_change(%{loyalty_phone: "09175550014"})
+
+    view |> element("#pos-loyalty-lookup") |> render_click()
+    submit_order(view)
+
+    assert [order] = Orders.list_active_orders()
+    assert order.payment_status == "paid"
+    assert order.customer_id == customer.id
+    assert Espreso.Loyalty.earn_pending?(order)
+
+    html = render(view)
+    assert html =~ "loyalty points will be added shortly"
+    refute html =~ "+1 pts"
+
+    customer = Repo.get!(Espreso.Customers.Customer, customer.id)
+    assert customer.points_balance == 0
+  end
+
+  test "reward availability uses Loyalty.redeem_cost", %{conn: conn, barista: barista} do
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09175550015", %{name: "Ready"})
+
+    customer
+    |> Ecto.Changeset.change(%{points_balance: Espreso.Loyalty.redeem_cost()})
+    |> Repo.update!()
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    view
+    |> element("#pos-loyalty-phone")
+    |> render_change(%{loyalty_phone: "09175550015"})
+
+    view |> element("#pos-loyalty-lookup") |> render_click()
+
+    assert has_element?(view, "#pos-loyalty-status", "ready to redeem")
+    assert has_element?(view, "#pos-loyalty-redeem", "Redeem reward")
+  end
+
+  test "editing phone after Find clears resolved loyalty until Find again", %{
+    conn: conn,
+    barista: barista
+  } do
+    {:ok, _customer} =
+      Espreso.Customers.find_or_create_by_phone("09175550016", %{name: "Stale"})
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    view
+    |> element("#pos-loyalty-phone")
+    |> render_change(%{loyalty_phone: "09175550016"})
+
+    view |> element("#pos-loyalty-lookup") |> render_click()
+    assert has_element?(view, "#pos-loyalty-status")
+
+    view
+    |> element("#pos-loyalty-phone")
+    |> render_change(%{loyalty_phone: "09175550099"})
+
+    refute has_element?(view, "#pos-loyalty-status")
+    assert has_element?(view, "#pos-loyalty-find-hint")
+  end
+
   test "manager and owner can open POS", %{conn: conn, manager: manager, owner: owner} do
     {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/pos")
     assert has_element?(manager_view, "#pos-place-order")

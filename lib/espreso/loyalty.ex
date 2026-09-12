@@ -78,6 +78,37 @@ defmodule Espreso.Loyalty do
   def earn_pending?(%Order{}), do: false
 
   @doc """
+  Read-only earn outcome for staff feedback. Does not attempt earn.
+
+  Returns:
+
+  - `:none` — unpaid or no customer
+  - `:pending` — paid with customer, but no earn ledger row yet
+  - `{:earned, points, balance}` — earn ledger present (`points` from ledger,
+    `balance` from the current customer row)
+  """
+  def earn_outcome_for_order(%Order{payment_status: "paid", customer_id: customer_id} = order)
+      when is_integer(customer_id) do
+    case Repo.one(
+           from(e in LedgerEntry,
+             where: e.order_id == ^order.id and e.kind == "earn",
+             select: e.points
+           )
+         ) do
+      nil ->
+        :pending
+
+      points when is_integer(points) ->
+        case Repo.get(Customer, customer_id) do
+          %Customer{points_balance: balance} -> {:earned, points, balance}
+          nil -> {:earned, points, points}
+        end
+    end
+  end
+
+  def earn_outcome_for_order(%Order{}), do: :none
+
+  @doc """
   Paid orders with a customer and no earn ledger row yet (durable pending work).
   """
   def list_pending_earn_orders(opts \\ []) do
