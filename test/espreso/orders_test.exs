@@ -377,6 +377,154 @@ defmodule Espreso.OrdersTest do
     assert summary.by_via["gcash"].count == 1
   end
 
+  test "list_transactions keyset pages newest first without duplicating or truncating summary" do
+    base = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    orders =
+      for i <- 1..5 do
+        {:ok, order} =
+          Orders.create_order(
+            [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+            %{
+              customer_name: "Page #{i}",
+              fulfillment: :pickup,
+              payment_method: :counter,
+              payment_status: :paid,
+              paid_via: "cash",
+              settlement_source: "pos",
+              cash_tendered: Decimal.new("100")
+            }
+          )
+
+        settled_at = DateTime.add(base, i, :second)
+
+        {1, _} =
+          Repo.update_all(from(o in Order, where: o.id == ^order.id),
+            set: [settled_at: settled_at]
+          )
+
+        Repo.get!(Order, order.id)
+      end
+
+    tied_at = DateTime.add(base, 3, :second)
+
+    # Force a settled_at tie between two rows so id DESC breaks it.
+    {1, _} =
+      Repo.update_all(from(o in Order, where: o.id == ^Enum.at(orders, 1).id),
+        set: [settled_at: tied_at]
+      )
+
+    {1, _} =
+      Repo.update_all(from(o in Order, where: o.id == ^Enum.at(orders, 2).id),
+        set: [settled_at: tied_at]
+      )
+
+    page1 =
+      Orders.list_transactions(%{}, limit: 2)
+
+    assert length(page1.orders) == 2
+    assert page1.has_next_page
+    assert %{settled_at: %DateTime{}, id: cursor_id} = page1.next_cursor
+    assert cursor_id == List.last(page1.orders).id
+
+    page1_ids = Enum.map(page1.orders, & &1.id)
+
+    page2 = Orders.list_transactions(%{}, limit: 2, cursor: page1.next_cursor)
+    assert length(page2.orders) == 2
+    assert page2.has_next_page
+    page2_ids = Enum.map(page2.orders, & &1.id)
+    assert MapSet.disjoint?(MapSet.new(page1_ids), MapSet.new(page2_ids))
+
+    page3 = Orders.list_transactions(%{}, limit: 2, cursor: page2.next_cursor)
+    assert length(page3.orders) == 1
+    refute page3.has_next_page
+    assert page3.next_cursor == nil
+
+    all_ids = page1_ids ++ page2_ids ++ Enum.map(page3.orders, & &1.id)
+    assert length(all_ids) == 5
+    assert all_ids == Enum.uniq(all_ids)
+
+    # Deterministic descending order across pages.
+    reloaded =
+      all_ids
+      |> Enum.map(&Repo.get!(Order, &1))
+
+    settled_pairs = Enum.map(reloaded, &{&1.settled_at, &1.id})
+    assert settled_pairs == Enum.sort(settled_pairs, &cursor_desc?/2)
+
+    summary = Orders.transaction_summary(%{})
+    assert summary.count == 5
+    assert Decimal.equal?(summary.total, Decimal.new("375"))
+  end
+
+  test "list_transactions keyset pages preserve payment filter while summary stays full-set" do
+    {:ok, cash_a} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Cash A",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_status: :paid,
+          paid_via: "cash",
+          settlement_source: "pos",
+          cash_tendered: Decimal.new("100")
+        }
+      )
+
+    {:ok, cash_b} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Cash B",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_status: :paid,
+          paid_via: "cash",
+          settlement_source: "pos",
+          cash_tendered: Decimal.new("100")
+        }
+      )
+
+    {:ok, _gcash} =
+      Orders.create_order(
+        [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("120")}],
+        %{
+          customer_name: "GCash",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_status: :paid,
+          paid_via: "gcash",
+          settlement_source: "pos"
+        }
+      )
+
+    page1 = Orders.list_transactions(%{"payment" => "cash"}, limit: 1)
+    assert length(page1.orders) == 1
+    assert page1.orders |> hd() |> Map.fetch!(:paid_via) == "cash"
+    assert page1.has_next_page
+
+    page2 = Orders.list_transactions(%{"payment" => "cash"}, limit: 1, cursor: page1.next_cursor)
+    assert length(page2.orders) == 1
+    assert page2.orders |> hd() |> Map.fetch!(:paid_via) == "cash"
+    refute page2.has_next_page
+
+    ids = Enum.map(page1.orders ++ page2.orders, & &1.id)
+    assert MapSet.new(ids) == MapSet.new([cash_a.id, cash_b.id])
+
+    summary = Orders.transaction_summary(%{"payment" => "cash"})
+    assert summary.count == 2
+    assert Decimal.equal?(summary.total, Decimal.new("150"))
+  end
+
+  defp cursor_desc?({a_at, a_id}, {b_at, b_id}) do
+    case DateTime.compare(a_at, b_at) do
+      :gt -> true
+      :lt -> false
+      :eq -> a_id >= b_id
+    end
+  end
+
   test "mark_paid is idempotent when already paid" do
     lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
 

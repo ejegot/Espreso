@@ -139,6 +139,129 @@ defmodule EspresoWeb.StaffTransactionsLiveTest do
     assert {:error, {:redirect, %{to: "/login"}}} = live(conn, ~p"/transactions")
   end
 
+  test "transactions load more appends next keyset page without duplicates", %{
+    conn: conn,
+    barista: barista,
+    manager: manager
+  } do
+    with_transaction_page_size(2, fn ->
+      orders =
+        for i <- 1..5 do
+          paid_order!("Page #{i}", barista)
+        end
+
+      {:ok, view, _html} = live(log_in(conn, manager), ~p"/transactions")
+
+      assert has_element?(view, "#transactions-summary", "5 receipts")
+      assert has_element?(view, "#transactions-load-more", "Load more")
+
+      first_ids =
+        orders
+        |> Enum.map(& &1.id)
+        |> Enum.filter(&has_element?(view, "#transaction-#{&1}"))
+
+      assert length(first_ids) == 2
+
+      view |> element("#transactions-load-more") |> render_click()
+
+      loaded_after_first =
+        orders
+        |> Enum.map(& &1.id)
+        |> Enum.filter(&has_element?(view, "#transaction-#{&1}"))
+
+      assert length(loaded_after_first) == 4
+      assert length(Enum.uniq(loaded_after_first)) == 4
+      assert has_element?(view, "#transactions-load-more")
+
+      view |> element("#transactions-load-more") |> render_click()
+
+      loaded_all =
+        orders
+        |> Enum.map(& &1.id)
+        |> Enum.filter(&has_element?(view, "#transaction-#{&1}"))
+
+      assert MapSet.new(loaded_all) == MapSet.new(Enum.map(orders, & &1.id))
+      refute has_element?(view, "#transactions-load-more")
+      assert has_element?(view, "#transactions-summary", "5 receipts")
+      assert has_element?(view, "#transactions-summary", "₱375")
+    end)
+  end
+
+  test "changing filters resets transaction pagination to the first page", %{
+    conn: conn,
+    barista: barista,
+    manager: manager
+  } do
+    with_transaction_page_size(2, fn ->
+      for i <- 1..3, do: paid_order!("Cash #{i}", barista)
+
+      {:ok, _gcash} =
+        Orders.create_order(
+          [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("120")}],
+          %{
+            customer_name: "Wallet Only",
+            fulfillment: :pickup,
+            payment_method: :counter,
+            payment_status: :paid,
+            paid_via: "gcash",
+            settlement_source: "pos",
+            settled_by_user_id: barista.id
+          }
+        )
+
+      {:ok, view, _html} = live(log_in(conn, manager), ~p"/transactions")
+      assert has_element?(view, "#transactions-load-more")
+
+      view |> element("#transactions-load-more") |> render_click()
+      assert has_element?(view, "#transactions-summary", "4 receipts")
+
+      view
+      |> form("#transactions-filters", %{"filters" => %{"payment" => "gcash"}})
+      |> render_change()
+
+      assert has_element?(view, "#transactions-summary", "1 receipts")
+      assert has_element?(view, "#transactions-summary", "₱120")
+      assert has_element?(view, "#transactions-list", "Wallet Only")
+      refute has_element?(view, "#transactions-load-more")
+    end)
+  end
+
+  test "pubsub reload resets transactions to the first page", %{
+    conn: conn,
+    barista: barista,
+    manager: manager
+  } do
+    with_transaction_page_size(2, fn ->
+      for i <- 1..3, do: paid_order!("Burst #{i}", barista)
+
+      {:ok, view, _html} = live(log_in(conn, manager), ~p"/transactions")
+      view |> element("#transactions-load-more") |> render_click()
+
+      loaded_before =
+        1..3
+        |> Enum.count(fn i ->
+          # best-effort: count visible cash rows by customer labels
+          render(view) =~ "Burst #{i}"
+        end)
+
+      assert loaded_before >= 3
+
+      paid_order!("After Reload", barista)
+      _ = :sys.get_state(view.pid)
+
+      assert has_element?(view, "#transactions-summary", "4 receipts")
+      assert has_element?(view, "#transactions-load-more")
+
+      # Page-1 reset: only two newest rows until Load more.
+      visible =
+        ["After Reload", "Burst 3", "Burst 2", "Burst 1"]
+        |> Enum.filter(&(render(view) =~ &1))
+
+      assert length(visible) == 2
+      assert "After Reload" in visible
+    end)
+  end
+
   test "order_changed eventually refreshes transactions and preserves filters", %{
     conn: conn,
     barista: barista,
@@ -235,6 +358,21 @@ defmodule EspresoWeb.StaffTransactionsLiveTest do
     Process.sleep(ms)
     _ = :sys.get_state(view.pid)
     :ok
+  end
+
+  defp with_transaction_page_size(size, fun) when is_integer(size) and is_function(fun, 0) do
+    previous = Application.get_env(:espreso, :transaction_page_size)
+    Application.put_env(:espreso, :transaction_page_size, size)
+
+    try do
+      fun.()
+    after
+      if is_nil(previous) do
+        Application.delete_env(:espreso, :transaction_page_size)
+      else
+        Application.put_env(:espreso, :transaction_page_size, previous)
+      end
+    end
   end
 
   defp restore_printer_config_on_exit do

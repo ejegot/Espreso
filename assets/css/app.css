@@ -20041,6 +20041,26 @@ a.brune-contact-value:focus-visible {
   line-height: 1.35;
 }
 
+.staff-transactions-load-more {
+  display: block;
+  width: 100%;
+  margin: 0.65rem 0 0;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--txn-ink) 14%, transparent);
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--txn-ink) 3%, #fff);
+  color: var(--txn-ink);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.staff-transactions-load-more:hover,
+.staff-transactions-load-more:focus-visible {
+  border-color: color-mix(in srgb, var(--txn-forest) 45%, transparent);
+  outline: none;
+}
+
 .staff-transaction-detail {
   display: flex;
   flex-direction: column;
