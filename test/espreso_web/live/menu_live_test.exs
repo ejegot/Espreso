@@ -2225,6 +2225,171 @@ defmodule EspresoWeb.MenuLiveTest do
     )
   end
 
+  test "/menu Rewards FAB is visible without restored My Orders", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+
+    assert has_element?(view, "#menu-qr-customer-nav")
+    assert has_element?(view, "#menu-qr-rewards", "Rewards")
+    refute has_element?(view, "#menu-qr-my-orders")
+  end
+
+  test "/menu Rewards asks for phone when no identity is available", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    view |> element("#menu-qr-rewards") |> render_click()
+
+    assert has_element?(view, "#menu-my-orders-title", "ELIlai Rewards")
+    assert has_element?(view, "#menu-rewards-phone-entry")
+    assert has_element?(view, "#menu-rewards-phone-form")
+    assert has_element?(view, "#menu-rewards-phone-input")
+    assert has_element?(view, "#menu-rewards-phone-form button[type=submit]", "Find")
+    refute has_element?(view, "#menu-my-orders-rewards-balance")
+  end
+
+  test "/menu Rewards phone lookup resolves existing customer without creating", %{conn: conn} do
+    cost = Espreso.Loyalty.redeem_cost()
+    before = Repo.aggregate(Espreso.Customers.Customer, :count, :id)
+
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09175558801", %{name: "Lookup Guest"})
+
+    customer =
+      customer
+      |> Ecto.Changeset.change(%{points_balance: 4})
+      |> Repo.update!()
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    view |> element("#menu-qr-rewards") |> render_click()
+
+    view
+    |> form("#menu-rewards-phone-form", %{rewards_phone: "09175558801"})
+    |> render_submit()
+
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "4")
+    assert has_element?(view, "#menu-my-orders-rewards-ratio", "4 / #{cost}")
+    assert has_element?(view, "#menu-rewards-clear-phone", "different phone")
+    assert Repo.aggregate(Espreso.Customers.Customer, :count, :id) == before + 1
+    assert Repo.get!(Espreso.Customers.Customer, customer.id).points_balance == 4
+  end
+
+  test "/menu Rewards unknown phone does not create a customer", %{conn: conn} do
+    before = Repo.aggregate(Espreso.Customers.Customer, :count, :id)
+    before_ledger = Repo.aggregate(Espreso.Loyalty.LedgerEntry, :count, :id)
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    view |> element("#menu-qr-rewards") |> render_click()
+
+    view
+    |> form("#menu-rewards-phone-form", %{rewards_phone: "09175558899"})
+    |> render_submit()
+
+    assert has_element?(view, "#menu-rewards-not-found")
+    assert has_element?(view, "#menu-my-orders-rewards-note", "No rewards account found")
+    refute has_element?(view, "#menu-my-orders-rewards-balance")
+    assert Repo.aggregate(Espreso.Customers.Customer, :count, :id) == before
+    assert Repo.aggregate(Espreso.Loyalty.LedgerEntry, :count, :id) == before_ledger
+  end
+
+  test "/menu Rewards restores remembered phone identity", %{conn: conn} do
+    cost = Espreso.Loyalty.redeem_cost()
+
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09175558802", %{name: "Remembered"})
+
+    customer
+    |> Ecto.Changeset.change(%{points_balance: 2})
+    |> Repo.update!()
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    render_hook(view, "restore_loyalty_phone", %{"phone" => customer.phone_e164})
+    view |> element("#menu-qr-rewards") |> render_click()
+
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "2")
+    assert has_element?(view, "#menu-my-orders-rewards-ratio", "2 / #{cost}")
+    refute has_element?(view, "#menu-rewards-phone-entry")
+  end
+
+  test "/menu Rewards clear remembered phone returns to phone entry", %{conn: conn} do
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09175558803", %{name: "Clear Phone"})
+
+    customer
+    |> Ecto.Changeset.change(%{points_balance: 1})
+    |> Repo.update!()
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    render_hook(view, "restore_loyalty_phone", %{"phone" => customer.phone_e164})
+    view |> element("#menu-qr-rewards") |> render_click()
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "1")
+
+    view |> element("#menu-rewards-clear-phone") |> render_click()
+    assert has_element?(view, "#menu-rewards-phone-entry")
+    refute has_element?(view, "#menu-my-orders-rewards-balance")
+  end
+
+  test "/menu Rewards restored order customer wins over remembered phone", %{conn: conn} do
+    {:ok, order_customer} =
+      Espreso.Customers.find_or_create_by_phone("09175558804", %{name: "Order Cust"})
+
+    {:ok, other} =
+      Espreso.Customers.find_or_create_by_phone("09175558805", %{name: "Other Cust"})
+
+    order_customer =
+      order_customer
+      |> Ecto.Changeset.change(%{points_balance: 6})
+      |> Repo.update!()
+
+    other
+    |> Ecto.Changeset.change(%{points_balance: 1})
+    |> Repo.update!()
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Order Cust",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          customer_id: order_customer.id
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    render_hook(view, "restore_loyalty_phone", %{"phone" => other.phone_e164})
+    render_hook(view, "restore_my_orders", %{"numbers" => [order.number]})
+    view |> element("#menu-qr-rewards") |> render_click()
+
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "6")
+    assert has_element?(view, "#menu-my-orders-rewards-ratio", "6 /")
+    refute has_element?(view, "#menu-my-orders-rewards-ratio", "1 /")
+    refute has_element?(view, "#menu-rewards-clear-phone")
+  end
+
+  test "/menu Rewards phone path shows latest persisted balance", %{conn: conn} do
+    cost = Espreso.Loyalty.redeem_cost()
+
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09175558806", %{name: "Cross Balance"})
+
+    customer
+    |> Ecto.Changeset.change(%{points_balance: 3})
+    |> Repo.update!()
+
+    # Simulate additional POS-earned points on the same customer row.
+    customer
+    |> Ecto.Changeset.change(%{points_balance: 5})
+    |> Repo.update!()
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    view |> element("#menu-qr-rewards") |> render_click()
+
+    view
+    |> form("#menu-rewards-phone-form", %{rewards_phone: "+639175558806"})
+    |> render_submit()
+
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "5")
+    assert has_element?(view, "#menu-my-orders-rewards-ratio", "5 / #{cost}")
+  end
+
   test "/menu loyalty phone Counter order earns after Mark Paid and Rewards shows 1 point", %{
     conn: conn
   } do
@@ -2309,11 +2474,11 @@ defmodule EspresoWeb.MenuLiveTest do
     {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
     render_hook(view, "restore_my_orders", %{"numbers" => [order.number]})
     view |> element("#menu-qr-rewards") |> render_click()
+    assert has_element?(view, "#menu-rewards-phone-entry")
     assert has_element?(view, "#menu-my-orders-rewards-note", "loyalty phone")
     refute has_element?(view, "#menu-my-orders-rewards-balance")
     refute has_element?(view, "#menu-my-orders-rewards-ratio")
     refute has_element?(view, "#menu-my-orders-rewards-unlocked")
-    refute render(view) =~ "0 Points"
   end
 
   test "/menu My Orders Rewards shows balance and progress below threshold", %{conn: conn} do
@@ -2347,7 +2512,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
     html = render(view)
     assert has_element?(view, "#menu-my-orders-rewards-balance", "#{balance}")
-    assert has_element?(view, "#menu-my-orders-rewards-balance", "Points")
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "/ #{cost} points")
     assert has_element?(view, "#menu-my-orders-rewards-ratio", "#{balance} / #{cost}")
     assert has_element?(view, "#menu-my-orders-rewards-progress", "#{more} more")
     assert has_element?(view, "#menu-my-orders-rewards-earn", "₱#{earn_pesos}")
@@ -2384,9 +2549,9 @@ defmodule EspresoWeb.MenuLiveTest do
     view |> element("#menu-qr-rewards") |> render_click()
 
     assert has_element?(view, "#menu-my-orders-rewards-balance", "0")
-    assert has_element?(view, "#menu-my-orders-rewards-balance", "Points")
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "/ #{cost} points")
     assert has_element?(view, "#menu-my-orders-rewards-ratio", "0 / #{cost}")
-    assert has_element?(view, "#menu-my-orders-rewards-progress", "#{cost} more")
+    assert has_element?(view, "#menu-my-orders-rewards-progress", "Keep earning")
     refute has_element?(view, "#menu-my-orders-rewards-unlocked")
     refute has_element?(view, "#menu-my-orders-rewards-status", "Reward Unlocked")
 
@@ -2395,19 +2560,21 @@ defmodule EspresoWeb.MenuLiveTest do
       |> element("#menu-my-orders-rewards-progress")
       |> render()
 
-    assert progress =~ ~r/#{cost} more points? to unlock your free coffee/
+    assert progress =~ "Keep earning to unlock your free coffee."
     refute progress =~ ~r/\b0 more points?\b/
   end
 
   test "/menu My Orders Rewards shows counter-only unlocked state without redeem control", %{
     conn: conn
   } do
+    cost = Espreso.Loyalty.redeem_cost()
+
     {:ok, customer} =
       Espreso.Customers.find_or_create_by_phone("09177770002", %{name: "Eligible Guest"})
 
     customer =
       customer
-      |> Ecto.Changeset.change(%{points_balance: Espreso.Loyalty.redeem_cost()})
+      |> Ecto.Changeset.change(%{points_balance: cost})
       |> Repo.update!()
 
     {:ok, order} =
@@ -2429,6 +2596,8 @@ defmodule EspresoWeb.MenuLiveTest do
     view |> element("#menu-qr-rewards") |> render_click()
 
     html = render(view)
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "#{cost}")
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "/ #{cost} points")
     assert has_element?(view, "#menu-my-orders-rewards-status", "Reward Unlocked")
     assert has_element?(view, "#menu-my-orders-rewards-reward", "Hot or Cold")
     assert has_element?(view, "#menu-my-orders-rewards-hint", "at the counter")
@@ -2525,11 +2694,13 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, "#menu-my-orders-rewards-note", "unavailable")
   end
 
-  test "/menu My Orders Rewards activity only includes listed orders", %{conn: conn} do
+  test "/menu Rewards Recent Activity is account-wide, not limited to restored orders", %{
+    conn: conn
+  } do
     {:ok, customer} =
       Espreso.Customers.find_or_create_by_phone("09177770006", %{name: "Activity"})
 
-    {:ok, listed} =
+    {:ok, restored} =
       Orders.create_order(
         [%{name: "Item", size: nil, quantity: 1, price: Decimal.new("200")}],
         %{
@@ -2543,28 +2714,278 @@ defmodule EspresoWeb.MenuLiveTest do
         }
       )
 
-    {:ok, other} =
+    {:ok, _hidden} =
       Orders.create_order(
-        [%{name: "Item", size: nil, quantity: 1, price: Decimal.new("200")}],
+        [%{name: "Item", size: nil, quantity: 1, price: Decimal.new("400")}],
         %{
           customer_name: "Activity",
           fulfillment: :pickup,
           payment_method: :counter,
           payment_status: :paid,
           paid_via: "cash",
+          source: :pos,
           customer_id: customer.id,
           skip_authoritative_prices: true
         }
       )
 
     {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
-    render_hook(view, "restore_my_orders", %{"numbers" => [listed.number]})
+    render_hook(view, "restore_my_orders", %{"numbers" => [restored.number]})
     view |> element("#menu-qr-rewards") |> render_click()
 
     html = render(view)
     assert has_element?(view, "#menu-my-orders-rewards-activity")
-    assert html =~ listed.number
-    refute html =~ other.number
+    assert html =~ "+1 point"
+    assert html =~ "+2 points"
+    assert html =~ "Purchase"
+    refute html =~ restored.number
+  end
+
+  test "/menu Rewards polish: 0 points, progress copy, and no activity section", %{conn: conn} do
+    cost = Espreso.Loyalty.redeem_cost()
+
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09175559001", %{name: "Polish Zero"})
+
+    customer
+    |> Ecto.Changeset.change(%{points_balance: 0})
+    |> Repo.update!()
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    view |> element("#menu-qr-rewards") |> render_click()
+
+    view
+    |> form("#menu-rewards-phone-form", %{rewards_phone: "09175559001"})
+    |> render_submit()
+
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "0")
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "/ #{cost} points")
+    assert has_element?(view, "#menu-my-orders-rewards-progress", "Keep earning")
+    refute has_element?(view, "#menu-my-orders-rewards-activity")
+    refute has_element?(view, "#menu-my-orders-rewards-unlocked")
+  end
+
+  test "/menu Rewards polish: below-threshold balance and remaining copy", %{conn: conn} do
+    cost = Espreso.Loyalty.redeem_cost()
+    balance = 6
+    more = cost - balance
+
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09175559002", %{name: "Polish Mid"})
+
+    customer
+    |> Ecto.Changeset.change(%{points_balance: balance})
+    |> Repo.update!()
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    view |> element("#menu-qr-rewards") |> render_click()
+
+    view
+    |> form("#menu-rewards-phone-form", %{rewards_phone: "09175559002"})
+    |> render_submit()
+
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "#{balance}")
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "/ #{cost} points")
+    assert has_element?(view, "#menu-my-orders-rewards-progress", "#{more} more points")
+    refute has_element?(view, "#menu-my-orders-rewards-unlocked")
+  end
+
+  test "/menu Rewards polish: reward unlocked at threshold", %{conn: conn} do
+    cost = Espreso.Loyalty.redeem_cost()
+
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09175559003", %{name: "Polish Unlock"})
+
+    customer
+    |> Ecto.Changeset.change(%{points_balance: cost})
+    |> Repo.update!()
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    view |> element("#menu-qr-rewards") |> render_click()
+
+    view
+    |> form("#menu-rewards-phone-form", %{rewards_phone: "09175559003"})
+    |> render_submit()
+
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "#{cost}")
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "/ #{cost} points")
+    assert has_element?(view, "#menu-my-orders-rewards-status", "Reward Unlocked")
+    assert has_element?(view, "#menu-my-orders-rewards-reward", "1 Free Hot or Cold Coffee")
+    assert has_element?(view, "#menu-my-orders-rewards-hint", "Redeem at the counter")
+  end
+
+  test "/menu Rewards polish: earn activity shows +N and Purchase", %{conn: conn} do
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09175559004", %{name: "Polish Earn"})
+
+    {:ok, _} =
+      Orders.create_order(
+        [%{name: "Item", size: nil, quantity: 1, price: Decimal.new("200")}],
+        %{
+          customer_name: "Polish Earn",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_status: :paid,
+          paid_via: "cash",
+          source: :pos,
+          customer_id: customer.id,
+          skip_authoritative_prices: true
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    view |> element("#menu-qr-rewards") |> render_click()
+
+    view
+    |> form("#menu-rewards-phone-form", %{rewards_phone: "09175559004"})
+    |> render_submit()
+
+    html = render(view)
+    assert has_element?(view, "#menu-my-orders-rewards-activity")
+    assert html =~ "+1 point"
+    assert html =~ "Purchase"
+    assert html =~ "·"
+  end
+
+  test "/menu Rewards polish: redeem activity shows −10 and remains after balance 0", %{
+    conn: conn,
+    americano: americano
+  } do
+    cost = Espreso.Loyalty.redeem_cost()
+
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09175559005", %{name: "Polish Redeem"})
+
+    {:ok, _} =
+      Orders.create_order(
+        [%{name: "Item", size: nil, quantity: 1, price: Decimal.new("2000")}],
+        %{
+          customer_name: "Polish Redeem",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_status: :paid,
+          paid_via: "cash",
+          source: :pos,
+          customer_id: customer.id,
+          skip_authoritative_prices: true
+        }
+      )
+
+    customer = Repo.get!(Espreso.Customers.Customer, customer.id)
+    assert customer.points_balance >= cost
+
+    {:ok, staff} =
+      Espreso.Accounts.register_user(%{
+        name: "Rewards Polish Staff",
+        email: "rewards.polish-#{System.unique_integer([:positive])}@test.local",
+        password: "password123",
+        role: "barista"
+      })
+
+    assert {:ok, _} =
+             Espreso.Loyalty.redeem_at_pos(
+               customer.id,
+               rewards_price_id(americano, "8oz"),
+               %{
+                 customer_name: "Polish Redeem",
+                 fulfillment: :pickup,
+                 payment_method: :counter,
+                 payment_status: :paid,
+                 paid_via: "cash",
+                 source: :pos,
+                 settled_by_user_id: staff.id,
+                 settlement_source: :pos
+               }
+             )
+
+    customer = Repo.get!(Espreso.Customers.Customer, customer.id)
+    assert customer.points_balance == 0
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    view |> element("#menu-qr-rewards") |> render_click()
+
+    view
+    |> form("#menu-rewards-phone-form", %{rewards_phone: "09175559005"})
+    |> render_submit()
+
+    html = render(view)
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "0")
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "/ #{cost} points")
+    assert has_element?(view, "#menu-my-orders-rewards-progress", "Keep earning")
+    assert has_element?(view, "#menu-my-orders-rewards-activity", "Reward redeemed")
+    assert html =~ "−#{cost} points"
+    assert html =~ "+#{cost} points"
+    assert html =~ "Purchase"
+    refute has_element?(view, "#menu-my-orders-rewards-unlocked")
+  end
+
+  test "/menu Rewards polish: new earn after redemption updates balance and history", %{
+    conn: conn,
+    americano: americano
+  } do
+    cost = Espreso.Loyalty.redeem_cost()
+
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09175559006", %{name: "Polish Cycle"})
+
+    customer
+    |> Ecto.Changeset.change(%{points_balance: cost})
+    |> Repo.update!()
+
+    {:ok, staff} =
+      Espreso.Accounts.register_user(%{
+        name: "Rewards Cycle Staff",
+        email: "rewards.cycle-#{System.unique_integer([:positive])}@test.local",
+        password: "password123",
+        role: "barista"
+      })
+
+    assert {:ok, _} =
+             Espreso.Loyalty.redeem_at_pos(
+               customer.id,
+               rewards_price_id(americano, "8oz"),
+               %{
+                 customer_name: "Polish Cycle",
+                 fulfillment: :pickup,
+                 payment_method: :counter,
+                 payment_status: :paid,
+                 paid_via: "cash",
+                 source: :pos,
+                 settled_by_user_id: staff.id,
+                 settlement_source: :pos
+               }
+             )
+
+    {:ok, _} =
+      Orders.create_order(
+        [%{name: "Item", size: nil, quantity: 1, price: Decimal.new("200")}],
+        %{
+          customer_name: "Polish Cycle",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_status: :paid,
+          paid_via: "cash",
+          source: :pos,
+          customer_id: customer.id,
+          skip_authoritative_prices: true
+        }
+      )
+
+    customer = Repo.get!(Espreso.Customers.Customer, customer.id)
+    assert customer.points_balance >= 1
+
+    {:ok, view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    view |> element("#menu-qr-rewards") |> render_click()
+
+    view
+    |> form("#menu-rewards-phone-form", %{rewards_phone: "09175559006"})
+    |> render_submit()
+
+    html = render(view)
+    assert has_element?(view, "#menu-my-orders-rewards-balance", "#{customer.points_balance}")
+    assert has_element?(view, "#menu-my-orders-rewards-activity", "Reward redeemed")
+    assert html =~ "−#{cost} points"
+    assert html =~ "+1 point"
   end
 
   defp set_payments_mode!(mode) do
@@ -2584,6 +3005,14 @@ defmodule EspresoWeb.MenuLiveTest do
     Espreso.BusinessSettings.get()
     |> Ecto.Changeset.change(attrs)
     |> Repo.update!()
+  end
+
+  defp rewards_price_id(product, size) do
+    product = Repo.preload(product, :product_prices)
+
+    product.product_prices
+    |> Enum.find(&(to_string(&1.size) == to_string(size)))
+    |> Map.fetch!(:id)
   end
 
   defp insert_category!(name) do
