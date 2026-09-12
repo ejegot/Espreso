@@ -113,6 +113,10 @@ defmodule EspresoWeb.StaffCashOutLive do
     end
   end
 
+  def handle_event("load_more_cash_out_history", _params, socket) do
+    {:noreply, append_cash_out_history(socket)}
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -298,6 +302,85 @@ defmodule EspresoWeb.StaffCashOutLive do
             No Cash Outs recorded today.
           </p>
         </section>
+
+        <section
+          class="staff-cash-out-history"
+          id="staff-cash-out-history"
+          aria-label="Cash Out history"
+        >
+          <div class="staff-cash-out-history-head">
+            <p class="staff-cash-out-section-label">Cash Out history</p>
+            <p class="staff-cash-out-history-hint">
+              Previous shop days · recorded totals exclude voided rows.
+            </p>
+          </div>
+
+          <div
+            :if={@cash_out_history == []}
+            class="staff-cash-out-history-empty"
+            id="staff-cash-out-history-empty"
+          >
+            <strong>No previous cash outs yet.</strong>
+            <p class="staff-cash-out-history-hint">Past Cash Outs will appear here by shop day.</p>
+          </div>
+
+          <div
+            :if={@cash_out_history != []}
+            class="staff-cash-out-history-days"
+            id="staff-cash-out-history-days"
+          >
+            <article
+              :for={day <- @cash_out_history}
+              class="staff-cash-out-history-day"
+              id={"staff-cash-out-history-day-#{Date.to_iso8601(day.shop_date)}"}
+            >
+              <div class="staff-cash-out-history-day-head">
+                <p class="staff-cash-out-history-date">
+                  {Calendar.strftime(day.shop_date, "%b %-d, %Y")}
+                </p>
+                <p class="staff-cash-out-history-total">
+                  {Menu.format_price(day.total)}
+                </p>
+              </div>
+
+              <ul class="staff-cash-out-list staff-cash-out-history-list">
+                <li
+                  :for={entry <- day.cash_outs}
+                  class={[
+                    "staff-cash-out-row",
+                    entry.status == "voided" && "staff-cash-out-row--voided"
+                  ]}
+                  id={"staff-cash-out-history-row-#{entry.id}"}
+                >
+                  <div class="staff-cash-out-row-main">
+                    <p class="staff-cash-out-row-amount">{Menu.format_price(entry.amount)}</p>
+                    <p class="staff-cash-out-row-category">{entry.category}</p>
+                    <p :if={entry.note} class="staff-cash-out-row-note">{entry.note}</p>
+                    <p class="staff-cash-out-row-meta">
+                      {format_shop_time(entry.recorded_at)}
+                      <span :if={entry.created_by_user}>
+                        · Recorded by {entry.created_by_user.name}
+                      </span>
+                    </p>
+                    <p :if={entry.status == "voided"} class="staff-cash-out-void-badge">
+                      VOIDED <span :if={entry.void_reason}>· {entry.void_reason}</span>
+                    </p>
+                  </div>
+                </li>
+              </ul>
+            </article>
+          </div>
+
+          <button
+            :if={@cash_out_history_has_next?}
+            type="button"
+            id="staff-cash-out-history-more"
+            class="staff-cash-out-history-more"
+            phx-click="load_more_cash_out_history"
+          >
+            Load more
+          </button>
+        </section>
       </main>
     </.staff_shell>
     """
@@ -339,6 +422,7 @@ defmodule EspresoWeb.StaffCashOutLive do
     |> assign(:note, "")
     |> assign(:form_error, nil)
     |> assign(:last_recorded, nil)
+    |> reset_cash_out_history()
   end
 
   defp reload_list(socket) do
@@ -350,6 +434,32 @@ defmodule EspresoWeb.StaffCashOutLive do
     |> assign(:cash_outs, cash_outs)
     |> assign(:recorded_cash_outs, recorded)
     |> assign(:total, CashOuts.total_for_shop_date(shop_date))
+  end
+
+  defp reset_cash_out_history(socket) do
+    %{days: days, has_next_page: has_next?, next_cursor: next_cursor} =
+      CashOuts.list_cash_out_history()
+
+    socket
+    |> assign(:cash_out_history, days)
+    |> assign(:cash_out_history_has_next?, has_next?)
+    |> assign(:cash_out_history_next_cursor, next_cursor)
+  end
+
+  defp append_cash_out_history(socket) do
+    cursor = socket.assigns.cash_out_history_next_cursor
+
+    if socket.assigns.cash_out_history_has_next? and not is_nil(cursor) do
+      %{days: days, has_next_page: has_next?, next_cursor: next_cursor} =
+        CashOuts.list_cash_out_history(cursor: cursor)
+
+      socket
+      |> assign(:cash_out_history, socket.assigns.cash_out_history ++ days)
+      |> assign(:cash_out_history_has_next?, has_next?)
+      |> assign(:cash_out_history_next_cursor, next_cursor)
+    else
+      socket
+    end
   end
 
   defp barista?(%User{role: "barista"}), do: true

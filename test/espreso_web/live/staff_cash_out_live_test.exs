@@ -152,4 +152,138 @@ defmodule EspresoWeb.StaffCashOutLiveTest do
 
     assert is_nil(Shifts.get_todays_close())
   end
+
+  test "cash out history empty state keeps today form available", %{conn: conn, manager: manager} do
+    {:ok, view, _html} = live(log_in(conn, manager), ~p"/staff/cash-out")
+
+    assert has_element?(view, "#staff-cash-out-history-empty", "No previous cash outs yet.")
+    assert has_element?(view, "#staff-cash-out-form")
+    refute has_element?(view, "#staff-cash-out-history-more")
+  end
+
+  test "cash out history groups previous days and paginates", %{conn: conn, manager: manager} do
+    today = Orders.shop_date_today()
+
+    for {offset, amount, note, void?} <- [
+          {3, "90", "Day three", false},
+          {2, "50", "Day two voided", true},
+          {2, "120", "Day two kept", false},
+          {1, "150", "Day one", false}
+        ] do
+      cash_out =
+        insert_history_cash_out!(manager, Date.add(today, -offset), %{
+          amount: Decimal.new(amount),
+          note: note
+        })
+
+      if void? do
+        assert {:ok, _} = CashOuts.void_cash_out(cash_out, manager, "Correction")
+      end
+    end
+
+    with_cash_out_history_page_size(2, fn ->
+      {:ok, view, _html} = live(log_in(conn, manager), ~p"/staff/cash-out")
+
+      assert has_element?(view, "#staff-cash-out-history")
+
+      assert has_element?(
+               view,
+               "#staff-cash-out-history-day-#{Date.to_iso8601(Date.add(today, -1))}"
+             )
+
+      assert has_element?(
+               view,
+               "#staff-cash-out-history-day-#{Date.to_iso8601(Date.add(today, -2))}"
+             )
+
+      refute has_element?(
+               view,
+               "#staff-cash-out-history-day-#{Date.to_iso8601(Date.add(today, -3))}"
+             )
+
+      assert has_element?(view, "#staff-cash-out-history-days", "Day one")
+      assert has_element?(view, "#staff-cash-out-history-days", "₱150")
+      assert has_element?(view, "#staff-cash-out-history-days", "Day two kept")
+      assert has_element?(view, "#staff-cash-out-history-days", "₱120")
+      assert has_element?(view, "#staff-cash-out-history-days", "VOIDED")
+      assert has_element?(view, "#staff-cash-out-history-days", "Correction")
+      assert has_element?(view, "#staff-cash-out-history-more", "Load more")
+      assert has_element?(view, "#staff-cash-out-form")
+
+      view |> element("#staff-cash-out-history-more") |> render_click()
+
+      assert has_element?(
+               view,
+               "#staff-cash-out-history-day-#{Date.to_iso8601(Date.add(today, -3))}"
+             )
+
+      assert has_element?(view, "#staff-cash-out-history-days", "Day three")
+      refute has_element?(view, "#staff-cash-out-history-more")
+
+      html = render(view)
+
+      assert length(Regex.scan(~r/id="staff-cash-out-history-day-\d{4}-\d{2}-\d{2}"/, html)) == 3
+
+      view
+      |> form("#staff-cash-out-form", %{cash_out: %{amount: "33", category: "Other"}})
+      |> render_submit()
+
+      assert has_element?(view, "#staff-cash-out-total", "₱33")
+
+      assert has_element?(
+               view,
+               "#staff-cash-out-history-day-#{Date.to_iso8601(Date.add(today, -3))}"
+             )
+    end)
+  end
+
+  test "inactive staff cannot open cash out history route", %{conn: conn} do
+    {:ok, inactive} =
+      Accounts.register_user(%{
+        name: "Inactive Cash",
+        email: "inactive-cash-#{System.unique_integer([:positive])}@test.local",
+        password: "password123",
+        role: "manager"
+      })
+
+    assert {:ok, _} = Accounts.update_user(inactive, %{active: false})
+
+    assert {:error, {:redirect, %{to: to}}} =
+             live(log_in(conn, inactive), ~p"/staff/cash-out")
+
+    assert to in [~p"/login", ~p"/staff", ~p"/dashboard"]
+  end
+
+  defp insert_history_cash_out!(user, shop_date, attrs) do
+    {:ok, cash_out} =
+      %Espreso.CashOuts.CashOut{}
+      |> Espreso.CashOuts.CashOut.create_changeset(%{
+        amount: Map.fetch!(attrs, :amount),
+        category: Map.get(attrs, :category, "Other"),
+        note: Map.get(attrs, :note),
+        recorded_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        shop_date: shop_date,
+        status: "recorded",
+        created_by_user_id: user.id
+      })
+      |> Espreso.Repo.insert()
+
+    Espreso.Repo.preload(cash_out, :created_by_user)
+  end
+
+  defp with_cash_out_history_page_size(size, fun)
+       when is_integer(size) and is_function(fun, 0) do
+    previous = Application.get_env(:espreso, :cash_out_history_page_size)
+    Application.put_env(:espreso, :cash_out_history_page_size, size)
+
+    try do
+      fun.()
+    after
+      if is_nil(previous) do
+        Application.delete_env(:espreso, :cash_out_history_page_size)
+      else
+        Application.put_env(:espreso, :cash_out_history_page_size, previous)
+      end
+    end
+  end
 end

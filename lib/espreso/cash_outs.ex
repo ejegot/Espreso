@@ -76,6 +76,89 @@ defmodule Espreso.CashOuts do
     |> Repo.all()
   end
 
+  @cash_out_history_page_size 25
+
+  @doc """
+  Read-only Cash Out history grouped by Manila shop date, newest day first.
+
+  Excludes today's shop date (`shop_date < Orders.shop_date_today/0` on the
+  first page). Optional `:cursor` is a `%Date{}` and continues with older days
+  (`shop_date < cursor`).
+
+  Each day includes all rows (recorded + voided) and the recorded-only total
+  via the existing day-scoped helpers.
+
+  Optional `opts`:
+  - `:limit` — page size (default #{@cash_out_history_page_size}, clamped 1..100)
+  - `:cursor` — last visible `shop_date` from the previous page
+
+  Returns `%{days, has_next_page, next_cursor}`.
+  """
+  def list_cash_out_history(opts \\ []) when is_list(opts) do
+    limit =
+      opts
+      |> Keyword.get(
+        :limit,
+        Application.get_env(:espreso, :cash_out_history_page_size, @cash_out_history_page_size)
+      )
+      |> cash_out_history_page_limit()
+
+    today = Orders.shop_date_today()
+    cursor = normalize_cash_out_history_cursor(Keyword.get(opts, :cursor))
+    upper_bound = cursor || today
+
+    shop_dates =
+      from(c in CashOut,
+        where: c.shop_date < ^upper_bound,
+        group_by: c.shop_date,
+        select: c.shop_date,
+        order_by: [desc: c.shop_date],
+        limit: ^(limit + 1)
+      )
+      |> Repo.all()
+
+    has_next_page? = length(shop_dates) > limit
+    page_dates = Enum.take(shop_dates, limit)
+
+    days =
+      Enum.map(page_dates, fn shop_date ->
+        %{
+          shop_date: shop_date,
+          cash_outs: list_cash_outs_for_shop_date(shop_date),
+          total: total_for_shop_date(shop_date)
+        }
+      end)
+
+    next_cursor =
+      if has_next_page? do
+        List.last(page_dates)
+      else
+        nil
+      end
+
+    %{
+      days: days,
+      has_next_page: has_next_page?,
+      next_cursor: next_cursor
+    }
+  end
+
+  defp cash_out_history_page_limit(limit) when is_integer(limit) and limit > 0,
+    do: min(limit, 100)
+
+  defp cash_out_history_page_limit(_), do: @cash_out_history_page_size
+
+  defp normalize_cash_out_history_cursor(%Date{} = shop_date), do: shop_date
+
+  defp normalize_cash_out_history_cursor(shop_date) when is_binary(shop_date) do
+    case Date.from_iso8601(shop_date) do
+      {:ok, date} -> date
+      _ -> nil
+    end
+  end
+
+  defp normalize_cash_out_history_cursor(_), do: nil
+
   @doc """
   Sum of non-voided (`status == "recorded"`) Cash Out amounts for a shop date.
   """
