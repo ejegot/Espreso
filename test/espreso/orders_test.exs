@@ -549,6 +549,64 @@ defmodule Espreso.OrdersTest do
     assert Espreso.Repo.aggregate(Espreso.Orders.PaymentReconciliation, :count, :id) == 1
   end
 
+  test "list_open_paymongo_reconciliations returns newest first with id tie-break" do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("100")}],
+        %{
+          customer_name: "Recon Order",
+          fulfillment: :pickup,
+          payment_method: :online
+        }
+      )
+
+    older_at = ~U[2026-01-01 10:00:00Z]
+    newer_at = ~U[2026-01-02 10:00:00Z]
+    tied_at = ~U[2026-01-03 10:00:00Z]
+
+    older = insert_recon!(order, "cs_recon_order_old", older_at)
+    newer = insert_recon!(order, "cs_recon_order_new", newer_at)
+    tied_low = insert_recon!(order, "cs_recon_order_tie_a", tied_at)
+    tied_high = insert_recon!(order, "cs_recon_order_tie_b", tied_at)
+
+    assert tied_high.id > tied_low.id
+
+    ids = Enum.map(Orders.list_open_paymongo_reconciliations(), & &1.id)
+    assert ids == [tied_high.id, tied_low.id, newer.id, older.id]
+  end
+
+  test "list_open_paymongo_reconciliations caps at 50 and keeps the newest" do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("100")}],
+        %{
+          customer_name: "Recon Cap",
+          fulfillment: :pickup,
+          payment_method: :online
+        }
+      )
+
+    base = ~U[2026-02-01 00:00:00Z]
+
+    records =
+      for i <- 1..51 do
+        at = DateTime.add(base, i, :second)
+        insert_recon!(order, "cs_recon_cap_#{i}", at)
+      end
+
+    listed = Orders.list_open_paymongo_reconciliations()
+    assert length(listed) == 50
+
+    expected_ids =
+      records
+      |> Enum.sort_by(&{&1.inserted_at, &1.id}, :desc)
+      |> Enum.take(50)
+      |> Enum.map(& &1.id)
+
+    assert Enum.map(listed, & &1.id) == expected_ids
+    refute Enum.any?(listed, &(&1.id == hd(records).id))
+  end
+
   test "attach_paymongo_session enforces unique checkout session binding" do
     lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
 
@@ -2076,5 +2134,24 @@ defmodule Espreso.OrdersTest do
       quantity: 1,
       price: price.price
     }
+  end
+
+  defp insert_recon!(order, session_id, %DateTime{} = inserted_at) do
+    {:ok, record} =
+      Orders.record_paymongo_reconciliation(%{
+        order_id: order.id,
+        order_number: order.number,
+        paymongo_checkout_session_id: session_id,
+        paymongo_payment_id: "pay_#{session_id}",
+        paymongo_webhook_event_id: "evt_#{session_id}",
+        amount_centavos: 10_000,
+        currency: "PHP"
+      })
+
+    {1, _} =
+      from(r in Espreso.Orders.PaymentReconciliation, where: r.id == ^record.id)
+      |> Repo.update_all(set: [inserted_at: DateTime.truncate(inserted_at, :second)])
+
+    Repo.get!(Espreso.Orders.PaymentReconciliation, record.id)
   end
 end
