@@ -27,6 +27,8 @@ defmodule EspresoWeb.StaffTransactionsLive do
      |> assign(:action_note, nil)
      |> assign(:pubsub_reload_timer, nil)
      |> assign(:pubsub_reload_token, nil)
+     |> assign(:transactions_has_next?, false)
+     |> assign(:transactions_next_cursor, nil)
      |> load_transactions(params), layout: false}
   end
 
@@ -54,6 +56,10 @@ defmodule EspresoWeb.StaffTransactionsLive do
      |> assign(:selected_transaction, nil)
      |> close_reprint()
      |> load_transactions(filters)}
+  end
+
+  def handle_event("load_more_transactions", _params, socket) do
+    {:noreply, append_transactions(socket)}
   end
 
   def handle_event("select_transaction", %{"id" => id}, socket) do
@@ -270,6 +276,16 @@ defmodule EspresoWeb.StaffTransactionsLive do
                 Unpaid orders and payment exceptions are handled in Orders.
               </span>
             </div>
+
+            <button
+              :if={@transactions_has_next?}
+              type="button"
+              id="transactions-load-more"
+              class="staff-transactions-load-more"
+              phx-click="load_more_transactions"
+            >
+              Load more
+            </button>
           </section>
 
           <aside :if={@selected_transaction} class="staff-transaction-detail" id="transaction-detail">
@@ -419,17 +435,48 @@ defmodule EspresoWeb.StaffTransactionsLive do
 
   defp load_transactions(socket, filters) do
     socket = cancel_pubsub_reload(socket)
-    %{orders: orders, filters: normalized} = Orders.list_transactions(filters)
+
+    %{
+      orders: orders,
+      filters: normalized,
+      has_next_page: has_next_page?,
+      next_cursor: next_cursor
+    } = Orders.list_transactions(filters)
+
     summary = Orders.transaction_summary(normalized)
     selected_id = socket.assigns[:selected_transaction] && socket.assigns.selected_transaction.id
     selected = if selected_id, do: Enum.find(orders, &(&1.id == selected_id))
 
     socket
     |> assign(:transactions, orders)
+    |> assign(:transactions_has_next?, has_next_page?)
+    |> assign(:transactions_next_cursor, next_cursor)
     |> assign(:filters, normalized)
     |> assign(:summary, summary)
     |> assign(:selected_transaction, selected)
     |> assign(:printer_enabled?, Printer.enabled?())
+  end
+
+  defp append_transactions(socket) do
+    cursor = socket.assigns.transactions_next_cursor
+
+    if socket.assigns.transactions_has_next? and not is_nil(cursor) do
+      %{
+        orders: more,
+        has_next_page: has_next_page?,
+        next_cursor: next_cursor
+      } = Orders.list_transactions(socket.assigns.filters, cursor: cursor)
+
+      existing_ids = MapSet.new(Enum.map(socket.assigns.transactions, & &1.id))
+      more = Enum.reject(more, &MapSet.member?(existing_ids, &1.id))
+
+      socket
+      |> assign(:transactions, socket.assigns.transactions ++ more)
+      |> assign(:transactions_has_next?, has_next_page?)
+      |> assign(:transactions_next_cursor, next_cursor)
+    else
+      socket
+    end
   end
 
   defp schedule_pubsub_reload(socket) do

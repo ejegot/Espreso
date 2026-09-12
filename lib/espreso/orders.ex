@@ -19,6 +19,8 @@ defmodule Espreso.Orders do
   # CoffeeSpot shop calendar is Asia/Manila. Philippines Standard Time is UTC+8
   # year-round (no DST). Timestamps stay UTC in the DB; we only shift the day window.
   @shop_utc_offset_seconds 8 * 60 * 60
+  # Staff Transactions list page size (keyset). Summary remains unpaginated.
+  @transaction_page_size 50
   # Staff Orders reconciliation drawer — exception/audit rows, newest first.
   @paymongo_reconciliation_list_limit 50
 
@@ -326,19 +328,85 @@ defmodule Espreso.Orders do
   Lists paid receipt transactions for one Asia/Manila shop day.
 
   Supported filters are `date`, `search`, `payment`, `status`, and `source`.
-  Results are newest-settled first and capped at 500 rows for the staff UI.
+  Results are newest-settled first (`settled_at DESC`, `id DESC`).
+
+  Optional `opts`:
+  - `:limit` — page size (default #{@transaction_page_size}, clamped 1..100)
+  - `:cursor` — `%{settled_at: DateTime.t(), id: integer()}` from the previous
+    page's last row; fetches strictly older rows in the same order
+
+  Returns `%{orders, filters, has_next_page, next_cursor}`.
+  `transaction_summary/1` is intentionally separate and unpaginated.
   """
-  def list_transactions(filters \\ %{}) when is_map(filters) do
+  def list_transactions(filters \\ %{}, opts \\ [])
+
+  def list_transactions(filters, opts) when is_map(filters) and is_list(opts) do
     {query, normalized} = transaction_query(filters)
 
-    orders =
-      query
-      |> order_by([o], desc: o.settled_at, desc: o.id)
-      |> limit(500)
-      |> preload([:items, :settled_by_user])
-      |> Repo.all()
+    limit =
+      opts
+      |> Keyword.get(
+        :limit,
+        Application.get_env(:espreso, :transaction_page_size, @transaction_page_size)
+      )
+      |> transaction_page_limit()
 
-    %{orders: orders, filters: normalized}
+    cursor = normalize_transaction_cursor(Keyword.get(opts, :cursor))
+
+    query =
+      query
+      |> apply_transaction_cursor(cursor)
+      |> order_by([o], desc: o.settled_at, desc: o.id)
+      |> limit(^(limit + 1))
+      |> preload([:items, :settled_by_user])
+
+    rows = Repo.all(query)
+    has_next_page? = length(rows) > limit
+    orders = Enum.take(rows, limit)
+
+    next_cursor =
+      if has_next_page? do
+        case List.last(orders) do
+          %{settled_at: %DateTime{} = settled_at, id: id} when is_integer(id) ->
+            %{settled_at: settled_at, id: id}
+
+          _ ->
+            nil
+        end
+      else
+        nil
+      end
+
+    %{
+      orders: orders,
+      filters: normalized,
+      has_next_page: has_next_page?,
+      next_cursor: next_cursor
+    }
+  end
+
+  defp transaction_page_limit(limit) when is_integer(limit) and limit > 0, do: min(limit, 100)
+  defp transaction_page_limit(_), do: @transaction_page_size
+
+  defp normalize_transaction_cursor(%{settled_at: %DateTime{} = settled_at, id: id})
+       when is_integer(id) and id > 0 do
+    %{settled_at: DateTime.truncate(settled_at, :second), id: id}
+  end
+
+  defp normalize_transaction_cursor(%{"settled_at" => settled_at, "id" => id}) do
+    normalize_transaction_cursor(%{settled_at: settled_at, id: id})
+  end
+
+  defp normalize_transaction_cursor(_), do: nil
+
+  defp apply_transaction_cursor(query, nil), do: query
+
+  defp apply_transaction_cursor(query, %{settled_at: settled_at, id: id}) do
+    from(o in query,
+      where:
+        o.settled_at < ^settled_at or
+          (o.settled_at == ^settled_at and o.id < ^id)
+    )
   end
 
   @doc """
