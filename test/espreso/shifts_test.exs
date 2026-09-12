@@ -177,4 +177,122 @@ defmodule Espreso.ShiftsTest do
     assert StaffShifts.get_open_shift(barista).id == open.id
     assert is_nil(Repo.get!(StaffShift, open.id).ended_at)
   end
+
+  describe "list_close_history/1" do
+    alias Espreso.Shifts.ShiftClose
+
+    defp insert_close!(user, shop_date, attrs \\ %{}) do
+      closed_at =
+        Map.get(attrs, :closed_at) || DateTime.utc_now() |> DateTime.truncate(:second)
+
+      {:ok, close} =
+        %ShiftClose{}
+        |> ShiftClose.changeset(%{
+          shop_date: shop_date,
+          system_total: Map.get(attrs, :system_total, Decimal.new("100")),
+          system_count: Map.get(attrs, :system_count, 1),
+          by_via:
+            Map.get(attrs, :by_via, %{
+              "cash" => %{"total" => "100", "count" => 1}
+            }),
+          counted_cash: Map.get(attrs, :counted_cash),
+          notes: Map.get(attrs, :notes),
+          closed_by_user_id: user.id,
+          closed_at: closed_at
+        })
+        |> Repo.insert()
+
+      Repo.preload(close, :closed_by_user)
+    end
+
+    test "returns empty history" do
+      assert %{closes: [], has_next_page: false, next_cursor: nil} = Shifts.list_close_history()
+    end
+
+    test "returns newest shop_date first with sealed snapshot fields" do
+      manager = manager!()
+      today = Orders.shop_date_today()
+      d1 = Date.add(today, -2)
+      d2 = Date.add(today, -1)
+
+      older =
+        insert_close!(manager, d1, %{
+          system_total: Decimal.new("80"),
+          system_count: 2,
+          by_via: %{"gcash" => %{"total" => "80", "count" => 2}},
+          counted_cash: Decimal.new("75"),
+          notes: "Short drawer"
+        })
+
+      newer =
+        insert_close!(manager, d2, %{
+          system_total: Decimal.new("150"),
+          system_count: 3,
+          notes: "Balanced"
+        })
+
+      %{closes: closes, has_next_page: false, next_cursor: nil} = Shifts.list_close_history()
+
+      assert Enum.map(closes, & &1.shop_date) == [d2, d1]
+      assert hd(closes).id == newer.id
+      assert List.last(closes).id == older.id
+      assert Decimal.equal?(hd(closes).system_total, Decimal.new("150"))
+      assert hd(closes).system_count == 3
+      assert hd(closes).notes == "Balanced"
+      assert hd(closes).closed_by_user.id == manager.id
+      assert Decimal.equal?(List.last(closes).counted_cash, Decimal.new("75"))
+      assert List.last(closes).by_via["gcash"]["count"] == 2
+    end
+
+    test "keyset pages by shop_date without duplicates" do
+      manager = manager!()
+      today = Orders.shop_date_today()
+
+      dates =
+        for offset <- 1..5 do
+          date = Date.add(today, -offset)
+          insert_close!(manager, date, %{system_count: offset})
+          date
+        end
+
+      page1 = Shifts.list_close_history(limit: 2)
+      assert Enum.map(page1.closes, & &1.shop_date) == Enum.take(dates, 2)
+      assert page1.has_next_page
+      assert page1.next_cursor == Enum.at(dates, 1)
+
+      page2 = Shifts.list_close_history(limit: 2, cursor: page1.next_cursor)
+      assert Enum.map(page2.closes, & &1.shop_date) == Enum.slice(dates, 2, 2)
+      assert page2.has_next_page
+      assert page2.next_cursor == Enum.at(dates, 3)
+
+      page3 = Shifts.list_close_history(limit: 2, cursor: page2.next_cursor)
+      assert Enum.map(page3.closes, & &1.shop_date) == [List.last(dates)]
+      refute page3.has_next_page
+      assert is_nil(page3.next_cursor)
+
+      all_ids =
+        (page1.closes ++ page2.closes ++ page3.closes)
+        |> Enum.map(& &1.id)
+
+      assert length(all_ids) == length(Enum.uniq(all_ids))
+
+      # Cursor excludes the already-loaded boundary row.
+      refute Enum.any?(page2.closes, &(&1.shop_date == page1.next_cursor))
+    end
+
+    test "page size is respected and clamped" do
+      manager = manager!()
+      today = Orders.shop_date_today()
+
+      for offset <- 1..3 do
+        insert_close!(manager, Date.add(today, -offset))
+      end
+
+      %{closes: closes} = Shifts.list_close_history(limit: 1)
+      assert length(closes) == 1
+
+      %{closes: all} = Shifts.list_close_history(limit: 1000)
+      assert length(all) == 3
+    end
+  end
 end

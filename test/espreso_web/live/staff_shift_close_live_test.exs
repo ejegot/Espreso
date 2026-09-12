@@ -260,4 +260,129 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     {:ok, view, _html} = live(owner_conn, ~p"/staff/close")
     assert has_element?(view, "#staff-shift-close-prepare", "Record close")
   end
+
+  test "close history empty state keeps close action available", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/staff/close")
+
+    assert has_element?(view, "#staff-shift-close-history-empty", "No previous closes yet.")
+    assert has_element?(view, "#staff-shift-close-prepare", "Record close")
+    refute has_element?(view, "#staff-shift-close-history-more")
+  end
+
+  test "close history lists sealed snapshots newest first and paginates", %{
+    conn: conn,
+    manager: manager
+  } do
+    today = Orders.shop_date_today()
+
+    for {offset, total, note} <- [
+          {3, "90", "Day three"},
+          {2, "120", "Day two"},
+          {1, "150", "Day one"}
+        ] do
+      insert_close_snapshot!(manager, Date.add(today, -offset), %{
+        system_total: Decimal.new(total),
+        notes: note
+      })
+    end
+
+    with_close_history_page_size(2, fn ->
+      {:ok, view, _html} = live(conn, ~p"/staff/close")
+
+      assert has_element?(view, "#staff-shift-close-history")
+
+      assert has_element?(
+               view,
+               "#staff-shift-close-history-#{Date.to_iso8601(Date.add(today, -1))}"
+             )
+
+      assert has_element?(
+               view,
+               "#staff-shift-close-history-#{Date.to_iso8601(Date.add(today, -2))}"
+             )
+
+      refute has_element?(
+               view,
+               "#staff-shift-close-history-#{Date.to_iso8601(Date.add(today, -3))}"
+             )
+
+      assert has_element?(view, "#staff-shift-close-history-list", "Day one")
+      assert has_element?(view, "#staff-shift-close-history-list", "₱150")
+      assert has_element?(view, "#staff-shift-close-history-list", "Ana")
+      assert has_element?(view, "#staff-shift-close-history-more", "Load more")
+      assert has_element?(view, "#staff-shift-close-prepare", "Record close")
+
+      view |> element("#staff-shift-close-history-more") |> render_click()
+
+      assert has_element?(
+               view,
+               "#staff-shift-close-history-#{Date.to_iso8601(Date.add(today, -3))}"
+             )
+
+      assert has_element?(view, "#staff-shift-close-history-list", "Day three")
+      refute has_element?(view, "#staff-shift-close-history-more")
+
+      html = render(view)
+      assert length(Regex.scan(~r/id="staff-shift-close-history-\d{4}-\d{2}-\d{2}"/, html)) == 3
+    end)
+  end
+
+  test "inactive staff cannot open close history route", %{conn: conn} do
+    {:ok, inactive} =
+      Accounts.register_user(%{
+        name: "Inactive",
+        email: "inactive-close-#{System.unique_integer([:positive])}@test.local",
+        password: "password123",
+        role: "manager"
+      })
+
+    assert {:ok, _} = Accounts.update_user(inactive, %{active: false})
+
+    inactive_conn =
+      conn
+      |> Phoenix.ConnTest.init_test_session(%{})
+      |> Plug.Conn.put_session(:user_id, inactive.id)
+
+    assert {:error, {:redirect, %{to: to}}} = live(inactive_conn, ~p"/staff/close")
+    assert to in [~p"/login", ~p"/staff", ~p"/dashboard"]
+  end
+
+  defp insert_close_snapshot!(user, shop_date, attrs) do
+    {:ok, close} =
+      %Espreso.Shifts.ShiftClose{}
+      |> Espreso.Shifts.ShiftClose.changeset(%{
+        shop_date: shop_date,
+        system_total: Map.fetch!(attrs, :system_total),
+        system_count: Map.get(attrs, :system_count, 1),
+        by_via:
+          Map.get(attrs, :by_via, %{
+            "cash" => %{
+              "total" => Decimal.to_string(Map.fetch!(attrs, :system_total)),
+              "count" => 1
+            }
+          }),
+        counted_cash: Map.get(attrs, :counted_cash),
+        notes: Map.get(attrs, :notes),
+        closed_by_user_id: user.id,
+        closed_at: DateTime.utc_now() |> DateTime.truncate(:second)
+      })
+      |> Repo.insert()
+
+    close
+  end
+
+  defp with_close_history_page_size(size, fun) when is_integer(size) and is_function(fun, 0) do
+    previous = Application.get_env(:espreso, :close_history_page_size)
+    Application.put_env(:espreso, :close_history_page_size, size)
+
+    try do
+      fun.()
+    after
+      if is_nil(previous) do
+        Application.delete_env(:espreso, :close_history_page_size)
+      else
+        Application.put_env(:espreso, :close_history_page_size, previous)
+      end
+    end
+  end
 end
