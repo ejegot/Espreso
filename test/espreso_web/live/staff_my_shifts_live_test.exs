@@ -178,10 +178,78 @@ defmodule EspresoWeb.StaffMyShiftsLiveTest do
     refute render(view) =~ "₱500"
   end
 
+  test "load more appends older closed shifts without changing current shift", %{
+    conn: conn,
+    barista: barista
+  } do
+    shifts =
+      for day <- 1..5 do
+        start = DateTime.new!(Date.add(~D[2026-09-01], day), ~T[01:00:00], "Etc/UTC")
+        insert_shift!(barista, start, DateTime.add(start, 3600, :second))
+      end
+
+    assert {:ok, open} = StaffShifts.open_shift_for_login(barista)
+
+    # Newest closed first by started_at.
+    [newest, second, third, fourth, oldest] =
+      Enum.sort_by(shifts, &{&1.started_at, &1.id}, :desc)
+
+    create_paid_pos!(barista,
+      settled_at: DateTime.add(newest.started_at, 30, :second),
+      price: "175"
+    )
+
+    newest_sales = Orders.sales_summary_for_staff_shift(Repo.get!(StaffShift, newest.id))
+
+    with_shift_history_page_size(2, fn ->
+      {:ok, view, _html} = live(log_in(conn, barista), ~p"/staff/shifts")
+
+      assert has_element?(view, "#my-shifts-current", "OPEN")
+      assert has_element?(view, "#my-shift-#{newest.id}", "1 order")
+      assert has_element?(view, "#my-shift-#{newest.id}", Menu.format_price(newest_sales.total))
+      assert has_element?(view, "#my-shift-#{second.id}")
+      refute has_element?(view, "#my-shift-#{third.id}")
+      assert has_element?(view, "#my-shifts-history-more", "Load more")
+      refute has_element?(view, "#my-shift-#{open.id}")
+
+      view |> element("#my-shifts-history-more") |> render_click()
+
+      assert has_element?(view, "#my-shift-#{third.id}")
+      assert has_element?(view, "#my-shift-#{fourth.id}")
+      refute has_element?(view, "#my-shift-#{oldest.id}")
+      assert has_element?(view, "#my-shifts-current", "OPEN")
+      assert has_element?(view, "#my-shifts-history-more", "Load more")
+
+      view |> element("#my-shifts-history-more") |> render_click()
+
+      assert has_element?(view, "#my-shift-#{oldest.id}")
+      refute has_element?(view, "#my-shifts-history-more")
+      assert has_element?(view, "#my-shifts-current", "OPEN")
+
+      html = render(view)
+      assert length(Regex.scan(~r/id="my-shift-\d+"/, html)) == 5
+    end)
+  end
+
   defp log_in(conn, user) do
     conn
     |> Phoenix.ConnTest.init_test_session(%{})
     |> Plug.Conn.put_session(:user_id, user.id)
+  end
+
+  defp with_shift_history_page_size(size, fun) when is_integer(size) and is_function(fun, 0) do
+    previous = Application.get_env(:espreso, :staff_shift_history_page_size)
+    Application.put_env(:espreso, :staff_shift_history_page_size, size)
+
+    try do
+      fun.()
+    after
+      if is_nil(previous) do
+        Application.delete_env(:espreso, :staff_shift_history_page_size)
+      else
+        Application.put_env(:espreso, :staff_shift_history_page_size, previous)
+      end
+    end
   end
 
   defp insert_shift!(user, started_at, ended_at, end_reason \\ "logout") do
