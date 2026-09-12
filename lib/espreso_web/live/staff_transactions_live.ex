@@ -9,6 +9,8 @@ defmodule EspresoWeb.StaffTransactionsLive do
   alias Espreso.Printer
 
   @reprintable_statuses ~w(received preparing ready completed)
+  # Coalesce rapid {:order_changed, _} transaction list/summary reloads.
+  @pubsub_reload_debounce_ms 300
 
   @impl true
   def mount(params, _session, socket) do
@@ -23,12 +25,26 @@ defmodule EspresoWeb.StaffTransactionsLive do
      |> assign(:reprint_transaction, nil)
      |> assign(:reprint_permit, nil)
      |> assign(:action_note, nil)
+     |> assign(:pubsub_reload_timer, nil)
+     |> assign(:pubsub_reload_token, nil)
      |> load_transactions(params), layout: false}
   end
 
   @impl true
   def handle_info({:order_changed, _order}, socket) do
-    {:noreply, load_transactions(socket, socket.assigns.filters)}
+    {:noreply, schedule_pubsub_reload(socket)}
+  end
+
+  def handle_info({:coalesced_transactions_reload, token}, socket) do
+    if socket.assigns.pubsub_reload_token == token do
+      {:noreply,
+       socket
+       |> assign(:pubsub_reload_timer, nil)
+       |> assign(:pubsub_reload_token, nil)
+       |> load_transactions(socket.assigns.filters)}
+    else
+      {:noreply, socket}
+    end
   end
 
   @impl true
@@ -402,6 +418,7 @@ defmodule EspresoWeb.StaffTransactionsLive do
   end
 
   defp load_transactions(socket, filters) do
+    socket = cancel_pubsub_reload(socket)
     %{orders: orders, filters: normalized} = Orders.list_transactions(filters)
     summary = Orders.transaction_summary(normalized)
     selected_id = socket.assigns[:selected_transaction] && socket.assigns.selected_transaction.id
@@ -413,6 +430,36 @@ defmodule EspresoWeb.StaffTransactionsLive do
     |> assign(:summary, summary)
     |> assign(:selected_transaction, selected)
     |> assign(:printer_enabled?, Printer.enabled?())
+  end
+
+  defp schedule_pubsub_reload(socket) do
+    socket = cancel_pubsub_reload(socket)
+    ms = pubsub_reload_debounce_ms()
+
+    if ms <= 0 do
+      load_transactions(socket, socket.assigns.filters)
+    else
+      token = make_ref()
+      timer = Process.send_after(self(), {:coalesced_transactions_reload, token}, ms)
+
+      socket
+      |> assign(:pubsub_reload_timer, timer)
+      |> assign(:pubsub_reload_token, token)
+    end
+  end
+
+  defp cancel_pubsub_reload(socket) do
+    if timer = socket.assigns[:pubsub_reload_timer] do
+      Process.cancel_timer(timer)
+    end
+
+    socket
+    |> assign(:pubsub_reload_timer, nil)
+    |> assign(:pubsub_reload_token, nil)
+  end
+
+  defp pubsub_reload_debounce_ms do
+    Application.get_env(:espreso, :staff_pubsub_reload_debounce_ms, @pubsub_reload_debounce_ms)
   end
 
   defp handle_reprint_result(socket, {:dispatched, _next_permit}) do
