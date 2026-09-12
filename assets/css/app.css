@@ -20692,7 +20692,60 @@ a.brune-contact-value:focus-visible {
 
 .staff-attendance-head {
   display: grid;
+  gap: 0.75rem;
+}
+
+.staff-attendance-date-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: end;
+}
+
+.staff-attendance-date-field {
+  display: grid;
   gap: 0.2rem;
+  min-width: 10.5rem;
+}
+
+.staff-attendance-date-field span {
+  color: var(--att-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.staff-attendance-date-field input[type="date"] {
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--att-forest) 16%, transparent);
+  border-radius: 0.65rem;
+  background: #fff;
+  color: var(--att-forest);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.staff-attendance-date-btn {
+  padding: 0.45rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--att-forest) 16%, transparent);
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--att-forest) 4%, #fff);
+  color: var(--att-forest);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.staff-attendance-date-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.staff-attendance-date-btn--today {
+  background: color-mix(in srgb, var(--att-forest) 10%, #fff);
 }
 
 .staff-attendance-eyebrow,
