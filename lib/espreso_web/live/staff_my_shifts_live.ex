@@ -9,14 +9,17 @@ defmodule EspresoWeb.StaffMyShiftsLive do
   alias Espreso.StaffShifts
   alias Espreso.StaffShifts.StaffShift
 
-  @history_limit 30
-
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
      socket
      |> assign(:page_title, "My shifts")
      |> load_my_shifts(), layout: false}
+  end
+
+  @impl true
+  def handle_event("load_more_shift_history", _params, socket) do
+    {:noreply, append_shift_history(socket)}
   end
 
   @impl true
@@ -77,6 +80,16 @@ defmodule EspresoWeb.StaffMyShiftsLive do
             </article>
           </div>
 
+          <button
+            :if={@history_has_next?}
+            type="button"
+            id="my-shifts-history-more"
+            class="staff-my-shifts-history-more"
+            phx-click="load_more_shift_history"
+          >
+            Load more
+          </button>
+
           <div
             :if={is_nil(@current_shift) and @history_shifts == []}
             class="staff-my-shifts-empty"
@@ -95,22 +108,41 @@ defmodule EspresoWeb.StaffMyShiftsLive do
 
   defp load_my_shifts(socket) do
     user = socket.assigns.current_user
-    shifts = StaffShifts.list_shifts_for_user(user.id, limit: @history_limit)
 
     current =
-      case Enum.find(shifts, &is_nil(&1.ended_at)) do
+      case StaffShifts.get_open_shift(user.id) do
         %StaffShift{} = open -> with_sales(open)
         nil -> nil
       end
 
-    history =
-      shifts
-      |> Enum.reject(&is_nil(&1.ended_at))
-      |> Enum.map(&with_sales/1)
+    %{shifts: shifts, has_next_page: has_next?, next_cursor: next_cursor} =
+      StaffShifts.list_shift_history_for_user(user.id)
 
     socket
     |> assign(:current_shift, current)
-    |> assign(:history_shifts, history)
+    |> assign(:history_shifts, Enum.map(shifts, &with_sales/1))
+    |> assign(:history_has_next?, has_next?)
+    |> assign(:history_next_cursor, next_cursor)
+  end
+
+  defp append_shift_history(socket) do
+    cursor = socket.assigns.history_next_cursor
+    user_id = socket.assigns.current_user.id
+
+    if socket.assigns.history_has_next? and not is_nil(cursor) do
+      %{shifts: shifts, has_next_page: has_next?, next_cursor: next_cursor} =
+        StaffShifts.list_shift_history_for_user(user_id, cursor: cursor)
+
+      socket
+      |> assign(
+        :history_shifts,
+        socket.assigns.history_shifts ++ Enum.map(shifts, &with_sales/1)
+      )
+      |> assign(:history_has_next?, has_next?)
+      |> assign(:history_next_cursor, next_cursor)
+    else
+      socket
+    end
   end
 
   defp with_sales(%StaffShift{} = shift) do

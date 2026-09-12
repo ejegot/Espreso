@@ -260,6 +260,93 @@ defmodule Espreso.StaffShiftsTest do
     end
   end
 
+  describe "list_shift_history_for_user/2" do
+    test "returns closed shifts newest first and excludes open shift", %{user: user} do
+      older = insert_shift!(user, ~U[2026-09-09 01:00:00Z], ~U[2026-09-09 05:00:00Z])
+      newer = insert_shift!(user, ~U[2026-09-10 01:00:00Z], ~U[2026-09-10 05:00:00Z])
+      assert {:ok, open} = StaffShifts.open_shift_for_login(user)
+
+      %{shifts: shifts, has_next_page: false, next_cursor: nil} =
+        StaffShifts.list_shift_history_for_user(user.id)
+
+      assert Enum.map(shifts, & &1.id) == [newer.id, older.id]
+      refute Enum.any?(shifts, &(&1.id == open.id))
+      assert Enum.all?(shifts, &(not is_nil(&1.ended_at)))
+    end
+
+    test "keyset pages by started_at and id without duplicates", %{user: user} do
+      # Same started_at, distinct ids — prove id DESC tie-breaker.
+      base = ~U[2026-09-08 12:00:00Z]
+
+      first =
+        insert_shift!(user, base, DateTime.add(base, 3600, :second))
+
+      second =
+        insert_shift!(user, base, DateTime.add(base, 7200, :second))
+
+      older =
+        insert_shift!(user, ~U[2026-09-07 12:00:00Z], ~U[2026-09-07 14:00:00Z])
+
+      oldest =
+        insert_shift!(user, ~U[2026-09-06 12:00:00Z], ~U[2026-09-06 14:00:00Z])
+
+      # Higher id with same started_at should sort first.
+      expected_first_page =
+        [second, first]
+        |> Enum.sort_by(& &1.id, :desc)
+
+      page1 = StaffShifts.list_shift_history_for_user(user.id, limit: 2)
+      assert Enum.map(page1.shifts, & &1.id) == Enum.map(expected_first_page, & &1.id)
+      assert page1.has_next_page
+
+      assert page1.next_cursor == %{
+               started_at: List.last(expected_first_page).started_at,
+               id: List.last(expected_first_page).id
+             }
+
+      page2 =
+        StaffShifts.list_shift_history_for_user(user.id, limit: 2, cursor: page1.next_cursor)
+
+      assert Enum.map(page2.shifts, & &1.id) == [older.id, oldest.id]
+      refute page2.has_next_page
+      assert is_nil(page2.next_cursor)
+
+      all_ids = Enum.map(page1.shifts ++ page2.shifts, & &1.id)
+      assert length(all_ids) == length(Enum.uniq(all_ids))
+      refute Enum.any?(page2.shifts, &(&1.id == page1.next_cursor.id))
+    end
+
+    test "never returns another user's closed shifts", %{user: user} do
+      {:ok, other} =
+        Accounts.register_user(%{
+          name: "History Other",
+          email: "history.other@test.local",
+          password: "password123",
+          role: "barista"
+        })
+
+      own = insert_shift!(user, ~U[2026-09-10 01:00:00Z], ~U[2026-09-10 02:00:00Z])
+      foreign = insert_shift!(other, ~U[2026-09-10 03:00:00Z], ~U[2026-09-10 04:00:00Z])
+
+      %{shifts: shifts} = StaffShifts.list_shift_history_for_user(user.id)
+      assert Enum.map(shifts, & &1.id) == [own.id]
+      refute Enum.any?(shifts, &(&1.id == foreign.id))
+    end
+
+    test "page size is respected and clamped", %{user: user} do
+      for hour <- 1..3 do
+        start = DateTime.new!(~D[2026-09-05], Time.new!(hour, 0, 0), "Etc/UTC")
+        insert_shift!(user, start, DateTime.add(start, 3600, :second))
+      end
+
+      %{shifts: one} = StaffShifts.list_shift_history_for_user(user.id, limit: 1)
+      assert length(one) == 1
+
+      %{shifts: all} = StaffShifts.list_shift_history_for_user(user.id, limit: 1000)
+      assert length(all) == 3
+    end
+  end
+
   describe "list_shifts_for_shop_day/1" do
     setup do
       shop_date = ~D[2026-09-10]

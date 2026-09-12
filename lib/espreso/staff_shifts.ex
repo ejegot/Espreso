@@ -90,6 +90,86 @@ defmodule Espreso.StaffShifts do
     |> Repo.all()
   end
 
+  @shift_history_page_size 30
+
+  @doc """
+  Closed attendance-shift history for one employee, newest first.
+
+  Excludes the currently open shift (`ended_at` is not nil). Ordering is
+  `started_at DESC, id DESC`. Optional `:cursor` is
+  `%{started_at: DateTime.t(), id: integer()}` from the previous page's last
+  row and fetches strictly older rows.
+
+  Optional `opts`:
+  - `:limit` — page size (default #{@shift_history_page_size}, clamped 1..100)
+  - `:cursor` — keyset cursor from the previous page
+
+  Returns `%{shifts, has_next_page, next_cursor}`.
+  """
+  def list_shift_history_for_user(user_id, opts \\ [])
+      when is_integer(user_id) and is_list(opts) do
+    limit =
+      opts
+      |> Keyword.get(
+        :limit,
+        Application.get_env(:espreso, :staff_shift_history_page_size, @shift_history_page_size)
+      )
+      |> normalize_limit()
+
+    cursor = normalize_shift_history_cursor(Keyword.get(opts, :cursor))
+
+    query =
+      StaffShift
+      |> where([s], s.user_id == ^user_id and not is_nil(s.ended_at))
+      |> apply_shift_history_cursor(cursor)
+      |> order_by([s], desc: s.started_at, desc: s.id)
+      |> limit(^(limit + 1))
+
+    rows = Repo.all(query)
+    has_next_page? = length(rows) > limit
+    shifts = Enum.take(rows, limit)
+
+    next_cursor =
+      if has_next_page? do
+        case List.last(shifts) do
+          %StaffShift{started_at: %DateTime{} = started_at, id: id} when is_integer(id) ->
+            %{started_at: started_at, id: id}
+
+          _ ->
+            nil
+        end
+      else
+        nil
+      end
+
+    %{
+      shifts: shifts,
+      has_next_page: has_next_page?,
+      next_cursor: next_cursor
+    }
+  end
+
+  defp normalize_shift_history_cursor(%{started_at: %DateTime{} = started_at, id: id})
+       when is_integer(id) and id > 0 do
+    %{started_at: DateTime.truncate(started_at, :second), id: id}
+  end
+
+  defp normalize_shift_history_cursor(%{"started_at" => started_at, "id" => id}) do
+    normalize_shift_history_cursor(%{started_at: started_at, id: id})
+  end
+
+  defp normalize_shift_history_cursor(_), do: nil
+
+  defp apply_shift_history_cursor(query, nil), do: query
+
+  defp apply_shift_history_cursor(query, %{started_at: started_at, id: id}) do
+    from(s in query,
+      where:
+        s.started_at < ^started_at or
+          (s.started_at == ^started_at and s.id < ^id)
+    )
+  end
+
   @doc """
   Lists all employee staff shifts that overlap an Asia/Manila shop day.
 
