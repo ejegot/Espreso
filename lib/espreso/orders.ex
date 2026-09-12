@@ -650,6 +650,32 @@ defmodule Espreso.Orders do
   end
 
   @doc """
+  Recent orders linked to a customer via `customer_id`.
+
+  Newest first. Default limit is 25. Preloads items for a compact staff summary.
+  Does not include anonymous / name-only orders (`customer_id` nil).
+  """
+  def list_orders_for_customer(customer_id, opts \\ [])
+
+  def list_orders_for_customer(customer_id, opts)
+      when is_integer(customer_id) and is_list(opts) do
+    limit =
+      case Keyword.get(opts, :limit, 25) do
+        n when is_integer(n) and n > 0 -> min(n, 100)
+        _ -> 25
+      end
+
+    Order
+    |> where([o], o.customer_id == ^customer_id)
+    |> order_by([o], desc: o.inserted_at, desc: o.id)
+    |> limit(^limit)
+    |> preload(:items)
+    |> Repo.all()
+  end
+
+  def list_orders_for_customer(_, _), do: []
+
+  @doc """
   Today's paid sales broken down by `paid_via` (current Asia/Manila shop day).
 
   Only `payment_status == "paid"` orders are included. Cancelled orders that

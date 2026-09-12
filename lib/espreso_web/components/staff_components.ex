@@ -262,6 +262,13 @@ defmodule EspresoWeb.StaffComponents do
         show?: Authorization.can?(user, :orders)
       },
       %{
+        key: :customers,
+        label: "Customers",
+        icon: "hero-identification",
+        path: ~p"/customers",
+        show?: Authorization.can?(user, :orders)
+      },
+      %{
         key: :my_shifts,
         label: "My shifts",
         icon: "hero-clock",

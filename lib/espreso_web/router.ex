@@ -132,6 +132,8 @@ defmodule EspresoWeb.Router do
       live "/orders", StaffOrdersLive
       live "/pos", StaffPosLive
       live "/transactions", StaffTransactionsLive
+      live "/customers", StaffCustomerLive, :index
+      live "/customers/:id", StaffCustomerLive, :show
     end
 
     live_session :barista_shifts,

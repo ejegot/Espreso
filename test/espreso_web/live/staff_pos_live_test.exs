@@ -69,6 +69,52 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute render(view) =~ "Coming soon"
   end
 
+  test "View history appears only when a loyalty customer is loaded", %{
+    conn: conn,
+    barista: barista
+  } do
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09175550001", %{name: "POS History"})
+
+    conn = log_in(conn, barista)
+    {:ok, view, _html} = live(conn, ~p"/pos")
+    refute has_element?(view, "#pos-loyalty-history")
+
+    view
+    |> element("#pos-loyalty-phone")
+    |> render_change(%{loyalty_phone: "09175550001"})
+
+    view |> element("#pos-loyalty-lookup") |> render_click()
+
+    assert has_element?(view, "#pos-loyalty-status")
+    assert has_element?(view, "#pos-loyalty-history", "View history")
+
+    {:ok, detail, _html} =
+      view
+      |> element("#pos-loyalty-history")
+      |> render_click()
+      |> follow_redirect(conn)
+
+    assert has_element?(detail, "#customer-phone", customer.phone_e164)
+    assert has_element?(detail, "#customer-name", "POS History")
+  end
+
+  test "Clear loyalty hides View history", %{conn: conn, barista: barista} do
+    {:ok, _customer} = Espreso.Customers.find_or_create_by_phone("09175550002", %{name: "Clear"})
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    view
+    |> element("#pos-loyalty-phone")
+    |> render_change(%{loyalty_phone: "09175550002"})
+
+    view |> element("#pos-loyalty-lookup") |> render_click()
+    assert has_element?(view, "#pos-loyalty-history")
+
+    view |> element("#pos-loyalty-clear") |> render_click()
+    refute has_element?(view, "#pos-loyalty-history")
+  end
+
   test "manager and owner can open POS", %{conn: conn, manager: manager, owner: owner} do
     {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/pos")
     assert has_element?(manager_view, "#pos-place-order")

@@ -381,6 +381,32 @@ defmodule Espreso.Loyalty do
     end
   end
 
+  @doc """
+  Append-only loyalty ledger activity for one customer.
+
+  Newest first. Default limit is 50. Preloads the associated order for staff
+  display (order number). Does not recalculate history from orders.
+  """
+  def list_activity_for_customer(customer_id, opts \\ [])
+
+  def list_activity_for_customer(customer_id, opts)
+      when is_integer(customer_id) and is_list(opts) do
+    limit =
+      case Keyword.get(opts, :limit, 50) do
+        n when is_integer(n) and n > 0 -> min(n, 100)
+        _ -> 50
+      end
+
+    LedgerEntry
+    |> where([e], e.customer_id == ^customer_id)
+    |> order_by([e], desc: e.inserted_at, desc: e.id)
+    |> limit(^limit)
+    |> preload(:order)
+    |> Repo.all()
+  end
+
+  def list_activity_for_customer(_, _), do: []
+
   @doc false
   def eligible_reward?(name) when is_binary(name), do: name in @reward_categories
 end
