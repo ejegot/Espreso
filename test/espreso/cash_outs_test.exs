@@ -237,4 +237,152 @@ defmodule Espreso.CashOutsTest do
              Decimal.new("10")
            )
   end
+
+  defp insert_day_cash_out!(user, shop_date, attrs \\ %{}) do
+    {:ok, cash_out} =
+      %CashOut{}
+      |> CashOut.create_changeset(%{
+        amount: Map.get(attrs, :amount, Decimal.new("100")),
+        category: Map.get(attrs, :category, "Other"),
+        note: Map.get(attrs, :note),
+        recorded_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        shop_date: shop_date,
+        status: "recorded",
+        created_by_user_id: user.id
+      })
+      |> Repo.insert()
+
+    if Map.get(attrs, :status) == "voided" do
+      cash_out
+      |> CashOut.void_changeset(%{
+        status: "voided",
+        voided_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        voided_by_user_id: user.id,
+        void_reason: Map.get(attrs, :void_reason, "Correction")
+      })
+      |> Repo.update!()
+    else
+      cash_out
+    end
+  end
+
+  describe "list_cash_out_history/1" do
+    test "returns empty history when only today has cash outs", %{manager: manager} do
+      assert {:ok, _} =
+               CashOuts.create_cash_out(manager, %{amount: "25", category: "Other"})
+
+      assert %{days: [], has_next_page: false, next_cursor: nil} =
+               CashOuts.list_cash_out_history()
+    end
+
+    test "returns previous shop dates newest first and excludes today", %{manager: manager} do
+      today = Orders.shop_date_today()
+      d1 = Date.add(today, -2)
+      d2 = Date.add(today, -1)
+
+      assert {:ok, _} =
+               CashOuts.create_cash_out(manager, %{amount: "40", category: "Supplies"})
+
+      insert_day_cash_out!(manager, d1, %{amount: Decimal.new("80"), category: "Cleaning"})
+      insert_day_cash_out!(manager, d2, %{amount: Decimal.new("120"), category: "Ingredients"})
+
+      %{days: days, has_next_page: false, next_cursor: nil} = CashOuts.list_cash_out_history()
+
+      assert Enum.map(days, & &1.shop_date) == [d2, d1]
+      refute Enum.any?(days, &(&1.shop_date == today))
+      assert Decimal.equal?(hd(days).total, Decimal.new("120"))
+      assert hd(days).cash_outs |> hd() |> Map.get(:category) == "Ingredients"
+    end
+
+    test "includes voided rows and excludes them from day totals", %{manager: manager} do
+      today = Orders.shop_date_today()
+      day = Date.add(today, -1)
+
+      recorded =
+        insert_day_cash_out!(manager, day, %{
+          amount: Decimal.new("200"),
+          category: "Supplies",
+          note: "Bags"
+        })
+
+      voided =
+        insert_day_cash_out!(manager, day, %{
+          amount: Decimal.new("50"),
+          category: "Other",
+          status: "voided",
+          void_reason: "Wrong amount"
+        })
+
+      %{days: [entry]} = CashOuts.list_cash_out_history()
+
+      assert entry.shop_date == day
+
+      assert Enum.map(entry.cash_outs, & &1.id) |> Enum.sort() ==
+               Enum.sort([recorded.id, voided.id])
+
+      assert Enum.any?(
+               entry.cash_outs,
+               &(&1.status == "voided" and &1.void_reason == "Wrong amount")
+             )
+
+      assert Decimal.equal?(entry.total, Decimal.new("200"))
+
+      assert {:ok, _} =
+               CashOuts.void_cash_out(Repo.get!(CashOut, recorded.id), manager, "Also wrong")
+
+      %{days: [after_void]} = CashOuts.list_cash_out_history()
+      assert Decimal.equal?(after_void.total, Decimal.new("0"))
+      assert Enum.all?(after_void.cash_outs, &(&1.status == "voided"))
+    end
+
+    test "keyset pages by shop_date without duplicates", %{manager: manager} do
+      today = Orders.shop_date_today()
+
+      dates =
+        for offset <- 1..5 do
+          date = Date.add(today, -offset)
+
+          insert_day_cash_out!(manager, date, %{
+            amount: Decimal.new(Integer.to_string(offset * 10))
+          })
+
+          date
+        end
+
+      page1 = CashOuts.list_cash_out_history(limit: 2)
+      assert Enum.map(page1.days, & &1.shop_date) == Enum.take(dates, 2)
+      assert page1.has_next_page
+      assert page1.next_cursor == Enum.at(dates, 1)
+
+      page2 = CashOuts.list_cash_out_history(limit: 2, cursor: page1.next_cursor)
+      assert Enum.map(page2.days, & &1.shop_date) == Enum.slice(dates, 2, 2)
+      assert page2.has_next_page
+
+      page3 = CashOuts.list_cash_out_history(limit: 2, cursor: page2.next_cursor)
+      assert Enum.map(page3.days, & &1.shop_date) == [List.last(dates)]
+      refute page3.has_next_page
+      assert is_nil(page3.next_cursor)
+
+      all_dates =
+        (page1.days ++ page2.days ++ page3.days)
+        |> Enum.map(& &1.shop_date)
+
+      assert length(all_dates) == length(Enum.uniq(all_dates))
+      refute Enum.any?(page2.days, &(&1.shop_date == page1.next_cursor))
+    end
+
+    test "page size is respected and clamped", %{manager: manager} do
+      today = Orders.shop_date_today()
+
+      for offset <- 1..3 do
+        insert_day_cash_out!(manager, Date.add(today, -offset))
+      end
+
+      %{days: days} = CashOuts.list_cash_out_history(limit: 1)
+      assert length(days) == 1
+
+      %{days: all} = CashOuts.list_cash_out_history(limit: 1000)
+      assert length(all) == 3
+    end
+  end
 end
