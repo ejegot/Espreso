@@ -10,6 +10,8 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   @ready_lane_limit 100
   @age_tick_ms 60_000
+  # Coalesce rapid {:order_changed, _} board reloads (notifications stay immediate).
+  @pubsub_reload_debounce_ms 300
 
   @impl true
   def mount(_params, _session, socket) do
@@ -32,6 +34,8 @@ defmodule EspresoWeb.StaffOrdersLive do
      |> assign(:cash_tender_error, nil)
      |> assign(:cash_tender_token, nil)
      |> assign(:alert_banner, nil)
+     |> assign(:pubsub_reload_timer, nil)
+     |> assign(:pubsub_reload_token, nil)
      |> load_orders(), layout: false}
   end
 
@@ -50,9 +54,21 @@ defmodule EspresoWeb.StaffOrdersLive do
     socket =
       socket
       |> maybe_set_alert_banner(order)
-      |> load_orders()
+      |> schedule_pubsub_reload()
 
     {:noreply, socket}
+  end
+
+  def handle_info({:coalesced_orders_reload, token}, socket) do
+    if socket.assigns.pubsub_reload_token == token do
+      {:noreply,
+       socket
+       |> assign(:pubsub_reload_timer, nil)
+       |> assign(:pubsub_reload_token, nil)
+       |> load_orders()}
+    else
+      {:noreply, socket}
+    end
   end
 
   def handle_info(:age_tick, socket) do
@@ -1820,7 +1836,39 @@ defmodule EspresoWeb.StaffOrdersLive do
     Process.send_after(self(), :age_tick, @age_tick_ms)
   end
 
+  defp schedule_pubsub_reload(socket) do
+    socket = cancel_pubsub_reload(socket)
+    ms = pubsub_reload_debounce_ms()
+
+    if ms <= 0 do
+      load_orders(socket)
+    else
+      token = make_ref()
+      timer = Process.send_after(self(), {:coalesced_orders_reload, token}, ms)
+
+      socket
+      |> assign(:pubsub_reload_timer, timer)
+      |> assign(:pubsub_reload_token, token)
+    end
+  end
+
+  defp cancel_pubsub_reload(socket) do
+    if timer = socket.assigns[:pubsub_reload_timer] do
+      Process.cancel_timer(timer)
+    end
+
+    socket
+    |> assign(:pubsub_reload_timer, nil)
+    |> assign(:pubsub_reload_token, nil)
+  end
+
+  defp pubsub_reload_debounce_ms do
+    Application.get_env(:espreso, :staff_pubsub_reload_debounce_ms, @pubsub_reload_debounce_ms)
+  end
+
   defp load_orders(socket) do
+    socket = cancel_pubsub_reload(socket)
+
     active_orders = Orders.list_active_orders()
     ready_orders = Orders.list_recent_ready(@ready_lane_limit)
     unpaid_orders = Orders.list_todays_unpaid()

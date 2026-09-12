@@ -139,6 +139,58 @@ defmodule EspresoWeb.StaffTransactionsLiveTest do
     assert {:error, {:redirect, %{to: "/login"}}} = live(conn, ~p"/transactions")
   end
 
+  test "order_changed eventually refreshes transactions and preserves filters", %{
+    conn: conn,
+    barista: barista,
+    manager: manager
+  } do
+    paid_order!("Already Settled", barista)
+    {:ok, view, _html} = live(log_in(conn, manager), ~p"/transactions")
+
+    assert has_element?(view, "#transactions-summary", "1 receipts")
+    assert has_element?(view, "#transactions-summary", "₱75")
+
+    view
+    |> form("#transactions-filters", %{"filters" => %{"payment" => "cash"}})
+    |> render_change()
+
+    assert has_element?(view, "#transactions-payment option[value=cash][selected]")
+
+    paid_order!("Second Settled", barista)
+    _ = :sys.get_state(view.pid)
+
+    assert has_element?(view, "#transactions-summary", "2 receipts")
+    assert has_element?(view, "#transactions-summary", "₱150")
+    assert has_element?(view, "#transactions-payment option[value=cash][selected]")
+  end
+
+  test "rapid order_changed events coalesce transaction refreshes", %{
+    conn: conn,
+    barista: barista,
+    manager: manager
+  } do
+    with_pubsub_debounce(120, fn ->
+      {:ok, view, _html} = live(log_in(conn, manager), ~p"/transactions")
+      assert has_element?(view, "#transactions-summary", "0 receipts")
+
+      first = paid_order!("Burst One", barista)
+      second = paid_order!("Burst Two", barista)
+      third = paid_order!("Burst Three", barista)
+
+      refute has_element?(view, "#transaction-#{first.id}")
+      refute has_element?(view, "#transaction-#{second.id}")
+      refute has_element?(view, "#transaction-#{third.id}")
+
+      wait_for_pubsub_reload(view, 200)
+
+      assert has_element?(view, "#transaction-#{first.id}")
+      assert has_element?(view, "#transaction-#{second.id}")
+      assert has_element?(view, "#transaction-#{third.id}")
+      assert has_element?(view, "#transactions-summary", "3 receipts")
+      assert has_element?(view, "#transactions-summary", "₱225")
+    end)
+  end
+
   defp paid_order!(customer_name, cashier) do
     {:ok, order} =
       Orders.create_order(
@@ -162,6 +214,27 @@ defmodule EspresoWeb.StaffTransactionsLiveTest do
     conn
     |> Phoenix.ConnTest.init_test_session(%{})
     |> Plug.Conn.put_session(:user_id, user.id)
+  end
+
+  defp with_pubsub_debounce(ms, fun) when is_integer(ms) and is_function(fun, 0) do
+    previous = Application.get_env(:espreso, :staff_pubsub_reload_debounce_ms)
+    Application.put_env(:espreso, :staff_pubsub_reload_debounce_ms, ms)
+
+    try do
+      fun.()
+    after
+      if is_nil(previous) do
+        Application.delete_env(:espreso, :staff_pubsub_reload_debounce_ms)
+      else
+        Application.put_env(:espreso, :staff_pubsub_reload_debounce_ms, previous)
+      end
+    end
+  end
+
+  defp wait_for_pubsub_reload(view, ms) when is_integer(ms) do
+    Process.sleep(ms)
+    _ = :sys.get_state(view.pid)
+    :ok
   end
 
   defp restore_printer_config_on_exit do

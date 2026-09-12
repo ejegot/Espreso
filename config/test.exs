@@ -52,3 +52,6 @@ config :espreso, Espreso.Printer,
 
 # Loyalty earn retries are driven explicitly in tests (nudge / reconcile_now).
 config :espreso, Espreso.Loyalty.EarnReconciler, enabled: false
+
+# PubSub board/transaction reloads are immediate in tests unless a case overrides.
+config :espreso, :staff_pubsub_reload_debounce_ms, 0

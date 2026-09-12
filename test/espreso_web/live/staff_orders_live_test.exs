@@ -1616,6 +1616,45 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     refute has_element?(view, "#orders-alert-banner")
   end
 
+  test "rapid order_changed events coalesce board reloads while keeping alerts", %{conn: conn} do
+    with_pubsub_debounce(120, fn ->
+      {:ok, view, _html} = live(conn, ~p"/orders")
+      refute has_element?(view, "#orders-new-header-count")
+
+      {:ok, first} =
+        Orders.create_order(
+          [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+          %{customer_name: "Burst One", fulfillment: :pickup, payment_method: :counter}
+        )
+
+      {:ok, second} =
+        Orders.create_order(
+          [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+          %{customer_name: "Burst Two", fulfillment: :pickup, payment_method: :counter}
+        )
+
+      {:ok, third} =
+        Orders.create_order(
+          [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+          %{customer_name: "Burst Three", fulfillment: :pickup, payment_method: :counter}
+        )
+
+      # Notifications / alerts are immediate; board reload waits for debounce quiet period.
+      assert has_element?(view, "#staff-notif-badge")
+      assert has_element?(view, "#orders-alert-banner", third.number)
+      refute has_element?(view, "#order-card-new-#{first.id}")
+      refute has_element?(view, "#order-card-new-#{second.id}")
+      refute has_element?(view, "#order-card-new-#{third.id}")
+
+      wait_for_pubsub_reload(view, 200)
+
+      assert has_element?(view, "#order-card-new-#{first.id}")
+      assert has_element?(view, "#order-card-new-#{second.id}")
+      assert has_element?(view, "#order-card-new-#{third.id}")
+      assert has_element?(view, "#orders-new-header-count", "3")
+    end)
+  end
+
   test "orders?unpaid=1 opens unpaid drawer", %{conn: conn} do
     {:ok, order} =
       Orders.create_order(
@@ -2285,6 +2324,27 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
   end
 
   defp drawer_kick_bytes, do: <<0x1B, 0x70, 0x00, 0x19, 0xFA>>
+
+  defp with_pubsub_debounce(ms, fun) when is_integer(ms) and is_function(fun, 0) do
+    previous = Application.get_env(:espreso, :staff_pubsub_reload_debounce_ms)
+    Application.put_env(:espreso, :staff_pubsub_reload_debounce_ms, ms)
+
+    try do
+      fun.()
+    after
+      if is_nil(previous) do
+        Application.delete_env(:espreso, :staff_pubsub_reload_debounce_ms)
+      else
+        Application.put_env(:espreso, :staff_pubsub_reload_debounce_ms, previous)
+      end
+    end
+  end
+
+  defp wait_for_pubsub_reload(view, ms) when is_integer(ms) do
+    Process.sleep(ms)
+    _ = :sys.get_state(view.pid)
+    :ok
+  end
 
   defp backdate_order!(order, minutes_ago: minutes) when is_integer(minutes) and minutes >= 0 do
     at =
