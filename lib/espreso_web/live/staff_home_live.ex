@@ -225,7 +225,7 @@ defmodule EspresoWeb.StaffHomeLive do
   end
 
   defp secondary_tiles(%User{} = user, shift_close) do
-    unpaid_count = length(Orders.list_todays_unpaid())
+    unpaid_count = Orders.count_todays_unpaid()
 
     base = [
       %{
