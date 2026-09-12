@@ -20242,3 +20242,296 @@ a.brune-contact-value:focus-visible {
     padding: 1.25rem 1.35rem 2rem;
   }
 }
+
+
+/* Staff customer history — ELIlai Kafe */
+.staff-customer {
+  --cust-forest: var(--elilai-forest, #394331);
+  --cust-ivory: var(--elilai-ivory, #f4efe3);
+  --cust-ink: var(--cs-brown, var(--cust-forest));
+  --cust-muted: color-mix(in srgb, var(--cust-forest) 55%, var(--cust-ivory));
+  --cust-line: color-mix(in srgb, var(--cust-forest) 14%, transparent);
+  --cust-surface: #fffef9;
+  width: min(100%, 52rem);
+  margin: 0 auto;
+  padding: 0.85rem 1rem 1.5rem;
+  color: var(--cust-ink);
+}
+
+.staff-customer-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.staff-customer-eyebrow,
+.staff-customer-head h2,
+.staff-customer-head p {
+  margin: 0;
+}
+
+.staff-customer-eyebrow {
+  color: var(--cust-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.staff-customer-head h2 {
+  margin-top: 0.2rem;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.staff-customer-head > div > p:last-child,
+.staff-customer-hint {
+  margin-top: 0.35rem;
+  color: var(--cust-muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.staff-customer-back {
+  color: var(--cust-forest);
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.staff-customer-search {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--cust-line);
+  border-radius: 0.85rem;
+  background: var(--cust-surface);
+}
+
+.staff-customer-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.staff-customer-field span {
+  color: var(--cust-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.staff-customer-field input {
+  width: 100%;
+  min-height: 2.65rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--cust-line);
+  border-radius: 0.65rem;
+  background: #fff;
+  color: var(--cust-ink);
+  font: inherit;
+}
+
+.staff-customer-search-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.staff-customer-search-actions button {
+  min-height: 2.5rem;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--cust-forest) 28%, transparent);
+  border-radius: 999px;
+  background: var(--cust-forest);
+  color: var(--cust-ivory);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.staff-customer-search-actions button[type="button"] {
+  background: transparent;
+  color: var(--cust-forest);
+}
+
+.staff-customer-error {
+  margin: 0.85rem 0 0;
+  color: #9a3412;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.staff-customer-loyalty {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0 0 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--cust-line);
+  border-radius: 0.85rem;
+  background: var(--cust-surface);
+}
+
+@media (min-width: 640px) {
+  .staff-customer-loyalty {
+    grid-template-columns: 1.2fr 1fr;
+    align-items: start;
+  }
+}
+
+.staff-customer-loyalty-label {
+  margin: 0 0 0.25rem;
+  color: var(--cust-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.staff-customer-points {
+  margin: 0;
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.staff-customer-points span {
+  margin-left: 0.2rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.staff-customer-reward {
+  margin: 0.45rem 0 0;
+  color: var(--cust-forest);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.staff-customer-reward-muted {
+  margin: 0.45rem 0 0;
+  color: var(--cust-muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.staff-customer-loyalty-side p:nth-child(2) {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 750;
+}
+
+.staff-customer-section {
+  margin-bottom: 1.35rem;
+}
+
+.staff-customer-section-head {
+  margin-bottom: 0.65rem;
+}
+
+.staff-customer-section-head h3,
+.staff-customer-section-head p {
+  margin: 0;
+}
+
+.staff-customer-section-head h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.staff-customer-section-head p {
+  margin-top: 0.25rem;
+  color: var(--cust-muted);
+  font-size: 0.86rem;
+}
+
+.staff-customer-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.staff-customer-row {
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--cust-line);
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.staff-customer-row-main,
+.staff-customer-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  align-items: baseline;
+}
+
+.staff-customer-row-main {
+  margin-bottom: 0.25rem;
+}
+
+.staff-customer-row-main strong {
+  font-weight: 800;
+}
+
+.staff-customer-row-meta {
+  color: var(--cust-muted);
+  font-size: 0.86rem;
+}
+
+.staff-customer-row-meta strong {
+  color: var(--cust-ink);
+  font-weight: 750;
+}
+
+.staff-customer-items {
+  margin: 0.4rem 0 0;
+  color: var(--cust-muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.staff-customer-free {
+  color: var(--cust-forest);
+  font-weight: 700;
+}
+
+.staff-customer-delta--earn {
+  color: var(--cust-forest);
+  font-weight: 800;
+}
+
+.staff-customer-delta--redeem {
+  color: #9a3412;
+  font-weight: 800;
+}
+
+.staff-customer-empty {
+  padding: 0.95rem 1rem;
+  border: 1px dashed var(--cust-line);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--cust-ivory) 70%, #fff);
+}
+
+.staff-customer-empty strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.staff-customer-empty-hint {
+  margin: 0.3rem 0 0;
+  color: var(--cust-muted);
+  font-size: 0.86rem;
+}
+
+.staff-pos-page .staff-pos-loyalty-history {
+  color: var(--cs-brown, var(--elilai-forest, #394331));
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}

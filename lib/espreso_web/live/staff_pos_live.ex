@@ -1146,6 +1146,14 @@ defmodule EspresoWeb.StaffPosLive do
                         <%= if @loyalty_customer.points_balance >= 10 do %>
                           · ready to redeem
                         <% end %>
+                        ·
+                        <.link
+                          navigate={~p"/customers/#{@loyalty_customer.id}"}
+                          class="staff-pos-loyalty-history"
+                          id="pos-loyalty-history"
+                        >
+                          View history
+                        </.link>
                       </p>
                       <button
                         :if={@loyalty_customer && @loyalty_customer.points_balance >= 10}
