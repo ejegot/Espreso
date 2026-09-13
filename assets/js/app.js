@@ -534,6 +534,167 @@ Hooks.LandingCarousel = {
   }
 }
 
+Hooks.SlideToStart = {
+  mounted() {
+    this.track = this.el.querySelector("[data-slide-track]")
+    this.handle = this.el.querySelector("[data-slide-handle]")
+    this.fill = this.el.querySelector("[data-slide-fill]")
+    this.hint = this.el.querySelector("[data-slide-hint]")
+    this.eventName = this.el.dataset.event || "enter_menu"
+    this.completed = false
+    this.dragging = false
+    this.pointerId = null
+    this.startX = 0
+    this.offsetX = 0
+    this.reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+
+    if (!this.track || !this.handle) return
+
+    this.onPointerDown = (event) => this.beginDrag(event)
+    this.onPointerMove = (event) => this.moveDrag(event)
+    this.onPointerUp = (event) => this.endDrag(event)
+    this.onKeyDown = (event) => this.onHandleKey(event)
+    this.onLostCapture = () => this.cancelDrag()
+
+    this.handle.addEventListener("pointerdown", this.onPointerDown)
+    this.handle.addEventListener("keydown", this.onKeyDown)
+    this.handle.addEventListener("lostpointercapture", this.onLostCapture)
+    this.render(0, false)
+  },
+
+  destroyed() {
+    this.teardownListeners()
+    if (this.completeTimer) window.clearTimeout(this.completeTimer)
+  },
+
+  teardownListeners() {
+    if (!this.handle) return
+    this.handle.removeEventListener("pointerdown", this.onPointerDown)
+    this.handle.removeEventListener("keydown", this.onKeyDown)
+    this.handle.removeEventListener("lostpointercapture", this.onLostCapture)
+    window.removeEventListener("pointermove", this.onPointerMove)
+    window.removeEventListener("pointerup", this.onPointerUp)
+    window.removeEventListener("pointercancel", this.onPointerUp)
+  },
+
+  maxTravel() {
+    const trackWidth = this.track.clientWidth
+    const handleWidth = this.handle.offsetWidth
+    const styles = window.getComputedStyle(this.track)
+    const padLeft = parseFloat(styles.paddingLeft) || 0
+    const padRight = parseFloat(styles.paddingRight) || 0
+    return Math.max(0, trackWidth - handleWidth - padLeft - padRight)
+  },
+
+  beginDrag(event) {
+    if (this.completed || event.button === 2) return
+    event.preventDefault()
+    this.dragging = true
+    this.pointerId = event.pointerId
+    this.startX = event.clientX - this.offsetX
+    this.el.classList.add("is-dragging")
+    this.handle.setPointerCapture?.(event.pointerId)
+    window.addEventListener("pointermove", this.onPointerMove, {passive: false})
+    window.addEventListener("pointerup", this.onPointerUp)
+    window.addEventListener("pointercancel", this.onPointerUp)
+  },
+
+  moveDrag(event) {
+    if (!this.dragging || this.completed) return
+    if (this.pointerId != null && event.pointerId !== this.pointerId) return
+    event.preventDefault()
+    const max = this.maxTravel()
+    const next = Math.max(0, Math.min(max, event.clientX - this.startX))
+    this.offsetX = next
+    this.render(next / (max || 1), false)
+  },
+
+  endDrag(event) {
+    if (!this.dragging) return
+    if (this.pointerId != null && event && event.pointerId !== this.pointerId) return
+    this.dragging = false
+    this.el.classList.remove("is-dragging")
+    window.removeEventListener("pointermove", this.onPointerMove)
+    window.removeEventListener("pointerup", this.onPointerUp)
+    window.removeEventListener("pointercancel", this.onPointerUp)
+
+    const max = this.maxTravel()
+    const progress = max > 0 ? this.offsetX / max : 0
+    if (progress >= 0.86) {
+      this.complete()
+    } else {
+      this.snapBack()
+    }
+  },
+
+  cancelDrag() {
+    if (!this.dragging || this.completed) return
+    this.dragging = false
+    this.el.classList.remove("is-dragging")
+    window.removeEventListener("pointermove", this.onPointerMove)
+    window.removeEventListener("pointerup", this.onPointerUp)
+    window.removeEventListener("pointercancel", this.onPointerUp)
+    this.snapBack()
+  },
+
+  onHandleKey(event) {
+    if (this.completed) return
+    if (event.key === "Enter" || event.key === " " || event.key === "ArrowRight") {
+      event.preventDefault()
+      this.complete()
+    } else if (event.key === "Home" || event.key === "ArrowLeft") {
+      event.preventDefault()
+      this.snapBack()
+    }
+  },
+
+  snapBack() {
+    this.offsetX = 0
+    this.render(0, true)
+  },
+
+  complete() {
+    if (this.completed) return
+    this.completed = true
+    this.dragging = false
+    this.el.classList.remove("is-dragging")
+    this.el.classList.add("is-complete")
+    this.handle.setAttribute("aria-disabled", "true")
+    this.handle.tabIndex = -1
+    const max = this.maxTravel()
+    this.offsetX = max
+    this.render(1, true)
+
+    const delay = this.reduceMotion ? 0 : 220
+    this.completeTimer = window.setTimeout(() => {
+      this.pushEvent(this.eventName, {})
+    }, delay)
+  },
+
+  render(progress, animate) {
+    const max = this.maxTravel()
+    const x = Math.max(0, Math.min(max, progress * max))
+    this.offsetX = x
+    const easing = animate && !this.reduceMotion ? "transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)" : "none"
+
+    if (this.handle) {
+      this.handle.style.transition = easing
+      this.handle.style.transform = `translate3d(${x}px, 0, 0)`
+    }
+    if (this.fill) {
+      this.fill.style.transition = animate && !this.reduceMotion
+        ? "width 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease"
+        : "none"
+      this.fill.style.width = `${Math.max((this.handle?.offsetWidth || 0) + x, 0)}px`
+      this.fill.style.opacity = String(0.22 + progress * 0.55)
+    }
+    if (this.hint) {
+      this.hint.style.transition = animate && !this.reduceMotion ? "opacity 0.28s ease" : "none"
+      this.hint.style.opacity = String(Math.max(0, 1 - progress * 1.35))
+    }
+  }
+}
+
 Hooks.MenuBrowse = {
   mounted() {
     this.handleEvent("scroll_to_items", () => this.scrollToItems())

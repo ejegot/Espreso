@@ -51,6 +51,9 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, ".menu-qr-landing-headline", "Visit CoffeeSpot")
     refute has_element?(view, ".menu-qr-landing-lede", "Browse the menu. Order from your table.")
     assert has_element?(view, "#menu-cta-view-menu", "Get Started")
+    assert has_element?(view, "#menu-slide-to-start[phx-hook='SlideToStart']")
+    assert has_element?(view, "#menu-slide-to-start .menu-qr-slide-handle")
+    assert has_element?(view, "#menu-slide-to-start .menu-qr-slide-hint", "Get Started")
     assert has_element?(view, "#menu-cta-visit-coffeespot", "See hours & directions")
 
     assert has_element?(
@@ -86,9 +89,12 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, ".brune-menu-shell")
   end
 
-  test "/menu View the menu enters Menu directly", %{conn: conn} do
+  test "/menu slide-to-start Get Started still enters Menu via accessibility control", %{
+    conn: conn
+  } do
     {:ok, view, _html} = live(conn, ~p"/menu")
 
+    assert has_element?(view, "#menu-slide-to-start[data-event='enter_menu']")
     view |> element("#menu-cta-view-menu") |> render_click()
     assert has_element?(view, "#menu-items")
     assert has_element?(view, "#category-HOT")
