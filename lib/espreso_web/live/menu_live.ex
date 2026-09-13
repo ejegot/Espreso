@@ -566,15 +566,28 @@ defmodule EspresoWeb.MenuLive do
             </button>
           </div>
 
-          <button
-            type="button"
-            id="menu-cta-view-menu"
-            class="menu-qr-landing-cta menu-qr-landing-cta--primary"
-            phx-click="enter_menu"
+          <div
+            id="menu-slide-to-start"
+            class="menu-qr-landing-cta menu-qr-landing-cta--slide"
+            phx-hook="SlideToStart"
+            data-event="enter_menu"
           >
-            <span class="menu-qr-landing-cta-label">Get Started</span>
-            <span class="menu-qr-landing-cta-arrow" aria-hidden="true">→</span>
-          </button>
+            <div class="menu-qr-slide-track" data-slide-track>
+              <div class="menu-qr-slide-fill" data-slide-fill aria-hidden="true"></div>
+              <span class="menu-qr-slide-hint" data-slide-hint aria-hidden="true">Get Started</span>
+              <button
+                type="button"
+                class="menu-qr-slide-handle"
+                data-slide-handle
+                aria-label="Slide to get started"
+              >
+                <span class="menu-qr-slide-handle-icon" aria-hidden="true">→</span>
+              </button>
+            </div>
+            <button type="button" id="menu-cta-view-menu" class="sr-only" phx-click="enter_menu">
+              Get Started
+            </button>
+          </div>
         </div>
       </div>
 
