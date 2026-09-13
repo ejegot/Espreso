@@ -1,0 +1,29 @@
+{
+  "name": "elilai-kafe-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ELIlai Kafe Capacitor native shell around the Espreso Phoenix LiveView staff app.",
+  "scripts": {
+    "sync": "npx cap sync",
+    "sync:android": "npx cap sync android",
+    "sync:ios": "npx cap sync ios",
+    "open:android": "npx cap open android",
+    "open:ios": "npx cap open ios",
+    "build:android:debug": "cd android && ./gradlew assembleDebug"
+  },
+  "keywords": [
+    "elilai-kafe",
+    "capacitor",
+    "espreso"
+  ],
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.2",
+    "typescript": "^5.9.2"
+  }
+}

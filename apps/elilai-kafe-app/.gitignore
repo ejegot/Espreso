@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Local env overrides (may contain LAN URLs)
+.env
+.env.*
+!.env.example
+
+# Capacitor / native build outputs
+android/app/build/
+android/.gradle/
+android/build/
+android/local.properties
+android/captures/
+android/*.keystore
+android/*.jks
+ios/App/Pods/
+ios/App/build/
+ios/DerivedData/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+ios/App/App.xcodeproj/project.xcworkspace/xcuserdata/
+**/xcuserdata/
+**/*.xcuserstate
+
+# Signing / secrets — never commit
+*.p12
+*.mobileprovision
+*.provisionprofile
+*.keystore
+*.jks
+google-services.json
+GoogleService-Info.plist
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+.DS_Store
+
+# Logs
+npm-debug.log*
+yarn-error.log*
+*.log
