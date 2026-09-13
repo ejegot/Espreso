@@ -367,29 +367,119 @@ Hooks.StaffNotifications = {
   }
 }
 
-Hooks.StaffAuthCarousel = {
+// Client-side PIN pad for staff login. Collects digits locally only —
+// verification remains server-side via POST /session/pin.
+Hooks.StaffPinPad = {
   mounted() {
-    this.slides = Array.from(this.el.querySelectorAll("[data-auth-slide]"))
-    this.index = 0
-    this.reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    this.show(0)
+    this.pin = ""
+    this.input = this.el.querySelector("[data-pin-input]")
+    this.dots = Array.from(this.el.querySelectorAll("[data-pin-dot]"))
+    this.keys = Array.from(this.el.querySelectorAll("[data-pin-key], [data-pin-action]"))
+    this.form = this.el.closest("form")
+    this.submit =
+      this.el.querySelector("[data-pin-submit]") ||
+      (this.form && this.form.querySelector("[data-pin-submit]"))
+    this.staffId = this.el.dataset.staffId || ""
 
-    if (this.slides.length > 1 && !this.reduce) {
-      this.timer = window.setInterval(() => {
-        this.index = (this.index + 1) % this.slides.length
-        this.show(this.index)
-      }, 5000)
+    this.onClick = (event) => {
+      const target = event.target.closest("[data-pin-key], [data-pin-action]")
+      if (!target || !this.el.contains(target) || target.disabled) return
+
+      event.preventDefault()
+      if (!this.isReady()) return
+
+      const digit = target.getAttribute("data-pin-key")
+      const action = target.getAttribute("data-pin-action")
+
+      if (digit) this.appendDigit(digit)
+      else if (action === "backspace") this.backspace()
+      else if (action === "clear") this.clearPin()
     }
+
+    this.onSubmit = () => {
+      if (this.submit) {
+        this.submit.disabled = true
+        this.submit.setAttribute("aria-busy", "true")
+        this.submit.classList.add("is-loading")
+      }
+    }
+
+    this.el.addEventListener("click", this.onClick)
+    if (this.form) this.form.addEventListener("submit", this.onSubmit)
+
+    this.syncReady()
+    this.render()
+  },
+
+  updated() {
+    const nextStaffId = this.el.dataset.staffId || ""
+    if (nextStaffId !== this.staffId) {
+      this.staffId = nextStaffId
+      this.clearPin()
+    }
+    this.submit =
+      this.el.querySelector("[data-pin-submit]") ||
+      (this.form && this.form.querySelector("[data-pin-submit]"))
+    this.syncReady()
+    this.render()
   },
 
   destroyed() {
-    if (this.timer) window.clearInterval(this.timer)
+    this.el.removeEventListener("click", this.onClick)
+    if (this.form && this.onSubmit) this.form.removeEventListener("submit", this.onSubmit)
   },
 
-  show(index) {
-    this.slides.forEach((slide, i) => {
-      slide.classList.toggle("is-active", i === index)
+  isReady() {
+    return this.el.dataset.pinReady === "true"
+  },
+
+  pinMax() {
+    return Number(this.el.dataset.pinMax || 6)
+  },
+
+  pinDisplay() {
+    return Number(this.el.dataset.pinDisplay || 4)
+  },
+
+  appendDigit(digit) {
+    if (!/^\d$/.test(digit)) return
+    if (this.pin.length >= this.pinMax()) return
+    this.pin += digit
+    this.render()
+  },
+
+  backspace() {
+    this.pin = this.pin.slice(0, -1)
+    this.render()
+  },
+
+  clearPin() {
+    this.pin = ""
+    this.render()
+  },
+
+  syncReady() {
+    const ready = this.isReady()
+    this.keys.forEach((key) => {
+      key.disabled = !ready
     })
+    if (this.submit && this.submit.getAttribute("aria-busy") !== "true") {
+      this.submit.disabled = !(ready && this.pin.length >= 4)
+    }
+  },
+
+  render() {
+    if (this.input) this.input.value = this.pin
+
+    const filledCount =
+      this.pin.length >= this.pinDisplay() ? this.pinDisplay() : this.pin.length
+
+    this.dots.forEach((dot) => {
+      const index = Number(dot.dataset.index || 0)
+      dot.classList.toggle("is-filled", index > 0 && index <= filledCount)
+    })
+
+    this.syncReady()
   }
 }
 

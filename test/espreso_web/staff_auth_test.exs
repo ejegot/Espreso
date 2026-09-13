@@ -624,18 +624,27 @@ defmodule EspresoWeb.StaffAuthTest do
 
     {:ok, view, html} = live(conn, ~p"/login")
     assert html =~ "Welcome back"
-    assert html =~ "Select your name, then enter your PIN."
+    assert html =~ "Please login to your account"
     assert html =~ "ELIlai Kafe"
 
     assert has_element?(
              view,
-             "img.staff-auth-logo[src='/images/elilai-kafe/elilai-kafe-logo.jpg']"
+             "img.staff-auth-logo[src='/images/elilai-kafe/elilai-kafe-logo.png']"
            )
 
+    assert has_element?(view, ".staff-auth-page--approved")
+    assert has_element?(view, ".staff-auth-stage")
+    assert has_element?(view, "aside.staff-auth-visual img.staff-auth-visual-img")
     assert has_element?(view, "#staff-pin-login")
     assert has_element?(view, "#staff-roster-search")
+    assert has_element?(view, "#staff-pin-local[phx-hook='StaffPinPad']")
     assert has_element?(view, "#staff-auth-account-recovery", "Account recovery")
-    assert has_element?(view, ".staff-auth-switch--quiet a[href='/register']", "Register")
+    assert has_element?(view, ".staff-auth-register a[href='/register']", "Register")
+    assert has_element?(view, ".staff-auth-actions #staff-pin-submit", "Sign in")
+    refute html =~ "/images/coffeespot/"
+    refute html =~ "find coffee"
+    refute html =~ "Sign in with Google"
+    refute has_element?(view, ".staff-auth-visual-tagline")
 
     refute html =~ "Employee login"
     refute html =~ "Owner login"
@@ -653,7 +662,7 @@ defmodule EspresoWeb.StaffAuthTest do
              barista.name
            )
 
-    assert has_element?(view, "#staff-pin-form button.staff-auth-submit--shift", "Sign In")
+    assert has_element?(view, "#staff-pin-form button.staff-auth-submit--shift", "Sign in")
   end
 
   test "staff login search filters roster and empty search copy", %{
@@ -686,7 +695,7 @@ defmodule EspresoWeb.StaffAuthTest do
     assert html =~ "No matching team members."
   end
 
-  test "staff pin login selects user and enables sign in", %{conn: conn, barista: barista} do
+  test "staff pin login selects user and prepares client pin pad", %{conn: conn, barista: barista} do
     assert {:ok, _} = Accounts.set_pin(barista, "4321")
 
     {:ok, view, _html} = live(conn, ~p"/login")
@@ -696,13 +705,15 @@ defmodule EspresoWeb.StaffAuthTest do
 
     assert has_element?(view, "#staff-pin-selected", barista.name)
     assert has_element?(view, "#staff-pin-enter-hint", "Enter your PIN.")
-
-    for digit <- ~w(4 3 2 1) do
-      view |> element("button[phx-value-digit=\"#{digit}\"]") |> render_click()
-    end
-
-    assert has_element?(view, ".staff-pin-dot.is-filled")
-    refute has_element?(view, "#staff-pin-form button.staff-auth-submit--shift[disabled]")
+    assert has_element?(view, "#staff-pin-local[data-pin-ready='true']")
+    assert has_element?(view, "#staff-pin-local[data-staff-id='#{barista.id}']")
+    assert has_element?(view, "#staff-pin-form input[name='user_id'][value='#{barista.id}']")
+    assert has_element?(view, "#staff-pin-local input[name='pin']")
+    assert has_element?(view, "button[data-pin-key='1']")
+    assert has_element?(view, "button[data-pin-action='clear']")
+    assert has_element?(view, "button[data-pin-action='backspace']")
+    assert has_element?(view, "#staff-pin-form button.staff-auth-submit--shift[data-pin-submit]")
+    refute has_element?(view, "button[phx-click='pin_digit']")
   end
 
   test "account recovery reveals email password form", %{conn: conn} do
@@ -766,7 +777,7 @@ defmodule EspresoWeb.StaffAuthTest do
 
     {:ok, _view, html} = live(recycle(logged_out), ~p"/login")
     assert html =~ "Welcome back"
-    assert html =~ "Select your name, then enter your PIN."
+    assert html =~ "Please login to your account"
   end
 
   test "repeated wrong pins trigger cooldown without locking other staff", %{
