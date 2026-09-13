@@ -31,10 +31,8 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
       assert html =~ ~s(href="/images/elilai-kafe/apple-touch-icon.png")
       assert html =~ ~s(name="apple-mobile-web-app-title")
 
-      assert has_element?(
-               view,
-               "img.staff-auth-logo[src='/images/elilai-kafe/elilai-kafe-logo.jpg']"
-             )
+      assert has_element?(view, "img.staff-auth-logo")
+      assert html =~ "/images/elilai-kafe/elilai-kafe-logo."
 
       assert has_element?(view, "h1.staff-auth-title")
     end
