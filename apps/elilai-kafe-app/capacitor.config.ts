@@ -39,6 +39,16 @@ const config: CapacitorConfig = {
     // Keep navigation on the production Phoenix host inside the WebView.
     // Other hosts open in the system browser by Capacitor default.
     allowNavigation: [PRODUCTION_HOST]
+  },
+  plugins: {
+    // Capacitor 8 core SystemBars: light icons on Forest chrome.
+    SystemBars: {
+      insetsHandling: "css",
+      // Hint avoids first-paint inset shift; employee_root uses viewport-fit=cover.
+      initialViewportFitValueHint: "cover",
+      style: "DARK",
+      hidden: false
+    }
   }
 };
 

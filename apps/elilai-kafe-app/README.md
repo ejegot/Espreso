@@ -63,11 +63,20 @@ npx cap sync ios
 npx cap open ios
 ```
 
+## Native shell UX (APP PASS 3B)
+
+- `@capacitor/app` handles Android hardware back (history.back or minimize)
+- Because `server.url` loads remote Phoenix, `www/js/elilai-native-shell.js` is injected from `MainActivity`
+- SystemBars: Forest chrome with light icons (`style: DARK`); WebView ivory `#F4EFE3`
+- Brand launcher/splash assets from `priv/static/images/elilai-kafe/` (regenerate via `python3 scripts/generate-brand-assets.py`)
+- `allowNavigation` remains `espreso.fly.dev` only
+
 ## Intentionally not in this pass
 
 - Native printer / kaha bridge
 - Offline mode
-- Final App Store / Play Store icon sets
-- Production signing / store submission
+- Modal-first Android back
+- Store submission / signing / certificates
 - CapacitorCookies / CapacitorHttp
 - Second authentication system
+- Service worker changes
