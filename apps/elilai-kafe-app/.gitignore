@@ -1,6 +1,13 @@
 # Dependencies
 node_modules/
 
+# Generated intermediates from scripts/generate-brand-assets.py
+assets-src/logo_*.png
+assets-src/tmp_*.png
+assets-src/splash_logo_*.png
+assets-src/ios_splash_logo.png
+assets-src/ic_launcher_foreground_*.png
+
 # Local env overrides (may contain LAN URLs)
 .env
 .env.*
