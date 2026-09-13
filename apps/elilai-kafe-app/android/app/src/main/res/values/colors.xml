@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Official ELIlai Kafe brand direction (minimal shell branding). -->
+    <color name="colorPrimary">#394331</color>
+    <color name="colorPrimaryDark">#2F3729</color>
+    <color name="colorAccent">#394331</color>
+    <color name="elilaiIvory">#F4EFE3</color>
+    <color name="elilaiForest">#394331</color>
+</resources>
