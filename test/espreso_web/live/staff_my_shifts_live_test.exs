@@ -55,10 +55,10 @@ defmodule EspresoWeb.StaffMyShiftsLiveTest do
     assert has_element?(view, ".staff-shell-title", "My shifts")
     assert has_element?(view, "#staff-nav-my_shifts", "My shifts")
 
-    assert {:error, {:redirect, %{to: "/dashboard"}}} =
+    assert {:error, {:redirect, %{to: "/staff"}}} =
              live(log_in(conn, manager), ~p"/staff/shifts")
 
-    assert {:error, {:redirect, %{to: "/dashboard"}}} =
+    assert {:error, {:redirect, %{to: "/staff"}}} =
              live(log_in(conn, owner), ~p"/staff/shifts")
   end
 

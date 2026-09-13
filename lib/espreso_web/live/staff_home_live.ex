@@ -44,41 +44,31 @@ defmodule EspresoWeb.StaffHomeLive do
     ~H"""
     <.staff_shell current={:home} current_user={@current_user} page_title="Home">
       <main class="staff-home-main staff-home-hub staff-home-desk" id="staff-home-desk">
-        <header class="staff-home-desk-head">
-          <div class="staff-home-desk-copy">
-            <p class="staff-home-brand">ELIlai Kafe</p>
-            <p class="staff-home-desk-eyebrow">Home</p>
-            <h2 class="staff-home-desk-title">
-              Welcome back, {@current_user.name}
-            </h2>
-            <p class="staff-home-desk-role">{User.role_label(@current_user.role)}</p>
-          </div>
-          <div class="staff-home-desk-status" id="staff-home-shop-status">
-            <span class="staff-home-status-dot" aria-hidden="true"></span>
-            <span>Live</span>
-          </div>
+        <header class="staff-home-identity" id="staff-home-identity">
+          <p class="staff-home-greeting" id="staff-home-greeting">{@greeting}</p>
+          <p class="staff-home-identity-role">{User.role_label(@current_user.role)}</p>
         </header>
 
-        <section class="staff-home-primary" aria-label="Primary workspaces">
+        <section class="staff-home-primary" aria-label="Primary action">
           <.link
             :for={item <- @primary}
             navigate={item.path}
-            class={["staff-home-hero-tile", item[:class]]}
+            class={["staff-home-pos-cta", item[:class]]}
             id={"staff-home-#{item.id}"}
           >
-            <div class="staff-home-hero-top">
-              <span class="staff-home-card-eyebrow">{item.eyebrow}</span>
-              <span :if={is_integer(item[:count]) and item.count > 0} class="staff-home-hero-count">
-                {item.count}
-              </span>
-            </div>
-            <span class="staff-home-card-title">{item.title}</span>
-            <span class="staff-home-card-body">{item.body}</span>
-            <span class="staff-home-hero-cta">{item.cta}</span>
+            <span class="staff-home-pos-cta-kicker">{item.eyebrow}</span>
+            <span class="staff-home-pos-cta-title">{item.title}</span>
+            <span class="staff-home-pos-cta-body">{item.body}</span>
+            <span class="staff-home-pos-cta-action">{item.cta}</span>
           </.link>
         </section>
 
-        <section class="staff-home-today" id="staff-home-today" aria-label="Today">
+        <section
+          :if={@today_visible?}
+          class="staff-home-today"
+          id="staff-home-today"
+          aria-label="Today"
+        >
           <div class="staff-home-today-head">
             <p class="staff-home-today-eyebrow">Today</p>
             <p :if={@shift_close} class="staff-home-today-closed" id="staff-home-shift-closed">
@@ -116,21 +106,31 @@ defmodule EspresoWeb.StaffHomeLive do
           <% end %>
         </section>
 
-        <section :if={@secondary != []} class="staff-home-secondary" aria-label="Shortcuts">
-          <.link
-            :for={item <- @secondary}
-            navigate={item.path}
-            class={["staff-home-tool-link", item[:class]]}
-            id={"staff-home-#{item.id}"}
-          >
-            <span class="staff-home-tool-label">
-              {item.title}
-              <span :if={is_integer(item[:count]) and item.count > 0} class="staff-home-inline-count">
-                {item.count}
+        <section
+          :for={group <- @shortcut_groups}
+          class="staff-home-shortcut-group"
+          aria-label={group.title}
+        >
+          <p class="staff-home-shortcut-eyebrow">{group.title}</p>
+          <div class="staff-home-secondary">
+            <.link
+              :for={item <- group.items}
+              navigate={item.path}
+              class={["staff-home-tool-link", item[:class]]}
+              id={"staff-home-#{item.id}"}
+            >
+              <span class="staff-home-tool-label">
+                {item.title}
+                <span
+                  :if={is_integer(item[:count]) and item.count > 0}
+                  class="staff-home-inline-count"
+                >
+                  {item.count}
+                </span>
               </span>
-            </span>
-            <span class="staff-home-tool-body">{item.body}</span>
-          </.link>
+              <span class="staff-home-tool-body">{item.body}</span>
+            </.link>
+          </div>
         </section>
 
         <section
@@ -191,139 +191,189 @@ defmodule EspresoWeb.StaffHomeLive do
     |> assign(:breakdown, breakdown)
     |> assign(:via_rows, if(breakdown, do: Orders.paid_via_rows(breakdown), else: []))
     |> assign(:shift_close, shift_close)
+    |> assign(:today_visible?, today_visible?(overview, sales, shift_close))
     |> assign(:printer_enabled?, Printer.enabled?())
+    |> assign(:greeting, staff_greeting(user))
     |> assign(:primary, primary_tiles(user, overview))
-    |> assign(:secondary, secondary_tiles(user, shift_close))
+    |> assign(:shortcut_groups, shortcut_groups(user, shift_close))
   end
 
-  defp primary_tiles(%User{} = user, overview) do
+  defp staff_greeting(%User{name: name}) do
+    first_name =
+      name
+      |> to_string()
+      |> String.trim()
+      |> String.split(~r/\s+/, parts: 2)
+      |> List.first()
+      |> case do
+        nil -> "there"
+        "" -> "there"
+        value -> value
+      end
+
+    "#{daypart_greeting()}, #{first_name}"
+  end
+
+  defp daypart_greeting do
+    hour =
+      DateTime.utc_now()
+      |> DateTime.add(8 * 60 * 60, :second)
+      |> Map.fetch!(:hour)
+
+    cond do
+      hour < 12 -> "Good morning"
+      hour < 17 -> "Good afternoon"
+      true -> "Good evening"
+    end
+  end
+
+  defp today_visible?(_overview, _sales, shift_close) when not is_nil(shift_close), do: true
+
+  defp today_visible?(overview, sales, nil) do
+    cond do
+      match?(%{todays_paid_count: count} when count > 0, sales) -> true
+      match?(%{active_count: count} when count > 0, overview) -> true
+      match?(%{unpaid_active_count: count} when count > 0, overview) -> true
+      match?(%{received_count: count} when count > 0, overview) -> true
+      match?(%{preparing_count: count} when count > 0, overview) -> true
+      match?(%{todays_count: count} when count > 0, overview) -> true
+      true -> false
+    end
+  end
+
+  defp primary_tiles(%User{} = user, _overview) do
     [
-      %{
-        id: "orders",
-        eyebrow: "Kitchen",
-        title: "Orders",
-        body: orders_body(overview),
-        path: ~p"/orders",
-        count: overview.received_count,
-        cta: "Open board →",
-        class: "staff-home-hero-tile--orders",
-        show?: Authorization.can?(user, :orders)
-      },
       %{
         id: "pos",
         eyebrow: "Counter",
-        title: "POS",
-        body: "Walk-in · pay at create",
+        title: "Open POS",
+        body: "Take walk-in orders and payment",
         path: ~p"/pos",
-        count: nil,
-        cta: "New order →",
-        class: "staff-home-hero-tile--pos",
+        cta: "Open POS →",
+        class: "staff-home-pos-cta--primary",
         show?: Authorization.can?(user, :orders)
       }
     ]
     |> Enum.filter(& &1.show?)
   end
 
-  defp secondary_tiles(%User{} = user, shift_close) do
+  defp shortcut_groups(%User{} = user, shift_close) do
     unpaid_count = Orders.count_todays_unpaid()
+    overview = Orders.dashboard_overview()
 
-    base = [
-      %{
-        id: "unpaid",
-        title: "Unpaid",
-        body: "Confirm counter & QR",
-        path: ~p"/orders?unpaid=1",
-        count: unpaid_count,
-        show?: Authorization.can?(user, :orders),
-        class: "staff-home-tool-link--attention"
-      },
-      %{
-        id: "transactions",
-        title: "Transactions",
-        body: "Daily receipts & reprints",
-        path: ~p"/transactions",
-        count: nil,
-        show?: Authorization.can?(user, :orders)
-      },
-      %{
-        id: "my-shifts",
-        title: "My shifts",
-        body: "Time In, Time Out & sales",
-        path: ~p"/staff/shifts",
-        count: nil,
-        show?: user.role == "barista"
-      },
-      %{
-        id: "cash-out",
-        title: "Cash Out",
-        body: "Drawer expense for the shop",
-        path: ~p"/staff/cash-out",
-        count: nil,
-        show?: CashOuts.can_access?(user)
-      },
-      %{
-        id: "close",
-        title: if(shift_close, do: "Shift closed", else: "Close shift"),
-        body: if(shift_close, do: "View close snapshot", else: "Totals & counted cash"),
-        path: ~p"/staff/close",
-        count: nil,
-        show?: Shifts.can_access_close?(user),
-        class: "staff-home-tool-link--close"
-      }
+    service =
+      [
+        %{
+          id: "orders",
+          title: "Orders",
+          body: orders_body(overview),
+          path: ~p"/orders",
+          count: overview.received_count,
+          show?: Authorization.can?(user, :orders)
+        },
+        %{
+          id: "unpaid",
+          title: "Unpaid",
+          body: "Confirm counter & QR",
+          path: ~p"/orders?unpaid=1",
+          count: unpaid_count,
+          show?: Authorization.can?(user, :orders),
+          class: "staff-home-tool-link--attention"
+        },
+        %{
+          id: "transactions",
+          title: "Transactions",
+          body: "Daily receipts & reprints",
+          path: ~p"/transactions",
+          count: nil,
+          show?: Authorization.can?(user, :orders)
+        },
+        %{
+          id: "customers",
+          title: "Loyalty / Customers",
+          body: "Find customers & history",
+          path: ~p"/customers",
+          count: nil,
+          show?: Authorization.can?(user, :orders)
+        }
+      ]
+      |> Enum.filter(& &1.show?)
+
+    shift =
+      [
+        %{
+          id: "my-shifts",
+          title: "My shifts",
+          body: "Time In, Time Out & sales",
+          path: ~p"/staff/shifts",
+          count: nil,
+          show?: user.role == "barista"
+        },
+        %{
+          id: "cash-out",
+          title: "Cash Out",
+          body: "Drawer expense for the shop",
+          path: ~p"/staff/cash-out",
+          count: nil,
+          show?: CashOuts.can_access?(user)
+        },
+        %{
+          id: "close",
+          title: if(shift_close, do: "Shift closed", else: "Close shift"),
+          body: if(shift_close, do: "View close snapshot", else: "Totals & counted cash"),
+          path: ~p"/staff/close",
+          count: nil,
+          show?: Shifts.can_access_close?(user),
+          class: "staff-home-tool-link--close"
+        }
+      ]
+      |> Enum.filter(& &1.show?)
+
+    manage =
+      [
+        %{
+          id: "dashboard",
+          title: "Dashboard",
+          body: "Sales & activity",
+          path: ~p"/dashboard",
+          count: nil,
+          show?: manager_or_owner?(user)
+        },
+        %{
+          id: "availability",
+          title: "Availability",
+          body: "Sold out / in stock",
+          path: ~p"/admin/availability",
+          count: nil,
+          show?: Authorization.can?(user, :product_availability)
+        },
+        %{
+          id: "staff",
+          title: "Staff",
+          body: "Accounts & PINs",
+          path: ~p"/admin/users",
+          count: nil,
+          show?: user.role == "owner",
+          class: "staff-home-tool-link--owner"
+        },
+        %{
+          id: "settings",
+          title: "Settings",
+          body: "Payments & shop",
+          path: ~p"/admin/settings",
+          count: nil,
+          show?: user.role == "owner",
+          class: "staff-home-tool-link--owner"
+        }
+      ]
+      |> Enum.filter(& &1.show?)
+
+    [
+      %{title: "Service", items: service},
+      %{title: "Shift", items: shift},
+      %{title: "Manage", items: manage}
     ]
-
-    manager =
-      if manager_or_owner?(user) do
-        [
-          %{
-            id: "dashboard",
-            title: "Dashboard",
-            body: "Sales & activity",
-            path: ~p"/dashboard",
-            count: nil,
-            show?: true
-          },
-          %{
-            id: "availability",
-            title: "Availability",
-            body: "Sold out / in stock",
-            path: ~p"/admin/availability",
-            count: nil,
-            show?: Authorization.can?(user, :product_availability)
-          }
-        ]
-      else
-        []
-      end
-
-    owner =
-      if user.role == "owner" do
-        [
-          %{
-            id: "staff",
-            title: "Staff",
-            body: "Accounts & PINs",
-            path: ~p"/admin/users",
-            count: nil,
-            show?: true,
-            class: "staff-home-tool-link--owner"
-          },
-          %{
-            id: "settings",
-            title: "Settings",
-            body: "Payments & shop",
-            path: ~p"/admin/settings",
-            count: nil,
-            show?: true,
-            class: "staff-home-tool-link--owner"
-          }
-        ]
-      else
-        []
-      end
-
-    (base ++ manager ++ owner)
-    |> Enum.filter(& &1.show?)
+    |> Enum.reject(&(&1.items == []))
   end
 
   defp manager_or_owner?(%User{role: role}), do: role in ["manager", "owner"]

@@ -320,40 +320,42 @@ defmodule EspresoWeb.StaffLoginLive do
                     >
                       Sign in
                     </button>
-
-                    <button
-                      type="button"
-                      class="staff-auth-mode-link staff-auth-mode-link--recovery"
-                      id="staff-auth-account-recovery"
-                      phx-click="show_email_login"
-                    >
-                      <span class="staff-auth-mode-link-label">
-                        <span class="staff-auth-mode-link-icon" aria-hidden="true">
-                          <svg
-                            viewBox="0 0 24 24"
-                            width="15"
-                            height="15"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="1.7"
-                          >
-                            <rect x="3.5" y="6.5" width="17" height="11" rx="1.5" />
-                            <path
-                              d="m4.5 8 7.5 5.5L19.5 8"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                            />
-                          </svg>
-                        </span>
-                        Account recovery
-                      </span>
-                    </button>
-
-                    <p class="staff-auth-register">
-                      Need an account? <.link navigate={~p"/register"}>Register</.link>
-                    </p>
                   </div>
                 </form>
+              </div>
+
+              <div class="staff-auth-actions staff-auth-actions--footer">
+                <button
+                  type="button"
+                  class="staff-auth-mode-link staff-auth-mode-link--recovery"
+                  id="staff-auth-account-recovery"
+                  phx-click="show_email_login"
+                >
+                  <span class="staff-auth-mode-link-label">
+                    <span class="staff-auth-mode-link-icon" aria-hidden="true">
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="15"
+                        height="15"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.7"
+                      >
+                        <rect x="3.5" y="6.5" width="17" height="11" rx="1.5" />
+                        <path
+                          d="m4.5 8 7.5 5.5L19.5 8"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    </span>
+                    Account recovery
+                  </span>
+                </button>
+
+                <p class="staff-auth-register">
+                  Need an account? <.link navigate={~p"/register"}>Register</.link>
+                </p>
               </div>
             </div>
 
@@ -422,26 +424,6 @@ defmodule EspresoWeb.StaffLoginLive do
               </button>
             </.form>
           </div>
-
-          <svg
-            class="staff-auth-wave staff-auth-wave--side"
-            viewBox="0 0 80 1000"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <path
-              class="staff-auth-wave-fill"
-              d="M80 0C58 90 62 180 40 280C18 380 48 470 28 570C8 670 40 760 22 860C12 920 36 970 80 1000V0Z"
-            />
-            <path
-              class="staff-auth-wave-stroke"
-              fill="none"
-              stroke-width="1.4"
-              stroke-linecap="round"
-              d="M38 0C58 90 22 180 44 280C66 380 20 470 42 570C64 670 18 760 36 860C46 920 18 970 4 1000"
-            />
-          </svg>
         </main>
 
         <aside class="staff-auth-visual" aria-hidden="true">

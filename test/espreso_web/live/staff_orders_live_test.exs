@@ -27,7 +27,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     %{conn: conn, barista: barista}
   end
 
-  test "Orders header centers ELIlai Kafe and overlays actionable counts", %{
+  test "Orders header keeps title and tools without center brand logo", %{
     conn: conn,
     barista: barista
   } do
@@ -35,11 +35,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     assert has_element?(view, "#staff-shell .staff-shell-bar--orders")
     assert has_element?(view, ".staff-shell-orders-title", "Orders")
-
-    assert has_element?(
-             view,
-             ".staff-shell-orders-brand[src='/images/elilai-kafe/elilai-kafe-logo.jpg']"
-           )
+    refute has_element?(view, ".staff-shell-orders-brand")
 
     assert has_element?(
              view,

@@ -56,7 +56,7 @@ defmodule EspresoWeb.AdminAvailabilityLiveTest do
   end
 
   test "barista is redirected", %{conn: conn, barista: barista} do
-    assert {:error, {:redirect, %{to: "/orders"}}} =
+    assert {:error, {:redirect, %{to: "/staff"}}} =
              live(log_in(conn, barista), ~p"/admin/availability")
   end
 

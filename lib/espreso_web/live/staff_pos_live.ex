@@ -524,7 +524,7 @@ defmodule EspresoWeb.StaffPosLive do
   end
 
   def handle_event("set_payment_method", %{"method" => paid_via}, socket)
-      when paid_via in ["cash", "gcash"] do
+      when paid_via in ["cash", "gcash", "maya"] do
     {:noreply,
      socket
      |> assign(:payment_choice, :paid)
@@ -1086,11 +1086,12 @@ defmodule EspresoWeb.StaffPosLive do
                       </div>
                     </div>
 
+                    <p class="staff-pos-section-label">Order type</p>
                     <div
                       class="staff-pos-fulfillment staff-pos-fulfillment--pills"
                       id="pos-fulfillment"
                       role="radiogroup"
-                      aria-label="Fulfillment"
+                      aria-label="Order type"
                     >
                       <button
                         type="button"
@@ -1100,7 +1101,7 @@ defmodule EspresoWeb.StaffPosLive do
                         phx-value-fulfillment="dine_in"
                         aria-pressed={to_string(@fulfillment == :dine_in)}
                       >
-                        Dine-in
+                        Dine In
                       </button>
                       <button
                         type="button"
@@ -1110,7 +1111,7 @@ defmodule EspresoWeb.StaffPosLive do
                         phx-value-fulfillment="pickup"
                         aria-pressed={to_string(@fulfillment == :pickup)}
                       >
-                        Takeout
+                        Take Out
                       </button>
                     </div>
 
@@ -1332,18 +1333,36 @@ defmodule EspresoWeb.StaffPosLive do
                         aria-pressed={to_string(@payment_choice == :paid and @paid_via == "gcash")}
                         aria-describedby={
                           if @payment_choice == :paid and @paid_via == "gcash",
-                            do: "pos-gcash-confirmation-cue",
+                            do: "pos-wallet-confirmation-cue",
                             else: nil
                         }
                       >
                         GCash
                       </button>
+                      <button
+                        type="button"
+                        class={[
+                          "staff-pos-pay-chip",
+                          @payment_choice == :paid and @paid_via == "maya" && "is-active"
+                        ]}
+                        id="pos-pay-maya"
+                        phx-click="set_payment_method"
+                        phx-value-method="maya"
+                        aria-pressed={to_string(@payment_choice == :paid and @paid_via == "maya")}
+                        aria-describedby={
+                          if @payment_choice == :paid and @paid_via == "maya",
+                            do: "pos-wallet-confirmation-cue",
+                            else: nil
+                        }
+                      >
+                        Maya
+                      </button>
                     </div>
 
                     <p
-                      :if={@payment_choice == :paid and @paid_via == "gcash"}
+                      :if={@payment_choice == :paid and @paid_via in ["gcash", "maya"]}
                       class="staff-pos-payment-cue"
-                      id="pos-gcash-confirmation-cue"
+                      id="pos-wallet-confirmation-cue"
                     >
                       Confirm payment was received before processing.
                     </p>
@@ -1371,11 +1390,7 @@ defmodule EspresoWeb.StaffPosLive do
                           loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)
                       }
                     >
-                      <%= if @payment_choice == :paid and @paid_via == "gcash" do %>
-                        Confirm GCash &amp; Process
-                      <% else %>
-                        Process Cash Order
-                      <% end %>
+                      {place_order_label(@payment_choice, @paid_via)}
                     </button>
                   </div>
                 </form>
@@ -2101,9 +2116,13 @@ defmodule EspresoWeb.StaffPosLive do
         "Loyalty · Find needed"
 
       true ->
-        "Loyalty · Add loyalty"
+        "Add Loyalty"
     end
   end
+
+  defp place_order_label(:paid, "gcash"), do: "Confirm GCash & Process"
+  defp place_order_label(:paid, "maya"), do: "Confirm Maya & Process"
+  defp place_order_label(_, _), do: "Process Cash Order"
 
   defp loyalty_place_note(%Espreso.Orders.Order{} = order) do
     case Loyalty.earn_outcome_for_order(order) do
