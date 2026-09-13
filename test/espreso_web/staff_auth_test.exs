@@ -46,7 +46,7 @@ defmodule EspresoWeb.StaffAuthTest do
     assert {:error, {:redirect, %{to: "/login"}}} = live(conn, ~p"/orders")
   end
 
-  test "login lands barista on orders and managers on dashboard", %{
+  test "login lands all staff on home", %{
     conn: conn,
     barista: barista,
     manager: manager,
@@ -57,21 +57,21 @@ defmodule EspresoWeb.StaffAuthTest do
         "user" => %{"email" => barista.email, "password" => "password123"}
       })
 
-    assert redirected_to(conn) == ~p"/orders"
+    assert redirected_to(conn) == ~p"/staff"
 
     conn =
       post(recycle(conn), ~p"/session", %{
         "user" => %{"email" => manager.email, "password" => "password123"}
       })
 
-    assert redirected_to(conn) == ~p"/dashboard"
+    assert redirected_to(conn) == ~p"/staff"
 
     conn =
       post(recycle(conn), ~p"/session", %{
         "user" => %{"email" => owner.email, "password" => "password123"}
       })
 
-    assert redirected_to(conn) == ~p"/dashboard"
+    assert redirected_to(conn) == ~p"/staff"
   end
 
   test "anyone can open register and sign-in link is present", %{conn: conn} do
@@ -107,7 +107,7 @@ defmodule EspresoWeb.StaffAuthTest do
         "user" => %{"email" => "newstaff@test.local", "password" => "password123"}
       })
 
-    assert redirected_to(conn) == ~p"/orders"
+    assert redirected_to(conn) == ~p"/staff"
   end
 
   test "dashboard requires login", %{conn: conn} do
@@ -126,7 +126,6 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(owner_view, "#staff-nav-pos", "POS")
     assert has_element?(owner_view, "#staff-nav-dashboard.is-active", "Dashboard")
     assert has_element?(owner_view, "#staff-nav-availability", "Availability")
-    assert has_element?(owner_view, "#staff-nav-reports", "Reports")
     assert has_element?(owner_view, "#staff-nav-staff", "Staff")
     assert has_element?(owner_view, "#staff-nav-settings", "Settings")
     assert has_element?(owner_view, "#dashboard-panel-sales", "Paid today")
@@ -184,7 +183,6 @@ defmodule EspresoWeb.StaffAuthTest do
     {:ok, staff_view, _html} = live(log_in(conn, barista), ~p"/dashboard")
     refute has_element?(staff_view, "#staff-nav-dashboard")
     refute has_element?(staff_view, "#staff-nav-availability")
-    refute has_element?(staff_view, "#staff-nav-reports")
     refute has_element?(staff_view, "#staff-nav-staff")
     refute has_element?(staff_view, "#staff-nav-settings")
     assert has_element?(staff_view, "#staff-nav-orders", "Orders")
@@ -495,12 +493,17 @@ defmodule EspresoWeb.StaffAuthTest do
   } do
     {:ok, barista_view, _html} = live(log_in(conn, barista), ~p"/staff")
     assert has_element?(barista_view, ".staff-shell-title", "Home")
-    assert has_element?(barista_view, ".staff-home-brand", "ELIlai Kafe")
+    assert has_element?(barista_view, "#staff-home-identity")
+    assert has_element?(barista_view, "#staff-home-greeting")
+    assert render(barista_view) =~ ~r/Good (morning|afternoon|evening), /
+    assert has_element?(barista_view, "#staff-home-pos", "Open POS")
     assert has_element?(barista_view, "#staff-home-orders", "Orders")
-    assert has_element?(barista_view, "#staff-home-pos", "POS")
     refute has_element?(barista_view, "#staff-home-dashboard")
     assert has_element?(barista_view, "#staff-nav-close", "Close shift")
     assert has_element?(barista_view, "#staff-home-close", "Close shift")
+    refute has_element?(barista_view, "#staff-home-shop-status")
+    assert has_element?(barista_view, ".staff-home-shortcut-eyebrow", "Service")
+    assert has_element?(barista_view, ".staff-home-shortcut-eyebrow", "Shift")
 
     {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/staff")
     assert has_element?(manager_view, "#staff-home-dashboard", "Dashboard")
@@ -524,9 +527,27 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(view, "#staff-nav-pos", "POS")
     assert has_element?(view, "#staff-nav-home", "Home")
     assert has_element?(view, "#staff-shell-more")
+    assert has_element?(view, "#staff-nav-more", "More")
+    assert has_element?(view, "#staff-shell-more #staff-nav-logout", "Log out")
     assert has_element?(view, "#staff-nav-logout", "Log out")
     refute has_element?(view, "#staff-nav-dashboard")
     refute has_element?(view, "#staff-nav-staff")
+  end
+
+  test "home More menu is directly available with secondary destinations", %{
+    conn: conn,
+    barista: barista
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/staff")
+
+    assert has_element?(view, "#staff-shell-more")
+    assert has_element?(view, "#staff-nav-more", "More")
+    assert has_element?(view, "#staff-shell-more #staff-nav-transactions", "Transactions")
+    assert has_element?(view, "#staff-shell-more #staff-nav-customers", "Customers")
+    assert has_element?(view, "#staff-shell-more #staff-nav-my_shifts", "My shifts")
+    assert has_element?(view, "#staff-shell-more #staff-nav-cash_out", "Cash Out")
+    assert has_element?(view, "#staff-shell-more #staff-nav-close", "Close shift")
+    assert has_element?(view, "#staff-shell-more #staff-nav-logout", "Log out")
   end
 
   test "manager can access staff routes but not user management", %{
@@ -539,10 +560,9 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(orders, ".staff-shell-title", "Orders")
     assert has_element?(orders, "#staff-nav-dashboard", "Dashboard")
     assert has_element?(orders, "#staff-nav-availability", "Availability")
-    assert has_element?(orders, "#staff-nav-reports", "Reports")
     refute has_element?(orders, "#staff-nav-staff")
 
-    assert {:error, {:redirect, %{to: "/dashboard"}}} = live(conn, ~p"/admin/users")
+    assert {:error, {:redirect, %{to: "/staff"}}} = live(conn, ~p"/admin/users")
   end
 
   test "owner can open staff admin from shell", %{conn: conn, owner: owner} do
@@ -555,7 +575,7 @@ defmodule EspresoWeb.StaffAuthTest do
 
   test "staff cannot open admin users", %{conn: conn, barista: barista} do
     conn = log_in(conn, barista)
-    assert {:error, {:redirect, %{to: "/orders"}}} = live(conn, ~p"/admin/users")
+    assert {:error, {:redirect, %{to: "/staff"}}} = live(conn, ~p"/admin/users")
   end
 
   test "owner cannot edit own role in admin UI", %{conn: conn, owner: owner} do
@@ -579,7 +599,7 @@ defmodule EspresoWeb.StaffAuthTest do
     refute render(view) =~ "Coming soon"
   end
 
-  test "pin login lands barista on orders", %{conn: conn, barista: barista} do
+  test "pin login lands barista on home", %{conn: conn, barista: barista} do
     assert {:ok, _} = Accounts.set_pin(barista, "4321")
 
     conn =
@@ -588,7 +608,7 @@ defmodule EspresoWeb.StaffAuthTest do
         "pin" => "4321"
       })
 
-    assert redirected_to(conn) == ~p"/orders"
+    assert redirected_to(conn) == ~p"/staff"
   end
 
   test "pin login accepts string user_id from form", %{conn: conn, barista: barista} do
@@ -600,7 +620,7 @@ defmodule EspresoWeb.StaffAuthTest do
         "pin" => "4321"
       })
 
-    assert redirected_to(conn) == ~p"/orders"
+    assert redirected_to(conn) == ~p"/staff"
   end
 
   test "invalid pin login returns to login", %{conn: conn, barista: barista} do
@@ -748,7 +768,7 @@ defmodule EspresoWeb.StaffAuthTest do
         "pin" => "5678"
       })
 
-    assert redirected_to(manager_conn) == ~p"/dashboard"
+    assert redirected_to(manager_conn) == ~p"/staff"
     assert get_session(manager_conn, :user_id) == manager.id
 
     owner_conn =
@@ -757,7 +777,7 @@ defmodule EspresoWeb.StaffAuthTest do
         "pin" => "9012"
       })
 
-    assert redirected_to(owner_conn) == ~p"/dashboard"
+    assert redirected_to(owner_conn) == ~p"/staff"
     assert get_session(owner_conn, :user_id) == owner.id
   end
 
@@ -770,7 +790,7 @@ defmodule EspresoWeb.StaffAuthTest do
         "pin" => "4321"
       })
 
-    assert redirected_to(logged_in) == ~p"/orders"
+    assert redirected_to(logged_in) == ~p"/staff"
 
     logged_out = delete(recycle(logged_in), ~p"/logout")
     assert redirected_to(logged_out) == ~p"/login"
@@ -816,7 +836,7 @@ defmodule EspresoWeb.StaffAuthTest do
         "pin" => "5678"
       })
 
-    assert redirected_to(other) == ~p"/dashboard"
+    assert redirected_to(other) == ~p"/staff"
     assert get_session(other, :user_id) == manager.id
   end
 
@@ -836,7 +856,7 @@ defmodule EspresoWeb.StaffAuthTest do
         "pin" => "4321"
       })
 
-    assert redirected_to(ok) == ~p"/orders"
+    assert redirected_to(ok) == ~p"/staff"
 
     Enum.each(1..5, fn _ ->
       post(recycle(conn), ~p"/session/pin", %{
@@ -865,7 +885,7 @@ defmodule EspresoWeb.StaffAuthTest do
           "pin" => "4321"
         })
 
-      assert redirected_to(conn) == ~p"/orders"
+      assert redirected_to(conn) == ~p"/staff"
       assert get_session(conn, :user_id) == barista.id
 
       open = StaffShifts.get_open_shift(barista)
@@ -918,7 +938,7 @@ defmodule EspresoWeb.StaffAuthTest do
           "user" => %{"email" => barista.email, "password" => "password123"}
         })
 
-      assert redirected_to(conn) == ~p"/orders"
+      assert redirected_to(conn) == ~p"/staff"
       assert get_session(conn, :user_id) == barista.id
 
       open = StaffShifts.get_open_shift(barista)
@@ -951,7 +971,7 @@ defmodule EspresoWeb.StaffAuthTest do
           "pin" => "4321"
         })
 
-      assert redirected_to(conn) == ~p"/orders"
+      assert redirected_to(conn) == ~p"/staff"
 
       first = Repo.get!(StaffShift, first.id)
       assert first.end_reason == "auto_close"
@@ -1044,7 +1064,7 @@ defmodule EspresoWeb.StaffAuthTest do
           "pin" => "5678"
         })
 
-      assert redirected_to(manager_conn) == ~p"/dashboard"
+      assert redirected_to(manager_conn) == ~p"/staff"
       assert get_session(manager_conn, :user_id) == manager.id
       assert shift_count(manager.id) == 0
       assert is_nil(StaffShifts.get_open_shift(manager))
@@ -1054,7 +1074,7 @@ defmodule EspresoWeb.StaffAuthTest do
           "user" => %{"email" => owner.email, "password" => "password123"}
         })
 
-      assert redirected_to(owner_conn) == ~p"/dashboard"
+      assert redirected_to(owner_conn) == ~p"/staff"
       assert get_session(owner_conn, :user_id) == owner.id
       assert shift_count(owner.id) == 0
       assert is_nil(StaffShifts.get_open_shift(owner))

@@ -64,7 +64,9 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#staff-pos-rail-more > #staff-nav-more", "More")
     assert has_element?(view, "#staff-pos-rail-more .staff-pos-rail-more-panel")
     assert has_element?(view, "#staff-pos-rail-more #staff-nav-logout", "Log out")
-    assert has_element?(view, "#staff-pos-rail-footer")
+    refute has_element?(view, "#staff-pos-rail-footer")
+    refute has_element?(view, ".staff-pos-rail-avatar")
+    refute has_element?(view, "#staff-pos-rail #staff-notifications")
     refute has_element?(view, "#staff-nav-dashboard")
     refute render(view) =~ "Coming soon"
   end
@@ -78,7 +80,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     conn = log_in(conn, barista)
     {:ok, view, _html} = live(conn, ~p"/pos")
-    assert has_element?(view, "#pos-loyalty-entry", "Add loyalty")
+    assert has_element?(view, "#pos-loyalty-entry", "Add Loyalty")
     refute has_element?(view, "#pos-loyalty-history")
 
     view = find_loyalty(view, "09175550001")
@@ -107,7 +109,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     view |> element("#pos-loyalty-clear") |> render_click()
     refute has_element?(view, "#pos-loyalty-history")
-    assert has_element?(view, "#pos-loyalty-entry", "Add loyalty")
+    assert has_element?(view, "#pos-loyalty-entry", "Add Loyalty")
   end
 
   test "phone entered without Find blocks place and shows Find hint", %{
@@ -156,7 +158,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
     view |> element("#pos-product-#{espresso.id}") |> render_click()
     refute has_element?(view, "#pos-loyalty-find-hint")
-    assert has_element?(view, "#pos-loyalty-entry", "Add loyalty")
+    assert has_element?(view, "#pos-loyalty-entry", "Add Loyalty")
 
     submit_order(view)
 
@@ -185,7 +187,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert order.customer_id == customer.id
     refute has_element?(view, "#pos-loyalty-status")
     refute has_element?(view, "#pos-loyalty-history")
-    assert has_element?(view, "#pos-loyalty-entry", "Add loyalty")
+    assert has_element?(view, "#pos-loyalty-entry", "Add Loyalty")
     assert live_assigns(view).loyalty_customer == nil
     assert live_assigns(view).loyalty_phone == ""
   end
@@ -446,7 +448,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
              "Availability"
            )
 
-    assert has_element?(manager_view, "#staff-pos-rail-more #staff-nav-reports", "Reports")
+    assert has_element?(manager_view, "#staff-pos-rail-more #staff-nav-dashboard", "Dashboard")
     refute has_element?(manager_view, "#staff-nav-staff")
     refute has_element?(manager_view, "#staff-nav-settings")
 
@@ -1573,7 +1575,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> render_click("cancel_cash_tender", %{})
     view |> element("#pos-pay-gcash") |> render_click()
 
-    assert has_element?(view, "#pos-gcash-confirmation-cue")
+    assert has_element?(view, "#pos-wallet-confirmation-cue")
     assert has_element?(view, "#pos-place-order", "Confirm GCash & Process")
     submit_order(view)
 
@@ -1597,9 +1599,9 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-pay-cash.is-active", "Cash")
     assert has_element?(view, ".staff-pos-section-label", "Payment method")
     assert has_element?(view, "#pos-place-order", "Process Cash Order")
-    refute has_element?(view, "#pos-gcash-confirmation-cue")
+    refute has_element?(view, "#pos-wallet-confirmation-cue")
     refute has_element?(view, "#pos-pay-later")
-    refute has_element?(view, "#pos-pay-maya")
+    assert has_element?(view, "#pos-pay-maya", "Maya")
     refute has_element?(view, "#pos-cash-helper")
 
     view |> element("#pos-product-#{espresso.id}") |> render_click()
@@ -1628,7 +1630,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> element("#pos-product-#{espresso.id}") |> render_click()
     view |> element("#pos-fulfillment-dine-in") |> render_click()
     refute has_element?(view, "#pos-table-number")
-    assert has_element?(view, "#pos-fulfillment-pickup", "Takeout")
+    assert has_element?(view, "#pos-fulfillment-pickup", "Take Out")
 
     view
     |> element("#pos-customer-name")
@@ -1640,7 +1642,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     assert has_element?(
              view,
-             "#pos-gcash-confirmation-cue",
+             "#pos-wallet-confirmation-cue",
              "Confirm payment was received before processing."
            )
 
@@ -1653,7 +1655,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, ~s(#pos-customer-name[value="Walk-in"]))
     assert has_element?(view, "#pos-pay-cash.is-active", "Cash")
     assert has_element?(view, "#pos-place-order", "Process Cash Order")
-    refute has_element?(view, "#pos-gcash-confirmation-cue")
+    refute has_element?(view, "#pos-wallet-confirmation-cue")
 
     [order] = Orders.list_active_orders()
     assert order.customer_name == "Maria"
@@ -1672,13 +1674,13 @@ defmodule EspresoWeb.StaffPosLiveTest do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
     view |> element("#pos-pay-gcash") |> render_click()
-    assert has_element?(view, "#pos-gcash-confirmation-cue")
+    assert has_element?(view, "#pos-wallet-confirmation-cue")
     assert has_element?(view, "#pos-place-order", "Confirm GCash & Process")
 
     view |> element("#pos-pay-cash") |> render_click()
     assert has_element?(view, "#pos-pay-cash.is-active", "Cash")
     assert has_element?(view, "#pos-place-order", "Process Cash Order")
-    refute has_element?(view, "#pos-gcash-confirmation-cue")
+    refute has_element?(view, "#pos-wallet-confirmation-cue")
     assert Orders.list_active_orders() == []
   end
 
@@ -2249,12 +2251,14 @@ defmodule EspresoWeb.StaffPosLiveTest do
   } do
     {:ok, home, html} = live(log_in(conn, barista), ~p"/staff")
     assert html =~ "ELIlai Kafe"
-    assert html =~ "Welcome back"
+    assert has_element?(home, "#staff-home-identity")
     assert has_element?(home, "#staff-home-orders", "Orders")
-    assert has_element?(home, "#staff-home-pos", "POS")
+    assert has_element?(home, "#staff-home-pos", "Open POS")
     assert has_element?(home, "#staff-home-unpaid", "Unpaid")
     assert has_element?(home, "#staff-notif-toggle")
-    assert has_element?(home, "#staff-home-today-barista")
+    refute has_element?(home, "#staff-home-shop-status")
+    refute has_element?(home, "#staff-home-today")
+    refute has_element?(home, "#staff-home-today-barista")
 
     {:ok, view, html} = live(log_in(conn, barista), ~p"/orders")
     assert has_element?(view, "#staff-nav-pos", "POS")

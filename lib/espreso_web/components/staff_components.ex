@@ -38,7 +38,7 @@ defmodule EspresoWeb.StaffComponents do
         <aside class="staff-pos-rail staff-pos-rail--icons" id="staff-pos-rail" aria-label="Staff">
           <div class="staff-pos-rail-brand" title="ELIlai Kafe">
             <img
-              src={~p"/images/elilai-kafe/elilai-kafe-logo.jpg"}
+              src={~p"/images/elilai-kafe/elilai-kafe-logo.png"}
               alt=""
               class="staff-pos-rail-logo"
               width="1024"
@@ -74,7 +74,7 @@ defmodule EspresoWeb.StaffComponents do
               title="More"
             >
               <.icon name="hero-ellipsis-horizontal" class="staff-pos-rail-icon" />
-              <span class="sr-only">More</span>
+              <span class="staff-pos-rail-more-label">More</span>
             </summary>
             <div class="staff-pos-rail-more-panel" role="menu" aria-label="More staff tools">
               <.link
@@ -103,17 +103,6 @@ defmodule EspresoWeb.StaffComponents do
               </.link>
             </div>
           </details>
-
-          <div class="staff-pos-rail-footer" id="staff-pos-rail-footer">
-            <div
-              class="staff-pos-rail-avatar"
-              title={"#{@current_user.name} · #{User.role_label(@current_user.role)}"}
-              aria-label={"#{@current_user.name}, #{User.role_label(@current_user.role)}"}
-            >
-              {staff_initials(@current_user.name)}
-            </div>
-            <.live_component module={EspresoWeb.StaffNotificationsComponent} id="staff-notifications" />
-          </div>
         </aside>
 
         <div class="staff-shell-body staff-shell-body--rail">
@@ -128,14 +117,6 @@ defmodule EspresoWeb.StaffComponents do
                 <p class="staff-shell-brand-label">ELIlai Kafe</p>
                 <h1 class="staff-shell-title staff-shell-orders-title">{@page_title}</h1>
               </div>
-
-              <img
-                src={~p"/images/elilai-kafe/elilai-kafe-logo.jpg"}
-                alt="ELIlai Kafe"
-                class="staff-shell-brand-logo staff-shell-orders-brand"
-                width="1024"
-                height="1024"
-              />
 
               <div class="staff-shell-tools-block staff-shell-tools-block--orders">
                 <div class="staff-shell-tools staff-shell-tools--orders">
@@ -226,17 +207,6 @@ defmodule EspresoWeb.StaffComponents do
     """
   end
 
-  defp staff_initials(name) when is_binary(name) do
-    name
-    |> String.split(~r/\s+/, trim: true)
-    |> Enum.take(2)
-    |> Enum.map(&String.first/1)
-    |> Enum.join()
-    |> String.upcase()
-  end
-
-  defp staff_initials(_), do: "?"
-
   defp nav_items(%User{} = user) do
     [
       %{key: :home, label: "Home", icon: "hero-home", path: ~p"/staff", show?: true},
@@ -309,13 +279,6 @@ defmodule EspresoWeb.StaffComponents do
         icon: "hero-cube",
         path: ~p"/admin/availability",
         show?: Authorization.can?(user, :product_availability)
-      },
-      %{
-        key: :reports,
-        label: "Reports",
-        icon: "hero-document-chart-bar",
-        path: ~p"/dashboard#dashboard-panel-reports",
-        show?: Authorization.can?(user, :reports)
       },
       %{
         key: :staff,

@@ -52,10 +52,10 @@ defmodule EspresoWeb.AdminSettingsLiveTest do
   end
 
   test "manager and staff are denied", %{conn: conn, manager: manager, barista: barista} do
-    assert {:error, {:redirect, %{to: "/dashboard"}}} =
+    assert {:error, {:redirect, %{to: "/staff"}}} =
              live(log_in(conn, manager), ~p"/admin/settings")
 
-    assert {:error, {:redirect, %{to: "/orders"}}} =
+    assert {:error, {:redirect, %{to: "/staff"}}} =
              live(log_in(conn, barista), ~p"/admin/settings")
   end
 

@@ -223,12 +223,11 @@ defmodule EspresoWeb.StaffAuth do
   defp maybe_store_return_to(conn), do: conn
 
   @doc """
-  Role-aware staff home after login / `/staff`.
+  Staff landing after login and unauthorized redirects.
 
-  Barista → `/orders`. Manager and owner → `/dashboard`.
+  All authenticated staff → `/staff` (Home). Unauthenticated → `/login`.
   """
-  def home_path(%User{role: "barista"}), do: ~p"/orders"
-  def home_path(%User{}), do: ~p"/dashboard"
+  def home_path(%User{}), do: ~p"/staff"
   def home_path(_), do: ~p"/login"
 
   defp signed_in_path(user), do: home_path(user)

@@ -63,7 +63,7 @@ defmodule EspresoWeb.StaffAttendanceLiveTest do
   end
 
   test "barista cannot access staff attendance", %{conn: conn, barista: barista} do
-    assert {:error, {:redirect, %{to: "/orders"}}} =
+    assert {:error, {:redirect, %{to: "/staff"}}} =
              live(log_in(conn, barista), ~p"/staff/attendance")
   end
 
