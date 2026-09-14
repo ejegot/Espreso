@@ -46,6 +46,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
       owner: owner,
       manager: manager,
       barista: barista,
+      hot: hot,
       espresso: espresso,
       americano: americano,
       iced: iced
@@ -475,6 +476,26 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute render(view) =~ ">All</span>"
     refute has_element?(view, "#pos-notes-toggle")
     assert has_element?(view, "#pos-ticket.is-empty")
+  end
+
+  test "POS marks Signature Tablea with a subtle signature badge", %{
+    conn: conn,
+    barista: barista,
+    hot: hot
+  } do
+    tablea = insert_product!(hot, "Signature Tablea", true, [{nil, "169"}])
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    assert has_element?(view, "#pos-product-#{tablea.id}", "Signature Tablea")
+
+    assert has_element?(
+             view,
+             "#pos-product-#{tablea.id} .staff-pos-signature-badge",
+             "✦ SIGNATURE"
+           )
+
+    assert has_element?(view, "#pos-product-#{tablea.id}", "₱169")
   end
 
   test "category selection switches product list", %{

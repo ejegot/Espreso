@@ -896,6 +896,7 @@ Hooks.MenuBrowse = {
   scrollToMenuContent() {
     const go = () => {
       const target =
+        this.el.querySelector("#menu-signature-feature") ||
         this.el.querySelector("#menu-items .brune-menu-section") ||
         this.el.querySelector("#menu-items")
       if (!target) return

@@ -25,6 +25,7 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:menu_stage, :landing)
      |> assign(:menu_filter, nil)
      |> assign(:categories, categories)
+     |> assign(:signature_feature, Menu.find_signature_product(categories))
      |> assign(:selected_category, selected)
      |> assign(:search, "")
      |> assign(:search_open?, false)
@@ -870,6 +871,43 @@ defmodule EspresoWeb.MenuLive do
 
         <section class="brune-menu-shell" id="menu">
           <div class="brune-menu-body" id="menu-items">
+            <section
+              :if={match?({_, _}, @signature_feature) and @search == "" and is_nil(@menu_filter)}
+              id="menu-signature-feature"
+              class="menu-signature-feature"
+              aria-label="Our signature"
+            >
+              <% {signature_category, signature_product} = @signature_feature %>
+              <button
+                type="button"
+                id={"menu-signature-feature-#{signature_product.id}"}
+                class="menu-signature-card"
+                phx-click="open_detail"
+                phx-value-id={signature_product.id}
+              >
+                <div class="menu-signature-card-media" aria-hidden="true">
+                  <img
+                    src={Menu.product_image(signature_category, signature_product.name)}
+                    alt=""
+                    class="menu-signature-card-photo"
+                    loading="lazy"
+                    width="320"
+                    height="320"
+                  />
+                </div>
+                <div class="menu-signature-card-copy">
+                  <p class="menu-signature-card-kicker">OUR SIGNATURE</p>
+                  <h2 class="menu-signature-card-title">{signature_product.name}</h2>
+                  <p class="menu-signature-card-lede">
+                    {product_blurb(signature_product, signature_category)}
+                  </p>
+                  <p class="menu-signature-card-price">
+                    {card_price_label(signature_product)}
+                  </p>
+                </div>
+              </button>
+            </section>
+
             <div
               :if={visible_categories(@categories, @selected_category, @search, @menu_filter) == []}
               id="menu-filter-empty"
@@ -897,7 +935,18 @@ defmodule EspresoWeb.MenuLive do
                 <p :if={group.name} class="brune-menu-subgroup">{group.name}</p>
 
                 <ul class="brune-menu-items">
-                  <li :for={product <- group.products} class="brune-menu-item">
+                  <li
+                    :for={
+                      product <-
+                        regular_menu_products(
+                          group.products,
+                          @signature_feature,
+                          @search,
+                          @menu_filter
+                        )
+                    }
+                    class="brune-menu-item"
+                  >
                     <article class="brune-menu-item-card">
                       <div class="brune-menu-item-thumb">
                         <img
@@ -911,6 +960,12 @@ defmodule EspresoWeb.MenuLive do
                           class={"menu-temp-badge menu-temp-badge--#{badge.tone}"}
                         >
                           {badge.label}
+                        </span>
+                        <span
+                          :if={Menu.signature_product?(product.name)}
+                          class="menu-signature-item-badge"
+                        >
+                          ✦ Signature
                         </span>
                       </div>
                       <div class="brune-menu-item-body">
@@ -1830,6 +1885,16 @@ defmodule EspresoWeb.MenuLive do
       categories
     else
       filter_categories_by_query(categories, query)
+    end
+  end
+
+  # When the top featured Signature card is visible, omit that SKU from the
+  # regular category list so it does not appear again at the bottom of HOT.
+  defp regular_menu_products(products, signature_feature, search, menu_filter) do
+    if match?({_, _}, signature_feature) and search == "" and is_nil(menu_filter) do
+      Enum.reject(products, &Menu.signature_product?(&1.name))
+    else
+      products
     end
   end
 

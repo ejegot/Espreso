@@ -906,6 +906,12 @@ defmodule EspresoWeb.StaffPosLive do
                       class={["staff-pos-product-img", img.packshot? && "is-packshot"]}
                       loading="lazy"
                     />
+                    <span
+                      :if={Menu.signature_product?(product.name)}
+                      class="staff-pos-signature-badge"
+                    >
+                      ✦ SIGNATURE
+                    </span>
                   </div>
                   <div class="staff-pos-product-card-body">
                     <h3 class="staff-pos-product-name">{product.name}</h3>

@@ -104,6 +104,75 @@ defmodule EspresoWeb.MenuLiveTest do
     refute has_element?(view, ".brune-top")
   end
 
+  test "/menu shows Signature Tablea featured card that opens product detail", %{
+    conn: conn,
+    hot: hot
+  } do
+    tablea =
+      insert_product!(
+        hot,
+        "Signature Tablea",
+        true,
+        [{nil, "169"}],
+        "Rich local cacao, our signature blend"
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view = enter_menu_browse(view)
+
+    assert has_element?(view, "#menu-signature-feature")
+    assert has_element?(view, ".menu-signature-card-kicker", "OUR SIGNATURE")
+    assert has_element?(view, ".menu-signature-card-title", "Signature Tablea")
+
+    assert has_element?(
+             view,
+             ".menu-signature-card-lede",
+             "Rich local cacao, our signature blend"
+           )
+
+    assert has_element?(view, ".menu-signature-card-price", "₱169")
+
+    assert has_element?(
+             view,
+             ~s(#menu-signature-feature-#{tablea.id} .menu-signature-card-photo[src="/images/coffeespot/signature-pure-tableya-portrait.jpg"])
+           )
+
+    view |> element("#menu-signature-feature-#{tablea.id}") |> render_click()
+    assert has_element?(view, "#menu-detail")
+    assert has_element?(view, "#menu-detail-title", "Signature Tablea")
+    assert has_element?(view, "#menu-detail .menu-detail-price", "₱169")
+  end
+
+  test "/menu shows only one Signature Tablea featured card and omits it from HOT list", %{
+    conn: conn,
+    hot: hot
+  } do
+    tablea =
+      insert_product!(
+        hot,
+        "Signature Tablea",
+        true,
+        [{nil, "169"}],
+        "Rich local cacao, our signature blend"
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view = enter_menu_browse(view)
+    html = render(view)
+
+    assert has_element?(view, "#menu-signature-feature")
+    assert has_element?(view, "#menu-signature-feature-#{tablea.id}")
+
+    assert html
+           |> Floki.parse_document!()
+           |> Floki.find("#menu-signature-feature")
+           |> length() == 1
+
+    refute has_element?(view, "#category-HOT button[aria-label='Add Signature Tablea']")
+    assert has_element?(view, "#category-HOT button[aria-label='Add Espresso']")
+    refute html =~ ~r/OUR SIGNATURE[\s\S]*OUR SIGNATURE/
+  end
+
   test "/menu sticky craving chips still offer eight options without Brunch", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
     view |> element("#menu-cta-view-menu") |> render_click()

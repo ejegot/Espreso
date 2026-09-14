@@ -131,7 +131,8 @@ hot_products = [
   {"Caramel Macchiato", [{"8oz", "160"}, {"12oz", "170"}]},
   {"Butter Scotch", [{"8oz", "160"}, {"12oz", "170"}]},
   {"Matcha Latte", [{"8oz", "160"}, {"12oz", "170"}]},
-  {"Hot Belagio Chocolate", [{"8oz", "160"}, {"12oz", "170"}]}
+  {"Hot Belagio Chocolate", [{"8oz", "160"}, {"12oz", "170"}]},
+  {"Signature Tablea", [{nil, "169"}]}
 ]
 
 seed_products.(hot_category, hot_products)
