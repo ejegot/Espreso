@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Regenerate Android/iOS launcher + splash assets from official ELIlai Kafe images.
+"""Regenerate Android/iOS launcher + splash assets from official Elilai Kafe images.
 
 Sources (copied into assets-src/):
   priv/static/images/elilai-kafe/app-icon-512.png
-  priv/static/images/elilai-kafe/elilai-kafe-logo.jpg
+  priv/static/images/elilai-kafe/elilai-kafe-mark.png  (flower + mug mark only)
 
-Does not alter the official logo artwork beyond resize/composite on Ivory.
+Does not redraw the official mark — only resize/composite on Ivory.
 """
 
 from __future__ import annotations
@@ -16,7 +16,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC_ICON = ROOT / "assets-src" / "app-icon-512.png"
-SRC_LOGO = ROOT / "assets-src" / "elilai-kafe-logo.jpg"
+SRC_MARK = ROOT / "assets-src" / "elilai-kafe-mark.png"
+# Prefer mark-only for sharp native chrome; fall back to full logo if absent.
+SRC_LOGO = SRC_MARK if SRC_MARK.exists() else ROOT / "assets-src" / "elilai-kafe-logo.jpg"
 IVORY = "#F4EFE3"
 
 ANDROID_RES = ROOT / "android" / "app" / "src" / "main" / "res"
@@ -36,7 +38,8 @@ def main() -> None:
 
     fg = ROOT / "assets-src" / "ic_launcher_foreground_1080.png"
     logo_640 = ROOT / "assets-src" / "logo_640.png"
-    convert(str(SRC_LOGO), "-resize", "640x640", f"PNG32:{logo_640}")
+    # Mark fills more of the adaptive-icon safe zone than the full wordmark lockup.
+    convert(str(SRC_LOGO), "-resize", "720x720", f"PNG32:{logo_640}")
     convert(
         "-size",
         "1080x1080",
@@ -60,7 +63,7 @@ def main() -> None:
         convert(str(fg), "-resize", f"{size}x{size}", str(out_fg))
         legacy = ANDROID_RES / f"mipmap-{name}" / "ic_launcher.png"
         round_icon = ANDROID_RES / f"mipmap-{name}" / "ic_launcher_round.png"
-        logo_size = int(size * 0.72)
+        logo_size = int(size * 0.78)
         tmp_logo = ROOT / "assets-src" / f"tmp_logo_{size}.png"
         convert(str(SRC_LOGO), "-resize", f"{logo_size}x{logo_size}", f"PNG32:{tmp_logo}")
         convert(
@@ -75,8 +78,9 @@ def main() -> None:
         )
         shutil.copy(legacy, round_icon)
 
+    # Android 12+ splash icon — larger mark for tablet sharpness.
     splash_icon = ANDROID_RES / "drawable" / "splash_icon.png"
-    convert(str(SRC_LOGO), "-resize", "576x576", f"PNG32:{splash_icon}")
+    convert(str(SRC_LOGO), "-resize", "768x768", f"PNG32:{splash_icon}")
 
     splash_sizes = {
         "drawable": (480, 800),
@@ -94,7 +98,7 @@ def main() -> None:
     for folder, (w, h) in splash_sizes.items():
         out_dir = ANDROID_RES / folder
         out_dir.mkdir(parents=True, exist_ok=True)
-        logo_dim = int(min(w, h) * 0.36)
+        logo_dim = int(min(w, h) * 0.46)
         tmp = ROOT / "assets-src" / f"splash_logo_{w}x{h}.png"
         convert(str(SRC_LOGO), "-resize", f"{logo_dim}x{logo_dim}", f"PNG32:{tmp}")
         convert(
@@ -108,12 +112,11 @@ def main() -> None:
             str(out_dir / "splash.png"),
         )
 
-    ios_icon = IOS_APPICON / "AppIcon-512@2x.png"
-    convert(str(SRC_ICON), "-resize", "1024x1024", str(ios_icon))
+    convert(str(SRC_ICON), "-resize", "1024x1024", str(IOS_APPICON / "AppIcon-512@2x.png"))
 
     ios_splash = IOS_SPLASH / "splash-2732x2732.png"
     ios_logo = ROOT / "assets-src" / "ios_splash_logo.png"
-    convert(str(SRC_LOGO), "-resize", "900x900", f"PNG32:{ios_logo}")
+    convert(str(SRC_LOGO), "-resize", "980x980", f"PNG32:{ios_logo}")
     convert(
         "-size",
         "2732x2732",
@@ -126,7 +129,8 @@ def main() -> None:
     )
     shutil.copy(ios_splash, IOS_SPLASH / "splash-2732x2732-1.png")
     shutil.copy(ios_splash, IOS_SPLASH / "splash-2732x2732-2.png")
-    print("ELIlai Kafe brand assets regenerated.")
+
+    print(f"Brand assets regenerated from {SRC_LOGO.name}")
 
 
 if __name__ == "__main__":

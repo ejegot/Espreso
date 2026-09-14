@@ -1,7 +1,7 @@
 {
-  "name": "ELIlai Kafe",
-  "short_name": "ELIlai",
-  "description": "ELIlai Kafe employee operations",
+  "name": "Elilai Kafe",
+  "short_name": "Elilai",
+  "description": "Elilai Kafe employee operations",
   "start_url": "/login",
   "scope": "/",
   "display": "standalone",

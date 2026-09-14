@@ -16,8 +16,8 @@ defmodule EspresoWeb.PwaManifestTest do
       |> File.read!()
       |> Jason.decode!()
 
-    assert manifest["name"] == "ELIlai Kafe"
-    assert manifest["short_name"] == "ELIlai"
+    assert manifest["name"] == "Elilai Kafe"
+    assert manifest["short_name"] == "Elilai"
     assert manifest["start_url"] == "/login"
     assert manifest["scope"] == "/"
     assert manifest["display"] == "standalone"
@@ -60,7 +60,7 @@ defmodule EspresoWeb.PwaManifestTest do
 
     body = Jason.decode!(response(conn, 200))
 
-    assert body["name"] == "ELIlai Kafe"
+    assert body["name"] == "Elilai Kafe"
     assert body["start_url"] == "/login"
     assert body["scope"] == "/"
     assert body["display"] == "standalone"

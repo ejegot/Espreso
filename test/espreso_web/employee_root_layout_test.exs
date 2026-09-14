@@ -18,7 +18,7 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
     %{owner: owner}
   end
 
-  test "employee authentication pages use the ELIlai Kafe root", %{conn: conn} do
+  test "employee authentication pages use the Elilai Kafe root", %{conn: conn} do
     for path <- [~p"/login", ~p"/register"] do
       {:ok, view, html} = live(recycle(conn), path)
 
@@ -32,7 +32,7 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
       assert html =~ ~s(name="apple-mobile-web-app-title")
 
       assert has_element?(view, "img.staff-auth-logo")
-      assert html =~ "/images/elilai-kafe/elilai-kafe-logo."
+      assert html =~ "/images/elilai-kafe/elilai-kafe-mark.png"
 
       assert has_element?(view, "h1.staff-auth-title")
     end
@@ -65,13 +65,18 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
       if path == ~p"/pos" do
         assert has_element?(
                  view,
-                 "#staff-pos-rail img.staff-pos-rail-logo[src='/images/elilai-kafe/elilai-kafe-logo.jpg']"
+                 "#staff-pos-rail img.staff-pos-rail-logo[src='/images/elilai-kafe/elilai-kafe-logo.png']"
                )
       else
-        assert has_element?(
-                 view,
-                 "#staff-shell img.staff-shell-brand-logo[src='/images/elilai-kafe/elilai-kafe-logo.jpg']"
-               )
+        if path == ~p"/orders" do
+          assert has_element?(view, "#staff-shell .staff-shell-brand-label", "Elilai Kafe")
+          refute has_element?(view, "#staff-shell img.staff-shell-brand-logo")
+        else
+          assert has_element?(
+                   view,
+                   "#staff-shell img.staff-shell-brand-logo[src='/images/elilai-kafe/elilai-kafe-logo.jpg']"
+                 )
+        end
       end
     end
   end

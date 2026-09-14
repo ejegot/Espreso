@@ -10,6 +10,7 @@
     "open:android": "npx cap open android",
     "open:ios": "npx cap open ios",
     "build:android:debug": "cd android && ./gradlew assembleDebug",
+    "build:android:release": "cd android && ./gradlew assembleRelease",
     "brand:assets": "python3 scripts/generate-brand-assets.py"
   },
   "keywords": [

@@ -2250,7 +2250,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     barista: barista
   } do
     {:ok, home, html} = live(log_in(conn, barista), ~p"/staff")
-    assert html =~ "ELIlai Kafe"
+    assert html =~ "Elilai Kafe"
     assert has_element?(home, "#staff-home-identity")
     assert has_element?(home, "#staff-home-orders", "Orders")
     assert has_element?(home, "#staff-home-pos", "Open POS")
