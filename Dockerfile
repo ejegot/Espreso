@@ -1,19 +1,22 @@
 # Find eligible builder and runner images on Docker Hub. We use Ubuntu/Debian
 # instead of Alpine to avoid DNS resolution issues in production.
 #
-# https://hub.docker.com/r/hexpm/elixir/tags?page=1&name=ubuntu
-# https://hub.docker.com/_/ubuntu?tab=tags
+# https://hub.docker.com/r/hexpm/elixir/tags?page=1&name=debian
+# https://hub.docker.com/_/debian?tab=tags&page=1&name=bookworm
 #
 # This file is based on these images:
 #
 #   - https://hub.docker.com/r/hexpm/elixir/tags - for the build image
-#   - https://hub.docker.com/_/debian?tab=tags&page=1&name=bullseye-20260610-slim - for the release image
+#   - https://hub.docker.com/_/debian?tab=tags&page=1&name=bookworm-20260824-slim - for the release image
 #   - https://pkgs.org/ - resource for finding needed packages
-#   - Ex: hexpm/elixir:1.17.3-erlang-27.3-debian-bullseye-20260610-slim
+#   - Ex: hexpm/elixir:1.17.3-erlang-27.3.4.17-debian-bookworm-20260824-slim
 #
+# Pin builder + runner to the same Debian snapshot so apt metadata matches.
+# Bookworm is used instead of Bullseye because older Bullseye snapshots 404 on
+# superseded security packages during `apt-get install`.
 ARG ELIXIR_VERSION=1.17.3
-ARG OTP_VERSION=27.3
-ARG DEBIAN_VERSION=bullseye-20260610-slim
+ARG OTP_VERSION=27.3.4.17
+ARG DEBIAN_VERSION=bookworm-20260824-slim
 
 ARG BUILDER_IMAGE="hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-debian-${DEBIAN_VERSION}"
 ARG RUNNER_IMAGE="debian:${DEBIAN_VERSION}"
