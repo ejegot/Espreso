@@ -53,6 +53,19 @@ npm run build:android:debug
 npx cap open android
 ```
 
+### Release APK (tablet sideload)
+
+Release signing uses a local keystore and secrets in `~/.gradle/gradle.properties`
+(`ELILAI_KAFE_UPLOAD_STORE_FILE`, `ELILAI_KAFE_UPLOAD_STORE_PASSWORD`,
+`ELILAI_KAFE_UPLOAD_KEY_ALIAS`, `ELILAI_KAFE_UPLOAD_KEY_PASSWORD`).
+Never commit the keystore or passwords.
+
+```bash
+cd apps/elilai-kafe-app
+npm run build:android:release
+# APK: android/app/build/outputs/apk/release/app-release.apk
+```
+
 ## Sync / iOS
 
 Requires full Xcode (not Command Line Tools only):
@@ -76,7 +89,7 @@ npx cap open ios
 - Native printer / kaha bridge
 - Offline mode
 - Modal-first Android back
-- Store submission / signing / certificates
+- Play Store / App Store submission packaging
 - CapacitorCookies / CapacitorHttp
 - Second authentication system
 - Service worker changes

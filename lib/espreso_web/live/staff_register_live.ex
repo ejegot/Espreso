@@ -76,7 +76,7 @@ defmodule EspresoWeb.StaffRegisterLive do
           <blockquote>
             “Skipping the morning line is a lifesaver!”
           </blockquote>
-          <figcaption>ELIlai Kafe · Team</figcaption>
+          <figcaption>Elilai Kafe · Team</figcaption>
         </figure>
       </aside>
 
@@ -84,9 +84,9 @@ defmodule EspresoWeb.StaffRegisterLive do
         <div class="staff-auth-panel-inner">
           <header class="staff-auth-brand">
             <img
-              src={~p"/images/elilai-kafe/elilai-kafe-logo.jpg"}
-              alt="ELIlai Kafe"
-              class="staff-auth-logo"
+              src={~p"/images/elilai-kafe/elilai-kafe-mark.png"}
+              alt="Elilai Kafe"
+              class="staff-auth-logo staff-auth-logo--mark"
               width="1024"
               height="1024"
             />

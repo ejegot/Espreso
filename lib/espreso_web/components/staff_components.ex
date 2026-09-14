@@ -36,7 +36,7 @@ defmodule EspresoWeb.StaffComponents do
     <div class={["staff-app site-page", @chrome == :rail && "staff-app--rail"]}>
       <%= if @chrome == :rail do %>
         <aside class="staff-pos-rail staff-pos-rail--icons" id="staff-pos-rail" aria-label="Staff">
-          <div class="staff-pos-rail-brand" title="ELIlai Kafe">
+          <div class="staff-pos-rail-brand" title="Elilai Kafe">
             <img
               src={~p"/images/elilai-kafe/elilai-kafe-logo.png"}
               alt=""
@@ -45,7 +45,7 @@ defmodule EspresoWeb.StaffComponents do
               height="1024"
               aria-hidden="true"
             />
-            <span class="sr-only">ELIlai Kafe · {@page_title}</span>
+            <span class="sr-only">Elilai Kafe · {@page_title}</span>
           </div>
 
           <nav class="staff-pos-rail-nav">
@@ -114,7 +114,7 @@ defmodule EspresoWeb.StaffComponents do
           <div class={["staff-shell-bar", @current == :orders && "staff-shell-bar--orders"]}>
             <%= if @current == :orders do %>
               <div class="staff-shell-heading staff-shell-heading--orders">
-                <p class="staff-shell-brand-label">ELIlai Kafe</p>
+                <p class="staff-shell-brand-label">Elilai Kafe</p>
                 <h1 class="staff-shell-title staff-shell-orders-title">{@page_title}</h1>
               </div>
 
@@ -134,13 +134,13 @@ defmodule EspresoWeb.StaffComponents do
               <div class="staff-shell-brand-block">
                 <img
                   src={~p"/images/elilai-kafe/elilai-kafe-logo.jpg"}
-                  alt="ELIlai Kafe"
+                  alt="Elilai Kafe"
                   class="staff-shell-brand-logo"
                   width="1024"
                   height="1024"
                 />
                 <div class="staff-shell-heading">
-                  <p class="staff-shell-brand-label">ELIlai Kafe</p>
+                  <p class="staff-shell-brand-label">Elilai Kafe</p>
                   <h1 class="staff-shell-title">{@page_title}</h1>
                   <p class="staff-shell-user">
                     {@current_user.name} · {User.role_label(@current_user.role)}
@@ -158,7 +158,7 @@ defmodule EspresoWeb.StaffComponents do
             <% end %>
           </div>
 
-          <nav class="staff-shell-nav" aria-label="ELIlai Kafe">
+          <nav class="staff-shell-nav" aria-label="Elilai Kafe">
             <.link
               :for={item <- @primary_nav}
               navigate={item.path}

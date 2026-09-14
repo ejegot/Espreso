@@ -36,6 +36,10 @@ ios/App/App.xcodeproj/project.xcworkspace/xcuserdata/
 *.provisionprofile
 *.keystore
 *.jks
+keystore.properties
+signing.properties
+android/keystore.properties
+android/signing.properties
 google-services.json
 GoogleService-Info.plist
 

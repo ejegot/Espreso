@@ -29,7 +29,7 @@ if (
 
 const config: CapacitorConfig = {
   appId: "ph.elilai.kafe",
-  appName: "ELIlai Kafe",
+  appName: "Elilai Kafe",
   webDir: "www",
   backgroundColor: "#F4EFE3",
   server: {

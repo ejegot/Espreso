@@ -645,11 +645,11 @@ defmodule EspresoWeb.StaffAuthTest do
     {:ok, view, html} = live(conn, ~p"/login")
     assert html =~ "Welcome back"
     assert html =~ "Please login to your account"
-    assert html =~ "ELIlai Kafe"
+    assert html =~ "Elilai Kafe"
 
     assert has_element?(
              view,
-             "img.staff-auth-logo[src='/images/elilai-kafe/elilai-kafe-logo.png']"
+             "img.staff-auth-logo[src='/images/elilai-kafe/elilai-kafe-mark.png']"
            )
 
     assert has_element?(view, ".staff-auth-page--approved")

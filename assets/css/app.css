@@ -2728,14 +2728,22 @@ body:has(.menu-page-locked) {
 }
 
 .staff-auth-page--approved .staff-auth-logo {
-  width: clamp(7rem, 17dvh, 10.25rem);
+  width: clamp(9.5rem, 24dvh, 13.5rem);
   height: auto;
+  max-width: min(100%, 14rem);
   aspect-ratio: 1 / 1;
   object-fit: contain;
+  object-position: center;
   background: transparent;
   border: 0;
   border-radius: 0;
   box-shadow: none;
+  image-rendering: -webkit-optimize-contrast;
+}
+
+.staff-auth-page--approved .staff-auth-logo--mark {
+  width: clamp(10.5rem, 28dvh, 15rem);
+  max-width: min(100%, 15.5rem);
 }
 
 .staff-auth-page--approved .staff-auth-title {
@@ -3847,8 +3855,10 @@ body:has(.menu-page-locked) {
     margin-bottom: 0.55rem;
   }
 
-  .staff-auth-page--approved .staff-auth-logo {
-    width: 7.75rem;
+  .staff-auth-page--approved .staff-auth-logo,
+  .staff-auth-page--approved .staff-auth-logo--mark {
+    width: clamp(9.75rem, 26dvh, 12.75rem);
+    max-width: min(100%, 13rem);
   }
 
   .staff-auth-page--approved .staff-auth-title {
@@ -3931,8 +3941,10 @@ body:has(.menu-page-locked) {
 
 /* Even shorter landscape (status bar / browser chrome ≈ 1024×711 shop capture) */
 @media (min-width: 900px) and (max-width: 1400px) and (max-height: 740px) and (orientation: landscape) {
-  .staff-auth-page--approved .staff-auth-logo {
-    width: 6.75rem;
+  .staff-auth-page--approved .staff-auth-logo,
+  .staff-auth-page--approved .staff-auth-logo--mark {
+    width: clamp(8.25rem, 22dvh, 10.5rem);
+    max-width: min(100%, 11rem);
   }
 
   .staff-auth-page--approved .staff-auth-brand {

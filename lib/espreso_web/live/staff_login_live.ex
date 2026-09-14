@@ -105,9 +105,9 @@ defmodule EspresoWeb.StaffLoginLive do
           <div class="staff-auth-panel-inner staff-auth-panel-inner--login">
             <header class="staff-auth-brand">
               <img
-                src={~p"/images/elilai-kafe/elilai-kafe-logo.png"}
-                alt="ELIlai Kafe"
-                class="staff-auth-logo"
+                src={~p"/images/elilai-kafe/elilai-kafe-mark.png"}
+                alt="Elilai Kafe"
+                class="staff-auth-logo staff-auth-logo--mark"
                 width="1024"
                 height="1024"
                 decoding="async"
