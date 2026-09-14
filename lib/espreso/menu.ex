@@ -24,6 +24,7 @@ defmodule Espreso.Menu do
     {"HOT", "Butter Scotch"} => "/images/coffeespot/gen-hot-butter-scotch.png",
     {"HOT", "Matcha Latte"} => "/images/coffeespot/gen-hot-matcha-latte.png",
     {"HOT", "Hot Belagio Chocolate"} => "/images/coffeespot/gen-hot-belagio-chocolate.png",
+    {"HOT", "Signature Tablea"} => "/images/coffeespot/signature-pure-tableya-portrait.jpg",
     {"COLD", "Americano"} => "/images/coffeespot/gen-cold-americano.png",
     {"COLD", "Café Latte"} => "/images/coffeespot/gen-cold-cafe-latte.png",
     {"COLD", "Mocha Latte"} => "/images/coffeespot/gen-cold-mocha-latte.png",
@@ -136,6 +137,7 @@ defmodule Espreso.Menu do
     {"HOT", "Matcha Latte"} => "Premium Japanese matcha whisked with creamy steamed milk.",
     {"HOT", "Hot Belagio Chocolate"} =>
       "A luxuriously thick and creamy European-style hot chocolate.",
+    {"HOT", "Signature Tablea"} => "Rich local cacao, our signature blend",
     # COLD
     {"COLD", "Americano"} => "Chilled espresso over ice for a refreshing, no-fuss coffee.",
     {"COLD", "Café Latte"} => "Espresso poured over ice and topped with cold, creamy milk.",
@@ -176,8 +178,7 @@ defmodule Espreso.Menu do
     # SODA
     {"SODA", "Tropical Passion Fruit"} =>
       "Tangy passion fruit fizzing with sparkling soda — bright and tropical.",
-    {"SODA", "Green Apple Campagna"} =>
-      "Crisp green apple soda with a refreshing tart finish.",
+    {"SODA", "Green Apple Campagna"} => "Crisp green apple soda with a refreshing tart finish.",
     {"SODA", "Minty Peach"} => "Cool mint meets sweet peach in a sparkling, refreshing drink.",
     {"SODA", "Scarlet Berry"} => "A vibrant berry soda with a deep, fruity sweetness.",
     {"SODA", "Majestic Mango"} => "Sweet Philippine mango blended into a fizzy, golden soda.",
@@ -292,6 +293,31 @@ defmodule Espreso.Menu do
   end
 
   def sweets_product_name?(_), do: false
+
+  @signature_product_name "Signature Tablea"
+
+  @doc "Canonical name for the CoffeeSpot signature cacao drink."
+  def signature_product_name, do: @signature_product_name
+
+  @doc "True when the product is the featured Signature Tablea SKU."
+  def signature_product?(name) when is_binary(name), do: name == @signature_product_name
+  def signature_product?(_), do: false
+
+  @doc """
+  Finds the available Signature Tablea product inside `list_menu/0` categories.
+
+  Returns `{category_name, product}` or `nil`.
+  """
+  def find_signature_product(categories) when is_list(categories) do
+    Enum.find_value(categories, fn category ->
+      case Enum.find(category.products, &signature_product?(&1.name)) do
+        nil -> nil
+        product -> {category.name, product}
+      end
+    end)
+  end
+
+  def find_signature_product(_), do: nil
 
   @doc """
   Returns categories in menu order, each with available products, prices,

@@ -341,4 +341,19 @@ defmodule Espreso.MenuTest do
       assert Menu.format_price(Decimal.new("10000.99")) == "₱10,000.99"
     end
   end
+
+  describe "signature product helpers" do
+    test "find_signature_product/1 returns Signature Tablea from HOT" do
+      hot = insert_category!("HOT")
+      insert_product!(hot, "Espresso", true, [{nil, "75"}])
+      tablea = insert_product!(hot, "Signature Tablea", true, [{nil, "169"}])
+
+      assert {"HOT", found} = Menu.find_signature_product(Menu.list_menu())
+      assert found.id == tablea.id
+      assert Menu.signature_product?(found.name)
+
+      assert Menu.product_image("HOT", "Signature Tablea") ==
+               "/images/coffeespot/signature-pure-tableya-portrait.jpg"
+    end
+  end
 end
