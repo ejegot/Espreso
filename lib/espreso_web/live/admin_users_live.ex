@@ -176,11 +176,12 @@ defmodule EspresoWeb.AdminUsersLive do
     end
   end
 
-  def handle_event("set_pin", %{"id" => id, "pin" => pin}, socket) do
+  def handle_event("set_pin", %{"id" => id, "pin" => pin} = params, socket) do
     actor = socket.assigns.current_user
     target = Accounts.get_user!(id)
+    confirm = Map.get(params, "pin_confirmation", "")
 
-    case Accounts.set_pin_as(actor, target, String.trim(pin)) do
+    case Accounts.set_pin_as(actor, target, String.trim(pin), String.trim(confirm)) do
       {:ok, _} ->
         {:noreply,
          socket
@@ -191,6 +192,9 @@ defmodule EspresoWeb.AdminUsersLive do
 
       {:error, :unauthorized} ->
         {:noreply, assign(socket, :flash_note, "You don’t have permission to manage users.")}
+
+      {:error, :pin_mismatch} ->
+        {:noreply, assign(socket, :flash_note, "PINs do not match.")}
 
       {:error, :invalid_pin_format} ->
         {:noreply, assign(socket, :flash_note, "PIN must be 4–6 digits.")}
@@ -386,6 +390,19 @@ defmodule EspresoWeb.AdminUsersLive do
                     autocomplete="off"
                     class="staff-team-input"
                     placeholder={if(Accounts.pin_set?(user), do: "Enter new PIN", else: "Set PIN")}
+                  />
+                  <label class="staff-team-pin-label" for={"pin-confirm-#{user.id}"}>
+                    Confirm PIN
+                  </label>
+                  <input
+                    type="password"
+                    name="pin_confirmation"
+                    id={"pin-confirm-#{user.id}"}
+                    inputmode="numeric"
+                    pattern="[0-9]{4,6}"
+                    autocomplete="off"
+                    class="staff-team-input"
+                    placeholder="Re-enter PIN"
                   />
                 </div>
                 <div class="staff-team-actions">

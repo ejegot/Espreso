@@ -142,12 +142,19 @@ defmodule EspresoWeb.AdminUsersLiveTest do
     assert has_element?(view, "#pin-form-#{barista.id}")
 
     view
-    |> form("#pin-form-#{barista.id}", %{pin: "4321"})
+    |> form("#pin-form-#{barista.id}", %{pin: "4321", pin_confirmation: "4321"})
     |> render_submit()
 
     assert has_element?(view, "#staff-team-note", "PIN set for Mia.")
     assert has_element?(view, "#user-pin-set-#{barista.id}", "PIN set")
     assert Accounts.pin_set?(Accounts.get_user!(barista.id))
+    assert {:ok, _} = Accounts.verify_pin(barista.id, "4321")
+
+    view
+    |> form("#pin-form-#{barista.id}", %{pin: "9999", pin_confirmation: "1111"})
+    |> render_submit()
+
+    assert has_element?(view, "#staff-team-note", "PINs do not match.")
     assert {:ok, _} = Accounts.verify_pin(barista.id, "4321")
 
     view |> element("#clear-pin-#{barista.id}") |> render_click()

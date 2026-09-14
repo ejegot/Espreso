@@ -31,10 +31,16 @@ defmodule Espreso.Accounts do
     count_users() == 0
   end
 
-  def registration_open? do
-    # Public self-registration is always available for staff/manager.
-    true
-  end
+  @doc """
+  True when the system still needs Initial Owner Setup (empty users table).
+  """
+  def needs_initial_owner_setup?, do: first_user?()
+
+  @doc """
+  Public self-registration is closed. New accounts are created by an Owner
+  (or via Initial Owner Setup when the database is empty).
+  """
+  def registration_open?, do: false
 
   def register_user(attrs) do
     %User{}
@@ -43,38 +49,112 @@ defmodule Espreso.Accounts do
   end
 
   @doc """
-  Public self-registration.
+  Public self-registration is permanently closed.
 
-  - First account becomes **owner**
-  - Later accounts may choose **barista** or **manager** only (not owner)
+  Use `bootstrap_initial_owner/1` for empty-database setup, or
+  `create_user_as/2` for Owner-managed accounts.
   """
-  def register_self(attrs) when is_map(attrs) do
-    name = attrs["name"] || attrs[:name]
-    email = attrs["email"] || attrs[:email]
-    password = attrs["password"] || attrs[:password]
-    requested_role = attrs["role"] || attrs[:role] || "barista"
+  def register_self(_attrs), do: {:error, :registration_closed}
 
-    role =
-      cond do
-        first_user?() -> "owner"
-        requested_role in ["barista", "manager"] -> requested_role
-        true -> "barista"
+  @bootstrap_lock_key 8_505_301_441
+
+  @doc """
+  Creates the first Owner when no users exist yet.
+
+  Expects name + PIN + matching PIN confirmation. Email/password are generated
+  as non-guessable internal placeholders (schema still requires them). PIN is
+  hashed with the same Pbkdf2 path as `set_pin/2`.
+
+  Race-safe via a Postgres transaction advisory lock so concurrent setup
+  attempts cannot create multiple initial owners.
+  """
+  def bootstrap_initial_owner(attrs) when is_map(attrs) do
+    name = attrs |> attr(:name) |> normalize_name()
+    pin = attrs |> attr(:pin) |> to_string_trim()
+    confirm = attrs |> attr(:pin_confirmation) |> to_string_trim()
+
+    with :ok <- validate_bootstrap_name(name),
+         :ok <- validate_pin_confirmation(pin, confirm),
+         :ok <- validate_pin_format(pin) do
+      Repo.transaction(fn ->
+        Repo.query!("SELECT pg_advisory_xact_lock($1)", [@bootstrap_lock_key])
+
+        if first_user?() do
+          case insert_bootstrap_owner(name, pin) do
+            {:ok, user} -> user
+            {:error, reason} -> Repo.rollback(reason)
+          end
+        else
+          Repo.rollback(:registration_closed)
+        end
+      end)
+      |> case do
+        {:ok, %User{} = user} -> {:ok, user}
+        {:error, reason} -> {:error, reason}
       end
+    end
+  end
 
-    register_user(%{
+  defp insert_bootstrap_owner(name, pin) do
+    attrs = %{
       "name" => name,
-      "email" => email,
-      "password" => password,
-      "role" => role
-    })
+      "email" => bootstrap_placeholder_email(),
+      "password" => bootstrap_placeholder_password(),
+      "role" => "owner"
+    }
+
+    case register_user(attrs) do
+      {:ok, user} -> set_pin(user, pin)
+      {:error, %Ecto.Changeset{} = changeset} -> {:error, changeset}
+    end
+  end
+
+  defp bootstrap_placeholder_email do
+    token = :crypto.strong_rand_bytes(18) |> Base.url_encode64(padding: false)
+    "owner.#{token}@internal.espreso.invalid"
+  end
+
+  defp bootstrap_placeholder_password do
+    :crypto.strong_rand_bytes(32) |> Base.encode64(padding: false)
+  end
+
+  defp normalize_name(name) when is_binary(name), do: String.trim(name)
+  defp normalize_name(_), do: ""
+
+  defp to_string_trim(value) when is_binary(value), do: String.trim(value)
+  defp to_string_trim(value) when is_integer(value), do: Integer.to_string(value)
+  defp to_string_trim(_), do: ""
+
+  defp validate_bootstrap_name(name) do
+    cond do
+      name == "" -> {:error, :invalid_name}
+      String.length(name) < 2 -> {:error, :invalid_name}
+      String.length(name) > 80 -> {:error, :invalid_name}
+      true -> :ok
+    end
+  end
+
+  defp validate_pin_confirmation(pin, confirm) do
+    if pin == confirm do
+      :ok
+    else
+      {:error, :pin_mismatch}
+    end
   end
 
   @doc """
   Creates the first owner when no users exist yet.
+
+  Prefer `bootstrap_initial_owner/1` for the product setup flow (PIN-based).
   """
   def register_first_owner(attrs) when is_map(attrs) do
     if first_user?() do
-      register_self(Map.put(attrs, "role", "owner"))
+      attrs =
+        attrs
+        |> Map.drop([:role, "role"])
+        |> Map.put("role", "owner")
+
+      register_user(attrs)
     else
       {:error, :registration_closed}
     end
@@ -314,10 +394,14 @@ defmodule Espreso.Accounts do
 
   @doc """
   Sets a user's PIN when the actor has `:user_management` permission.
+
+  Requires a matching PIN confirmation.
   """
-  def set_pin_as(%User{} = actor, %User{} = target, pin) when is_binary(pin) do
-    with :ok <- Authorization.authorize(actor, :user_management) do
-      set_pin(target, pin)
+  def set_pin_as(%User{} = actor, %User{} = target, pin, confirm)
+      when is_binary(pin) and is_binary(confirm) do
+    with :ok <- Authorization.authorize(actor, :user_management),
+         :ok <- validate_pin_confirmation(String.trim(pin), String.trim(confirm)) do
+      set_pin(target, String.trim(pin))
     end
   end
 

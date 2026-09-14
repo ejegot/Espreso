@@ -8,20 +8,24 @@ defmodule EspresoWeb.StaffLoginLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    roster = Accounts.list_staff_for_pin_login()
+    if Accounts.needs_initial_owner_setup?() do
+      {:ok, push_navigate(socket, to: ~p"/setup")}
+    else
+      roster = Accounts.list_staff_for_pin_login()
 
-    {:ok,
-     socket
-     |> assign(:page_title, "Welcome back")
-     |> assign(:login_mode, :pin)
-     |> assign(:roster, roster)
-     |> assign(:roster_query, "")
-     |> assign(:roster_open, false)
-     |> assign(:selected_staff, nil)
-     |> assign(:pin_max, @pin_max)
-     |> assign(:pin_display, @pin_display)
-     |> assign(:show_password?, false)
-     |> assign(:form, to_form(%{"email" => "", "password" => ""}, as: :user)), layout: false}
+      {:ok,
+       socket
+       |> assign(:page_title, "Welcome back")
+       |> assign(:login_mode, :pin)
+       |> assign(:roster, roster)
+       |> assign(:roster_query, "")
+       |> assign(:roster_open, false)
+       |> assign(:selected_staff, nil)
+       |> assign(:pin_max, @pin_max)
+       |> assign(:pin_display, @pin_display)
+       |> assign(:show_password?, false)
+       |> assign(:form, to_form(%{"email" => "", "password" => ""}, as: :user)), layout: false}
+    end
   end
 
   @impl true
@@ -352,10 +356,6 @@ defmodule EspresoWeb.StaffLoginLive do
                     Account recovery
                   </span>
                 </button>
-
-                <p class="staff-auth-register">
-                  Need an account? <.link navigate={~p"/register"}>Register</.link>
-                </p>
               </div>
             </div>
 

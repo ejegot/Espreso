@@ -74,40 +74,20 @@ defmodule EspresoWeb.StaffAuthTest do
     assert redirected_to(conn) == ~p"/staff"
   end
 
-  test "anyone can open register and sign-in link is present", %{conn: conn} do
-    {:ok, view, html} = live(conn, ~p"/register")
-    assert html =~ "Create your account"
-    assert has_element?(view, "#staff-register-form")
-    assert has_element?(view, "a[href='/login']", "Sign In")
-    assert html =~ "Already have an account?"
+  test "/register redirects to login when accounts already exist", %{conn: conn} do
+    assert {:error, {:live_redirect, %{to: "/login"}}} = live(conn, ~p"/register")
   end
 
-  test "self-register creates staff then can login", %{conn: conn} do
-    {:ok, view, _html} = live(conn, ~p"/register")
+  test "public register cannot create staff after initialization", %{conn: conn} do
+    assert {:error, :registration_closed} =
+             Accounts.register_self(%{
+               "name" => "New Staff",
+               "email" => "newstaff@test.local",
+               "password" => "password123",
+               "role" => "barista"
+             })
 
-    {:ok, conn} =
-      view
-      |> form("#staff-register-form", %{
-        user: %{
-          name: "New Staff",
-          email: "newstaff@test.local",
-          password: "password123",
-          role: "barista"
-        }
-      })
-      |> render_submit()
-      |> follow_redirect(conn, ~p"/login")
-
-    html = html_response(conn, 200)
-    assert html =~ "Welcome back"
-    assert html =~ "Account created"
-
-    conn =
-      post(recycle(conn), ~p"/session", %{
-        "user" => %{"email" => "newstaff@test.local", "password" => "password123"}
-      })
-
-    assert redirected_to(conn) == ~p"/staff"
+    assert {:error, {:live_redirect, %{to: "/login"}}} = live(conn, ~p"/register")
   end
 
   test "dashboard requires login", %{conn: conn} do
@@ -659,7 +639,8 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(view, "#staff-roster-search")
     assert has_element?(view, "#staff-pin-local[phx-hook='StaffPinPad']")
     assert has_element?(view, "#staff-auth-account-recovery", "Account recovery")
-    assert has_element?(view, ".staff-auth-register a[href='/register']", "Register")
+    refute has_element?(view, ".staff-auth-register")
+    refute html =~ ~r/href=\"\/register\"/
     assert has_element?(view, ".staff-auth-actions #staff-pin-submit", "Sign in")
     refute html =~ "/images/coffeespot/"
     refute html =~ "find coffee"
