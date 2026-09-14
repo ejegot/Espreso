@@ -230,6 +230,24 @@ defmodule EspresoWeb.StaffAuth do
   def home_path(%User{}), do: ~p"/staff"
   def home_path(_), do: ~p"/login"
 
+  @login_token_salt "espreso staff login"
+  @login_token_max_age 120
+
+  @doc """
+  Short-lived signed token used after Initial Owner Setup to establish a session.
+  """
+  def sign_login_token(user_id) when is_integer(user_id) do
+    Phoenix.Token.sign(EspresoWeb.Endpoint, @login_token_salt, user_id,
+      max_age: @login_token_max_age
+    )
+  end
+
+  def verify_login_token(token) when is_binary(token) do
+    Phoenix.Token.verify(EspresoWeb.Endpoint, @login_token_salt, token,
+      max_age: @login_token_max_age
+    )
+  end
+
   defp signed_in_path(user), do: home_path(user)
 
   # Employee StaffShift Time In/Out is barista-only. Manager/owner login and logout

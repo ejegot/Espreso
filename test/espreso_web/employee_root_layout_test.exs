@@ -19,23 +19,23 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
   end
 
   test "employee authentication pages use the Elilai Kafe root", %{conn: conn} do
-    for path <- [~p"/login", ~p"/register"] do
-      {:ok, view, html} = live(recycle(conn), path)
+    {:ok, view, html} = live(conn, ~p"/login")
 
-      assert html =~ ~s(data-application="elilai-kafe-employee")
-      assert html =~ ~s(class="site-body elilai-kafe-employee-root")
-      assert html =~ ~s(rel="manifest")
-      assert html =~ ~s(href="/elilai-kafe.webmanifest")
-      assert html =~ ~s(name="theme-color" content="#394331")
-      assert html =~ ~s(rel="apple-touch-icon")
-      assert html =~ ~s(href="/images/elilai-kafe/apple-touch-icon.png")
-      assert html =~ ~s(name="apple-mobile-web-app-title")
+    assert html =~ ~s(data-application="elilai-kafe-employee")
+    assert html =~ ~s(class="site-body elilai-kafe-employee-root")
+    assert html =~ ~s(rel="manifest")
+    assert html =~ ~s(href="/elilai-kafe.webmanifest")
+    assert html =~ ~s(name="theme-color" content="#394331")
+    assert html =~ ~s(rel="apple-touch-icon")
+    assert html =~ ~s(href="/images/elilai-kafe/apple-touch-icon.png")
+    assert html =~ ~s(name="apple-mobile-web-app-title")
 
-      assert has_element?(view, "img.staff-auth-logo")
-      assert html =~ "/images/elilai-kafe/elilai-kafe-mark.png"
+    assert has_element?(view, "img.staff-auth-logo")
+    assert html =~ "/images/elilai-kafe/elilai-kafe-mark.png"
 
-      assert has_element?(view, "h1.staff-auth-title")
-    end
+    assert has_element?(view, "h1.staff-auth-title")
+
+    assert {:error, {:live_redirect, %{to: "/login"}}} = live(recycle(conn), ~p"/register")
   end
 
   test "every protected employee page uses the employee root and branded staff shell", %{

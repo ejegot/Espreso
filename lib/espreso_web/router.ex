@@ -91,6 +91,7 @@ defmodule EspresoWeb.Router do
     live_session :redirect_if_authenticated,
       on_mount: [{EspresoWeb.StaffAuth, :redirect_if_authenticated}] do
       live "/login", StaffLoginLive, :new
+      live "/setup", StaffOwnerSetupLive, :new
       live "/register", StaffRegisterLive, :new
     end
   end
@@ -100,6 +101,7 @@ defmodule EspresoWeb.Router do
 
     post "/session", UserSessionController, :create
     post "/session/pin", UserSessionController, :create_pin
+    get "/session/token/:token", UserSessionController, :create_from_token
     delete "/logout", UserSessionController, :delete
   end
 

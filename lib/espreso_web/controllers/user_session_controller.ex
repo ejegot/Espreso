@@ -65,6 +65,28 @@ defmodule EspresoWeb.UserSessionController do
     |> redirect(to: ~p"/login")
   end
 
+  def create_from_token(conn, %{"token" => token}) when is_binary(token) do
+    case StaffAuth.verify_login_token(token) do
+      {:ok, user_id} ->
+        case Accounts.get_user(user_id) do
+          %Espreso.Accounts.User{active: true} = user ->
+            conn
+            |> put_flash(:info, "Welcome, #{user.name}. Your owner account is ready.")
+            |> StaffAuth.log_in_user(user, %{})
+
+          _ ->
+            conn
+            |> put_flash(:error, "That setup link is no longer valid. Please sign in.")
+            |> redirect(to: ~p"/login")
+        end
+
+      {:error, _} ->
+        conn
+        |> put_flash(:error, "That setup link expired. Please sign in.")
+        |> redirect(to: ~p"/login")
+    end
+  end
+
   def delete(conn, _params) do
     conn
     |> put_flash(:info, "Logged out.")

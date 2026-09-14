@@ -41,10 +41,11 @@ defmodule Espreso.AccountsTest do
              Accounts.authenticate_user("ben@coffeespot.local", "password123")
   end
 
-  test "first self-registered user becomes owner" do
+  test "public self-registration is closed" do
     assert Accounts.first_user?()
+    refute Accounts.registration_open?()
 
-    assert {:ok, owner} =
+    assert {:error, :registration_closed} =
              Accounts.register_self(%{
                "name" => "First",
                "email" => "first@coffeespot.local",
@@ -52,11 +53,48 @@ defmodule Espreso.AccountsTest do
                "role" => "barista"
              })
 
-    assert owner.role == "owner"
-    refute Accounts.first_user?()
+    assert Accounts.first_user?()
   end
 
-  test "public registration cannot create owner when users exist" do
+  test "bootstrap_initial_owner creates owner with PIN and closes further public registration" do
+    assert Accounts.needs_initial_owner_setup?()
+
+    assert {:ok, owner} =
+             Accounts.bootstrap_initial_owner(%{
+               "name" => "Shop Owner",
+               "pin" => "2468",
+               "pin_confirmation" => "2468"
+             })
+
+    assert owner.role == "owner"
+    assert owner.name == "Shop Owner"
+    assert Accounts.pin_set?(owner)
+    assert {:ok, _} = Accounts.verify_pin(owner.id, "2468")
+    refute Accounts.needs_initial_owner_setup?()
+    assert {:error, :registration_closed} = Accounts.register_self(%{"name" => "Nope"})
+
+    assert String.contains?(owner.email, "@internal.espreso.invalid")
+  end
+
+  test "bootstrap_initial_owner rejects pin mismatch and invalid format" do
+    assert {:error, :pin_mismatch} =
+             Accounts.bootstrap_initial_owner(%{
+               name: "Owner",
+               pin: "1234",
+               pin_confirmation: "9999"
+             })
+
+    assert {:error, :invalid_pin_format} =
+             Accounts.bootstrap_initial_owner(%{
+               name: "Owner",
+               pin: "12",
+               pin_confirmation: "12"
+             })
+
+    assert Accounts.first_user?()
+  end
+
+  test "public registration remains closed when users already exist" do
     {:ok, _} =
       Accounts.register_user(%{
         name: "Owner",
@@ -65,7 +103,7 @@ defmodule Espreso.AccountsTest do
         role: "owner"
       })
 
-    assert {:ok, user} =
+    assert {:error, :registration_closed} =
              Accounts.register_self(%{
                "name" => "Hacker",
                "email" => "hacker@coffeespot.local",
@@ -73,37 +111,13 @@ defmodule Espreso.AccountsTest do
                "role" => "owner"
              })
 
-    assert user.role == "barista"
-  end
-
-  test "public registration may choose staff or manager" do
-    {:ok, _} =
-      Accounts.register_user(%{
-        name: "Owner",
-        email: "owner2@coffeespot.local",
-        password: "password123",
-        role: "owner"
-      })
-
-    assert {:ok, staff} =
+    assert {:error, :registration_closed} =
              Accounts.register_self(%{
                "name" => "Staff",
                "email" => "staff@coffeespot.local",
                "password" => "password123",
                "role" => "barista"
              })
-
-    assert staff.role == "barista"
-
-    assert {:ok, manager} =
-             Accounts.register_self(%{
-               "name" => "Mgr",
-               "email" => "mgr@coffeespot.local",
-               "password" => "password123",
-               "role" => "manager"
-             })
-
-    assert manager.role == "manager"
   end
 
   test "role permission matrix" do
@@ -495,10 +509,11 @@ defmodule Espreso.AccountsTest do
         role: "barista"
       })
 
-    assert {:ok, staff} = Accounts.set_pin_as(owner, staff, "5678")
+    assert {:ok, staff} = Accounts.set_pin_as(owner, staff, "5678", "5678")
     assert {:ok, _} = Accounts.verify_pin(staff, "5678")
 
-    assert {:error, :unauthorized} = Accounts.set_pin_as(staff, owner, "1111")
+    assert {:error, :pin_mismatch} = Accounts.set_pin_as(owner, staff, "5678", "9999")
+    assert {:error, :unauthorized} = Accounts.set_pin_as(staff, owner, "1111", "1111")
   end
 
   test "list_active_staff_for_roster excludes inactive users" do
