@@ -1,0 +1,49 @@
+/**
+ * Resolve a single ESC/POS send function for the ELIlai Kafe tablet bridge.
+ *
+ * Prefer the injected wrapper (window.ElilaiKafePrinter), then fall back to the
+ * Capacitor-registered EscPosPrinter plugin. Never returns more than one sender
+ * so callers make exactly one native send attempt per payload.
+ */
+
+export const PRINTER_BRIDGE_UNAVAILABLE =
+  "Printer bridge unavailable — use the ELIlai Kafe Android app on shop Wi‑Fi"
+
+/**
+ * @param {any} [root=globalThis]
+ * @returns {null | ((opts: {dataBase64: string}) => Promise<unknown>)}
+ */
+export function resolveElilaiPrinterSend(root = globalThis) {
+  const wrapper = root && root.ElilaiKafePrinter
+  if (wrapper && typeof wrapper.send === "function") {
+    return (opts) => wrapper.send(opts)
+  }
+
+  const plugin =
+    root &&
+    root.Capacitor &&
+    root.Capacitor.Plugins &&
+    root.Capacitor.Plugins.EscPosPrinter
+
+  if (plugin && typeof plugin.send === "function") {
+    return (opts) => plugin.send(opts)
+  }
+
+  return null
+}
+
+/**
+ * Exactly one native send attempt per call.
+ *
+ * @param {{data_base64?: string, dataBase64?: string}} payload
+ * @param {any} [root=globalThis]
+ */
+export async function sendEscPosOnce(payload, root = globalThis) {
+  const send = resolveElilaiPrinterSend(root)
+  if (!send) {
+    throw new Error(PRINTER_BRIDGE_UNAVAILABLE)
+  }
+
+  const dataBase64 = payload.data_base64 ?? payload.dataBase64
+  return send({dataBase64})
+}

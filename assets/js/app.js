@@ -21,6 +21,7 @@ import "phoenix_html"
 import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
+import {sendEscPosOnce} from "./elilai_printer_bridge"
 
 const Hooks = {}
 
@@ -400,7 +401,6 @@ Hooks.ElilaiPrinter = {
   },
 
   async sendPayload(payload) {
-    const bridge = window.ElilaiKafePrinter
     const reply = {
       order_id: String(payload.order_id ?? ""),
       action: payload.action,
@@ -410,12 +410,9 @@ Hooks.ElilaiPrinter = {
     }
 
     try {
-      if (!bridge || typeof bridge.send !== "function") {
-        throw new Error(
-          "Printer bridge unavailable — use the ELIlai Kafe Android app on shop Wi‑Fi"
-        )
-      }
-      await bridge.send({dataBase64: payload.data_base64})
+      // Prefer injected window.ElilaiKafePrinter; fall back to Cap.Plugins.EscPosPrinter.
+      // sendEscPosOnce guarantees a single native send attempt (no duplicate kicks/prints).
+      await sendEscPosOnce(payload)
       this.pushEvent("elilai_printer_result", Object.assign({ok: true}, reply))
     } catch (error) {
       const message = error && error.message ? error.message : String(error)
