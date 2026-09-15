@@ -5,6 +5,7 @@
 import assert from "node:assert/strict"
 import {
   PRINTER_BRIDGE_UNAVAILABLE,
+  isEscPosPrinterAvailable,
   resolveElilaiPrinterSend,
   sendEscPosOnce
 } from "./elilai_printer_bridge.js"
@@ -16,6 +17,38 @@ function test(name, fn) {
   passed += 1
   console.log(`ok - ${name}`)
 }
+
+test("isEscPosPrinterAvailable: Plugins.EscPosPrinter present", () => {
+  assert.equal(
+    isEscPosPrinterAvailable({Plugins: {EscPosPrinter: {}}}),
+    true
+  )
+})
+
+test("isEscPosPrinterAvailable: isPluginAvailable true", () => {
+  assert.equal(
+    isEscPosPrinterAvailable({
+      Plugins: {},
+      isPluginAvailable: (name) => name === "EscPosPrinter"
+    }),
+    true
+  )
+})
+
+test("isEscPosPrinterAvailable: nativePromise alone is false", () => {
+  assert.equal(
+    isEscPosPrinterAvailable({
+      Plugins: {},
+      nativePromise: async () => ({ok: true})
+    }),
+    false
+  )
+})
+
+test("isEscPosPrinterAvailable: missing Capacitor is false", () => {
+  assert.equal(isEscPosPrinterAvailable(undefined), false)
+  assert.equal(isEscPosPrinterAvailable({}), false)
+})
 
 test("prefers ElilaiKafePrinter wrapper when present", async () => {
   const calls = []
@@ -35,6 +68,7 @@ test("prefers ElilaiKafePrinter wrapper when present", async () => {
           }
         }
       },
+      isPluginAvailable: () => true,
       nativePromise: async (...args) => {
         calls.push(["nativePromise", args])
         return {ok: true}
@@ -60,6 +94,7 @@ test("falls back to Capacitor.Plugins.EscPosPrinter once", async () => {
           }
         }
       },
+      isPluginAvailable: () => true,
       nativePromise: async () => {
         calls.push("nativePromise")
         return {ok: true}
@@ -71,11 +106,12 @@ test("falls back to Capacitor.Plugins.EscPosPrinter once", async () => {
   assert.deepEqual(calls, [{dataBase64: "Qg=="}])
 })
 
-test("falls back to Capacitor.nativePromise once when stub missing", async () => {
+test("nativePromise allowed when isPluginAvailable confirms EscPosPrinter", async () => {
   const calls = []
   const root = {
     Capacitor: {
       Plugins: {},
+      isPluginAvailable: (name) => name === "EscPosPrinter",
       nativePromise: async (plugin, method, opts) => {
         calls.push([plugin, method, opts])
         return {ok: true}
@@ -85,6 +121,30 @@ test("falls back to Capacitor.nativePromise once when stub missing", async () =>
 
   await sendEscPosOnce({data_base64: "Qw=="}, root)
   assert.deepEqual(calls, [["EscPosPrinter", "send", {dataBase64: "Qw=="}]])
+})
+
+test("nativePromise exists but EscPosPrinter unavailable must not call nativePromise", async () => {
+  const calls = []
+  const root = {
+    Capacitor: {
+      Plugins: {},
+      isPluginAvailable: () => false,
+      nativePromise: async (...args) => {
+        calls.push(args)
+        return {ok: true}
+      }
+    }
+  }
+
+  assert.equal(resolveElilaiPrinterSend(root), null)
+  await assert.rejects(
+    () => sendEscPosOnce({data_base64: "Qw=="}, root),
+    (err) => {
+      assert.equal(err.message, PRINTER_BRIDGE_UNAVAILABLE)
+      return true
+    }
+  )
+  assert.deepEqual(calls, [])
 })
 
 test("unavailable bridge throws the existing clear error", async () => {
@@ -116,6 +176,7 @@ test("does not double-dispatch when wrapper, plugin, and nativePromise exist", a
           }
         }
       },
+      isPluginAvailable: () => true,
       nativePromise: async () => {
         count += 1
         return {ok: true}
@@ -139,6 +200,7 @@ test("does not double-dispatch plugin vs nativePromise", async () => {
           }
         }
       },
+      isPluginAvailable: () => true,
       nativePromise: async () => {
         count += 1
         return {ok: true}

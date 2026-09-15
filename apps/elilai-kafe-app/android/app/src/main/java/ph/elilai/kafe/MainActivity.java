@@ -3,6 +3,7 @@ package ph.elilai.kafe;
 import android.os.Bundle;
 import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.Logger;
 import com.getcapacitor.WebViewListener;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -38,8 +39,15 @@ public class MainActivity extends BridgeActivity {
 
         super.onCreate(savedInstanceState);
 
-        // If the first document already finished during bridge create, inject now.
+        // Ensure EscPosPrinter is on the live Bridge map (Builder registration alone
+        // was insufficient at runtime: Bridge.getPlugin("EscPosPrinter") == null).
         if (this.bridge != null) {
+            this.bridge.registerPlugin(EscPosPrinterPlugin.class);
+            if (this.bridge.getPlugin("EscPosPrinter") != null) {
+                Logger.debug("EscPosPrinter registered on live Bridge");
+            } else {
+                Logger.error("EscPosPrinter missing from live Bridge after registerPlugin");
+            }
             injectNativeShell(this.bridge.getWebView());
         }
     }

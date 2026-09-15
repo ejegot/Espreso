@@ -6,9 +6,9 @@
  *
  * Scope: Android hardware back + ESC/POS printer bridge.
  *
- * Do not mark the shell "installed" until EscPosPrinter can actually be invoked
- * (plugin stub or Capacitor.nativePromise). getPlatform() !== "android" is NOT
- * success — Cap 8 may briefly report "web" when androidBridge is late.
+ * Do not mark the shell "installed" until EscPosPrinter is confirmed available
+ * via Capacitor.Plugins.EscPosPrinter or Capacitor.isPluginAvailable.
+ * Bare Capacitor.nativePromise is NOT sufficient.
  */
 (function elilaiNativeShell() {
   if (window.__elilaiKafeNativeShellInstalled) {
@@ -21,11 +21,7 @@
     return;
   }
 
-  var plugin = Cap.Plugins && Cap.Plugins.EscPosPrinter;
-  var hasPluginSend = !!(plugin && typeof plugin.send === "function");
-  var hasNativePromise = typeof Cap.nativePromise === "function";
-
-  if (!hasPluginSend && !hasNativePromise) {
+  if (!isEscPosPrinterAvailable(Cap)) {
     setTimeout(elilaiNativeShell, 40);
     return;
   }
@@ -53,20 +49,23 @@
   /**
    * Sends raw ESC/POS bytes via the native TCP plugin.
    * Defaults: host 192.168.0.87, port 9100 (shop HS-802UL).
-   * Exactly one native send path per call (plugin stub preferred, else nativePromise).
+   * Exactly one native send path per call (plugin stub preferred, else gated nativePromise).
    */
   window.ElilaiKafePrinter = {
     available: function () {
-      var p = Cap.Plugins && Cap.Plugins.EscPosPrinter;
-      return (
-        !!(p && typeof p.send === "function") ||
-        typeof Cap.nativePromise === "function"
-      );
+      return isEscPosPrinterAvailable(Cap);
     },
     send: function (opts) {
       opts = opts || {};
       if (!opts.dataBase64) {
         return Promise.reject(new Error("Missing ESC/POS payload"));
+      }
+      if (!isEscPosPrinterAvailable(Cap)) {
+        return Promise.reject(
+          new Error(
+            "Printer bridge unavailable — open the ELIlai Kafe Android app on shop Wi‑Fi"
+          )
+        );
       }
       var payload = {
         dataBase64: opts.dataBase64,
@@ -88,6 +87,9 @@
       );
     },
     getDefaults: function () {
+      if (!isEscPosPrinterAvailable(Cap)) {
+        return Promise.resolve({host: "192.168.0.87", port: 9100, timeoutMs: 4000});
+      }
       var p = Cap.Plugins && Cap.Plugins.EscPosPrinter;
       if (p && typeof p.getDefaults === "function") {
         return p.getDefaults();
@@ -98,4 +100,20 @@
       return Promise.resolve({host: "192.168.0.87", port: 9100, timeoutMs: 4000});
     }
   };
+
+  function isEscPosPrinterAvailable(cap) {
+    if (!cap) {
+      return false;
+    }
+    if (cap.Plugins && cap.Plugins.EscPosPrinter) {
+      return true;
+    }
+    if (
+      typeof cap.isPluginAvailable === "function" &&
+      cap.isPluginAvailable("EscPosPrinter")
+    ) {
+      return true;
+    }
+    return false;
+  }
 })();
