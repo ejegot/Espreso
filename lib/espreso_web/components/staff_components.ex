@@ -177,6 +177,7 @@ defmodule EspresoWeb.StaffComponents do
         module={StaffNavDrawerComponent}
         id="staff-nav-drawer"
         current={@current}
+        current_user={@current_user}
         items={@drawer_nav}
       />
     </div>

@@ -7,11 +7,16 @@ defmodule EspresoWeb.StaffNavDrawerComponent do
 
   import EspresoWeb.CoreComponents, only: [icon: 1]
 
+  alias Espreso.Accounts.User
+
   @impl true
   def update(assigns, socket) do
+    role_title = User.role_label(assigns.current_user.role)
+
     {:ok,
      socket
      |> assign(assigns)
+     |> assign(:role_title, role_title)
      |> assign_new(:open?, fn -> false end)}
   end
 
@@ -52,7 +57,7 @@ defmodule EspresoWeb.StaffNavDrawerComponent do
       <nav
         id="staff-nav-drawer-panel"
         class={["staff-nav-drawer", @open? && "is-open"]}
-        aria-label="Staff menu"
+        aria-label={@role_title}
         aria-hidden={to_string(not @open?)}
         inert={unless(@open?, do: true)}
       >
@@ -68,7 +73,7 @@ defmodule EspresoWeb.StaffNavDrawerComponent do
             />
             <div class="staff-nav-drawer-brand-copy">
               <p class="staff-nav-drawer-brand-name">Elilai Kafe</p>
-              <p class="staff-nav-drawer-brand-meta">Staff menu</p>
+              <p class="staff-nav-drawer-brand-meta" id="staff-nav-drawer-role">{@role_title}</p>
             </div>
           </div>
           <button

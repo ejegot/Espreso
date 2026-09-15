@@ -524,6 +524,10 @@ defmodule EspresoWeb.StaffAuthTest do
 
     assert has_element?(view, "#staff-nav-menu-open")
     assert has_element?(view, "#staff-nav-drawer-panel")
+    assert has_element?(view, "#staff-nav-drawer-role", "Staff")
+    refute render(view) =~ "Staff Menu"
+    refute render(view) =~ "Manager Menu"
+    refute render(view) =~ "Owner Menu"
     assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-transactions", "Transactions")
     assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-customers", "Customers")
     assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-my_shifts", "My shifts")
@@ -539,6 +543,31 @@ defmodule EspresoWeb.StaffAuthTest do
     view |> element("#staff-nav-menu-close") |> render_click()
     refute has_element?(view, "#staff-nav-drawer-panel.is-open")
     refute has_element?(view, "#staff-nav-drawer-backdrop")
+  end
+
+  test "drawer header shows role title without Menu for each role", %{
+    conn: conn,
+    owner: owner,
+    manager: manager,
+    barista: barista
+  } do
+    {:ok, owner_view, _html} = live(log_in(conn, owner), ~p"/staff")
+    assert has_element?(owner_view, "#staff-nav-drawer-role", "Owner")
+    refute render(owner_view) =~ "Owner Menu"
+    refute render(owner_view) =~ "Staff Menu"
+    refute render(owner_view) =~ "Manager Menu"
+
+    {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/staff")
+    assert has_element?(manager_view, "#staff-nav-drawer-role", "Manager")
+    refute render(manager_view) =~ "Manager Menu"
+    refute render(manager_view) =~ "Staff Menu"
+    refute render(manager_view) =~ "Owner Menu"
+
+    {:ok, barista_view, _html} = live(log_in(conn, barista), ~p"/staff")
+    assert has_element?(barista_view, "#staff-nav-drawer-role", "Staff")
+    refute render(barista_view) =~ "Staff Menu"
+    refute render(barista_view) =~ "Manager Menu"
+    refute render(barista_view) =~ "Owner Menu"
   end
 
   test "manager can access staff routes but not user management", %{
