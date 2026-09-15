@@ -18,18 +18,30 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(EscPosPrinterPlugin.class);
-        super.onCreate(savedInstanceState);
 
-        // Remote server.url never executes www/ as the document. Inject the
-        // Android back/printer bridge after each full WebView document load.
-        this.bridge.addWebViewListener(
+        // Register before super.onCreate so the first WebView page load cannot miss injection.
+        // (Remote server.url never executes www/ as the document.)
+        bridgeBuilder.addWebViewListener(
             new WebViewListener() {
                 @Override
                 public void onPageLoaded(WebView webView) {
                     injectNativeShell(webView);
                 }
+
+                @Override
+                public void onPageCommitVisible(WebView webView, String url) {
+                    // Earlier than onPageLoaded on some devices; shell is idempotent.
+                    injectNativeShell(webView);
+                }
             }
         );
+
+        super.onCreate(savedInstanceState);
+
+        // If the first document already finished during bridge create, inject now.
+        if (this.bridge != null) {
+            injectNativeShell(this.bridge.getWebView());
+        }
     }
 
     private void injectNativeShell(WebView webView) {
