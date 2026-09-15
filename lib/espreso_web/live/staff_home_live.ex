@@ -47,7 +47,7 @@ defmodule EspresoWeb.StaffHomeLive do
       {:client_dispatch, bytes} ->
         {:noreply,
          socket
-         |> assign(:printer_note, "Opening kaha…")
+         |> assign(:printer_note, "Test Drawer…")
          |> push_event("elilai-printer", %{
            action: "raw_drawer",
            permit: "raw",
@@ -59,7 +59,7 @@ defmodule EspresoWeb.StaffHomeLive do
 
       other ->
         {:noreply,
-         assign(socket, :printer_note, printer_action_note(map_drawer_result(other), "Open kaha"))}
+         assign(socket, :printer_note, printer_action_note(map_drawer_result(other), "Test Drawer"))}
     end
   end
 
@@ -70,9 +70,9 @@ defmodule EspresoWeb.StaffHomeLive do
 
         note =
           cond do
-            ok? and flow == "raw_drawer" -> "Open kaha: ok"
+            ok? and flow == "raw_drawer" -> "Test Drawer: ok"
             ok? -> "Test print: ok"
-            true -> "#{if(flow == "raw_drawer", do: "Open kaha", else: "Test print")}: #{Map.get(params, "error") || "failed"}"
+            true -> "#{if(flow == "raw_drawer", do: "Test Drawer", else: "Test print")}: #{Map.get(params, "error") || "failed"}"
           end
 
         {:noreply, assign(socket, :printer_note, note)}
@@ -222,7 +222,7 @@ defmodule EspresoWeb.StaffHomeLive do
               class="staff-home-printer-btn"
               phx-click="printer_open_drawer"
             >
-              Open kaha
+              Test Drawer
             </button>
           </div>
           <p

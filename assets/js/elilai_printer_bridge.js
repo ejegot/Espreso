@@ -1,9 +1,10 @@
 /**
  * Resolve a single ESC/POS send function for the ELIlai Kafe tablet bridge.
  *
- * Prefer the injected wrapper (window.ElilaiKafePrinter), then fall back to the
- * Capacitor-registered EscPosPrinter plugin. Never returns more than one sender
- * so callers make exactly one native send attempt per payload.
+ * Prefer the injected wrapper (window.ElilaiKafePrinter), then the
+ * Capacitor-registered EscPosPrinter plugin stub, then Capacitor.nativePromise.
+ * Never returns more than one sender so callers make exactly one native send
+ * attempt per payload.
  */
 
 export const PRINTER_BRIDGE_UNAVAILABLE =
@@ -19,14 +20,15 @@ export function resolveElilaiPrinterSend(root = globalThis) {
     return (opts) => wrapper.send(opts)
   }
 
-  const plugin =
-    root &&
-    root.Capacitor &&
-    root.Capacitor.Plugins &&
-    root.Capacitor.Plugins.EscPosPrinter
+  const cap = root && root.Capacitor
+  const plugin = cap && cap.Plugins && cap.Plugins.EscPosPrinter
 
   if (plugin && typeof plugin.send === "function") {
     return (opts) => plugin.send(opts)
+  }
+
+  if (cap && typeof cap.nativePromise === "function") {
+    return (opts) => cap.nativePromise("EscPosPrinter", "send", opts)
   }
 
   return null

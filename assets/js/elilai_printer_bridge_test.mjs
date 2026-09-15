@@ -34,6 +34,10 @@ test("prefers ElilaiKafePrinter wrapper when present", async () => {
             return {ok: true}
           }
         }
+      },
+      nativePromise: async (...args) => {
+        calls.push(["nativePromise", args])
+        return {ok: true}
       }
     }
   }
@@ -55,12 +59,32 @@ test("falls back to Capacitor.Plugins.EscPosPrinter once", async () => {
             return {ok: true}
           }
         }
+      },
+      nativePromise: async () => {
+        calls.push("nativePromise")
+        return {ok: true}
       }
     }
   }
 
   await sendEscPosOnce({data_base64: "Qg=="}, root)
   assert.deepEqual(calls, [{dataBase64: "Qg=="}])
+})
+
+test("falls back to Capacitor.nativePromise once when stub missing", async () => {
+  const calls = []
+  const root = {
+    Capacitor: {
+      Plugins: {},
+      nativePromise: async (plugin, method, opts) => {
+        calls.push([plugin, method, opts])
+        return {ok: true}
+      }
+    }
+  }
+
+  await sendEscPosOnce({data_base64: "Qw=="}, root)
+  assert.deepEqual(calls, [["EscPosPrinter", "send", {dataBase64: "Qw=="}]])
 })
 
 test("unavailable bridge throws the existing clear error", async () => {
@@ -74,7 +98,7 @@ test("unavailable bridge throws the existing clear error", async () => {
   assert.equal(resolveElilaiPrinterSend({}), null)
 })
 
-test("does not double-dispatch when both wrapper and plugin exist", async () => {
+test("does not double-dispatch when wrapper, plugin, and nativePromise exist", async () => {
   let count = 0
   const root = {
     ElilaiKafePrinter: {
@@ -91,11 +115,38 @@ test("does not double-dispatch when both wrapper and plugin exist", async () => 
             return {ok: true}
           }
         }
+      },
+      nativePromise: async () => {
+        count += 1
+        return {ok: true}
       }
     }
   }
 
   await sendEscPosOnce({dataBase64: "RA=="}, root)
+  assert.equal(count, 1)
+})
+
+test("does not double-dispatch plugin vs nativePromise", async () => {
+  let count = 0
+  const root = {
+    Capacitor: {
+      Plugins: {
+        EscPosPrinter: {
+          send: async () => {
+            count += 1
+            return {ok: true}
+          }
+        }
+      },
+      nativePromise: async () => {
+        count += 1
+        return {ok: true}
+      }
+    }
+  }
+
+  await sendEscPosOnce({dataBase64: "RQ=="}, root)
   assert.equal(count, 1)
 })
 
