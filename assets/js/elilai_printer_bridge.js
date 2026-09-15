@@ -2,13 +2,39 @@
  * Resolve a single ESC/POS send function for the ELIlai Kafe tablet bridge.
  *
  * Prefer the injected wrapper (window.ElilaiKafePrinter), then the
- * Capacitor-registered EscPosPrinter plugin stub, then Capacitor.nativePromise.
- * Never returns more than one sender so callers make exactly one native send
- * attempt per payload.
+ * Capacitor-registered EscPosPrinter plugin stub, then Capacitor.nativePromise
+ * only when EscPosPrinter is confirmed available. Never returns more than one
+ * sender so callers make exactly one native send attempt per payload.
  */
 
 export const PRINTER_BRIDGE_UNAVAILABLE =
   "Printer bridge unavailable — use the ELIlai Kafe Android app on shop Wi‑Fi"
+
+/**
+ * True when Capacitor exposes EscPosPrinter via Plugins or isPluginAvailable.
+ * Bare nativePromise existence is not sufficient.
+ *
+ * @param {any} [cap]
+ * @returns {boolean}
+ */
+export function isEscPosPrinterAvailable(cap) {
+  if (!cap) {
+    return false
+  }
+
+  if (cap.Plugins && cap.Plugins.EscPosPrinter) {
+    return true
+  }
+
+  if (
+    typeof cap.isPluginAvailable === "function" &&
+    cap.isPluginAvailable("EscPosPrinter")
+  ) {
+    return true
+  }
+
+  return false
+}
 
 /**
  * @param {any} [root=globalThis]
@@ -27,7 +53,11 @@ export function resolveElilaiPrinterSend(root = globalThis) {
     return (opts) => plugin.send(opts)
   }
 
-  if (cap && typeof cap.nativePromise === "function") {
+  if (
+    isEscPosPrinterAvailable(cap) &&
+    cap &&
+    typeof cap.nativePromise === "function"
+  ) {
     return (opts) => cap.nativePromise("EscPosPrinter", "send", opts)
   }
 
