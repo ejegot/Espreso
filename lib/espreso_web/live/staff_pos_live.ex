@@ -948,12 +948,14 @@ defmodule EspresoWeb.StaffPosLive do
               <div class="staff-pos-products staff-pos-products--rows" id="pos-products">
                 <article
                   :for={
-                    {product, img} <-
-                      product_cards(
-                        @categories,
-                        @selected_category,
-                        @menu_filter,
-                        @search
+                    {{product, img}, index} <-
+                      Enum.with_index(
+                        product_cards(
+                          @categories,
+                          @selected_category,
+                          @menu_filter,
+                          @search
+                        )
                       )
                   }
                   class={[
@@ -976,7 +978,8 @@ defmodule EspresoWeb.StaffPosLive do
                       src={img.src}
                       alt=""
                       class={["staff-pos-product-img", img.packshot? && "is-packshot"]}
-                      loading="lazy"
+                      loading="eager"
+                      fetchpriority={if index < 4, do: "high"}
                     />
                     <span
                       :if={Menu.signature_product?(product.name)}
@@ -2099,7 +2102,13 @@ defmodule EspresoWeb.StaffPosLive do
                 flash = place_flash_message(order, note, cash_change, loyalty_note)
 
                 socket
-                |> assign(:last_order, if(match?({:ok, _, _, {:client_dispatch, _, _, _}}, settle_result), do: order, else: nil))
+                |> assign(
+                  :last_order,
+                  if(match?({:ok, _, _, {:client_dispatch, _, _, _}}, settle_result),
+                    do: order,
+                    else: nil
+                  )
+                )
                 |> put_place_flash(flash)
               end
 
@@ -2409,7 +2418,7 @@ defmodule EspresoWeb.StaffPosLive do
   defp product_cards(categories, selected, filter, search) do
     Enum.map(visible_product_entries(categories, selected, filter, search), fn {category_name,
                                                                                 product} ->
-      {product, Menu.product_image_meta(category_name || "", product.name)}
+      {product, Menu.pos_product_image_meta(category_name || "", product.name)}
     end)
   end
 
@@ -2463,7 +2472,7 @@ defmodule EspresoWeb.StaffPosLive do
 
   defp add_line(cart, product, price, category_name, quantity) do
     key = "#{product.id}-#{price.id}"
-    image = Menu.product_image_meta(category_name || "", product.name).src
+    image = Menu.pos_product_image_meta(category_name || "", product.name).src
     quantity = max(quantity, 1)
 
     case Enum.find_index(cart, &(&1.key == key)) do
@@ -3063,7 +3072,8 @@ defmodule EspresoWeb.StaffPosLive do
         assign(socket, :print_note, "Kaha opened.") |> assign(:print_note_error?, false)
 
       :disabled ->
-        assign(socket, :print_note, "Printer is not enabled.") |> assign(:print_note_error?, false)
+        assign(socket, :print_note, "Printer is not enabled.")
+        |> assign(:print_note_error?, false)
 
       {:definite_failure, reason} ->
         assign(socket, :print_note, "Could not open kaha (#{inspect(reason)}).")

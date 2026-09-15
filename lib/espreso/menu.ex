@@ -515,6 +515,10 @@ defmodule Espreso.Menu do
   defp price_sort_key(%{size: nil}), do: {0, ""}
   defp price_sort_key(%{size: size}), do: {1, size}
 
+  # Bump when regenerating priv/static/images/coffeespot/pos-thumbs/ so tablets
+  # fetch fresh files via Plug.Static ?vsn= long-cache.
+  @pos_thumb_vsn "pos1"
+
   @doc """
   Public image path for a menu item. Named CoffeeSpot photos first,
   then a stable category fallback so every card has a photo.
@@ -531,12 +535,50 @@ defmodule Espreso.Menu do
     %{src: src, packshot?: packshot_image?(src)}
   end
 
+  @doc """
+  POS tablet image meta: lightweight WebP thumb under `/images/coffeespot/pos-thumbs/`
+  with `?vsn=` for long-lived HTTP cache. Falls back to the full image if missing.
+
+  Customer menu and API must keep using `product_image/2` / `product_image_meta/2`.
+  """
+  def pos_product_image_meta(category_name, product_name)
+      when is_binary(category_name) and is_binary(product_name) do
+    full = product_image(category_name, product_name)
+    packshot? = packshot_image?(full)
+
+    case pos_thumb_url(full) do
+      {:ok, thumb_url} ->
+        %{src: thumb_url, packshot?: packshot?}
+
+      :missing ->
+        %{src: full, packshot?: packshot?}
+    end
+  end
+
   @doc "True when the image is a transparent packshot PNG (prefer contain in UI)."
   def packshot_image?(path) when is_binary(path) do
-    String.ends_with?(String.downcase(path), ".png")
+    path
+    |> String.split("?", parts: 2)
+    |> hd()
+    |> String.downcase()
+    |> String.ends_with?(".png")
   end
 
   def packshot_image?(_), do: false
+
+  defp pos_thumb_url("/images/coffeespot/" <> name) do
+    stem = Path.rootname(name)
+    relative = "images/coffeespot/pos-thumbs/#{stem}.webp"
+    absolute = Application.app_dir(:espreso, Path.join("priv/static", relative))
+
+    if File.exists?(absolute) do
+      {:ok, "/#{relative}?vsn=#{@pos_thumb_vsn}"}
+    else
+      :missing
+    end
+  end
+
+  defp pos_thumb_url(_other), do: :missing
 
   defp category_fallback_image(category_name, product_name) do
     pool = Map.get(@category_images, category_name) || @category_images["HOT"]

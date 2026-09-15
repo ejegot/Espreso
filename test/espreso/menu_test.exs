@@ -295,6 +295,53 @@ defmodule Espreso.MenuTest do
     end
   end
 
+  describe "pos_product_image_meta/2" do
+    test "returns versioned POS WebP thumb when the thumbnail exists" do
+      meta = Menu.pos_product_image_meta("HOT", "Espresso")
+
+      assert meta.src ==
+               "/images/coffeespot/pos-thumbs/gen-hot-espresso.webp?vsn=pos1"
+
+      assert meta.packshot? == true
+    end
+
+    test "keeps Signature Tablea packshot? false for jpg source" do
+      meta = Menu.pos_product_image_meta("HOT", "Signature Tablea")
+
+      assert meta.src ==
+               "/images/coffeespot/pos-thumbs/signature-pure-tableya-portrait.webp?vsn=pos1"
+
+      assert meta.packshot? == false
+    end
+
+    test "falls back to the full-size image when the thumb file is missing" do
+      thumb =
+        Application.app_dir(
+          :espreso,
+          "priv/static/images/coffeespot/pos-thumbs/gen-hot-espresso.webp"
+        )
+
+      backup = thumb <> ".bak-test"
+      File.rename!(thumb, backup)
+
+      try do
+        meta = Menu.pos_product_image_meta("HOT", "Espresso")
+        assert meta.src == "/images/coffeespot/gen-hot-espresso.png"
+        assert meta.packshot? == true
+      after
+        File.rename!(backup, thumb)
+      end
+    end
+
+    test "does not change customer product_image/2 paths" do
+      assert Menu.product_image("HOT", "Espresso") ==
+               "/images/coffeespot/gen-hot-espresso.png"
+
+      assert Menu.product_image_meta("HOT", "Espresso").src ==
+               "/images/coffeespot/gen-hot-espresso.png"
+    end
+  end
+
   defp insert_product!(category, name, available, prices) do
     product =
       %Product{}
