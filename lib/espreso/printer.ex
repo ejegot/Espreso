@@ -1,10 +1,13 @@
 defmodule Espreso.Printer do
   @moduledoc """
-  Network ESC/POS client for the shop HS-802UL (port 9100).
+  ESC/POS receipt/drawer helpers for the shop HS-802UL.
 
-  The Phoenix host must be on the **same LAN** as the printer
-  (e.g. Mac on main Wi‑Fi during shop trial). Cloud hosts cannot
-  reach `192.168.x.x` printers.
+  Transports:
+  - `:lan_server` — Phoenix opens TCP to the printer (same LAN trial only)
+  - `:native_client` — Phoenix builds bytes; ELIlai Kafe Android sends via Capacitor
+  - `:off` — printing disabled
+
+  Fly/cloud must use `:native_client` (or `:off`). Never point Fly at `192.168.x.x`.
   """
 
   require Logger
@@ -13,18 +16,48 @@ defmodule Espreso.Printer do
   alias Espreso.Printer.EscPos
   alias Espreso.Printer.Receipt
 
+  @type transport :: :off | :lan_server | :native_client
   @type result :: :ok | {:error, term()} | :disabled
+  @type dispatch_result ::
+          :dispatched
+          | :disabled
+          | {:definite_failure, term()}
+          | {:uncertain, term()}
+          | {:client_dispatch, binary()}
 
   def config do
     Application.get_env(:espreso, __MODULE__, [])
   end
 
+  def transport do
+    case Keyword.get(config(), :transport, :off) do
+      value when value in [:off, :lan_server, :native_client] -> value
+      "off" -> :off
+      "lan_server" -> :lan_server
+      "native_client" -> :native_client
+      "client" -> :native_client
+      _ -> :off
+    end
+  end
+
   def enabled? do
     conf = config()
-    host = conf |> Keyword.get(:host) |> to_string() |> String.trim()
 
-    Keyword.get(conf, :enabled, false) == true and host != ""
+    case transport() do
+      :off ->
+        false
+
+      :native_client ->
+        Keyword.get(conf, :enabled, false) == true
+
+      :lan_server ->
+        host = conf |> Keyword.get(:host) |> to_string() |> String.trim()
+        Keyword.get(conf, :enabled, false) == true and host != ""
+    end
   end
+
+  def native_client?, do: transport() == :native_client
+  def lan_server?, do: transport() == :lan_server
 
   def host, do: config() |> Keyword.get(:host) |> to_string() |> String.trim()
   def port, do: Keyword.get(config(), :port, 9100)
@@ -32,6 +65,8 @@ defmodule Espreso.Printer do
 
   @doc """
   After a successful cash-like payment: print receipt and open the drawer.
+
+  Only valid for `:lan_server`. Prefer coordinator + client bridge in production.
   """
   def after_cash_paid(%Order{} = order, opts \\ []) do
     with :ok <- print_receipt(order, opts),
@@ -55,6 +90,9 @@ defmodule Espreso.Printer do
       not enabled?() ->
         :disabled
 
+      native_client?() ->
+        {:error, :use_client_bridge}
+
       cash_like?(paid_via) ->
         after_cash_paid(order, opts)
 
@@ -70,13 +108,12 @@ defmodule Espreso.Printer do
   @doc """
   Dispatches receipt bytes with transport-phase result semantics.
 
-  A successful TCP send means the command was dispatched, not that paper output
-  was physically confirmed by the printer.
+  A successful TCP send / client handoff means the command was dispatched, not that
+  paper output was physically confirmed by the printer.
   """
   def dispatch_receipt(%Order{} = order, opts \\ []) do
     Receipt.build(order, opts)
-    |> send_bytes_detailed("receipt #{order.number}")
-    |> dispatch_result()
+    |> dispatch_payload("receipt #{order.number}")
   end
 
   def print_kitchen(%Order{} = order, opts \\ []) do
@@ -85,54 +122,54 @@ defmodule Espreso.Printer do
 
   def dispatch_kitchen(%Order{} = order, opts \\ []) do
     Receipt.build_kitchen(order, opts)
-    |> send_bytes_detailed("kitchen #{order.number}")
-    |> dispatch_result()
+    |> dispatch_payload("kitchen #{order.number}")
   end
 
   def open_drawer(pin \\ :pin2) do
-    bytes =
-      case pin do
-        :pin5 -> EscPos.drawer_kick_pin5()
-        _ -> EscPos.drawer_kick_pin2()
-      end
-
-    send_bytes(bytes, "drawer #{pin}")
+    send_bytes(drawer_bytes(pin), "drawer #{pin}")
   end
 
   def dispatch_drawer(pin \\ :pin2) do
-    bytes =
-      case pin do
-        :pin5 -> EscPos.drawer_kick_pin5()
-        _ -> EscPos.drawer_kick_pin2()
-      end
+    drawer_bytes(pin)
+    |> dispatch_payload("drawer #{pin}")
+  end
 
-    bytes
-    |> send_bytes_detailed("drawer #{pin}")
-    |> dispatch_result()
+  def drawer_bytes(pin \\ :pin2) do
+    case pin do
+      :pin5 -> EscPos.drawer_kick_pin5()
+      _ -> EscPos.drawer_kick_pin2()
+    end
+  end
+
+  def encode_payload(bytes) when is_binary(bytes), do: Base.encode64(bytes)
+
+  def test_print_bytes do
+    EscPos.join([
+      EscPos.init(),
+      EscPos.align_center(),
+      EscPos.bold_on(),
+      EscPos.text_line("CoffeeSpot"),
+      EscPos.bold_off(),
+      EscPos.text_line("Espreso printer test"),
+      EscPos.align_left(),
+      EscPos.separator(),
+      EscPos.text_line("Transport: #{transport()}"),
+      EscPos.text_line(Calendar.strftime(DateTime.utc_now(), "%Y-%m-%d %H:%M:%S UTC")),
+      EscPos.separator(),
+      EscPos.align_center(),
+      EscPos.text_line("If you can read this,"),
+      EscPos.text_line("staff printer works."),
+      EscPos.feed(3),
+      EscPos.cut()
+    ])
   end
 
   def test_print do
-    bytes =
-      EscPos.join([
-        EscPos.init(),
-        EscPos.align_center(),
-        EscPos.bold_on(),
-        EscPos.text_line("CoffeeSpot"),
-        EscPos.bold_off(),
-        EscPos.text_line("Espreso printer test"),
-        EscPos.align_left(),
-        EscPos.separator(),
-        EscPos.text_line("Host: #{host()}"),
-        EscPos.text_line(Calendar.strftime(DateTime.utc_now(), "%Y-%m-%d %H:%M:%S UTC")),
-        EscPos.separator(),
-        EscPos.align_center(),
-        EscPos.text_line("If you can read this,"),
-        EscPos.text_line("staff printer works."),
-        EscPos.feed(3),
-        EscPos.cut()
-      ])
+    send_bytes(test_print_bytes(), "test print")
+  end
 
-    send_bytes(bytes, "test print")
+  def dispatch_payload_test do
+    dispatch_payload(test_print_bytes(), "test print")
   end
 
   def cash_like?("cash"), do: true
@@ -143,16 +180,42 @@ defmodule Espreso.Printer do
   def describe_result(:disabled), do: nil
   def describe_result({:error, reason}), do: "print failed (#{inspect(reason)})"
 
+  defp dispatch_payload(bytes, label) when is_binary(bytes) do
+    case transport() do
+      :native_client ->
+        if enabled?() do
+          {:client_dispatch, bytes}
+        else
+          :disabled
+        end
+
+      :lan_server ->
+        send_bytes_detailed(bytes, label) |> dispatch_result()
+
+      :off ->
+        :disabled
+    end
+  end
+
   defp send_bytes(bytes, label) when is_binary(bytes) do
-    case send_bytes_detailed(bytes, label) do
-      :ok -> :ok
-      :disabled -> :disabled
-      {:error, _phase, reason} -> {:error, reason}
+    case transport() do
+      :native_client ->
+        {:error, :use_client_bridge}
+
+      :off ->
+        :disabled
+
+      :lan_server ->
+        case send_bytes_detailed(bytes, label) do
+          :ok -> :ok
+          :disabled -> :disabled
+          {:error, _phase, reason} -> {:error, reason}
+        end
     end
   end
 
   defp send_bytes_detailed(bytes, label) when is_binary(bytes) do
-    if enabled?() do
+    if lan_server?() and enabled?() do
       do_send(bytes, label)
     else
       :disabled

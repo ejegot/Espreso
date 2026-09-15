@@ -13,6 +13,7 @@ defmodule Espreso.PhysicalActionCoordinatorTest do
       :espreso,
       Espreso.Printer,
       enabled: true,
+      transport: :lan_server,
       host: "127.0.0.1",
       port: 1,
       timeout_ms: 50
@@ -768,6 +769,129 @@ defmodule Espreso.PhysicalActionCoordinatorTest do
       |> Map.fetch!(order.id)
 
     refute fresh_permit == permit
+  end
+
+  test "native client mark paid returns client_dispatch and confirm completes cash drawer once" do
+    parent = self()
+
+    start_coordinator_with(
+      dispatch_receipt: fn order, _opts ->
+        send(parent, {:client_receipt, order.id})
+        {:client_dispatch, "RECEIPT"}
+      end,
+      dispatch_drawer: fn order, _opts ->
+        send(parent, {:client_drawer, order.id})
+        {:client_dispatch, "DRAWER"}
+      end
+    )
+
+    order = unpaid_order!()
+    permit = permit_for(order.id, :mark_paid)
+
+    assert {:ok, :transitioned, paid,
+            {:client_dispatch, :receipt, receipt_b64, receipt_req}} =
+             PhysicalActionCoordinator.execute_mark_paid(order.id, permit, "cash",
+               server: @server
+             )
+
+    assert receipt_b64 == Base.encode64("RECEIPT")
+    assert_receive {:client_receipt, _}
+    refute_receive {:client_drawer, _}
+
+    assert {:ok, :transitioned, paid2,
+            {:client_dispatch, :drawer, drawer_b64, drawer_req}} =
+             PhysicalActionCoordinator.confirm_client_physical(
+               order.id,
+               :mark_paid,
+               permit,
+               receipt_req,
+               :ok,
+               server: @server
+             )
+
+    assert paid2.id == paid.id
+    assert drawer_b64 == Base.encode64("DRAWER")
+    assert_receive {:client_drawer, _}
+
+    assert {:ok, :transitioned, paid3, {:dispatched, :receipt_and_drawer}} =
+             PhysicalActionCoordinator.confirm_client_physical(
+               order.id,
+               :mark_paid,
+               permit,
+               drawer_req,
+               :ok,
+               server: @server
+             )
+
+    assert paid3.id == paid.id
+    refute_receive {:client_receipt, _}
+    refute_receive {:client_drawer, _}
+  end
+
+  test "native client GCash mark paid never opens drawer" do
+    parent = self()
+
+    start_coordinator_with(
+      dispatch_receipt: fn order, _opts ->
+        send(parent, {:client_receipt, order.id})
+        {:client_dispatch, "RECEIPT"}
+      end,
+      dispatch_drawer: fn order, _opts ->
+        send(parent, {:unexpected_drawer, order.id})
+        {:client_dispatch, "DRAWER"}
+      end
+    )
+
+    order = unpaid_order!()
+    permit = permit_for(order.id, :mark_paid)
+
+    assert {:ok, :transitioned, paid, {:client_dispatch, :receipt, _b64, req}} =
+             PhysicalActionCoordinator.execute_mark_paid(order.id, permit, "gcash",
+               server: @server
+             )
+
+    assert {:ok, :transitioned, paid2, {:dispatched, :receipt}} =
+             PhysicalActionCoordinator.confirm_client_physical(
+               order.id,
+               :mark_paid,
+               permit,
+               req,
+               :ok,
+               server: @server
+             )
+
+    assert paid2.id == paid.id
+    assert_receive {:client_receipt, _}
+    refute_receive {:unexpected_drawer, _}
+  end
+
+  test "settle_physical cash path mirrors mark paid client handoff without resettling" do
+    start_coordinator_with(
+      dispatch_receipt: fn _order, _opts -> {:client_dispatch, "R"} end,
+      dispatch_drawer: fn _order, _opts -> {:client_dispatch, "D"} end
+    )
+
+    order = paid_order!()
+    permit = permit_for(order.id, :settle_physical)
+
+    assert {:ok, :settle_physical, settled, {:client_dispatch, :receipt, _, req}} =
+             PhysicalActionCoordinator.execute_settle_physical(order.id, permit, "maya",
+               server: @server
+             )
+
+    assert settled.id == order.id
+
+    assert {:ok, :settle_physical, settled2, {:dispatched, :receipt}} =
+             PhysicalActionCoordinator.confirm_client_physical(
+               order.id,
+               :settle_physical,
+               permit,
+               req,
+               :ok,
+               server: @server
+             )
+
+    assert settled2.id == order.id
   end
 
   defp start_coordinator(dispatch_receipt, opts \\ []) do

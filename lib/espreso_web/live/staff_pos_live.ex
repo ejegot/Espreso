@@ -6,6 +6,7 @@ defmodule EspresoWeb.StaffPosLive do
   alias Espreso.Menu
   alias Espreso.Orders
   alias Espreso.Printer
+  alias EspresoWeb.PrinterClientBridge
   alias EspresoWeb.StaffNotifications
   alias Phoenix.LiveView.JS
 
@@ -51,6 +52,7 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:last_cash_change, nil)
      |> assign(:print_failed?, false)
      |> assign(:print_retry_token, nil)
+     |> assign(:print_retry_permit, nil)
      |> assign(:print_note_error?, false)
      |> assign(:place_flash, nil)
      |> assign(:place_flash_token, nil)
@@ -708,35 +710,88 @@ defmodule EspresoWeb.StaffPosLive do
         } = socket
       )
       when not is_nil(order) and not is_nil(token) do
-    socket = assign(socket, :print_retry_token, nil)
-    order = Espreso.Repo.preload(order, :items)
-    opts = print_opts(socket, order)
+    paid_via = order.paid_via || "cash"
 
-    {note, failed?, note_error?} =
-      case Printer.after_paid(order, order.paid_via || "cash", opts) do
-        :ok ->
-          if Printer.cash_like?(order.paid_via || "cash") do
-            {"Receipt printed · kaha opened.", false, false}
-          else
-            {"Receipt printed.", false, false}
-          end
+    result =
+      case socket.assigns[:print_retry_permit] do
+        retry_permit when is_binary(retry_permit) ->
+          Espreso.PhysicalActionCoordinator.execute_settle_physical(
+            order.id,
+            retry_permit,
+            paid_via,
+            staff_name: socket.assigns.current_user.name
+          )
 
-        :disabled ->
-          {"Printer is not enabled on this server.", true, false}
+        _ ->
+          {_permit, settle_result} =
+            PrinterClientBridge.settle_physical_for_paid_order(order, paid_via,
+              staff_name: socket.assigns.current_user.name
+            )
 
-        {:error, reason} ->
-          {"Print failed (#{inspect(reason)}). Tap Retry.", true, true}
+          settle_result
       end
 
-    {:noreply,
-     socket
-     |> assign(:print_note, note)
-     |> assign(:print_failed?, failed?)
-     |> assign(:print_retry_token, if(failed?, do: new_print_retry_token()))
-     |> assign(:print_note_error?, note_error?)}
+    {:noreply, apply_pos_physical_result(socket, order, paid_via, result)}
   end
 
   def handle_event("reprint_receipt", _params, socket), do: {:noreply, socket}
+
+  def handle_event("elilai_printer_result", params, socket) do
+    case PrinterClientBridge.confirm_params(params) do
+      {order_id, :settle_physical, permit, request_id, client_result} ->
+        result =
+          PrinterClientBridge.run_confirm(
+            order_id,
+            :settle_physical,
+            permit,
+            request_id,
+            client_result,
+            staff_name: socket.assigns.current_user.name
+          )
+
+        order =
+          socket.assigns.last_order ||
+            Espreso.Repo.get(Espreso.Orders.Order, order_id_int(order_id))
+
+        paid_via = (order && (order.paid_via || "cash")) || "cash"
+        {:noreply, apply_pos_physical_result(socket, order, paid_via, result)}
+
+      {order_id, action, permit, request_id, client_result}
+      when action in [:receipt_reprint, :kitchen, :drawer] ->
+        result =
+          PrinterClientBridge.run_confirm(
+            order_id,
+            action,
+            permit,
+            request_id,
+            client_result,
+            staff_name: socket.assigns.current_user.name
+          )
+
+        {:noreply, apply_pos_single_physical(socket, result, order_id, action, permit)}
+
+      :invalid ->
+        case params do
+          %{"flow" => flow, "ok" => ok} when flow in ["raw_test", "raw_drawer"] ->
+            ok? = ok in [true, "true"]
+
+            note =
+              cond do
+                ok? and flow == "raw_drawer" -> "Kaha opened."
+                ok? -> "Test print sent."
+                true -> Map.get(params, "error") || "Printer failed."
+              end
+
+            {:noreply,
+             socket
+             |> assign(:print_note, note)
+             |> assign(:print_note_error?, not ok?)}
+
+          _ ->
+            {:noreply, socket}
+        end
+    end
+  end
 
   def handle_event("print_kitchen", _params, socket) do
     case socket.assigns.last_order do
@@ -746,32 +801,49 @@ defmodule EspresoWeb.StaffPosLive do
       order ->
         order = Espreso.Repo.preload(order, :items)
 
-        {note, note_error?} =
-          case Printer.print_kitchen(order, staff_name: socket.assigns.current_user.name) do
-            :ok -> {"Kitchen ticket printed.", false}
-            :disabled -> {"Printer is not enabled on this server.", false}
-            {:error, reason} -> {"Kitchen print failed (#{inspect(reason)}).", true}
-          end
+        case Espreso.PhysicalActionCoordinator.permits(:kitchen, [order.id])
+             |> Map.get(order.id) do
+          permit when is_binary(permit) ->
+            result =
+              Espreso.PhysicalActionCoordinator.execute(order.id, :kitchen, permit,
+                staff_name: socket.assigns.current_user.name
+              )
 
-        {:noreply,
-         socket
-         |> assign(:print_note, note)
-         |> assign(:print_note_error?, note_error?)}
+            {:noreply, apply_pos_single_physical(socket, result, order.id, :kitchen, permit)}
+
+          _ ->
+            {:noreply,
+             assign(socket, :print_note, "Kitchen print is unavailable.")
+             |> assign(:print_note_error?, true)}
+        end
     end
   end
 
   def handle_event("open_drawer", _params, socket) do
-    {note, note_error?} =
-      case Printer.open_drawer() do
-        :ok -> {"Kaha opened.", false}
-        :disabled -> {"Printer is not enabled on this server.", false}
-        {:error, reason} -> {"Could not open kaha (#{inspect(reason)}).", true}
-      end
+    case socket.assigns.last_order do
+      %{id: id, paid_via: paid_via} ->
+        if Printer.cash_like?(paid_via || "cash") do
+          case Espreso.PhysicalActionCoordinator.permits(:drawer, [id]) |> Map.get(id) do
+            permit when is_binary(permit) ->
+              result =
+                Espreso.PhysicalActionCoordinator.execute(id, :drawer, permit,
+                  staff_name: socket.assigns.current_user.name
+                )
 
-    {:noreply,
-     socket
-     |> assign(:print_note, note)
-     |> assign(:print_note_error?, note_error?)}
+              {:noreply, apply_pos_single_physical(socket, result, id, :drawer, permit)}
+
+            _ ->
+              {:noreply, push_raw_drawer(socket)}
+          end
+        else
+          {:noreply,
+           assign(socket, :print_note, "Kaha opens for cash payments only.")
+           |> assign(:print_note_error?, true)}
+        end
+
+      _ ->
+        {:noreply, push_raw_drawer(socket)}
+    end
   end
 
   def handle_event("place_order", params, socket) do
@@ -1818,25 +1890,35 @@ defmodule EspresoWeb.StaffPosLive do
 
       case Loyalty.redeem_at_pos(customer.id, quote.selected_price.id, attrs) do
         {:ok, %{order: order, customer: updated_customer}} ->
-          print_result =
+          {permit, settle_result} =
             if paid? do
-              opts =
-                [staff_name: socket.assigns.current_user.name] ++
-                  if(tendered, do: [cash_tendered: tendered, change: change], else: [])
-
-              Printer.after_paid(order, order.paid_via || paid_via || "cash", opts)
+              PrinterClientBridge.settle_physical_for_paid_order(
+                order,
+                order.paid_via || paid_via || "cash",
+                staff_name: socket.assigns.current_user.name
+              )
             else
-              :disabled
+              {nil, :disabled}
             end
 
-          {note, failed?, note_error?} =
-            print_note_result(print_result, order.paid_via || paid_via)
+          socket =
+            socket
+            |> apply_pos_physical_result(
+              order,
+              order.paid_via || paid_via,
+              settle_result,
+              permit
+            )
+
+          note = socket.assigns.print_note
+          failed? = socket.assigns.print_failed?
+          note_error? = socket.assigns.print_note_error?
 
           cash_change = if(change, do: %{tendered: tendered, change: change})
 
           flash =
             "Redeemed · #{order.number} · #{updated_customer.points_balance} pts left" <>
-              if(note, do: " · #{note}", else: "")
+              if(note && not failed?, do: " · #{note}", else: "")
 
           socket =
             socket
@@ -1950,19 +2032,29 @@ defmodule EspresoWeb.StaffPosLive do
 
         case Orders.create_order(lines, attrs) do
           {:ok, order} ->
-            print_result =
+            {permit, settle_result} =
               if paid? do
-                opts =
-                  [staff_name: socket.assigns.current_user.name] ++
-                    if(tendered, do: [cash_tendered: tendered, change: change], else: [])
-
-                Printer.after_paid(order, order.paid_via || paid_via || "cash", opts)
+                PrinterClientBridge.settle_physical_for_paid_order(
+                  order,
+                  order.paid_via || paid_via || "cash",
+                  staff_name: socket.assigns.current_user.name
+                )
               else
-                :disabled
+                {nil, :disabled}
               end
 
-            {note, failed?, note_error?} =
-              print_note_result(print_result, order.paid_via || paid_via)
+            socket =
+              socket
+              |> apply_pos_physical_result(
+                order,
+                order.paid_via || paid_via,
+                settle_result,
+                permit
+              )
+
+            note = socket.assigns.print_note
+            failed? = socket.assigns.print_failed?
+            note_error? = socket.assigns.print_note_error?
 
             cash_change = if(change, do: %{tendered: tendered, change: change})
 
@@ -1996,7 +2088,6 @@ defmodule EspresoWeb.StaffPosLive do
               |> assign(:last_cash_change, cash_change)
               |> assign(:print_note, note)
               |> assign(:print_failed?, failed?)
-              |> assign(:print_retry_token, if(failed?, do: new_print_retry_token()))
               |> assign(:print_note_error?, note_error?)
 
             socket =
@@ -2008,7 +2099,7 @@ defmodule EspresoWeb.StaffPosLive do
                 flash = place_flash_message(order, note, cash_change, loyalty_note)
 
                 socket
-                |> assign(:last_order, nil)
+                |> assign(:last_order, if(match?({:ok, _, _, {:client_dispatch, _, _, _}}, settle_result), do: order, else: nil))
                 |> put_place_flash(flash)
               end
 
@@ -2766,24 +2857,6 @@ defmodule EspresoWeb.StaffPosLive do
     Integer.to_string(System.unique_integer([:positive]))
   end
 
-  defp print_opts(socket, order) do
-    base = [staff_name: socket.assigns.current_user.name]
-    paid_via = order.paid_via || "cash"
-
-    case socket.assigns.last_cash_change do
-      %{tendered: tendered, change: change}
-      when not is_nil(tendered) and not is_nil(change) ->
-        if Printer.cash_like?(paid_via) do
-          base ++ [cash_tendered: tendered, change: change]
-        else
-          base
-        end
-
-      _ ->
-        base
-    end
-  end
-
   defp print_note_result(:ok, paid_via) do
     note =
       if Printer.cash_like?(paid_via || "cash") do
@@ -2802,6 +2875,214 @@ defmodule EspresoWeb.StaffPosLive do
   end
 
   defp print_note_result(_, _), do: {nil, false, false}
+
+  defp apply_pos_physical_result(socket, order, paid_via, result, permit \\ nil)
+
+  defp apply_pos_physical_result(socket, order, paid_via, :disabled, _permit) do
+    {note, failed?, note_error?} = print_note_result(:disabled, paid_via)
+
+    socket
+    |> assign(:print_note, note)
+    |> assign(:print_failed?, failed?)
+    |> assign(:print_note_error?, note_error?)
+    |> assign(:print_retry_token, nil)
+    |> assign(:print_retry_permit, nil)
+    |> assign(:last_order, order)
+  end
+
+  defp apply_pos_physical_result(socket, order, paid_via, {:ok, _op, _paid, physical}, permit) do
+    apply_pos_physical_payload(socket, order, paid_via, physical, permit)
+  end
+
+  defp apply_pos_physical_result(socket, order, paid_via, physical, permit)
+       when is_tuple(physical) or physical in [:disabled, :ok] do
+    apply_pos_physical_payload(socket, order, paid_via, physical, permit)
+  end
+
+  defp apply_pos_physical_result(socket, order, _paid_via, other, _permit) do
+    {note, failed?, note_error?} =
+      case other do
+        {:ineligible, reason} ->
+          {"Print skipped (#{inspect(reason)}).", true, true}
+
+        {:stale, _} ->
+          {"Print request is stale.", true, true}
+
+        _ ->
+          {"Order saved · print failed (#{inspect(other)}). Tap Retry.", true, true}
+      end
+
+    socket
+    |> assign(:last_order, order)
+    |> assign(:print_note, note)
+    |> assign(:print_failed?, failed?)
+    |> assign(:print_note_error?, note_error?)
+    |> assign(:print_retry_token, if(failed?, do: new_print_retry_token()))
+    |> assign(:print_retry_permit, nil)
+  end
+
+  defp apply_pos_physical_payload(socket, order, _paid_via, physical, permit) do
+    retrying? = socket.assigns[:print_failed?] == true
+
+    {note, failed?, note_error?, retry_permit} =
+      case physical do
+        {:dispatched, :receipt_and_drawer} ->
+          {"Receipt printed · kaha opened.", false, false, nil}
+
+        {:dispatched, :receipt} ->
+          {"Receipt printed.", false, false, nil}
+
+        {:dispatched, :drawer} ->
+          {"Kaha opened.", false, false, nil}
+
+        :disabled ->
+          {"Printing disabled", false, false, nil}
+
+        {:client_dispatch, :receipt, _b64, _req} ->
+          {"Sending receipt to printer…", false, false, nil}
+
+        {:client_dispatch, :drawer, _b64, _req} ->
+          {"Opening kaha…", false, false, nil}
+
+        {:definite_failure, _phase, reason, next_permit} ->
+          prefix = if(retrying?, do: "Print failed", else: "Order saved · print failed")
+          {"#{prefix} (#{inspect(reason)}). Tap Retry.", true, true, next_permit}
+
+        {:uncertain, _phase, reason} ->
+          prefix = if(retrying?, do: "Print failed", else: "Order saved · print failed")
+          {"#{prefix} (#{inspect(reason)}).", true, true, nil}
+
+        other ->
+          prefix = if(retrying?, do: "Print failed", else: "Order saved · print failed")
+          {"#{prefix} (#{inspect(other)}). Tap Retry.", true, true, nil}
+      end
+
+    socket =
+      socket
+      |> assign(:last_order, order)
+      |> assign(:print_note, note)
+      |> assign(:print_failed?, failed?)
+      |> assign(:print_note_error?, note_error?)
+      |> assign(:print_retry_token, if(failed?, do: new_print_retry_token()))
+      |> assign(:print_retry_permit, retry_permit)
+
+    case physical do
+      {:client_dispatch, _, _, _} ->
+        PrinterClientBridge.maybe_push_settle_physical(socket, order.id, permit, physical)
+
+      _ ->
+        socket
+    end
+  end
+
+  defp apply_pos_single_physical(socket, result, order_id, action, permit)
+
+  defp apply_pos_single_physical(socket, {:dispatched, _}, _order_id, :kitchen, _permit) do
+    socket
+    |> assign(:print_note, "Kitchen ticket printed.")
+    |> assign(:print_note_error?, false)
+  end
+
+  defp apply_pos_single_physical(socket, {:dispatched, _}, _order_id, :drawer, _permit) do
+    socket
+    |> assign(:print_note, "Kaha opened.")
+    |> assign(:print_note_error?, false)
+  end
+
+  defp apply_pos_single_physical(socket, {:client_dispatch, b64, req}, order_id, action, permit)
+       when is_binary(permit) do
+    socket
+    |> assign(:print_note, "Sending to printer…")
+    |> assign(:print_note_error?, false)
+    |> PrinterClientBridge.maybe_push_single_physical(
+      order_id,
+      action,
+      permit,
+      {:client_dispatch, b64, req}
+    )
+  end
+
+  defp apply_pos_single_physical(socket, :disabled, _, _, _) do
+    socket
+    |> assign(:print_note, "Printer is not enabled.")
+    |> assign(:print_note_error?, false)
+  end
+
+  defp apply_pos_single_physical(socket, {:definite_failure, reason, _}, _, :kitchen, _) do
+    socket
+    |> assign(:print_note, "Kitchen print failed (#{inspect(reason)}).")
+    |> assign(:print_note_error?, true)
+  end
+
+  defp apply_pos_single_physical(socket, {:definite_failure, reason, _}, _, :drawer, _) do
+    socket
+    |> assign(:print_note, "Could not open kaha (#{inspect(reason)}).")
+    |> assign(:print_note_error?, true)
+  end
+
+  defp apply_pos_single_physical(socket, {:definite_failure, reason, _}, _, _, _) do
+    socket
+    |> assign(:print_note, "Print failed (#{inspect(reason)}).")
+    |> assign(:print_note_error?, true)
+  end
+
+  defp apply_pos_single_physical(socket, {:ineligible, :printer_disabled}, _, :kitchen, _) do
+    socket
+    |> assign(:print_note, "Kitchen print failed (printer disabled).")
+    |> assign(:print_note_error?, true)
+  end
+
+  defp apply_pos_single_physical(socket, {:ineligible, reason}, _, _, _) do
+    socket
+    |> assign(:print_note, "Could not print (#{inspect(reason)}).")
+    |> assign(:print_note_error?, true)
+  end
+
+  defp apply_pos_single_physical(socket, other, _, _, _) do
+    socket
+    |> assign(:print_note, "Print failed (#{inspect(other)}).")
+    |> assign(:print_note_error?, true)
+  end
+
+  defp push_raw_drawer(socket) do
+    case Printer.dispatch_drawer() do
+      {:client_dispatch, bytes} ->
+        socket
+        |> assign(:print_note, "Opening kaha…")
+        |> assign(:print_note_error?, false)
+        |> push_event("elilai-printer", %{
+          action: "raw_drawer",
+          permit: "raw",
+          request_id: Integer.to_string(System.unique_integer([:positive])),
+          data_base64: Printer.encode_payload(bytes),
+          order_id: 0,
+          flow: "raw_drawer"
+        })
+
+      :dispatched ->
+        assign(socket, :print_note, "Kaha opened.") |> assign(:print_note_error?, false)
+
+      :disabled ->
+        assign(socket, :print_note, "Printer is not enabled.") |> assign(:print_note_error?, false)
+
+      {:definite_failure, reason} ->
+        assign(socket, :print_note, "Could not open kaha (#{inspect(reason)}).")
+        |> assign(:print_note_error?, true)
+
+      other ->
+        assign(socket, :print_note, "Could not open kaha (#{inspect(other)}).")
+        |> assign(:print_note_error?, true)
+    end
+  end
+
+  defp order_id_int(id) when is_integer(id), do: id
+
+  defp order_id_int(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {n, ""} -> n
+      _ -> 0
+    end
+  end
 
   defp maybe_put_cash_settlement(attrs, %Decimal{} = tendered),
     do: Map.put(attrs, :cash_tendered, tendered)

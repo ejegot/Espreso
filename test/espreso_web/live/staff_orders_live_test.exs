@@ -1947,7 +1947,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     disabled_order = paid_order!("cash")
     {:ok, disabled_view, _html} = live(conn, ~p"/orders")
     disabled_permit = live_assigns(disabled_view).reprint_permits[disabled_order.id]
-    Application.put_env(:espreso, Printer, enabled: false, host: "")
+    Application.put_env(:espreso, Printer, enabled: false, transport: :off, host: "")
 
     disabled_view
     |> render_click("reprint_receipt", %{
@@ -2212,7 +2212,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     {:ok, disabled_view, _html} = live(conn, ~p"/orders")
     disabled_kitchen = live_assigns(disabled_view).kitchen_permits[disabled_order.id]
     disabled_drawer = live_assigns(disabled_view).drawer_permits[disabled_order.id]
-    Application.put_env(:espreso, Printer, enabled: false, host: "")
+    Application.put_env(:espreso, Printer, enabled: false, transport: :off, host: "")
 
     disabled_view
     |> render_click("print_kitchen", %{
@@ -2290,6 +2290,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
       :espreso,
       Printer,
       enabled: true,
+      transport: :lan_server,
       host: "127.0.0.1",
       port: port,
       timeout_ms: 1_000

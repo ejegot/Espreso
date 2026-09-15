@@ -393,6 +393,40 @@ Hooks.StaffNavDrawer = {
   }
 }
 
+// Native Capacitor ESC/POS bridge (tablet → LAN printer). Phoenix only builds bytes.
+Hooks.ElilaiPrinter = {
+  mounted() {
+    this.handleEvent("elilai-printer", (payload) => this.sendPayload(payload))
+  },
+
+  async sendPayload(payload) {
+    const bridge = window.ElilaiKafePrinter
+    const reply = {
+      order_id: String(payload.order_id ?? ""),
+      action: payload.action,
+      permit: payload.permit,
+      request_id: payload.request_id,
+      flow: payload.flow
+    }
+
+    try {
+      if (!bridge || typeof bridge.send !== "function") {
+        throw new Error(
+          "Printer bridge unavailable — use the ELIlai Kafe Android app on shop Wi‑Fi"
+        )
+      }
+      await bridge.send({dataBase64: payload.data_base64})
+      this.pushEvent("elilai_printer_result", Object.assign({ok: true}, reply))
+    } catch (error) {
+      const message = error && error.message ? error.message : String(error)
+      this.pushEvent(
+        "elilai_printer_result",
+        Object.assign({ok: false, error: message}, reply)
+      )
+    }
+  }
+}
+
 // Client-side PIN pad for staff login. Collects digits locally only —
 // verification remains server-side via POST /session/pin.
 Hooks.StaffPinPad = {
@@ -1108,18 +1142,25 @@ let liveSocket = new LiveSocket("/live", Socket, {
   hooks: Hooks
 })
 
-// Show progress bar on live navigation and form submits
+// Show progress bar on live navigation and form submits.
+// Employee tablet shell: keep topbar for real async work, but do not dim the page
+// or disable pointer-events (that made LiveView navigation feel frozen).
+const isEmployeeApp = () =>
+  document.documentElement?.dataset?.application === "elilai-kafe-employee"
+
 topbar.config({barColors: {0: "#3a8a3e"}, shadowColor: "rgba(58, 138, 62, 0.15)"})
 window.addEventListener("phx:page-loading-start", info => {
   topbar.show(200)
   const kind = info.detail?.kind
-  if (kind !== "initial" && kind !== "ignore") {
+  if (kind !== "initial" && kind !== "ignore" && !isEmployeeApp()) {
     document.documentElement.classList.add("page-is-loading")
   }
 })
 window.addEventListener("phx:page-loading-stop", _info => {
   topbar.hide()
   document.documentElement.classList.remove("page-is-loading")
+  // Marketing site page-enter animation is intentional; skip on shop tablet.
+  if (isEmployeeApp()) return
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
   if (reduce) return
   const page = document.querySelector(".site-page")

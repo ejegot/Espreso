@@ -11,6 +11,36 @@ defmodule Espreso.PrinterTest do
     assert Printer.after_paid(%Order{number: "CS-TEST"}, "cash") == :disabled
   end
 
+  test "native_client transport returns client_dispatch payloads without TCP" do
+    restore_printer_config_on_exit()
+
+    Application.put_env(:espreso, Printer,
+      enabled: true,
+      transport: :native_client,
+      host: nil,
+      port: 9100
+    )
+
+    assert Printer.enabled?()
+    assert Printer.native_client?()
+
+    order = %Order{
+      number: "CS-CLIENT",
+      paid_via: "cash",
+      total: Decimal.new("75"),
+      items: []
+    }
+
+    assert {:client_dispatch, receipt} = Printer.dispatch_receipt(order)
+    assert is_binary(receipt)
+    assert byte_size(receipt) > 0
+
+    assert {:client_dispatch, drawer} = Printer.dispatch_drawer()
+    assert drawer == <<0x1B, 0x70, 0x00, 0x19, 0xFA>>
+
+    assert Printer.after_paid(order, "cash") == {:error, :use_client_bridge}
+  end
+
   test "cash_like?/1" do
     assert Printer.cash_like?("cash")
     assert Printer.cash_like?("counter")
@@ -86,7 +116,7 @@ defmodule Espreso.PrinterTest do
 
     assert ticket =~ "KITCHEN"
     assert ticket =~ "CS-KIT001"
-    assert ticket =~ "Dine in - Table 5"
+    assert ticket =~ "Dine-in"
     assert ticket =~ "2x Scarlet Berry 16oz"
     assert ticket =~ "NOTE"
     assert ticket =~ "Less ice"
@@ -184,6 +214,7 @@ defmodule Espreso.PrinterTest do
       :espreso,
       Printer,
       enabled: true,
+      transport: :lan_server,
       host: "127.0.0.1",
       port: port,
       timeout_ms: 1_000

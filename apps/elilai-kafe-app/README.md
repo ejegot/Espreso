@@ -84,12 +84,39 @@ npx cap open ios
 - Brand launcher/splash assets from `priv/static/images/elilai-kafe/` (regenerate via `python3 scripts/generate-brand-assets.py`)
 - `allowNavigation` remains `espreso.fly.dev` only
 
-## Intentionally not in this pass
+## Shop tablet performance / responsiveness (required)
 
-- Native printer / kaha bridge
+This is a production shop app. Responsiveness is a core requirement — see
+`docs/SHOP_TABLET_PERFORMANCE.md`.
+
+Goals (summary):
+
+- Fast startup; login without unnecessary blocking loaders
+- Instant staff search/select, PIN keypad, Home/POS taps, cart, hamburger
+- Normal LiveView navigation must not introduce unnecessary loading states
+- No artificial splash/loading screens; do not block the WebView UI thread
+- Loading/progress UI only for real async work (network, payment, printer, native bridge)
+- Printer TCP/network must run off the Android UI thread and return asynchronously
+
+Do **not** remove legitimate loading states. Fix only justified/measurable issues;
+preserve Pass 3E-4 payment, loyalty, sales attribution, GCash/Maya, and auth rules.
+
+## Native printer / kaha (APP PASS — LAN ESC/POS)
+
+Tablet talks **directly** to the shop HS-802UL (`192.168.0.87:9100`).
+Phoenix/Fly only builds ESC/POS bytes; it never opens a TCP socket to the printer.
+
+- Plugin: `EscPosPrinter` (`send` / `getDefaults`)
+- Injected JS: `window.ElilaiKafePrinter` via `www/js/elilai-native-shell.js`
+- LiveView hook: `ElilaiPrinter` pushes `elilai-printer` jobs and confirms with `elilai_printer_result`
+- Server transport: set `PRINTER_TRANSPORT=native_client` on Fly (do **not** set `PRINTER_HOST` on Fly)
+
+### Intentionally not in this pass
+
 - Offline mode
 - Modal-first Android back
 - Play Store / App Store submission packaging
 - CapacitorCookies / CapacitorHttp
 - Second authentication system
 - Service worker changes
+- Barista-facing printer IP settings UI (host/port are app defaults)
