@@ -8,6 +8,7 @@ defmodule EspresoWeb.StaffComponents do
 
   alias Espreso.Accounts.Authorization
   alias Espreso.Accounts.User
+  alias EspresoWeb.StaffNavDrawerComponent
 
   use EspresoWeb, :verified_routes
 
@@ -24,13 +25,13 @@ defmodule EspresoWeb.StaffComponents do
   def staff_shell(assigns) do
     items = nav_items(assigns.current_user)
     primary = Enum.filter(items, &(&1.key in @primary_nav_keys))
-    more = Enum.reject(items, &(&1.key in @primary_nav_keys))
+    drawer = Enum.reject(items, &(&1.key in @primary_nav_keys))
 
     assigns =
       assigns
       |> assign(:primary_nav, primary)
-      |> assign(:more_nav, more)
-      |> assign(:more_active?, assigns.current not in @primary_nav_keys)
+      |> assign(:drawer_nav, drawer)
+      |> assign(:drawer_active?, assigns.current not in @primary_nav_keys)
 
     ~H"""
     <div class={["staff-app site-page", @chrome == :rail && "staff-app--rail"]}>
@@ -63,46 +64,24 @@ defmodule EspresoWeb.StaffComponents do
             </.link>
           </nav>
 
-          <details
-            class={["staff-pos-rail-more", @more_active? && "is-active"]}
-            id="staff-pos-rail-more"
+          <button
+            type="button"
+            id="staff-nav-menu-open"
+            class={[
+              "staff-pos-rail-link staff-nav-menu-open staff-nav-menu-open--rail",
+              @drawer_active? && "is-active"
+            ]}
+            phx-click="toggle"
+            phx-target="#staff-nav-drawer"
+            data-staff-nav-menu-open
+            aria-expanded="false"
+            aria-controls="staff-nav-drawer-panel"
+            aria-label="Open navigation menu"
+            title="Menu"
           >
-            <summary
-              class="staff-pos-rail-link staff-pos-rail-more-summary"
-              id="staff-nav-more"
-              aria-label="More staff tools"
-              title="More"
-            >
-              <.icon name="hero-ellipsis-horizontal" class="staff-pos-rail-icon" />
-              <span class="staff-pos-rail-more-label">More</span>
-            </summary>
-            <div class="staff-pos-rail-more-panel" role="menu" aria-label="More staff tools">
-              <.link
-                :for={item <- @more_nav}
-                navigate={item.path}
-                class={[
-                  "staff-pos-rail-more-link",
-                  @current == item.key && "is-active"
-                ]}
-                id={"staff-nav-#{item.key}"}
-                role="menuitem"
-                aria-current={if(@current == item.key, do: "page", else: nil)}
-              >
-                <.icon name={item.icon} class="staff-pos-rail-more-icon" />
-                <span>{item.label}</span>
-              </.link>
-              <.link
-                href={~p"/logout"}
-                method="delete"
-                class="staff-pos-rail-more-link staff-pos-rail-logout"
-                id="staff-nav-logout"
-                role="menuitem"
-              >
-                <.icon name="hero-arrow-right-on-rectangle" class="staff-pos-rail-more-icon" />
-                <span>Log out</span>
-              </.link>
-            </div>
-          </details>
+            <.icon name="hero-bars-3" class="staff-pos-rail-icon" />
+            <span class="staff-nav-menu-open-label">Menu</span>
+          </button>
         </aside>
 
         <div class="staff-shell-body staff-shell-body--rail">
@@ -159,6 +138,24 @@ defmodule EspresoWeb.StaffComponents do
           </div>
 
           <nav class="staff-shell-nav" aria-label="Elilai Kafe">
+            <button
+              type="button"
+              id="staff-nav-menu-open"
+              class={[
+                "staff-nav-menu-open staff-nav-menu-open--top",
+                @drawer_active? && "is-active"
+              ]}
+              phx-click="toggle"
+              phx-target="#staff-nav-drawer"
+              data-staff-nav-menu-open
+              aria-expanded="false"
+              aria-controls="staff-nav-drawer-panel"
+              aria-label="Open navigation menu"
+            >
+              <.icon name="hero-bars-3" class="staff-nav-menu-open-icon" />
+              <span class="staff-nav-menu-open-text">Menu</span>
+            </button>
+
             <.link
               :for={item <- @primary_nav}
               navigate={item.path}
@@ -168,34 +165,6 @@ defmodule EspresoWeb.StaffComponents do
             >
               {item.label}
             </.link>
-
-            <details class={["staff-shell-more", @more_active? && "is-active"]} id="staff-shell-more">
-              <summary class="staff-shell-more-summary" id="staff-nav-more">More</summary>
-              <div class="staff-shell-more-panel" role="menu" aria-label="More staff tools">
-                <.link
-                  :for={item <- @more_nav}
-                  navigate={item.path}
-                  class={[
-                    "staff-shell-more-link",
-                    @current == item.key && "is-active"
-                  ]}
-                  id={"staff-nav-#{item.key}"}
-                  role="menuitem"
-                  aria-current={if(@current == item.key, do: "page", else: nil)}
-                >
-                  {item.label}
-                </.link>
-                <.link
-                  href={~p"/logout"}
-                  method="delete"
-                  class="staff-shell-more-link staff-shell-logout"
-                  id="staff-nav-logout"
-                  role="menuitem"
-                >
-                  Log out
-                </.link>
-              </div>
-            </details>
           </nav>
         </header>
 
@@ -203,6 +172,13 @@ defmodule EspresoWeb.StaffComponents do
           {render_slot(@inner_block)}
         </div>
       <% end %>
+
+      <.live_component
+        module={StaffNavDrawerComponent}
+        id="staff-nav-drawer"
+        current={@current}
+        items={@drawer_nav}
+      />
     </div>
     """
   end

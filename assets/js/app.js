@@ -367,6 +367,32 @@ Hooks.StaffNotifications = {
   }
 }
 
+// Keeps hamburger aria-expanded in sync with the LiveComponent drawer open state.
+Hooks.StaffNavDrawer = {
+  mounted() {
+    this.syncOpenButtons()
+  },
+
+  updated() {
+    this.syncOpenButtons()
+  },
+
+  syncOpenButtons() {
+    const open = this.el.getAttribute("data-open") === "true"
+    document.querySelectorAll("[data-staff-nav-menu-open]").forEach((btn) => {
+      btn.setAttribute("aria-expanded", open ? "true" : "false")
+      btn.setAttribute("aria-label", open ? "Close navigation menu" : "Open navigation menu")
+    })
+
+    if (open) {
+      const closeBtn = this.el.querySelector("#staff-nav-menu-close")
+      if (closeBtn && typeof closeBtn.focus === "function") {
+        window.requestAnimationFrame(() => closeBtn.focus())
+      }
+    }
+  }
+}
+
 // Client-side PIN pad for staff login. Collects digits locally only —
 // verification remains server-side via POST /session/pin.
 Hooks.StaffPinPad = {
