@@ -62,9 +62,11 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-ticket")
     assert has_element?(view, "#staff-pos-rail")
     assert has_element?(view, "#staff-nav-pos.is-active")
-    assert has_element?(view, "#staff-pos-rail-more > #staff-nav-more", "More")
-    assert has_element?(view, "#staff-pos-rail-more .staff-pos-rail-more-panel")
-    assert has_element?(view, "#staff-pos-rail-more #staff-nav-logout", "Log out")
+    assert has_element?(view, "#staff-pos-rail #staff-nav-menu-open")
+    assert has_element?(view, "#staff-nav-drawer-panel")
+    assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-logout", "Log out")
+    refute has_element?(view, "#staff-nav-more")
+    refute has_element?(view, "#staff-pos-rail-more")
     refute has_element?(view, "#staff-pos-rail-footer")
     refute has_element?(view, ".staff-pos-rail-avatar")
     refute has_element?(view, "#staff-pos-rail #staff-notifications")
@@ -441,22 +443,22 @@ defmodule EspresoWeb.StaffPosLiveTest do
   test "manager and owner can open POS", %{conn: conn, manager: manager, owner: owner} do
     {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/pos")
     assert has_element?(manager_view, "#pos-place-order")
-    assert has_element?(manager_view, "#staff-pos-rail-more #staff-nav-dashboard", "Dashboard")
+    assert has_element?(manager_view, "#staff-nav-drawer-panel #staff-nav-dashboard", "Dashboard")
 
     assert has_element?(
              manager_view,
-             "#staff-pos-rail-more #staff-nav-availability",
+             "#staff-nav-drawer-panel #staff-nav-availability",
              "Availability"
            )
 
-    assert has_element?(manager_view, "#staff-pos-rail-more #staff-nav-dashboard", "Dashboard")
+    assert has_element?(manager_view, "#staff-nav-drawer-panel #staff-nav-dashboard", "Dashboard")
     refute has_element?(manager_view, "#staff-nav-staff")
     refute has_element?(manager_view, "#staff-nav-settings")
 
     {:ok, owner_view, _html} = live(log_in(conn, owner), ~p"/pos")
     assert has_element?(owner_view, "#pos-place-order")
-    assert has_element?(owner_view, "#staff-pos-rail-more #staff-nav-staff", "Staff")
-    assert has_element?(owner_view, "#staff-pos-rail-more #staff-nav-settings", "Settings")
+    assert has_element?(owner_view, "#staff-nav-drawer-panel #staff-nav-staff", "Staff")
+    assert has_element?(owner_view, "#staff-nav-drawer-panel #staff-nav-settings", "Settings")
   end
 
   test "POS shows available products and hides unavailable", %{

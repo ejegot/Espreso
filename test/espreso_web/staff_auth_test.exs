@@ -506,28 +506,39 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(view, "#staff-nav-orders.is-active", "Orders")
     assert has_element?(view, "#staff-nav-pos", "POS")
     assert has_element?(view, "#staff-nav-home", "Home")
-    assert has_element?(view, "#staff-shell-more")
-    assert has_element?(view, "#staff-nav-more", "More")
-    assert has_element?(view, "#staff-shell-more #staff-nav-logout", "Log out")
+    assert has_element?(view, "#staff-nav-menu-open")
+    assert has_element?(view, "#staff-nav-drawer")
+    assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-logout", "Log out")
     assert has_element?(view, "#staff-nav-logout", "Log out")
+    refute has_element?(view, "#staff-nav-more")
+    refute has_element?(view, "#staff-shell-more")
     refute has_element?(view, "#staff-nav-dashboard")
     refute has_element?(view, "#staff-nav-staff")
   end
 
-  test "home More menu is directly available with secondary destinations", %{
+  test "home menu drawer lists secondary destinations", %{
     conn: conn,
     barista: barista
   } do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/staff")
 
-    assert has_element?(view, "#staff-shell-more")
-    assert has_element?(view, "#staff-nav-more", "More")
-    assert has_element?(view, "#staff-shell-more #staff-nav-transactions", "Transactions")
-    assert has_element?(view, "#staff-shell-more #staff-nav-customers", "Customers")
-    assert has_element?(view, "#staff-shell-more #staff-nav-my_shifts", "My shifts")
-    assert has_element?(view, "#staff-shell-more #staff-nav-cash_out", "Cash Out")
-    assert has_element?(view, "#staff-shell-more #staff-nav-close", "Close shift")
-    assert has_element?(view, "#staff-shell-more #staff-nav-logout", "Log out")
+    assert has_element?(view, "#staff-nav-menu-open")
+    assert has_element?(view, "#staff-nav-drawer-panel")
+    assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-transactions", "Transactions")
+    assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-customers", "Customers")
+    assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-my_shifts", "My shifts")
+    assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-cash_out", "Cash Out")
+    assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-close", "Close shift")
+    assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-logout", "Log out")
+
+    view |> element("#staff-nav-menu-open") |> render_click()
+    assert has_element?(view, "#staff-nav-drawer-panel.is-open")
+    assert has_element?(view, "#staff-nav-drawer-backdrop")
+    assert has_element?(view, "#staff-nav-menu-close")
+
+    view |> element("#staff-nav-menu-close") |> render_click()
+    refute has_element?(view, "#staff-nav-drawer-panel.is-open")
+    refute has_element?(view, "#staff-nav-drawer-backdrop")
   end
 
   test "manager can access staff routes but not user management", %{
@@ -550,7 +561,7 @@ defmodule EspresoWeb.StaffAuthTest do
     {:ok, admin, _html} = live(conn, ~p"/admin/users")
     assert has_element?(admin, ".staff-shell-title", "Staff")
     assert has_element?(admin, "#staff-nav-staff.is-active", "Staff")
-    assert has_element?(admin, "#staff-shell-more.is-active")
+    assert has_element?(admin, "#staff-nav-menu-open.is-active")
   end
 
   test "staff cannot open admin users", %{conn: conn, barista: barista} do
