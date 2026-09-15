@@ -21698,6 +21698,137 @@ a.brune-contact-value:focus-visible {
   max-width: 42rem;
 }
 
+/* —— Staff Sales Reports (Excel export) —— */
+.staff-reports {
+  --rpt-forest: var(--elilai-forest, #394331);
+  --rpt-ivory: var(--elilai-ivory, #f4efe3);
+  --rpt-muted: color-mix(in srgb, var(--rpt-forest) 58%, #fff);
+  display: grid;
+  gap: 1.15rem;
+  padding: 1rem 1rem 1.75rem;
+  max-width: 36rem;
+}
+
+.staff-reports-head {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.staff-reports-eyebrow {
+  margin: 0;
+  color: var(--rpt-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.staff-reports-head h2 {
+  margin: 0;
+  color: var(--rpt-forest);
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.staff-reports-head p {
+  margin: 0;
+  color: var(--rpt-muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.staff-reports-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem 1.05rem 1.15rem;
+  border: 1px solid color-mix(in srgb, var(--rpt-forest) 12%, transparent);
+  border-radius: 0.95rem;
+  background: #fffef9;
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--rpt-forest) 6%, transparent);
+}
+
+.staff-reports-fields {
+  display: grid;
+  gap: 0.85rem;
+}
+
+@media (min-width: 520px) {
+  .staff-reports-fields {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.staff-reports-field {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.staff-reports-field span {
+  color: var(--rpt-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.staff-reports-field input[type="date"] {
+  width: 100%;
+  min-height: 2.65rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--rpt-forest) 16%, transparent);
+  border-radius: 0.65rem;
+  background: #fff;
+  color: var(--rpt-forest);
+  font: inherit;
+  font-size: 0.95rem;
+}
+
+.staff-reports-field input[type="date"]:focus {
+  outline: 2px solid color-mix(in srgb, var(--rpt-forest) 28%, transparent);
+  outline-offset: 1px;
+}
+
+.staff-reports-error {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.55rem;
+  border: 1px solid color-mix(in srgb, #b42318 28%, transparent);
+  background: color-mix(in srgb, #b42318 8%, #fff);
+  color: #8a1c14;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.staff-reports-export-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  width: 100%;
+  padding: 0.55rem 1rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: var(--rpt-forest);
+  color: var(--rpt-ivory);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.staff-reports-export-btn:hover:not(:disabled),
+.staff-reports-export-btn:focus-visible:not(:disabled) {
+  filter: brightness(1.05);
+  outline: none;
+}
+
+.staff-reports-export-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .staff-attendance-head {
   display: grid;
   gap: 0.75rem;

@@ -236,6 +236,13 @@ defmodule EspresoWeb.StaffComponents do
         show?: user.role in ["manager", "owner"]
       },
       %{
+        key: :reports,
+        label: "Reports",
+        icon: "hero-document-chart-bar",
+        path: ~p"/staff/reports",
+        show?: Authorization.can?(user, :reports)
+      },
+      %{
         key: :close,
         label: "Close shift",
         icon: "hero-lock-closed",

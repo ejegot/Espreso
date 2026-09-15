@@ -126,7 +126,10 @@ defmodule EspresoWeb.Router do
     live_session :reports,
       on_mount: [{EspresoWeb.StaffAuth, {:ensure_permission, :reports}}] do
       live "/staff/attendance", StaffAttendanceLive
+      live "/staff/reports", StaffReportsLive
     end
+
+    get "/staff/reports/export", SalesExportController, :download
 
     live_session :staff,
       on_mount: [{EspresoWeb.StaffAuth, :ensure_staff}] do
