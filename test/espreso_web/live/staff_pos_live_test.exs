@@ -480,6 +480,23 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-ticket.is-empty")
   end
 
+  test "POS catalog uses versioned WebP thumbnails with eager loading", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, html} = live(log_in(conn, barista), ~p"/pos")
+
+    assert html =~ "/images/coffeespot/pos-thumbs/gen-hot-espresso.webp?vsn=pos1"
+    assert html =~ ~s(loading="eager")
+    assert html =~ ~s(fetchpriority="high")
+    refute html =~ ~s(src="/images/coffeespot/gen-hot-espresso.png")
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    cart_html = render(view)
+    assert cart_html =~ "/images/coffeespot/pos-thumbs/gen-hot-espresso.webp?vsn=pos1"
+  end
+
   test "POS marks Signature Tablea with a subtle signature badge", %{
     conn: conn,
     barista: barista,
