@@ -325,6 +325,19 @@ html.page-is-loading .site-page {
   pointer-events: none;
 }
 
+/* Shop tablet (ELIlai Kafe employee): keep taps responsive during LiveView nav.
+   Topbar still shows real progress; do not block the WebView touch surface. */
+html[data-application="elilai-kafe-employee"] .site-page,
+html[data-application="elilai-kafe-employee"] .site-page.is-entering {
+  animation: none;
+}
+
+html[data-application="elilai-kafe-employee"].page-is-loading .site-page {
+  opacity: 1;
+  transition: none;
+  pointer-events: auto;
+}
+
 @keyframes brune-page-enter {
   from {
     opacity: 0;

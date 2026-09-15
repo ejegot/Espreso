@@ -93,7 +93,7 @@ defmodule EspresoWeb.StaffTransactionsLiveTest do
     barista: barista
   } do
     restore_printer_config_on_exit()
-    Application.put_env(:espreso, Printer, enabled: true, host: "127.0.0.1", port: 1)
+    Application.put_env(:espreso, Printer, enabled: true, transport: :lan_server, host: "127.0.0.1", port: 1)
 
     order = paid_order!("Reprint Receipt", barista)
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/transactions")
@@ -118,7 +118,7 @@ defmodule EspresoWeb.StaffTransactionsLiveTest do
   } do
     restore_printer_config_on_exit()
     {port, printer_task} = start_test_printer!()
-    Application.put_env(:espreso, Printer, enabled: true, host: "127.0.0.1", port: port)
+    Application.put_env(:espreso, Printer, enabled: true, transport: :lan_server, host: "127.0.0.1", port: port)
 
     order = paid_order!("Confirmed Reprint", barista)
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/transactions")

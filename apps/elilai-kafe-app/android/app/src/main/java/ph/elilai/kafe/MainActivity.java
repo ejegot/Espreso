@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import ph.elilai.kafe.printer.EscPosPrinterPlugin;
 
 public class MainActivity extends BridgeActivity {
     private static final String NATIVE_SHELL_ASSET = "public/js/elilai-native-shell.js";
@@ -16,10 +17,11 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(EscPosPrinterPlugin.class);
         super.onCreate(savedInstanceState);
 
         // Remote server.url never executes www/ as the document. Inject the
-        // Android back handler after each full WebView document load.
+        // Android back/printer bridge after each full WebView document load.
         this.bridge.addWebViewListener(
             new WebViewListener() {
                 @Override

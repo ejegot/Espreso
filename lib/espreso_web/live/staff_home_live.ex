@@ -23,14 +23,76 @@ defmodule EspresoWeb.StaffHomeLive do
 
   @impl true
   def handle_event("printer_test_print", _params, socket) do
-    {:noreply,
-     assign(socket, :printer_note, printer_action_note(Printer.test_print(), "Test print"))}
+    case Printer.dispatch_payload_test() do
+      {:client_dispatch, bytes} ->
+        {:noreply,
+         socket
+         |> assign(:printer_note, "Sending test print…")
+         |> push_event("elilai-printer", %{
+           action: "raw_test",
+           permit: "raw",
+           request_id: Integer.to_string(System.unique_integer([:positive])),
+           data_base64: Printer.encode_payload(bytes),
+           order_id: 0,
+           flow: "raw_test"
+         })}
+
+      other ->
+        {:noreply, assign(socket, :printer_note, printer_action_note(map_test_result(other), "Test print"))}
+    end
   end
 
   def handle_event("printer_open_drawer", _params, socket) do
-    {:noreply,
-     assign(socket, :printer_note, printer_action_note(Printer.open_drawer(), "Open kaha"))}
+    case Printer.dispatch_drawer() do
+      {:client_dispatch, bytes} ->
+        {:noreply,
+         socket
+         |> assign(:printer_note, "Opening kaha…")
+         |> push_event("elilai-printer", %{
+           action: "raw_drawer",
+           permit: "raw",
+           request_id: Integer.to_string(System.unique_integer([:positive])),
+           data_base64: Printer.encode_payload(bytes),
+           order_id: 0,
+           flow: "raw_drawer"
+         })}
+
+      other ->
+        {:noreply,
+         assign(socket, :printer_note, printer_action_note(map_drawer_result(other), "Open kaha"))}
+    end
   end
+
+  def handle_event("elilai_printer_result", params, socket) do
+    case params do
+      %{"flow" => flow, "ok" => ok} when flow in ["raw_test", "raw_drawer"] ->
+        ok? = ok in [true, "true"]
+
+        note =
+          cond do
+            ok? and flow == "raw_drawer" -> "Open kaha: ok"
+            ok? -> "Test print: ok"
+            true -> "#{if(flow == "raw_drawer", do: "Open kaha", else: "Test print")}: #{Map.get(params, "error") || "failed"}"
+          end
+
+        {:noreply, assign(socket, :printer_note, note)}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  defp map_test_result(:dispatched), do: :ok
+  defp map_test_result(:disabled), do: :disabled
+  defp map_test_result({:definite_failure, reason}), do: {:error, reason}
+  defp map_test_result({:uncertain, reason}), do: {:error, reason}
+  defp map_test_result(other), do: other
+
+  defp map_drawer_result(:dispatched), do: :ok
+  defp map_drawer_result(:disabled), do: :disabled
+  defp map_drawer_result({:definite_failure, reason}), do: {:error, reason}
+  defp map_drawer_result({:uncertain, reason}), do: {:error, reason}
+  defp map_drawer_result(other), do: other
 
   @impl true
   def handle_info({:order_changed, order}, socket) do

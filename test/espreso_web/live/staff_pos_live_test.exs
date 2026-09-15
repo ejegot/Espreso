@@ -1976,6 +1976,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
       :espreso,
       Espreso.Printer,
       enabled: true,
+      transport: :lan_server,
       host: "127.0.0.1",
       port: 1,
       timeout_ms: 50
@@ -2073,6 +2074,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
       :espreso,
       Espreso.Printer,
       enabled: true,
+      transport: :lan_server,
       host: "127.0.0.1",
       port: 1,
       timeout_ms: 50
@@ -2094,6 +2096,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
       :espreso,
       Espreso.Printer,
       enabled: true,
+      transport: :lan_server,
       host: "127.0.0.1",
       port: port,
       timeout_ms: 1_000
@@ -2237,6 +2240,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
       :espreso,
       Espreso.Printer,
       enabled: true,
+      transport: :lan_server,
       host: "127.0.0.1",
       port: 1,
       timeout_ms: 50
@@ -2387,6 +2391,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
       :espreso,
       Espreso.Printer,
       enabled: true,
+      transport: :lan_server,
       host: "127.0.0.1",
       port: port,
       timeout_ms: 1_000

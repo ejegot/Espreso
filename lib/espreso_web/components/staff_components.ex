@@ -34,7 +34,11 @@ defmodule EspresoWeb.StaffComponents do
       |> assign(:drawer_active?, assigns.current not in @primary_nav_keys)
 
     ~H"""
-    <div class={["staff-app site-page", @chrome == :rail && "staff-app--rail"]}>
+    <div
+      class={["staff-app site-page", @chrome == :rail && "staff-app--rail"]}
+      id="elilai-printer-bridge"
+      phx-hook="ElilaiPrinter"
+    >
       <%= if @chrome == :rail do %>
         <aside class="staff-pos-rail staff-pos-rail--icons" id="staff-pos-rail" aria-label="Staff">
           <div class="staff-pos-rail-brand" title="Elilai Kafe">

@@ -20,9 +20,11 @@ config :espreso, Espreso.Accounts.Token,
   access_ttl: 15 * 60,
   refresh_ttl: 7 * 24 * 60 * 60
 
-# Shop ESC/POS printer (LAN only). Enable via PRINTER_ENABLED=true + PRINTER_HOST.
+# Shop ESC/POS printer.
+# transport: :off | :lan_server (Phoenix TCP on same LAN) | :native_client (tablet Capacitor)
 config :espreso, Espreso.Printer,
   enabled: false,
+  transport: :off,
   host: nil,
   port: 9100,
   timeout_ms: 4_000,

@@ -6,6 +6,7 @@ defmodule EspresoWeb.StaffOrdersLive do
   alias Espreso.PhysicalActionCoordinator
   alias Espreso.Printer
   alias Espreso.Repo
+  alias EspresoWeb.PrinterClientBridge
   alias EspresoWeb.StaffNotifications
 
   @ready_lane_limit 100
@@ -135,6 +136,7 @@ defmodule EspresoWeb.StaffOrdersLive do
     {:noreply,
      socket
      |> assign(:flash_note, physical_action_note(:kitchen, result))
+     |> PrinterClientBridge.maybe_push_single_physical(id, :kitchen, permit, result)
      |> load_orders()}
   end
 
@@ -155,6 +157,7 @@ defmodule EspresoWeb.StaffOrdersLive do
     {:noreply,
      socket
      |> assign(:flash_note, reprint_note(result))
+     |> PrinterClientBridge.maybe_push_single_physical(id, :receipt_reprint, permit, result)
      |> load_orders()}
   end
 
@@ -175,6 +178,7 @@ defmodule EspresoWeb.StaffOrdersLive do
     {:noreply,
      socket
      |> assign(:flash_note, physical_action_note(:drawer, result))
+     |> PrinterClientBridge.maybe_push_single_physical(id, :drawer, permit, result)
      |> load_orders()}
   end
 
@@ -316,6 +320,7 @@ defmodule EspresoWeb.StaffOrdersLive do
          |> assign(:mark_paid_order, nil)
          |> update_mark_paid_recovery(paid.id, paid.paid_via || paid_via, physical_result)
          |> assign(:flash_note, mark_paid_flash(paid, paid_via, physical_result))
+         |> PrinterClientBridge.maybe_push_mark_paid_physical(paid.id, permit, physical_result)
          |> load_orders()}
 
       {:ok, :already_paid, paid} ->
@@ -369,6 +374,21 @@ defmodule EspresoWeb.StaffOrdersLive do
     {:noreply, assign(socket, :flash_note, "Could not mark order paid.")}
   end
 
+  def handle_event("elilai_printer_result", params, socket) do
+    case PrinterClientBridge.confirm_params(params) do
+      {order_id, action, permit, request_id, client_result} ->
+        result =
+          PrinterClientBridge.run_confirm(order_id, action, permit, request_id, client_result,
+            staff_name: socket.assigns.current_user.name
+          )
+
+        {:noreply, handle_client_printer_confirm(socket, order_id, action, permit, result)}
+
+      :invalid ->
+        {:noreply, assign(socket, :flash_note, "Printer confirmation was invalid.")}
+    end
+  end
+
   def handle_event(
         "retry_mark_paid",
         %{
@@ -384,6 +404,20 @@ defmodule EspresoWeb.StaffOrdersLive do
       PhysicalActionCoordinator.execute_mark_paid(id, permit, paid_via,
         staff_name: socket.assigns.current_user.name
       )
+
+    socket =
+      case result do
+        {:ok, :recovery, paid, physical_result} ->
+          PrinterClientBridge.maybe_push_mark_paid_physical(
+            socket,
+            paid.id,
+            permit,
+            physical_result
+          )
+
+        _ ->
+          socket
+      end
 
     {:noreply,
      socket
@@ -1579,6 +1613,15 @@ defmodule EspresoWeb.StaffOrdersLive do
       {:dispatched, :receipt} ->
         base <> " Receipt printed."
 
+      {:dispatched, :drawer} ->
+        base <> " Kaha opened."
+
+      {:client_dispatch, :receipt, _, _} ->
+        base <> " Sending receipt to printer…"
+
+      {:client_dispatch, :drawer, _, _} ->
+        base <> " Opening kaha…"
+
       {:definite_failure, _phase, :printer_disabled, _permit} ->
         base
 
@@ -1930,14 +1973,97 @@ defmodule EspresoWeb.StaffOrdersLive do
           &Map.put(&1, order_id, %{phase: phase, permit: permit, paid_via: paid_via})
         )
 
+      {:client_dispatch, _phase, _payload, _request_id} ->
+        update(socket, :mark_paid_recoveries, &Map.delete(&1, order_id))
+
       _ ->
         update(socket, :mark_paid_recoveries, &Map.delete(&1, order_id))
     end
   end
 
+  defp handle_client_printer_confirm(socket, _order_id, action, permit, result)
+       when action in [:mark_paid, :settle_physical] do
+    case result do
+      {:ok, _operation, paid, physical_result} ->
+        socket =
+          socket
+          |> update_mark_paid_recovery(
+            paid.id,
+            paid.paid_via || "cash",
+            physical_result
+          )
+          |> assign(
+            :flash_note,
+            mark_paid_flash(paid, paid.paid_via || "cash", physical_result)
+          )
+
+        socket =
+          if action == :settle_physical do
+            PrinterClientBridge.maybe_push_settle_physical(
+              socket,
+              paid.id,
+              permit,
+              physical_result
+            )
+          else
+            PrinterClientBridge.maybe_push_mark_paid_physical(
+              socket,
+              paid.id,
+              permit,
+              physical_result
+            )
+          end
+
+        load_orders(socket)
+
+      {:ok, :already_paid, paid} ->
+        socket
+        |> assign(:flash_note, mark_paid_flash(paid, paid.paid_via || "cash", :disabled))
+        |> load_orders()
+
+      {:duplicate, _} ->
+        socket
+
+      {:ineligible, reason} ->
+        assign(socket, :flash_note, "Printer confirmation failed (#{inspect(reason)}).")
+
+      other ->
+        assign(socket, :flash_note, "Printer confirmation failed (#{inspect(other)}).")
+    end
+  end
+
+  defp handle_client_printer_confirm(socket, order_id, action, permit, result) do
+    case result do
+      {:dispatched, _next} ->
+        socket
+        |> assign(:flash_note, physical_action_note(action, result))
+        |> load_orders()
+
+      {:client_dispatch, data_base64, request_id} ->
+        socket
+        |> PrinterClientBridge.maybe_push_single_physical(
+          order_id,
+          action,
+          permit,
+          {:client_dispatch, data_base64, request_id}
+        )
+        |> load_orders()
+
+      {:definite_failure, reason, _retry} ->
+        socket
+        |> assign(:flash_note, physical_action_note(action, {:definite_failure, reason, nil}))
+        |> load_orders()
+
+      other ->
+        socket
+        |> assign(:flash_note, physical_action_note(action, other))
+        |> load_orders()
+    end
+  end
+
   defp handle_mark_paid_recovery_result(socket, id, paid_via, phase, result) do
     order_id =
-      case Integer.parse(id) do
+      case Integer.parse(to_string(id)) do
         {parsed, ""} -> parsed
         _ -> nil
       end

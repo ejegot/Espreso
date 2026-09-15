@@ -30,26 +30,53 @@ case System.get_env("PUBLIC_MENU_URL") do
     :ok
 end
 
-# LAN ESC/POS printer (HS-802UL). Phoenix host must reach the printer IP.
+# ESC/POS printer transport.
+# - PRINTER_TRANSPORT=native_client → tablet Capacitor sends to LAN (Fly-safe)
+# - PRINTER_HOST=x.x.x.x → Phoenix TCP on same LAN (shop trial / Mac)
+printer_transport = System.get_env("PRINTER_TRANSPORT") |> to_string() |> String.trim() |> String.downcase()
 printer_host = System.get_env("PRINTER_HOST")
-printer_enabled? =
-  System.get_env("PRINTER_ENABLED") in ~w(true 1) or
-    (is_binary(printer_host) and String.trim(printer_host) != "")
 
-if printer_enabled? and is_binary(printer_host) and String.trim(printer_host) != "" do
-  config :espreso, Espreso.Printer,
-    enabled: true,
-    host: String.trim(printer_host),
-    port: String.to_integer(System.get_env("PRINTER_PORT") || "9100"),
-    timeout_ms: String.to_integer(System.get_env("PRINTER_TIMEOUT_MS") || "4000"),
-    receipt_address: System.get_env("PRINTER_RECEIPT_ADDRESS") || "84 Lilac St., Marikina City",
-    wifi_title: System.get_env("PRINTER_WIFI_TITLE") || "COFFEESPOT LILAC WI-FI",
-    wifi_ssid: System.get_env("PRINTER_WIFI_SSID") || "CoffeeSpot_Guest",
-    wifi_password: System.get_env("PRINTER_WIFI_PASSWORD") || "SPOT3333",
-    wifi_note:
-      System.get_env("PRINTER_WIFI_NOTE") || "Access is valid for 2 Hours per purchase.",
-    wifi_thanks:
-      System.get_env("PRINTER_WIFI_THANKS") || "Thank you for fueling your hustle with us!"
+printer_receipt_opts = [
+  receipt_address: System.get_env("PRINTER_RECEIPT_ADDRESS") || "84 Lilac St., Marikina City",
+  wifi_title: System.get_env("PRINTER_WIFI_TITLE") || "COFFEESPOT LILAC WI-FI",
+  wifi_ssid: System.get_env("PRINTER_WIFI_SSID") || "CoffeeSpot_Guest",
+  wifi_password: System.get_env("PRINTER_WIFI_PASSWORD") || "SPOT3333",
+  wifi_note: System.get_env("PRINTER_WIFI_NOTE") || "Access is valid for 2 Hours per purchase.",
+  wifi_thanks:
+    System.get_env("PRINTER_WIFI_THANKS") || "Thank you for fueling your hustle with us!"
+]
+
+cond do
+  printer_transport in ~w(native_client client) ->
+    config :espreso, Espreso.Printer,
+           [
+             enabled: true,
+             transport: :native_client,
+             host: nil,
+             port: String.to_integer(System.get_env("PRINTER_PORT") || "9100"),
+             timeout_ms: String.to_integer(System.get_env("PRINTER_TIMEOUT_MS") || "4000")
+           ] ++ printer_receipt_opts
+
+  is_binary(printer_host) and String.trim(printer_host) != "" ->
+    printer_enabled? =
+      System.get_env("PRINTER_ENABLED") in ~w(true 1) or true
+
+    if printer_enabled? do
+      config :espreso, Espreso.Printer,
+             [
+               enabled: true,
+               transport: :lan_server,
+               host: String.trim(printer_host),
+               port: String.to_integer(System.get_env("PRINTER_PORT") || "9100"),
+               timeout_ms: String.to_integer(System.get_env("PRINTER_TIMEOUT_MS") || "4000")
+             ] ++ printer_receipt_opts
+    end
+
+  System.get_env("PRINTER_ENABLED") in ~w(true 1) ->
+    config :espreso, Espreso.Printer, enabled: true, transport: :native_client
+
+  true ->
+    :ok
 end
 
 if config_env() == :prod do
