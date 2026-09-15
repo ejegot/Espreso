@@ -458,6 +458,77 @@ defmodule Espreso.Orders do
 
   def get_transaction(_), do: nil
 
+  @max_sales_export_shop_days 31
+  @max_sales_export_orders 5_000
+
+  @doc """
+  Maximum inclusive Asia/Manila shop-day span for sales Excel export.
+  """
+  def max_sales_export_shop_days, do: @max_sales_export_shop_days
+
+  @doc """
+  Validates an inclusive Asia/Manila shop-date export range.
+
+  Returns `:ok` or `{:error, reason}` where reason is one of:
+  `:invalid_range`, `:range_too_large`.
+  """
+  def validate_sales_export_shop_dates(%Date{} = from_date, %Date{} = to_date) do
+    case Date.compare(from_date, to_date) do
+      :gt ->
+        {:error, :invalid_range}
+
+      _ ->
+        days = Date.diff(to_date, from_date) + 1
+
+        if days > @max_sales_export_shop_days do
+          {:error, :range_too_large}
+        else
+          :ok
+        end
+    end
+  end
+
+  def validate_sales_export_shop_dates(_, _), do: {:error, :invalid_range}
+
+  @doc """
+  Paid orders settled within inclusive Asia/Manila shop dates `[from_date, to_date]`.
+
+  Uses half-open UTC bounds via `shop_day_bounds_utc/1` on `settled_at`:
+  `[from_start, to_end)`.
+
+  Only `payment_status == "paid"` rows with non-nil `settled_at` are included.
+  Results are ordered by `settled_at ASC`, `id ASC` and preload `:items` and
+  `:settled_by_user`.
+
+  Returns `{:ok, orders}` or `{:error, reason}` (`:invalid_range`,
+  `:range_too_large`, `:too_many_orders`).
+  """
+  def list_paid_orders_for_shop_dates(%Date{} = from_date, %Date{} = to_date) do
+    with :ok <- validate_sales_export_shop_dates(from_date, to_date) do
+      {from_start, _} = shop_day_bounds_utc(from_date)
+      {_, to_end} = shop_day_bounds_utc(to_date)
+
+      query =
+        from(o in Order,
+          where:
+            o.payment_status == "paid" and not is_nil(o.settled_at) and
+              o.settled_at >= ^from_start and o.settled_at < ^to_end,
+          order_by: [asc: o.settled_at, asc: o.id],
+          preload: [:items, :settled_by_user]
+        )
+
+      count = Repo.aggregate(query, :count, :id)
+
+      if count > @max_sales_export_orders do
+        {:error, :too_many_orders}
+      else
+        {:ok, Repo.all(query)}
+      end
+    end
+  end
+
+  def list_paid_orders_for_shop_dates(_, _), do: {:error, :invalid_range}
+
   @doc """
   Paid POS sales attributed to one staff attendance shift.
 

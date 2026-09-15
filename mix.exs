@@ -59,7 +59,8 @@ defmodule Espreso.MixProject do
       {:dns_cluster, "~> 0.1.1"},
       {:bandit, "~> 1.5"},
       {:pbkdf2_elixir, "~> 2.0"},
-      {:joken, "~> 2.6"}
+      {:joken, "~> 2.6"},
+      {:elixlsx, "~> 0.6.0"}
     ]
   end
 
