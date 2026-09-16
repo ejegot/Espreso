@@ -669,8 +669,16 @@ defmodule EspresoWeb.StaffAuthTest do
 
     assert has_element?(
              view,
-             "img.staff-auth-logo[src='/images/elilai-kafe/elilai-kafe-mark.png']"
+             "header.staff-auth-brand source[type='image/webp'][srcset='/images/elilai-kafe/elilai-kafe-mark-login.webp']"
            )
+
+    assert has_element?(
+             view,
+             "header.staff-auth-brand img.staff-auth-logo[src='/images/elilai-kafe/elilai-kafe-mark-login.png'][width='512'][height='512']"
+           )
+
+    assert has_element?(view, "header.staff-auth-brand p.staff-auth-wordmark", "ELILAI KAFE")
+    refute html =~ "/images/elilai-kafe/elilai-kafe-mark.png"
 
     assert has_element?(view, ".staff-auth-page--approved")
     assert has_element?(view, ".staff-auth-stage")
