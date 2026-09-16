@@ -8,11 +8,13 @@ defmodule EspresoWeb.StaffLoginLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    if Accounts.needs_initial_owner_setup?() do
+    # Roster first: skip empty-DB check when PIN staff already exist (one query).
+    # Empty roster still needs the setup check (zero users → /setup vs no PINs → login).
+    roster = Accounts.list_staff_for_pin_login()
+
+    if roster == [] and Accounts.needs_initial_owner_setup?() do
       {:ok, push_navigate(socket, to: ~p"/setup")}
     else
-      roster = Accounts.list_staff_for_pin_login()
-
       {:ok,
        socket
        |> assign(:page_title, "Welcome back")
