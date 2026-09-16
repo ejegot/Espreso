@@ -63,6 +63,47 @@ dependencies {
 
 apply from: 'capacitor.build.gradle'
 
+// Cap CLI regenerates assets/capacitor.plugins.json from npm packages only.
+// Local EscPosPrinterPlugin is also registered in MainActivity; merge this file so
+// PluginManager discovery includes it at Bridge create (PluginHeaders / Cap.Plugins).
+tasks.register("mergeLocalCapacitorPlugins") {
+    description = "Merge local Capacitor plugin classpaths into capacitor.plugins.json"
+    def generated = file("src/main/assets/capacitor.plugins.json")
+    def localExtras = file("capacitor.plugins.local.json")
+    inputs.files(generated, localExtras)
+    outputs.file(generated)
+    doLast {
+        if (!localExtras.exists()) {
+            return
+        }
+        def slurper = new groovy.json.JsonSlurper()
+        def extras = slurper.parse(localExtras)
+        if (!(extras instanceof List) || extras.isEmpty()) {
+            return
+        }
+        def existing = generated.exists() ? slurper.parse(generated) : []
+        if (!(existing instanceof List)) {
+            existing = []
+        }
+        def byClasspath = new LinkedHashMap<String, Object>()
+        existing.each { entry ->
+            if (entry instanceof Map && entry.classpath) {
+                byClasspath[entry.classpath.toString()] = entry
+            }
+        }
+        extras.each { entry ->
+            if (entry instanceof Map && entry.classpath) {
+                byClasspath[entry.classpath.toString()] = entry
+            }
+        }
+        def merged = new ArrayList(byClasspath.values())
+        generated.parentFile.mkdirs()
+        generated.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(merged)) + "\n"
+    }
+}
+
+tasks.named("preBuild").configure { dependsOn("mergeLocalCapacitorPlugins") }
+
 try {
     def servicesJSON = file('google-services.json')
     if (servicesJSON.text) {

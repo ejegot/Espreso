@@ -18,6 +18,9 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // Cap 8.5.2 supported local-plugin registration: must run before super.onCreate
+        // so Bridge.Builder includes the class when registerAllPlugins() runs and
+        // JSExport.getPluginJS() builds Cap.Plugins / PluginHeaders.
         registerPlugin(EscPosPrinterPlugin.class);
 
         // Register before super.onCreate so the first WebView page load cannot miss injection.
@@ -39,14 +42,13 @@ public class MainActivity extends BridgeActivity {
 
         super.onCreate(savedInstanceState);
 
-        // Ensure EscPosPrinter is on the live Bridge map (Builder registration alone
-        // was insufficient at runtime: Bridge.getPlugin("EscPosPrinter") == null).
+        // Assert only — do not late-register. bridge.registerPlugin after create cannot
+        // refresh the already-injected JS PluginHeaders / Cap.Plugins catalog.
         if (this.bridge != null) {
-            this.bridge.registerPlugin(EscPosPrinterPlugin.class);
             if (this.bridge.getPlugin("EscPosPrinter") != null) {
-                Logger.debug("EscPosPrinter registered on live Bridge");
+                Logger.debug("EscPosPrinter present on Bridge after create");
             } else {
-                Logger.error("EscPosPrinter missing from live Bridge after registerPlugin");
+                Logger.error("EscPosPrinter missing from Bridge after create");
             }
             injectNativeShell(this.bridge.getWebView());
         }
