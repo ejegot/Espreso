@@ -10236,6 +10236,214 @@ body:has(.staff-nav-drawer.is-open) {
   color: color-mix(in srgb, var(--cs-brown) 70%, var(--cs-beige));
 }
 
+/*
+  Shop Samsung tablet (counter) — landscape 16:10, coarse pointer.
+  Phase 1: shared staff shell / nav / form / admin foundation only.
+  Scoped to .staff-app so customer pages are unchanged.
+  Does not redesign Home/Dashboard cards or POS product layout.
+*/
+@media (min-width: 900px) and (max-width: 1400px) and (orientation: landscape) and (pointer: coarse) {
+  /* —— 1. Staff shell typography —— */
+  .staff-app .staff-shell-bar {
+    gap: 0.45rem 0.65rem;
+    padding: 0.55rem 0.85rem 0.28rem;
+  }
+
+  .staff-app .staff-shell-brand-label {
+    font-size: 0.75rem;
+  }
+
+  .staff-app .staff-shell-title {
+    font-size: 1.2rem;
+  }
+
+  .staff-app .staff-shell-user {
+    font-size: 0.85rem;
+  }
+
+  .staff-app .staff-shell-nav {
+    gap: 0.35rem;
+    padding: 0 0.85rem 0.45rem;
+  }
+
+  /* —— 2. Primary navigation —— */
+  .staff-app .staff-shell-nav-link {
+    min-height: 2.85rem;
+    padding: 0.4rem 1rem;
+    font-size: 0.98rem;
+  }
+
+  .staff-app .staff-nav-menu-open--top {
+    min-height: 2.85rem;
+    min-width: 2.85rem;
+    padding: 0.4rem 0.95rem;
+    font-size: 0.98rem;
+  }
+
+  .staff-app .staff-nav-menu-open-icon {
+    width: 1.3rem;
+    height: 1.3rem;
+  }
+
+  /* —— 3. Notification control —— */
+  .staff-app .staff-notif-bell {
+    width: 2.65rem;
+    height: 2.65rem;
+    min-width: 2.65rem;
+    min-height: 2.65rem;
+  }
+
+  .staff-app .staff-shell-tools--orders .staff-notif-bell {
+    width: 2.65rem;
+    height: 2.65rem;
+    min-width: 2.65rem;
+    min-height: 2.65rem;
+  }
+
+  /* —— 4. Shared touch-target floor (selected controls only) —— */
+  .staff-app .staff-shell-tool,
+  .staff-app .staff-shell-logout {
+    min-height: 2.75rem;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.88rem;
+  }
+
+  .staff-app .staff-nav-drawer-link {
+    min-height: 3rem;
+    padding: 0.6rem 0.85rem;
+    font-size: 1rem;
+  }
+
+  .staff-app .staff-nav-drawer-close {
+    width: 2.75rem;
+    height: 2.75rem;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+
+  .staff-app .staff-team-btn,
+  .staff-app .staff-team-add-toggle {
+    min-height: 2.85rem;
+    font-size: 0.95rem;
+  }
+
+  .staff-app .staff-refresh {
+    min-height: 2.75rem;
+  }
+
+  .staff-app .staff-attendance-date-btn {
+    min-height: 2.75rem;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  /* —— 5. Admin content width —— */
+  .staff-app .staff-admin-main {
+    width: min(calc(100% - 1.5rem), 40rem);
+  }
+
+  .staff-app .staff-reports {
+    max-width: 40rem;
+  }
+
+  /* —— 6. Shared form scale —— */
+  .staff-app .staff-auth-form label,
+  .staff-app .staff-auth-field > span,
+  .staff-app .staff-customer-field span,
+  .staff-app .staff-team-edit-label,
+  .staff-app .staff-team-pin-label,
+  .staff-app .staff-reports-field span,
+  .staff-app .staff-attendance-date-field span,
+  .staff-app .staff-transactions-filters label,
+  .staff-app .staff-cash-out-field,
+  .staff-app .staff-cash-out-field > span,
+  .staff-app .staff-shift-close-field,
+  .staff-app .staff-shift-close-field > span,
+  .staff-app .staff-shift-close-section-label {
+    font-size: 0.88rem;
+  }
+
+  .staff-app .staff-auth-form input:not([type="checkbox"]):not([type="hidden"]),
+  .staff-app .staff-auth-form select,
+  .staff-app .staff-auth-form textarea,
+  .staff-app .staff-auth-field input,
+  .staff-app .staff-auth-select,
+  .staff-app .staff-team-input,
+  .staff-app .staff-customer-field input,
+  .staff-app .staff-reports-field input,
+  .staff-app .staff-attendance-date-field input,
+  .staff-app .staff-transactions-filters input,
+  .staff-app .staff-transactions-filters select,
+  .staff-app .staff-cash-out-input:not(.staff-cash-out-input--notes),
+  .staff-app .staff-cash-out-select,
+  .staff-app .staff-cash-out-input-wrap,
+  .staff-app .staff-shift-close-input:not(.staff-shift-close-input--notes),
+  .staff-app .staff-shift-close-input-wrap {
+    min-height: 3rem;
+  }
+
+  .staff-app .staff-shift-close-input--notes,
+  .staff-app .staff-cash-out-input--notes {
+    min-height: 3.5rem;
+  }
+
+  .staff-app .staff-auth-form .menu-basket-checkout,
+  .staff-app .staff-customer-search-actions button,
+  .staff-app .staff-reports-export-btn,
+  .staff-app .staff-cash-out-submit,
+  .staff-app .staff-shift-close-submit {
+    min-height: 3rem;
+  }
+
+  .staff-app .staff-auth-lede,
+  .staff-app .staff-home-lede,
+  .staff-app .staff-customer-hint,
+  .staff-app .staff-customer-head > div > p:last-child,
+  .staff-app .staff-reports-head p,
+  .staff-app .staff-team-lede {
+    font-size: 0.9rem;
+  }
+
+  /* —— 7. Section eyebrows / secondary text —— */
+  .staff-app .staff-home-desk-eyebrow,
+  .staff-app .staff-home-card-eyebrow,
+  .staff-app .staff-team-eyebrow,
+  .staff-app .staff-customer-eyebrow,
+  .staff-app .staff-reports-eyebrow,
+  .staff-app .staff-attendance-eyebrow,
+  .staff-app .staff-attendance-section-label,
+  .staff-app .staff-cash-out-section-label,
+  .staff-app .staff-admin-heading,
+  .staff-app .staff-home-pos-cta-kicker,
+  .staff-app .staff-home-shortcut-eyebrow,
+  .staff-app .staff-home-today-eyebrow {
+    font-size: 0.75rem;
+  }
+
+  /* —— 8. Home/Dashboard shared text (foundation only) —— */
+  .staff-app .staff-home-tool-body {
+    font-size: 0.82rem;
+  }
+
+  .staff-app .staff-home-tool-label {
+    font-size: 0.95rem;
+  }
+
+  .staff-app .dashboard-page .staff-home-card-body,
+  .staff-app .dashboard-page .dashboard-card-metric {
+    font-size: 1rem;
+  }
+
+  /* —— 9. Paid breakdown / shared table text —— */
+  .staff-app .staff-paid-breakdown-row {
+    font-size: 0.95rem;
+  }
+
+  .staff-app .staff-paid-breakdown-count {
+    font-size: 0.88rem;
+  }
+}
+
 /* —— Staff Orders KDS workboard (tablet-first) —— */
 .staff-app .staff-orders-page,
 .staff-orders-page {
