@@ -115,6 +115,7 @@ defmodule EspresoWeb.StaffLoginLive do
                 width="1024"
                 height="1024"
                 decoding="async"
+                fetchpriority="low"
               />
             </header>
 
@@ -427,14 +428,21 @@ defmodule EspresoWeb.StaffLoginLive do
         </main>
 
         <aside class="staff-auth-visual" aria-hidden="true">
-          <img
-            src={~p"/images/elilai-kafe/login-brand-panel.jpg"}
-            alt=""
-            class="staff-auth-visual-img"
-            width="1084"
-            height="1310"
-            decoding="async"
-          />
+          <picture class="staff-auth-visual-picture">
+            <source
+              srcset={~p"/images/elilai-kafe/login-brand-panel.webp"}
+              type="image/webp"
+            />
+            <img
+              src={~p"/images/elilai-kafe/login-brand-panel.jpg"}
+              alt=""
+              class="staff-auth-visual-img"
+              width="1084"
+              height="1310"
+              decoding="async"
+              fetchpriority="high"
+            />
+          </picture>
 
           <svg
             class="staff-auth-wave staff-auth-wave--bottom"

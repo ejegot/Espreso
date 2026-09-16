@@ -30,8 +30,18 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
     assert html =~ ~s(href="/images/elilai-kafe/apple-touch-icon.png")
     assert html =~ ~s(name="apple-mobile-web-app-title")
 
+    # Employee login fonts: DM Sans + Instrument Serif only (not Fraunces/Figtree).
+    assert html =~ "family=DM+Sans"
+    assert html =~ "family=Instrument+Serif"
+    refute html =~ "family=Fraunces"
+    refute html =~ "family=Figtree"
+
     assert has_element?(view, "img.staff-auth-logo")
     assert html =~ "/images/elilai-kafe/elilai-kafe-mark.png"
+    assert has_element?(
+             view,
+             "aside.staff-auth-visual source[type='image/webp'][srcset='/images/elilai-kafe/login-brand-panel.webp']"
+           )
 
     assert has_element?(view, "h1.staff-auth-title")
 
