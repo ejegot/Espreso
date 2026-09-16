@@ -108,15 +108,22 @@ defmodule EspresoWeb.StaffLoginLive do
         <main class="staff-auth-panel">
           <div class="staff-auth-panel-inner staff-auth-panel-inner--login">
             <header class="staff-auth-brand">
-              <img
-                src={~p"/images/elilai-kafe/elilai-kafe-mark.png"}
-                alt="Elilai Kafe"
-                class="staff-auth-logo staff-auth-logo--mark"
-                width="1024"
-                height="1024"
-                decoding="async"
-                fetchpriority="low"
-              />
+              <picture class="staff-auth-logo-picture">
+                <source
+                  srcset={~p"/images/elilai-kafe/elilai-kafe-mark-login.webp"}
+                  type="image/webp"
+                />
+                <img
+                  src={~p"/images/elilai-kafe/elilai-kafe-mark-login.png"}
+                  alt=""
+                  class="staff-auth-logo staff-auth-logo--mark"
+                  width="512"
+                  height="512"
+                  decoding="async"
+                  fetchpriority="low"
+                />
+              </picture>
+              <p class="staff-auth-wordmark">ELILAI KAFE</p>
             </header>
 
             <h1 class="staff-auth-title">{login_title(@login_mode)}</h1>

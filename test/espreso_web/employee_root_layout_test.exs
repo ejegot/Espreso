@@ -36,8 +36,13 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
     refute html =~ "family=Fraunces"
     refute html =~ "family=Figtree"
 
-    assert has_element?(view, "img.staff-auth-logo")
-    assert html =~ "/images/elilai-kafe/elilai-kafe-mark.png"
+    assert has_element?(
+             view,
+             "header.staff-auth-brand img.staff-auth-logo[src='/images/elilai-kafe/elilai-kafe-mark-login.png']"
+           )
+    assert html =~ "/images/elilai-kafe/elilai-kafe-mark-login.webp"
+    assert has_element?(view, "header.staff-auth-brand p.staff-auth-wordmark", "ELILAI KAFE")
+    refute html =~ "/images/elilai-kafe/elilai-kafe-mark.png"
     assert has_element?(
              view,
              "aside.staff-auth-visual source[type='image/webp'][srcset='/images/elilai-kafe/login-brand-panel.webp']"
