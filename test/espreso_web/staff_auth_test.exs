@@ -675,6 +675,14 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(view, ".staff-auth-page--approved")
     assert has_element?(view, ".staff-auth-stage")
     assert has_element?(view, "aside.staff-auth-visual img.staff-auth-visual-img")
+    assert has_element?(
+             view,
+             "aside.staff-auth-visual source[type='image/webp'][srcset='/images/elilai-kafe/login-brand-panel.webp']"
+           )
+    assert has_element?(
+             view,
+             "aside.staff-auth-visual img.staff-auth-visual-img[src='/images/elilai-kafe/login-brand-panel.jpg'][width='1084'][height='1310']"
+           )
     assert has_element?(view, "#staff-pin-login")
     assert has_element?(view, "#staff-roster-search")
     assert has_element?(view, "#staff-pin-local[phx-hook='StaffPinPad']")
