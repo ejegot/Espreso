@@ -1,0 +1,6 @@
+[
+	{
+		"pkg": "ph.elilai.kafe",
+		"classpath": "ph.elilai.kafe.printer.EscPosPrinterPlugin"
+	}
+]
