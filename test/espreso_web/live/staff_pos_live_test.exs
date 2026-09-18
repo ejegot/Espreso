@@ -1274,6 +1274,76 @@ defmodule EspresoWeb.StaffPosLiveTest do
              "#pos-confirm-cash[disabled][data-dismiss-keyboard]",
              "Confirm Payment"
            )
+
+    refute has_element?(view, "#cash-tender-modal-container[phx-click-away]")
+    assert has_element?(view, ~s(#cash-tender-modal-container[phx-key="escape"]))
+    assert has_element?(view, ~s(#cash-tender-modal-container[phx-window-keydown]))
+    refute has_element?(view, "#pos-cash-tendered[autofocus]")
+    assert has_element?(view, ~s(#pos-cancel-cash[type="button"]))
+    assert has_element?(view, ~s(#cash-tender-modal button[aria-label="close"]))
+  end
+
+  test "Cash Received Exact fills tender without confirming; cancel and escape still close", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> form("#pos-order-form") |> render_submit()
+
+    assert has_element?(view, "#cash-tender-modal")
+    refute has_element?(view, "#cash-tender-modal-container[phx-click-away]")
+
+    view |> element("#pos-cash-exact") |> render_click()
+
+    assert has_element?(view, "#cash-tender-modal")
+    assert has_element?(view, ~s(#pos-cash-tendered[value="75.00"]))
+    assert has_element?(view, "#pos-cash-tender-feedback", "Exact cash")
+    refute has_element?(view, "#pos-confirm-cash[disabled]")
+    assert Orders.list_active_orders() == []
+    assert live_assigns(view).cash_tender_open? == true
+
+    assert has_element?(view, ~s(#cash-tender-modal-container[phx-key="escape"]))
+    assert has_element?(view, ~s(#cash-tender-modal-container[phx-window-keydown]))
+    assert has_element?(view, ~s(#pos-cancel-cash[type="button"]))
+    assert has_element?(view, ~s(#cash-tender-modal button[aria-label="close"]))
+
+    html = render(view)
+    assert html =~ ~s(id="pos-cancel-cash")
+    assert html =~ "data-cancel"
+    assert html =~ ~s(phx-key="escape")
+
+    view |> render_click("cancel_cash_tender", %{})
+    refute has_element?(view, "#cash-tender-modal")
+    assert Orders.list_active_orders() == []
+    assert live_assigns(view).cash_tender_open? == false
+
+    view |> form("#pos-order-form") |> render_submit()
+    assert has_element?(view, "#cash-tender-modal")
+    assert has_element?(view, ~s(#cash-tender-modal-container[phx-key="escape"]))
+    assert has_element?(view, ~s(#cash-tender-modal-container[phx-window-keydown]))
+
+    view |> render_click("cancel_cash_tender", %{})
+    refute has_element?(view, "#cash-tender-modal")
+    assert Orders.list_active_orders() == []
+
+    view |> form("#pos-order-form") |> render_submit()
+    view |> element("#pos-cash-exact") |> render_click()
+    token = live_assigns(view).cash_tender_token
+
+    view
+    |> form("#pos-cash-tender-form", %{
+      "cash_tender_token" => token,
+      "cash_tendered" => "75.00"
+    })
+    |> render_submit()
+
+    refute has_element?(view, "#cash-tender-modal")
+    [order] = Orders.list_active_orders()
+    assert order.paid_via == "cash"
+    assert order.payment_status == "paid"
+    assert Decimal.equal?(order.cash_tendered, Decimal.new("75.00"))
   end
 
   test "cancelling Cash Received preserves the ticket and clears tender state", %{

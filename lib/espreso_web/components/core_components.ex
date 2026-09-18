@@ -36,17 +36,22 @@ defmodule EspresoWeb.CoreComponents do
         This is another modal.
       </.modal>
 
+  Set `click_away={false}` to ignore outside clicks. Set `autofocus={false}`
+  to focus the dialog panel instead of the first field.
+
   """
   attr :id, :string, required: true
   attr :show, :boolean, default: false
   attr :on_cancel, JS, default: %JS{}
+  attr :click_away, :boolean, default: true
+  attr :autofocus, :boolean, default: true
   slot :inner_block, required: true
 
   def modal(assigns) do
     ~H"""
     <div
       id={@id}
-      phx-mounted={@show && show_modal(@id)}
+      phx-mounted={@show && show_modal(%JS{}, @id, @autofocus)}
       phx-remove={hide_modal(@id)}
       data-cancel={JS.exec(@on_cancel, "phx-remove")}
       class="relative z-50 hidden"
@@ -64,9 +69,10 @@ defmodule EspresoWeb.CoreComponents do
           <div class="w-full max-w-3xl p-4 sm:p-6 lg:py-8">
             <.focus_wrap
               id={"#{@id}-container"}
+              tabindex={if(!@autofocus, do: "-1")}
               phx-window-keydown={JS.exec("data-cancel", to: "##{@id}")}
               phx-key="escape"
-              phx-click-away={JS.exec("data-cancel", to: "##{@id}")}
+              phx-click-away={if(@click_away, do: JS.exec("data-cancel", to: "##{@id}"))}
               class="shadow-zinc-700/10 ring-zinc-700/10 relative hidden rounded-2xl bg-white p-14 shadow-lg ring-1 transition"
             >
               <div class="absolute top-6 right-5">
@@ -1120,17 +1126,27 @@ defmodule EspresoWeb.CoreComponents do
     )
   end
 
-  def show_modal(js \\ %JS{}, id) when is_binary(id) do
-    js
-    |> JS.show(to: "##{id}")
-    |> JS.show(
-      to: "##{id}-bg",
-      time: 300,
-      transition: {"transition-all transform ease-out duration-300", "opacity-0", "opacity-100"}
-    )
-    |> show("##{id}-container")
-    |> JS.add_class("overflow-hidden", to: "body")
-    |> JS.focus_first(to: "##{id}-content")
+  def show_modal(id) when is_binary(id), do: show_modal(%JS{}, id, true)
+
+  def show_modal(%JS{} = js, id) when is_binary(id), do: show_modal(js, id, true)
+
+  def show_modal(%JS{} = js, id, autofocus?) when is_binary(id) and is_boolean(autofocus?) do
+    js =
+      js
+      |> JS.show(to: "##{id}")
+      |> JS.show(
+        to: "##{id}-bg",
+        time: 300,
+        transition: {"transition-all transform ease-out duration-300", "opacity-0", "opacity-100"}
+      )
+      |> show("##{id}-container")
+      |> JS.add_class("overflow-hidden", to: "body")
+
+    if autofocus? do
+      JS.focus_first(js, to: "##{id}-content")
+    else
+      JS.focus(js, to: "##{id}-container")
+    end
   end
 
   def hide_modal(js \\ %JS{}, id) do
