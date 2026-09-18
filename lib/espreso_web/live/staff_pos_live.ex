@@ -1518,7 +1518,13 @@ defmodule EspresoWeb.StaffPosLive do
       |> assign(:confirm_enabled?, cash_tender_valid?(tender_state))
 
     ~H"""
-    <.modal id="cash-tender-modal" show={true} on_cancel={JS.push("cancel_cash_tender")}>
+    <.modal
+      id="cash-tender-modal"
+      show={true}
+      on_cancel={JS.push("cancel_cash_tender")}
+      click_away={false}
+      autofocus={false}
+    >
       <div class="staff-pos-cash-modal">
         <header class="staff-pos-cash-modal-head">
           <p class="staff-pos-cash-modal-eyebrow">Cash payment</p>
