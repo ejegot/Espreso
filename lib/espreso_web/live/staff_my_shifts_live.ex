@@ -25,7 +25,12 @@ defmodule EspresoWeb.StaffMyShiftsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.staff_shell current={:my_shifts} current_user={@current_user} page_title="My shifts" chrome={:bar}>
+    <.staff_shell
+      current={:my_shifts}
+      current_user={@current_user}
+      page_title="My shifts"
+      chrome={:bar}
+    >
       <main class="staff-my-shifts" id="staff-my-shifts">
         <header class="staff-my-shifts-head">
           <div>
@@ -35,72 +40,74 @@ defmodule EspresoWeb.StaffMyShiftsLive do
           </div>
         </header>
 
-        <section
-          :if={@current_shift}
-          class="staff-my-shifts-current"
-          id="my-shifts-current"
-          aria-label="Current shift"
-        >
-          <p class="staff-my-shifts-section-label">Current shift</p>
-          <div class="staff-my-shift-card staff-my-shift-card--open">
-            <div class="staff-my-shift-card-main">
-              <p class="staff-my-shift-when">
-                {format_shift_date(@current_shift.shift.started_at)} · {format_shop_time(
-                  @current_shift.shift.started_at
-                )}
-                <span aria-hidden="true">·</span>
-                <span class="staff-badge staff-my-shift-open-badge">OPEN</span>
-              </p>
-              <p class="staff-my-shift-sales">
-                {format_orders(@current_shift.sales.order_count)} · {Menu.format_price(
-                  @current_shift.sales.total
-                )}
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section class="staff-my-shifts-history" aria-label="Recent shifts">
-          <p :if={@history_shifts != []} class="staff-my-shifts-section-label">Recent shifts</p>
-
-          <div :if={@history_shifts != []} class="staff-my-shifts-list" id="my-shifts-history">
-            <article
-              :for={entry <- @history_shifts}
-              class="staff-my-shift-row"
-              id={"my-shift-#{entry.shift.id}"}
-            >
-              <div class="staff-my-shift-row-main">
+        <div class="staff-my-shifts-desk">
+          <section
+            :if={@current_shift}
+            class="staff-my-shifts-current"
+            id="my-shifts-current"
+            aria-label="Current shift"
+          >
+            <p class="staff-my-shifts-section-label">Current shift</p>
+            <div class="staff-my-shift-card staff-my-shift-card--open">
+              <div class="staff-my-shift-card-main">
                 <p class="staff-my-shift-when">
-                  {format_shift_range(entry.shift)}
+                  {format_shift_date(@current_shift.shift.started_at)} · {format_shop_time(
+                    @current_shift.shift.started_at
+                  )}
+                  <span aria-hidden="true">·</span>
+                  <span class="staff-badge staff-my-shift-open-badge">OPEN</span>
                 </p>
                 <p class="staff-my-shift-sales">
-                  {format_orders(entry.sales.order_count)} · {Menu.format_price(entry.sales.total)}
+                  {format_orders(@current_shift.sales.order_count)} · {Menu.format_price(
+                    @current_shift.sales.total
+                  )}
                 </p>
               </div>
-            </article>
-          </div>
+            </div>
+          </section>
 
-          <button
-            :if={@history_has_next?}
-            type="button"
-            id="my-shifts-history-more"
-            class="staff-my-shifts-history-more"
-            phx-click="load_more_shift_history"
-          >
-            Load more
-          </button>
+          <section class="staff-my-shifts-history" aria-label="Recent shifts">
+            <p :if={@history_shifts != []} class="staff-my-shifts-section-label">Recent shifts</p>
 
-          <div
-            :if={is_nil(@current_shift) and @history_shifts == []}
-            class="staff-my-shifts-empty"
-            id="my-shifts-empty"
-          >
-            <strong>No shift history yet.</strong>
-            <p class="staff-my-shifts-empty-hint">
-              Your shifts appear here after you sign in and work a session.
-            </p>
-          </div>
-        </section>
+            <div :if={@history_shifts != []} class="staff-my-shifts-list" id="my-shifts-history">
+              <article
+                :for={entry <- @history_shifts}
+                class="staff-my-shift-row"
+                id={"my-shift-#{entry.shift.id}"}
+              >
+                <div class="staff-my-shift-row-main">
+                  <p class="staff-my-shift-when">
+                    {format_shift_range(entry.shift)}
+                  </p>
+                  <p class="staff-my-shift-sales">
+                    {format_orders(entry.sales.order_count)} · {Menu.format_price(entry.sales.total)}
+                  </p>
+                </div>
+              </article>
+            </div>
+
+            <button
+              :if={@history_has_next?}
+              type="button"
+              id="my-shifts-history-more"
+              class="staff-my-shifts-history-more"
+              phx-click="load_more_shift_history"
+            >
+              Load more
+            </button>
+
+            <div
+              :if={is_nil(@current_shift) and @history_shifts == []}
+              class="staff-my-shifts-empty"
+              id="my-shifts-empty"
+            >
+              <strong>No shift history yet.</strong>
+              <p class="staff-my-shifts-empty-hint">
+                Your shifts appear here after you sign in and work a session.
+              </p>
+            </div>
+          </section>
+        </div>
       </main>
     </.staff_shell>
     """

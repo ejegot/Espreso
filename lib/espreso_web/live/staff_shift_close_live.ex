@@ -302,187 +302,189 @@ defmodule EspresoWeb.StaffShiftCloseLive do
             </div>
           </section>
         <% else %>
-          <section
-            :if={@blocked?}
-            class="staff-shift-close-blocked"
-            id="staff-shift-close-blocked"
-            role="status"
-          >
-            <p class="staff-shift-close-blocked-title">Cannot close yet</p>
-            <p class="staff-shift-close-blocked-copy" id="staff-shift-close-blocked-copy">
-              <%= if @block_reason == :not_on_shift do %>
-                You need an open staff shift to close the shop. Log in again if your shift already ended.
-              <% else %>
-                Another staff member is still on shift. They need to Time Out before you can Close Shift.
-              <% end %>
-            </p>
-            <ul
-              :if={@other_active_names != []}
-              class="staff-shift-close-blocked-list"
-              id="staff-shift-close-blocked-staff"
-            >
-              <li :for={name <- @other_active_names}>{name}</li>
-            </ul>
-            <div class="staff-shift-close-nav">
-              <.link navigate={~p"/staff"} class="staff-shell-tool">Back to Home</.link>
-            </div>
-          </section>
-
-          <section
-            :if={!@blocked?}
-            class="staff-shift-close-cash"
-            id="staff-shift-close-cash"
-            aria-label="Cash settled"
-          >
-            <p class="staff-shift-close-section-label">Cash settled</p>
-            <p class="staff-shift-close-cash-value">{Menu.format_price(@cash_total)}</p>
-            <p class="staff-shift-close-section-hint">Cash payments recorded as paid today.</p>
-          </section>
-
-          <section
-            :if={!@blocked?}
-            class="staff-shift-close-cash-outs"
-            id="staff-shift-close-cash-outs"
-            aria-label="Cash outs"
-          >
-            <p class="staff-shift-close-section-label">Cash Outs</p>
-            <p class="staff-shift-close-cash-value" id="staff-shift-close-cash-out-total">
-              {Menu.format_price(@cash_out_total)}
-            </p>
-            <p class="staff-shift-close-section-hint">
-              Drawer withdrawals recorded today (non-voided).
-            </p>
-            <ul
-              :if={@cash_outs != []}
-              class="staff-shift-close-cash-out-list"
-              id="staff-shift-close-cash-out-list"
-            >
-              <li :for={entry <- @cash_outs} class="staff-shift-close-cash-out-row">
-                <span class="staff-shift-close-cash-out-amount">
-                  {Menu.format_price(entry.amount)}
-                </span>
-                <span class="staff-shift-close-cash-out-category">{entry.category}</span>
-                <span :if={entry.note} class="staff-shift-close-cash-out-note">{entry.note}</span>
-              </li>
-            </ul>
-            <p :if={@cash_outs == []} class="staff-shift-close-section-hint">
-              No Cash Outs recorded today.
-            </p>
-          </section>
-
-          <form
-            :if={!@blocked?}
-            id="staff-shift-close-form"
-            phx-change="validate"
-            phx-submit="prepare_close"
-            class="staff-shift-close-form"
-          >
-            <label class="staff-shift-close-field" id="staff-shift-close-counted-field">
-              <span>Counted drawer cash</span>
-              <div class="staff-shift-close-input-wrap">
-                <span class="staff-shift-close-currency" aria-hidden="true">₱</span>
-                <input
-                  type="text"
-                  name="close[counted_cash]"
-                  value={@counted_cash}
-                  inputmode="decimal"
-                  placeholder="0.00"
-                  class="staff-shift-close-input"
-                  aria-describedby="staff-shift-close-counted-hint"
-                />
-              </div>
-              <span class="staff-shift-close-section-hint" id="staff-shift-close-counted-hint">
-                Optional — enter the cash physically counted at close.
-              </span>
-            </label>
-
-            <label class="staff-shift-close-field">
-              <span>Notes</span>
-              <textarea
-                name="close[notes]"
-                rows="2"
-                maxlength="500"
-                placeholder="Optional"
-                class="staff-shift-close-input staff-shift-close-input--notes"
-              >{@notes}</textarea>
-            </label>
-
+          <div class="staff-shift-close-desk">
             <section
-              class="staff-shift-close-panel staff-shift-close-panel--secondary"
-              aria-label="Payment methods"
+              :if={@blocked?}
+              class="staff-shift-close-blocked"
+              id="staff-shift-close-blocked"
+              role="status"
             >
-              <p class="staff-shift-close-section-label">Payment methods</p>
-              <ul class="staff-paid-breakdown" id="staff-shift-close-breakdown">
-                <li :for={row <- @via_rows} class="staff-paid-breakdown-row">
-                  <span class="staff-paid-breakdown-label">{row.label}</span>
-                  <span class="staff-paid-breakdown-total">{Menu.format_price(row.total)}</span>
-                  <span class="staff-paid-breakdown-count">{row.count}</span>
-                </li>
-              </ul>
-            </section>
-
-            <div
-              class="staff-shift-close-system"
-              id="staff-shift-close-system"
-              aria-label="System paid"
-            >
-              <p class="staff-shift-close-section-label">System paid</p>
-              <p class="staff-shift-close-system-value">
-                {Menu.format_price(@breakdown.total)}
-                <span>({@breakdown.count} orders)</span>
-              </p>
-              <p class="staff-shift-close-section-hint">Total settled sales recorded today.</p>
-            </div>
-
-            <p :if={@form_error} class="staff-shift-close-error" id="staff-shift-close-error">
-              {@form_error}
-            </p>
-
-            <div :if={@confirming?} class="staff-shift-close-confirm" id="staff-shift-close-confirm">
-              <p class="staff-shift-close-confirm-title">Record today’s close?</p>
-              <p class="staff-shift-close-confirm-copy">
-                This will seal today’s recorded paid sales and save the cash count you entered.
-                <span :if={barista?(@current_user)}>
-                  Your staff shift will also end (Time Out).
-                </span>
-              </p>
-              <p class="staff-shift-close-confirm-cash" id="staff-shift-close-confirm-cash">
-                <%= if String.trim(@counted_cash || "") == "" do %>
-                  No drawer cash count entered.
+              <p class="staff-shift-close-blocked-title">Cannot close yet</p>
+              <p class="staff-shift-close-blocked-copy" id="staff-shift-close-blocked-copy">
+                <%= if @block_reason == :not_on_shift do %>
+                  You need an open staff shift to close the shop. Log in again if your shift already ended.
                 <% else %>
-                  Counted drawer cash · ₱{@counted_cash}
+                  Another staff member is still on shift. They need to Time Out before you can Close Shift.
                 <% end %>
               </p>
-              <div class="staff-shift-close-confirm-actions">
-                <button
-                  type="button"
-                  class="staff-shift-close-submit"
-                  id="staff-shift-close-submit"
-                  phx-click="record_close"
-                  phx-disable-with="Recording…"
-                >
-                  Confirm seal
-                </button>
-                <button
-                  type="button"
-                  class="staff-shell-tool staff-shell-tool--quiet"
-                  id="staff-shift-close-cancel-confirm"
-                  phx-click="cancel_confirm"
-                >
-                  Cancel
-                </button>
+              <ul
+                :if={@other_active_names != []}
+                class="staff-shift-close-blocked-list"
+                id="staff-shift-close-blocked-staff"
+              >
+                <li :for={name <- @other_active_names}>{name}</li>
+              </ul>
+              <div class="staff-shift-close-nav">
+                <.link navigate={~p"/staff"} class="staff-shell-tool">Back to Home</.link>
               </div>
-            </div>
+            </section>
 
-            <button
-              :if={!@confirming?}
-              type="submit"
-              class="staff-shift-close-submit"
-              id="staff-shift-close-prepare"
+            <section
+              :if={!@blocked?}
+              class="staff-shift-close-cash"
+              id="staff-shift-close-cash"
+              aria-label="Cash settled"
             >
-              Record close
-            </button>
-          </form>
+              <p class="staff-shift-close-section-label">Cash settled</p>
+              <p class="staff-shift-close-cash-value">{Menu.format_price(@cash_total)}</p>
+              <p class="staff-shift-close-section-hint">Cash payments recorded as paid today.</p>
+            </section>
+
+            <section
+              :if={!@blocked?}
+              class="staff-shift-close-cash-outs"
+              id="staff-shift-close-cash-outs"
+              aria-label="Cash outs"
+            >
+              <p class="staff-shift-close-section-label">Cash Outs</p>
+              <p class="staff-shift-close-cash-value" id="staff-shift-close-cash-out-total">
+                {Menu.format_price(@cash_out_total)}
+              </p>
+              <p class="staff-shift-close-section-hint">
+                Drawer withdrawals recorded today (non-voided).
+              </p>
+              <ul
+                :if={@cash_outs != []}
+                class="staff-shift-close-cash-out-list"
+                id="staff-shift-close-cash-out-list"
+              >
+                <li :for={entry <- @cash_outs} class="staff-shift-close-cash-out-row">
+                  <span class="staff-shift-close-cash-out-amount">
+                    {Menu.format_price(entry.amount)}
+                  </span>
+                  <span class="staff-shift-close-cash-out-category">{entry.category}</span>
+                  <span :if={entry.note} class="staff-shift-close-cash-out-note">{entry.note}</span>
+                </li>
+              </ul>
+              <p :if={@cash_outs == []} class="staff-shift-close-section-hint">
+                No Cash Outs recorded today.
+              </p>
+            </section>
+
+            <form
+              :if={!@blocked?}
+              id="staff-shift-close-form"
+              phx-change="validate"
+              phx-submit="prepare_close"
+              class="staff-shift-close-form"
+            >
+              <label class="staff-shift-close-field" id="staff-shift-close-counted-field">
+                <span>Counted drawer cash</span>
+                <div class="staff-shift-close-input-wrap">
+                  <span class="staff-shift-close-currency" aria-hidden="true">₱</span>
+                  <input
+                    type="text"
+                    name="close[counted_cash]"
+                    value={@counted_cash}
+                    inputmode="decimal"
+                    placeholder="0.00"
+                    class="staff-shift-close-input"
+                    aria-describedby="staff-shift-close-counted-hint"
+                  />
+                </div>
+                <span class="staff-shift-close-section-hint" id="staff-shift-close-counted-hint">
+                  Optional — enter the cash physically counted at close.
+                </span>
+              </label>
+
+              <label class="staff-shift-close-field">
+                <span>Notes</span>
+                <textarea
+                  name="close[notes]"
+                  rows="2"
+                  maxlength="500"
+                  placeholder="Optional"
+                  class="staff-shift-close-input staff-shift-close-input--notes"
+                >{@notes}</textarea>
+              </label>
+
+              <section
+                class="staff-shift-close-panel staff-shift-close-panel--secondary"
+                aria-label="Payment methods"
+              >
+                <p class="staff-shift-close-section-label">Payment methods</p>
+                <ul class="staff-paid-breakdown" id="staff-shift-close-breakdown">
+                  <li :for={row <- @via_rows} class="staff-paid-breakdown-row">
+                    <span class="staff-paid-breakdown-label">{row.label}</span>
+                    <span class="staff-paid-breakdown-total">{Menu.format_price(row.total)}</span>
+                    <span class="staff-paid-breakdown-count">{row.count}</span>
+                  </li>
+                </ul>
+              </section>
+
+              <div
+                class="staff-shift-close-system"
+                id="staff-shift-close-system"
+                aria-label="System paid"
+              >
+                <p class="staff-shift-close-section-label">System paid</p>
+                <p class="staff-shift-close-system-value">
+                  {Menu.format_price(@breakdown.total)}
+                  <span>({@breakdown.count} orders)</span>
+                </p>
+                <p class="staff-shift-close-section-hint">Total settled sales recorded today.</p>
+              </div>
+
+              <p :if={@form_error} class="staff-shift-close-error" id="staff-shift-close-error">
+                {@form_error}
+              </p>
+
+              <div :if={@confirming?} class="staff-shift-close-confirm" id="staff-shift-close-confirm">
+                <p class="staff-shift-close-confirm-title">Record today’s close?</p>
+                <p class="staff-shift-close-confirm-copy">
+                  This will seal today’s recorded paid sales and save the cash count you entered.
+                  <span :if={barista?(@current_user)}>
+                    Your staff shift will also end (Time Out).
+                  </span>
+                </p>
+                <p class="staff-shift-close-confirm-cash" id="staff-shift-close-confirm-cash">
+                  <%= if String.trim(@counted_cash || "") == "" do %>
+                    No drawer cash count entered.
+                  <% else %>
+                    Counted drawer cash · ₱{@counted_cash}
+                  <% end %>
+                </p>
+                <div class="staff-shift-close-confirm-actions">
+                  <button
+                    type="button"
+                    class="staff-shift-close-submit"
+                    id="staff-shift-close-submit"
+                    phx-click="record_close"
+                    phx-disable-with="Recording…"
+                  >
+                    Confirm seal
+                  </button>
+                  <button
+                    type="button"
+                    class="staff-shell-tool staff-shell-tool--quiet"
+                    id="staff-shift-close-cancel-confirm"
+                    phx-click="cancel_confirm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+
+              <button
+                :if={!@confirming?}
+                type="submit"
+                class="staff-shift-close-submit"
+                id="staff-shift-close-prepare"
+              >
+                Record close
+              </button>
+            </form>
+          </div>
         <% end %>
 
         <section

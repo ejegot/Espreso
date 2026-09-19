@@ -48,7 +48,8 @@ defmodule EspresoWeb.StaffReportsLive do
          |> assign(:to_date, to_date)
          |> assign(:form_error, nil)
          |> redirect(
-           to: ~p"/staff/reports/export?from=#{Date.to_iso8601(from_date)}&to=#{Date.to_iso8601(to_date)}"
+           to:
+             ~p"/staff/reports/export?from=#{Date.to_iso8601(from_date)}&to=#{Date.to_iso8601(to_date)}"
          )}
 
       {from_date, to_date, error} ->
@@ -63,7 +64,12 @@ defmodule EspresoWeb.StaffReportsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.staff_shell current={:reports} current_user={@current_user} page_title="Sales Report" chrome={:bar}>
+    <.staff_shell
+      current={:reports}
+      current_user={@current_user}
+      page_title="Sales Report"
+      chrome={:bar}
+    >
       <main class="staff-reports" id="staff-reports">
         <header class="staff-reports-head">
           <div>
@@ -100,20 +106,20 @@ defmodule EspresoWeb.StaffReportsLive do
                   required
                 />
               </label>
+
+              <button
+                type="submit"
+                id="staff-reports-export"
+                class="staff-reports-export-btn"
+                disabled={not is_nil(@form_error)}
+              >
+                Export Excel
+              </button>
             </div>
 
             <p :if={@form_error} class="staff-reports-error" id="staff-reports-error" role="alert">
               {@form_error}
             </p>
-
-            <button
-              type="submit"
-              id="staff-reports-export"
-              class="staff-reports-export-btn"
-              disabled={not is_nil(@form_error)}
-            >
-              Export Excel
-            </button>
           </form>
         </section>
       </main>

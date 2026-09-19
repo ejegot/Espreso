@@ -32,7 +32,7 @@ defmodule EspresoWeb.AdminUsersLiveTest do
   } do
     {:ok, view, html} = live(log_in(conn, owner), ~p"/admin/users")
 
-    assert has_element?(view, "#staff-team-page", "Staff management")
+    assert has_element?(view, ".staff-team-title", "Staff")
     assert has_element?(view, ".staff-team-eyebrow", "Team")
     assert has_element?(view, "#staff-team-summary", "Active")
     assert has_element?(view, "#staff-team-summary", "Disabled")
