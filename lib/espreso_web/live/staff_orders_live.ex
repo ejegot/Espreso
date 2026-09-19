@@ -530,7 +530,7 @@ defmodule EspresoWeb.StaffOrdersLive do
       |> assign(:actionable_received_count, actionable)
 
     ~H"""
-    <.staff_shell current={:orders} current_user={@current_user} page_title="Orders">
+    <.staff_shell current={:orders} current_user={@current_user} page_title="Orders" chrome={:bar}>
       <:tools>
         <a
           href="#orders-new"

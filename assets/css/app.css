@@ -5859,9 +5859,38 @@ a.staff-home-card:focus-visible {
   min-width: 2.45rem;
   height: 2.45rem;
   min-height: 2.45rem;
-  margin: 0 0 0 auto;
+  margin: 0;
   padding: 0;
   border-top: none;
+}
+
+.staff-pos-rail--bar .staff-pos-rail-end {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  min-width: 0;
+  margin-left: 0.4rem;
+}
+
+.staff-pos-rail--bar .staff-pos-rail-tools {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.staff-pos-rail--bar .staff-pos-rail-tools .staff-orders-header-tool,
+.staff-pos-rail--bar .staff-pos-rail-tools .staff-orders-reconciliation-toggle,
+.staff-pos-rail--bar .staff-pos-rail-tools .staff-orders-refresh {
+  min-height: 2.2rem;
+  padding-inline: 0.55rem;
+}
+
+.staff-pos-rail--bar .staff-notif {
+  flex: 0 0 auto;
 }
 
 .staff-pos-rail-brand-name {
@@ -10969,7 +10998,8 @@ body:has(.staff-nav-drawer.is-open) {
   flex: 0 0 auto;
 }
 
-.staff-app:has(.staff-orders-shell-root) .staff-shell-body {
+.staff-app:has(.staff-orders-shell-root) .staff-shell-body,
+.staff-app:has(.staff-orders-shell-root) .staff-shell-body--bar {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
