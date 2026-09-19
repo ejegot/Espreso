@@ -30,50 +30,41 @@ defmodule Espreso.Printer.Receipt do
         EscPos.bold_off(),
         EscPos.text_line(conf.address),
         EscPos.text_line("Owned and Operated by: Elilai Kafe"),
-        EscPos.feed(2),
+        EscPos.feed(1),
         EscPos.align_left(),
         EscPos.bold_on(),
         EscPos.text_line(employee_line(staff_name)),
         EscPos.bold_off(),
-        EscPos.feed(1),
         EscPos.separator(),
         EscPos.bold_on(),
         EscPos.text_line(fulfillment_line(order)),
         EscPos.bold_off(),
         EscPos.separator(),
-        EscPos.feed(1),
         EscPos.bold_on(),
         EscPos.text_line("Order #{order.number}"),
         EscPos.text_line(customer_line(order)),
         EscPos.bold_off(),
-        EscPos.feed(1),
-        EscPos.separator(),
-        EscPos.feed(1)
+        EscPos.separator()
       ] ++
         Enum.flat_map(items, &item_lines/1) ++
         [
           EscPos.separator(),
-          EscPos.feed(1),
           EscPos.bold_on(),
           EscPos.size_double_height(),
           EscPos.columns("TOTAL", money(order.total)),
-          EscPos.size_normal(),
-          EscPos.columns(Orders.paid_via_label(paid_via), money(order.total))
+          EscPos.size_normal()
         ] ++
-        cash_change_lines(order, opts) ++
+        payment_lines(order, paid_via, opts) ++
         [
           EscPos.bold_off(),
-          EscPos.feed(1),
           EscPos.separator(),
-          EscPos.feed(1),
           EscPos.align_center()
         ] ++
         wifi_block(conf) ++
         [
-          EscPos.feed(1),
           EscPos.align_left(),
           EscPos.columns(timestamp_line(order), "##{order.number}"),
-          EscPos.feed(3),
+          EscPos.feed(2),
           EscPos.cut()
         ]
     )
@@ -96,7 +87,6 @@ defmodule Espreso.Printer.Receipt do
         EscPos.size_normal(),
         EscPos.text_line(shop_name()),
         EscPos.bold_off(),
-        EscPos.feed(1),
         EscPos.align_left(),
         EscPos.bold_on(),
         EscPos.size_double_height(),
@@ -108,17 +98,26 @@ defmodule Espreso.Printer.Receipt do
       ] ++
         if(staff_name, do: [EscPos.text_line("Cashier: #{staff_name}")], else: []) ++
         [
-          EscPos.separator(),
-          EscPos.feed(1)
+          EscPos.separator()
         ] ++
         Enum.flat_map(items, &kitchen_item_lines/1) ++
         kitchen_notes(order) ++
         [
           EscPos.separator(),
-          EscPos.feed(3),
+          EscPos.feed(2),
           EscPos.cut()
         ]
     )
+  end
+
+  defp payment_lines(order, paid_via, opts) do
+    case cash_change_lines(order, opts) do
+      [] ->
+        [EscPos.columns(Orders.paid_via_label(paid_via), money(order.total))]
+
+      tender_lines ->
+        tender_lines
+    end
   end
 
   defp cash_change_lines(order, opts) do
@@ -127,7 +126,7 @@ defmodule Espreso.Printer.Receipt do
 
     if match?(%Decimal{}, tendered) and match?(%Decimal{}, change) do
       [
-        EscPos.columns("Cash", money(tendered)),
+        EscPos.columns("Tendered", money(tendered)),
         EscPos.columns("Change", money(change))
       ]
     else
@@ -144,8 +143,7 @@ defmodule Espreso.Printer.Receipt do
       EscPos.size_double_height(),
       EscPos.text_line("#{qty}x #{name}"),
       EscPos.size_normal(),
-      EscPos.bold_off(),
-      EscPos.feed(1)
+      EscPos.bold_off()
     ]
   end
 
@@ -160,8 +158,7 @@ defmodule Espreso.Printer.Receipt do
         EscPos.bold_on(),
         EscPos.text_line("NOTE"),
         EscPos.bold_off(),
-        EscPos.text_line(trimmed),
-        EscPos.feed(1)
+        EscPos.text_line(trimmed)
       ]
     end
   end
@@ -227,8 +224,7 @@ defmodule Espreso.Printer.Receipt do
       EscPos.bold_on(),
       EscPos.columns(name, line),
       EscPos.bold_off(),
-      EscPos.text_line("  #{qty} x #{unit}"),
-      EscPos.feed(1)
+      EscPos.text_line("  #{qty} x #{unit}")
     ]
   end
 
@@ -237,14 +233,11 @@ defmodule Espreso.Printer.Receipt do
     [
       EscPos.bold_on(),
       EscPos.text_line(conf.wifi_title),
-      EscPos.feed(1),
       EscPos.text_line("Today's Network: #{ssid}"),
       EscPos.text_line("Today's Access Code: #{password}"),
       EscPos.bold_off(),
-      EscPos.feed(1),
       EscPos.text_line("*#{conf.wifi_note}"),
       EscPos.text_line(conf.wifi_thanks),
-      EscPos.feed(1),
       EscPos.separator()
     ]
   end
