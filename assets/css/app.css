@@ -10104,6 +10104,77 @@ a.staff-home-card:focus-visible {
   line-height: 1.4;
 }
 
+#staff-team-confirm,
+#staff-shift-close-confirm,
+#staff-cash-out-void-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+}
+
+#staff-team-confirm-bg,
+#staff-shift-close-confirm-bg,
+#staff-cash-out-void-modal-bg {
+  background: rgba(24, 16, 12, 0.46);
+}
+
+#staff-team-confirm-container,
+#staff-shift-close-confirm-container,
+#staff-cash-out-void-modal-container {
+  width: min(100%, 24rem);
+  max-height: calc(100dvh - 2rem);
+  margin-inline: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 1.15rem 1.2rem 1.2rem;
+  padding-bottom: max(1.2rem, env(safe-area-inset-bottom));
+  border: 1px solid color-mix(in srgb, var(--elilai-forest, #394331) 16%, transparent);
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(24, 16, 12, 0.2);
+}
+
+.staff-confirm-dialog {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.staff-confirm-dialog-title {
+  margin: 0;
+  padding-right: 1.75rem;
+  color: var(--elilai-forest, #394331);
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.staff-confirm-dialog-copy,
+.staff-confirm-dialog-meta {
+  margin: 0;
+  color: color-mix(in srgb, var(--elilai-forest, #394331) 58%, #f4efe3);
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.staff-confirm-dialog-meta {
+  color: var(--elilai-forest, #394331);
+}
+
+.staff-confirm-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 0.55rem;
+}
+
+#staff-cash-out-void-modal .staff-cash-out-void-form {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.2rem 0 0;
+}
+
 @media (max-width: 520px) {
   .staff-team-summary {
     grid-template-columns: repeat(3, minmax(0, 1fr));

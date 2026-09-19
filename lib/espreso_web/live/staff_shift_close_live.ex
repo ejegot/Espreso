@@ -439,42 +439,6 @@ defmodule EspresoWeb.StaffShiftCloseLive do
                 {@form_error}
               </p>
 
-              <div :if={@confirming?} class="staff-shift-close-confirm" id="staff-shift-close-confirm">
-                <p class="staff-shift-close-confirm-title">Record today’s close?</p>
-                <p class="staff-shift-close-confirm-copy">
-                  This will seal today’s recorded paid sales and save the cash count you entered.
-                  <span :if={barista?(@current_user)}>
-                    Your staff shift will also end (Time Out).
-                  </span>
-                </p>
-                <p class="staff-shift-close-confirm-cash" id="staff-shift-close-confirm-cash">
-                  <%= if String.trim(@counted_cash || "") == "" do %>
-                    No drawer cash count entered.
-                  <% else %>
-                    Counted drawer cash · ₱{@counted_cash}
-                  <% end %>
-                </p>
-                <div class="staff-shift-close-confirm-actions">
-                  <button
-                    type="button"
-                    class="staff-shift-close-submit"
-                    id="staff-shift-close-submit"
-                    phx-click="record_close"
-                    phx-disable-with="Recording…"
-                  >
-                    Confirm seal
-                  </button>
-                  <button
-                    type="button"
-                    class="staff-shell-tool staff-shell-tool--quiet"
-                    id="staff-shift-close-cancel-confirm"
-                    phx-click="cancel_confirm"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-
               <button
                 :if={!@confirming?}
                 type="submit"
@@ -563,6 +527,51 @@ defmodule EspresoWeb.StaffShiftCloseLive do
             Load more
           </button>
         </section>
+
+        <.modal
+          :if={@confirming?}
+          id="staff-shift-close-confirm"
+          show
+          click_away={false}
+          autofocus={false}
+          on_cancel={JS.push("cancel_confirm")}
+        >
+          <div class="staff-confirm-dialog">
+            <p class="staff-confirm-dialog-title">Record today’s close?</p>
+            <p class="staff-confirm-dialog-copy">
+              This will seal today’s recorded paid sales and save the cash count you entered.
+              <span :if={barista?(@current_user)}>
+                Your staff shift will also end (Time Out).
+              </span>
+            </p>
+            <p class="staff-confirm-dialog-meta" id="staff-shift-close-confirm-cash">
+              <%= if String.trim(@counted_cash || "") == "" do %>
+                No drawer cash count entered.
+              <% else %>
+                Counted drawer cash · ₱{@counted_cash}
+              <% end %>
+            </p>
+            <div class="staff-confirm-dialog-actions">
+              <button
+                type="button"
+                class="staff-shift-close-submit"
+                id="staff-shift-close-submit"
+                phx-click="record_close"
+                phx-disable-with="Recording…"
+              >
+                Confirm seal
+              </button>
+              <button
+                type="button"
+                class="staff-shell-tool staff-shell-tool--quiet"
+                id="staff-shift-close-cancel-confirm"
+                phx-click="cancel_confirm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </.modal>
       </main>
     </.staff_shell>
     """

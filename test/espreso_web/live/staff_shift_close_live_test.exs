@@ -66,6 +66,8 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     assert has_element?(view, "#staff-shift-close-confirm", "Record today’s close?")
     assert has_element?(view, "#staff-shift-close-confirm-cash", "Counted drawer cash · ₱80")
     assert has_element?(view, "#staff-shift-close-submit", "Confirm seal")
+    refute has_element?(view, "#staff-shift-close-confirm-container[phx-click-away]")
+    assert has_element?(view, ~s(#staff-shift-close-confirm-container[phx-key="escape"]))
 
     view
     |> element("#staff-shift-close-submit")

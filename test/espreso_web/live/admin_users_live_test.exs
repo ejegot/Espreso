@@ -118,6 +118,8 @@ defmodule EspresoWeb.AdminUsersLiveTest do
 
     view |> element("#disable-user-#{barista.id}") |> render_click()
     assert has_element?(view, "#staff-team-confirm-disable-#{barista.id}")
+    refute has_element?(view, "#staff-team-confirm-container[phx-click-away]")
+    assert has_element?(view, ~s(#staff-team-confirm-container[phx-key="escape"]))
 
     view |> element("#confirm-disable-#{barista.id}") |> render_click()
     assert has_element?(view, "#staff-team-note", "Account disabled.")
@@ -159,6 +161,7 @@ defmodule EspresoWeb.AdminUsersLiveTest do
 
     view |> element("#clear-pin-#{barista.id}") |> render_click()
     assert has_element?(view, "#staff-team-confirm-clear-pin-#{barista.id}")
+    refute has_element?(view, "#staff-team-confirm-container[phx-click-away]")
 
     view |> element("#confirm-clear-pin-#{barista.id}") |> render_click()
 
