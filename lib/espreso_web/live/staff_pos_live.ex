@@ -1074,14 +1074,16 @@ defmodule EspresoWeb.StaffPosLive do
                   ]}
                   id="pos-confirmation"
                 >
-                  <div class="staff-pos-success-badge" aria-hidden="true">
-                    {if @print_failed?, do: "!", else: "✓"}
+                  <div class="staff-pos-success-head">
+                    <div class="staff-pos-success-badge" aria-hidden="true">
+                      {if @print_failed?, do: "!", else: "✓"}
+                    </div>
+                    <p class="staff-pos-success-eyebrow">
+                      {if @print_failed?,
+                        do: "Print failed · order saved",
+                        else: "Print complete · order saved"}
+                    </p>
                   </div>
-                  <p class="staff-pos-success-eyebrow">
-                    {if @print_failed?,
-                      do: "Print failed · order saved",
-                      else: "Print complete · order saved"}
-                  </p>
                   <p class="staff-order-number">{@last_order.number}</p>
                   <p class="staff-order-meta">
                     {Orders.status_label(@last_order.status)} · {@last_order.customer_name} · {Orders.payment_label(
@@ -1107,9 +1109,8 @@ defmodule EspresoWeb.StaffPosLive do
                     >
                       Retry print
                     </button>
-                    <div class="staff-pos-success-secondary">
+                    <div :if={Printer.enabled?()} class="staff-pos-success-secondary">
                       <button
-                        :if={Printer.enabled?()}
                         type="button"
                         class="staff-pos-mini"
                         id="pos-print-kitchen"
