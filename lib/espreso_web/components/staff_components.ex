@@ -17,7 +17,8 @@ defmodule EspresoWeb.StaffComponents do
   attr :current, :atom, required: true, doc: "active nav key, e.g. :orders"
   attr :current_user, :map, required: true
   attr :page_title, :string, required: true
-  attr :chrome, :atom, default: :top, values: [:top, :rail]
+  attr :chrome, :atom, default: :top, values: [:top, :rail, :bar]
+  attr :orders_badge_count, :integer, default: 0
 
   slot :inner_block, required: true
   slot :tools
@@ -35,12 +36,24 @@ defmodule EspresoWeb.StaffComponents do
 
     ~H"""
     <div
-      class={["staff-app site-page", @chrome == :rail && "staff-app--rail"]}
+      class={[
+        "staff-app site-page",
+        @chrome == :rail && "staff-app--rail",
+        @chrome == :bar && "staff-app--bar"
+      ]}
       id="elilai-printer-bridge"
       phx-hook="ElilaiPrinter"
     >
-      <%= if @chrome == :rail do %>
-        <aside class="staff-pos-rail staff-pos-rail--icons" id="staff-pos-rail" aria-label="Staff">
+      <%= if @chrome in [:rail, :bar] do %>
+        <header
+          class={[
+            "staff-pos-rail",
+            @chrome == :rail && "staff-pos-rail--icons",
+            @chrome == :bar && "staff-pos-rail--bar"
+          ]}
+          id="staff-pos-rail"
+          aria-label="Staff"
+        >
           <div class="staff-pos-rail-brand" title="Elilai Kafe">
             <img
               src={~p"/images/elilai-kafe/elilai-kafe-logo.png"}
@@ -59,12 +72,19 @@ defmodule EspresoWeb.StaffComponents do
               navigate={item.path}
               class={["staff-pos-rail-link", @current == item.key && "is-active"]}
               id={"staff-nav-#{item.key}"}
-              aria-label={item.label}
+              aria-label={nav_item_aria(item, @orders_badge_count)}
               title={item.label}
               aria-current={if(@current == item.key, do: "page", else: nil)}
             >
               <.icon name={item.icon} class="staff-pos-rail-icon" />
               <span class="sr-only">{item.label}</span>
+              <span
+                :if={item.key == :orders and @orders_badge_count > 0}
+                class="staff-pos-nav-badge"
+                id="staff-nav-orders-badge"
+              >
+                {nav_badge_count(@orders_badge_count)}
+              </span>
             </.link>
           </nav>
 
@@ -72,7 +92,9 @@ defmodule EspresoWeb.StaffComponents do
             type="button"
             id="staff-nav-menu-open"
             class={[
-              "staff-pos-rail-link staff-nav-menu-open staff-nav-menu-open--rail",
+              "staff-pos-rail-link staff-nav-menu-open",
+              @chrome == :rail && "staff-nav-menu-open--rail",
+              @chrome == :bar && "staff-nav-menu-open--bar",
               @drawer_active? && "is-active"
             ]}
             phx-click="toggle"
@@ -84,11 +106,15 @@ defmodule EspresoWeb.StaffComponents do
             title="Menu"
           >
             <.icon name="hero-bars-3" class="staff-pos-rail-icon" />
-            <span class="staff-nav-menu-open-label">Menu</span>
+            <span class="sr-only">Menu</span>
           </button>
-        </aside>
+        </header>
 
-        <div class="staff-shell-body staff-shell-body--rail">
+        <div class={[
+          "staff-shell-body",
+          @chrome == :rail && "staff-shell-body--rail",
+          @chrome == :bar && "staff-shell-body--bar"
+        ]}>
           <h1 class="sr-only staff-shell-title">{@page_title}</h1>
           {render_slot(@inner_block)}
         </div>
@@ -285,4 +311,13 @@ defmodule EspresoWeb.StaffComponents do
     ]
     |> Enum.filter(& &1.show?)
   end
+
+  defp nav_item_aria(%{key: :orders, label: label}, count) when count > 0 do
+    "#{label}, #{count} new"
+  end
+
+  defp nav_item_aria(%{label: label}, _count), do: label
+
+  defp nav_badge_count(count) when count > 9, do: "9+"
+  defp nav_badge_count(count), do: Integer.to_string(count)
 end

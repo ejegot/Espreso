@@ -7,7 +7,6 @@ defmodule EspresoWeb.StaffPosLive do
   alias Espreso.Orders
   alias Espreso.Printer
   alias EspresoWeb.PrinterClientBridge
-  alias EspresoWeb.StaffNotifications
   alias Phoenix.LiveView.JS
 
   @cart_undo_timeout_ms 4_000
@@ -70,13 +69,13 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:review_open?, false)
      |> assign(:print_note, nil)
      |> assign(:error, nil)
-     |> assign(:submission_error, nil), layout: false}
+     |> assign(:submission_error, nil)
+     |> assign(:orders_new_count, Orders.new_lane_count()), layout: false}
   end
 
   @impl true
-  def handle_info({:order_changed, order}, socket) do
-    StaffNotifications.push_order_change(order)
-    {:noreply, socket}
+  def handle_info({:order_changed, _order}, socket) do
+    {:noreply, assign(socket, :orders_new_count, Orders.new_lane_count())}
   end
 
   def handle_info(
@@ -914,7 +913,13 @@ defmodule EspresoWeb.StaffPosLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.staff_shell current={:pos} current_user={@current_user} page_title="POS" chrome={:rail}>
+    <.staff_shell
+      current={:pos}
+      current_user={@current_user}
+      page_title="POS"
+      chrome={:bar}
+      orders_badge_count={@orders_new_count}
+    >
       <div class="staff-pos-page staff-pos-shell-root staff-pos-page--cafe">
         <main class="staff-pos-main">
           <p :if={@error} class="staff-pos-flash" id="pos-error">{@error}</p>
@@ -922,37 +927,39 @@ defmodule EspresoWeb.StaffPosLive do
           <div class="staff-pos-layout staff-pos-layout--cafe">
             <section class="staff-pos-catalog" id="pos-catalog">
               <div class="staff-pos-catalog-toolbar">
-                <form class="staff-pos-search" id="pos-search" phx-change="search" phx-submit="search">
-                  <label class="staff-pos-search-label" for="pos-search-input">Search</label>
-                  <div class="staff-pos-search-row">
-                    <input
-                      type="search"
-                      class="staff-pos-search-input"
-                      id="pos-search-input"
-                      name="q"
-                      value={@search}
-                      placeholder="Search menu"
-                      autocomplete="off"
-                      phx-debounce="200"
-                    />
-                    <button
-                      :if={String.trim(@search) != ""}
-                      type="button"
-                      class="staff-pos-search-clear"
-                      id="pos-search-clear"
-                      phx-click="clear_search"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </form>
-
                 <header class="staff-pos-catalog-head">
-                  <div>
-                    <h2 class="staff-pos-catalog-title" id="pos-catalog-title">
-                      Categories
-                    </h2>
-                  </div>
+                  <h2 class="staff-pos-catalog-title" id="pos-catalog-title">
+                    Categories
+                  </h2>
+                  <form
+                    class="staff-pos-search"
+                    id="pos-search"
+                    phx-change="search"
+                    phx-submit="search"
+                  >
+                    <label class="staff-pos-search-label" for="pos-search-input">Search</label>
+                    <div class="staff-pos-search-row">
+                      <input
+                        type="search"
+                        class="staff-pos-search-input"
+                        id="pos-search-input"
+                        name="q"
+                        value={@search}
+                        placeholder="Search menu"
+                        autocomplete="off"
+                        phx-debounce="200"
+                      />
+                      <button
+                        :if={String.trim(@search) != ""}
+                        type="button"
+                        class="staff-pos-search-clear"
+                        id="pos-search-clear"
+                        phx-click="clear_search"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </form>
                   <span class="staff-pos-catalog-count" id="pos-catalog-count">
                     {length(
                       visible_product_entries(

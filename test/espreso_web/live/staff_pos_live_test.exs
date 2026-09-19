@@ -63,8 +63,12 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-catalog")
     assert has_element?(view, "#pos-ticket")
     assert has_element?(view, "#staff-pos-rail")
+    assert has_element?(view, "#staff-pos-rail.staff-pos-rail--bar")
+    refute has_element?(view, "#staff-pos-rail.staff-pos-rail--icons")
     assert has_element?(view, "#staff-nav-pos.is-active")
     assert has_element?(view, "#staff-pos-rail #staff-nav-menu-open")
+    assert has_element?(view, "#staff-pos-rail #staff-nav-home")
+    assert has_element?(view, "#staff-pos-rail #staff-nav-orders")
     assert has_element?(view, "#staff-nav-drawer-panel")
     assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-logout", "Log out")
     refute has_element?(view, "#staff-nav-more")
@@ -72,8 +76,33 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute has_element?(view, "#staff-pos-rail-footer")
     refute has_element?(view, ".staff-pos-rail-avatar")
     refute has_element?(view, "#staff-pos-rail #staff-notifications")
+    refute has_element?(view, "#staff-nav-orders-badge")
     refute has_element?(view, "#staff-nav-dashboard")
     refute render(view) =~ "Coming soon"
+  end
+
+  test "Orders icon badges New-lane count while staff stay on POS", %{
+    conn: conn,
+    barista: barista
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    refute has_element?(view, "#staff-nav-orders-badge")
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Latte", size: "12oz", quantity: 1, price: Decimal.new("120")}],
+        %{
+          customer_name: "Online Queue",
+          fulfillment: :pickup,
+          payment_method: :online
+        }
+      )
+
+    html = render(view)
+    assert html =~ ~s(id="staff-nav-orders-badge")
+    assert has_element?(view, "#staff-nav-orders-badge", "1")
+    assert has_element?(view, ~s(#staff-nav-orders[aria-label="Orders, 1 new"]))
+    assert Repo.get!(Order, order.id).status == "received"
   end
 
   test "View history appears only when a loyalty customer is loaded", %{
@@ -788,10 +817,12 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-product-#{americano.id}", "Americano")
     refute has_element?(view, "#pos-product-#{americano.id} .staff-pos-size-chips")
     refute has_element?(view, "#pos-size-picker")
+
     assert has_element?(
              view,
              "#pos-product-#{americano.id}[aria-label='Choose size for Americano']"
            )
+
     assert has_element?(view, "#pos-product-#{americano.id}", "8oz · 12oz")
     assert has_element?(view, "#pos-product-#{americano.id}", "from ₱110")
 
@@ -2695,8 +2726,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     assert has_element?(view, "#pos-category-HOT.is-active", "Hot coffee")
     assert has_element?(view, "#pos-catalog-title", "Categories")
-    assert has_element?(view, "#pos-place-order", "Process Cash Order")
-    assert has_element?(view, "#pos-search-input")
+    assert has_element?(view, ".staff-pos-catalog-head #pos-search-input")
     assert has_element?(view, "#pos-product-#{espresso.id}")
     assert has_element?(view, "#pos-product-#{americano.id}")
 

@@ -756,6 +756,11 @@ defmodule Espreso.Orders do
   end
 
   @doc """
+  Count of New-lane orders (`received`), used for POS Orders-icon badge.
+  """
+  def new_lane_count, do: count_orders(status: ["received"])
+
+  @doc """
   Recent orders placed on the current Asia/Manila shop day.
 
   Newest first. Does not preload items. Default limit is 5.
