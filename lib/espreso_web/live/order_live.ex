@@ -315,6 +315,12 @@ defmodule EspresoWeb.OrderLive do
                     {item.name}
                   </p>
                   <p :if={item.size} class="order-item-size">{item.size}</p>
+                  <p
+                    :if={meta = Orders.temperature_meta(item)}
+                    class={"order-item-temp is-#{meta.tone}"}
+                  >
+                    {meta.label}
+                  </p>
                 </div>
                 <p class="order-item-price">{Menu.format_price(item.line_total)}</p>
               </li>

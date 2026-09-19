@@ -11,6 +11,7 @@ defmodule Espreso.Orders do
   alias Espreso.Loyalty
   alias Espreso.Orders.{Order, OrderItem, PaymentReconciliation}
   alias Espreso.Menu
+  alias Espreso.Menu.Product
   alias Espreso.Menu.ProductPrice
   alias Espreso.StaffShifts.StaffShift
 
@@ -28,7 +29,9 @@ defmodule Espreso.Orders do
   Creates an order from cart lines and checkout attrs.
 
   `lines` — maps with `:name`, `:size`, `:quantity`, `:price` (Decimal),
-  and preferably `:product_id` (for availability checks). POS lines must also
+  and preferably `:product_id` (for availability checks). Optional `:category`
+  snapshots the menu category (`HOT` / `COLD` / …); when omitted, it is copied
+  from the product. POS lines must also
   include `:price_id`; their expected prices are checked against locked,
   authoritative product-price rows before the order is inserted.
   `attrs` — `:customer_name`, `:fulfillment` (`:dine_in` | `:pickup` or strings),
@@ -176,6 +179,8 @@ defmodule Espreso.Orders do
       end)
       |> Ecto.Multi.insert(:order, Order.changeset(%Order{}, order_attrs))
       |> Ecto.Multi.run(:items, fn repo, %{order: order} ->
+        category_by_product_id = categories_for_lines(repo, lines)
+
         items =
           Enum.map(lines, fn line ->
             qty = line.quantity
@@ -187,6 +192,7 @@ defmodule Espreso.Orders do
               order_id: order.id,
               name: line.name,
               size: blank_to_nil(Map.get(line, :size)),
+              category: snapshot_line_category(line, category_by_product_id),
               quantity: qty,
               unit_price: unit,
               line_total: line_total
@@ -1314,6 +1320,26 @@ defmodule Espreso.Orders do
 
   def format_total(%Order{total: total}), do: Menu.format_price(total)
 
+  def temperature_meta(%{category: category}), do: temperature_meta(category)
+  def temperature_meta("HOT"), do: %{label: "Hot", tone: "hot"}
+  def temperature_meta("COLD"), do: %{label: "Iced", tone: "iced"}
+  def temperature_meta(_), do: nil
+
+  def temperature_label(item_or_category) do
+    case temperature_meta(item_or_category) do
+      %{label: label} -> label
+      _ -> nil
+    end
+  end
+
+  def prep_item_name(item) do
+    size = blank_to_nil(Map.get(item, :size) || Map.get(item, "size"))
+
+    [item.name, size, temperature_label(item)]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join(" ")
+  end
+
   def fulfillment_label("dine_in"), do: "Dine-in"
   def fulfillment_label("pickup"), do: "Takeout"
   def fulfillment_label(_), do: "Order"
@@ -1830,6 +1856,45 @@ defmodule Espreso.Orders do
     case Application.get_env(:espreso, :orders_cancel_barrier) do
       fun when is_function(fun, 0) -> fun.()
       _ -> :ok
+    end
+  end
+
+  defp categories_for_lines(repo, lines) do
+    ids =
+      lines
+      |> Enum.map(&(Map.get(&1, :product_id) || Map.get(&1, "product_id")))
+      |> Enum.filter(&is_integer/1)
+      |> Enum.uniq()
+
+    if ids == [] do
+      %{}
+    else
+      Product
+      |> where([p], p.id in ^ids)
+      |> preload(:category)
+      |> repo.all()
+      |> Map.new(fn product ->
+        name =
+          case product.category do
+            %{name: name} when is_binary(name) and name != "" -> name
+            _ -> nil
+          end
+
+        {product.id, name}
+      end)
+    end
+  end
+
+  defp snapshot_line_category(line, category_by_product_id) do
+    explicit =
+      blank_to_nil(Map.get(line, :category) || Map.get(line, "category"))
+
+    product_id = Map.get(line, :product_id) || Map.get(line, "product_id")
+
+    cond do
+      is_binary(explicit) -> explicit
+      is_integer(product_id) -> Map.get(category_by_product_id, product_id)
+      true -> nil
     end
   end
 

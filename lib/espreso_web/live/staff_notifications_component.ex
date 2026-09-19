@@ -232,8 +232,8 @@ defmodule EspresoWeb.StaffNotificationsComponent do
        when is_binary(table) and table != "",
        do: "Table #{table}"
 
-  defp fulfillment_short(%{fulfillment: "dine_in"}), do: "Dine-in"
-  defp fulfillment_short(%{fulfillment: "pickup"}), do: "Pickup"
+  defp fulfillment_short(%{fulfillment: "dine_in"}), do: "Dine In"
+  defp fulfillment_short(%{fulfillment: "pickup"}), do: "Take Out"
   defp fulfillment_short(_), do: nil
 
   defp format_age(%DateTime{} = at) do

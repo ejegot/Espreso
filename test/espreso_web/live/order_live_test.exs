@@ -87,6 +87,26 @@ defmodule EspresoWeb.OrderLiveTest do
     refute render(view) =~ "Payment is due at the counter"
   end
 
+  test "customer receipt shows Hot or Iced on drink lines", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [
+          %{
+            name: "Americano",
+            size: "12oz",
+            category: "COLD",
+            quantity: 1,
+            price: Decimal.new("120")
+          }
+        ],
+        %{customer_name: "Iced Guest", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/order/#{order.number}")
+    assert has_element?(view, "#order-receipt .order-item-temp.is-iced", "Iced")
+    refute has_element?(view, "#order-receipt .order-item-temp.is-hot")
+  end
+
   test "customer order page updates when picked up", %{conn: conn} do
     {:ok, order} =
       Orders.create_order(

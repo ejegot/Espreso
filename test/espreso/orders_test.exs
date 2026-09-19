@@ -4,6 +4,7 @@ defmodule Espreso.OrdersTest do
   import Ecto.Query
 
   alias Espreso.{Accounts, Orders}
+  alias Espreso.Menu.{Category, Product, ProductPrice}
   alias Espreso.Orders.Order
   alias Espreso.Repo
 
@@ -35,6 +36,54 @@ defmodule Espreso.OrdersTest do
     assert order.settlement_source == nil
     assert Decimal.equal?(order.total, Decimal.new("315"))
     assert length(order.items) == 2
+    assert Enum.all?(order.items, &is_nil(&1.category))
+  end
+
+  test "create_order snapshots HOT and COLD from product_id" do
+    hot = insert_category!("HOT")
+    cold = insert_category!("COLD")
+    hot_americano = insert_product!(hot, "Americano", [{"12oz", "120"}])
+    iced_americano = insert_product!(cold, "Americano", [{"12oz", "120"}])
+    muffin = insert_product!(insert_category!("FOOD"), "Muffin", [{nil, "85"}])
+
+    assert {:ok, order} =
+             Orders.create_order(
+               [
+                 %{
+                   product_id: hot_americano.id,
+                   name: "Americano",
+                   size: "12oz",
+                   quantity: 1,
+                   price: Decimal.new("120")
+                 },
+                 %{
+                   product_id: iced_americano.id,
+                   name: "Americano",
+                   size: "12oz",
+                   quantity: 1,
+                   price: Decimal.new("120")
+                 },
+                 %{
+                   product_id: muffin.id,
+                   name: "Muffin",
+                   size: nil,
+                   quantity: 1,
+                   price: Decimal.new("85")
+                 }
+               ],
+               %{customer_name: "Liza", fulfillment: :pickup, payment_method: :counter}
+             )
+
+    temps =
+      order.items
+      |> Enum.map(&{&1.name, &1.category, Orders.temperature_label(&1)})
+      |> Enum.sort()
+
+    assert temps == [
+             {"Americano", "COLD", "Iced"},
+             {"Americano", "HOT", "Hot"},
+             {"Muffin", "FOOD", nil}
+           ]
   end
 
   test "list_orders_by_numbers returns matching orders and ignores invalid input" do
@@ -2255,6 +2304,29 @@ defmodule Espreso.OrdersTest do
     setting
     |> Ecto.Changeset.change(%{payments_mode: mode})
     |> Repo.update!()
+  end
+
+  defp insert_category!(name) do
+    %Category{} |> Category.changeset(%{name: name}) |> Repo.insert!()
+  end
+
+  defp insert_product!(category, name, prices) do
+    product =
+      %Product{}
+      |> Product.changeset(%{name: name, category_id: category.id, available: true})
+      |> Repo.insert!()
+
+    Enum.each(prices, fn {size, amount} ->
+      %ProductPrice{}
+      |> ProductPrice.changeset(%{
+        product_id: product.id,
+        size: size,
+        price: Decimal.new(amount)
+      })
+      |> Repo.insert!()
+    end)
+
+    product
   end
 
   defp insert_pos_line!(name, size, amount) do

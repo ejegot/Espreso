@@ -48,6 +48,8 @@ defmodule EspresoWeb.Api.JSON do
       id: item.id,
       name: item.name,
       size: item.size,
+      category: item.category,
+      temperature: Orders.temperature_label(item),
       quantity: item.quantity,
       unit_price: decimal_string(item.unit_price),
       line_total: decimal_string(item.line_total)

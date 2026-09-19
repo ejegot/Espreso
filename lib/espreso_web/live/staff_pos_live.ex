@@ -49,6 +49,7 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:cash_tender_purpose, :order)
      |> assign(:cash_tender_total, nil)
      |> assign(:last_cash_change, nil)
+     |> assign(:ticket_loyalty_note, nil)
      |> assign(:print_failed?, false)
      |> assign(:print_retry_token, nil)
      |> assign(:print_retry_permit, nil)
@@ -1118,13 +1119,21 @@ defmodule EspresoWeb.StaffPosLive do
                     <p class="staff-pos-success-eyebrow">
                       {if @print_failed?,
                         do: "Print failed · order saved",
-                        else: "Print complete · order saved"}
+                        else: "Order saved"}
                     </p>
                   </div>
                   <p class="staff-order-number">{@last_order.number}</p>
                   <p class="staff-order-meta">
                     {Orders.status_label(@last_order.status)} · {@last_order.customer_name} · {Orders.payment_label(
                       @last_order
+                    )}
+                  </p>
+                  <p :if={@ticket_loyalty_note} class="staff-order-meta" id="pos-loyalty-note">
+                    {@ticket_loyalty_note}
+                  </p>
+                  <p :if={@last_cash_change} class="staff-order-meta" id="pos-cash-change">
+                    Cash received {Menu.format_price(@last_cash_change.tendered)} · Change {Menu.format_price(
+                      @last_cash_change.change
                     )}
                   </p>
                   <p
@@ -1174,7 +1183,7 @@ defmodule EspresoWeb.StaffPosLive do
                       id="pos-new-order"
                       phx-click="new_order"
                     >
-                      New Order
+                      Clear Ticket
                     </button>
                     <button
                       type="button"
@@ -1351,6 +1360,12 @@ defmodule EspresoWeb.StaffPosLive do
                             <% else %>
                               <p class="staff-pos-cart-size">{size_label(line.size)}</p>
                             <% end %>
+                            <p
+                              :if={meta = Orders.temperature_meta(line[:category])}
+                              class={"staff-pos-cart-temp is-#{meta.tone}"}
+                            >
+                              {meta.label}
+                            </p>
                             <p class="staff-pos-cart-amount">
                               {Menu.format_price(Decimal.mult(line.price, line.quantity))}
                             </p>
@@ -1647,7 +1662,19 @@ defmodule EspresoWeb.StaffPosLive do
             <span class="staff-pos-order-review-qty">{item.quantity} ×</span>
             <span class="staff-pos-order-review-name">
               {item.name}
-              <span :if={item.size} class="staff-pos-order-review-size">{item.size}</span>
+              <span
+                :if={item.size || Orders.temperature_meta(item)}
+                class="staff-pos-order-review-meta-line"
+              >
+                <span :if={item.size} class="staff-pos-order-review-size">{item.size}</span>
+                <span :if={item.size && Orders.temperature_meta(item)}> · </span>
+                <span
+                  :if={meta = Orders.temperature_meta(item)}
+                  class={"staff-pos-order-review-temp is-#{meta.tone}"}
+                >
+                  {meta.label}
+                </span>
+              </span>
             </span>
             <span class="staff-pos-order-review-line">{Menu.format_price(item.line_total)}</span>
           </li>
@@ -1777,7 +1804,6 @@ defmodule EspresoWeb.StaffPosLive do
               class="staff-pos-place"
               id="pos-confirm-cash"
               disabled={!@confirm_enabled? or @placing_order?}
-              phx-disable-with="Processing…"
               data-dismiss-keyboard
             >
               Confirm Payment
@@ -2086,38 +2112,26 @@ defmodule EspresoWeb.StaffPosLive do
 
           cash_change = if(change, do: %{tendered: tendered, change: change})
 
-          flash =
-            "Redeemed · #{order.number} · #{updated_customer.points_balance} pts left" <>
-              if(note && not failed?, do: " · #{note}", else: "")
-
-          socket =
-            socket
-            |> assign(:loyalty_customer, updated_customer)
-            |> assign(:loyalty_phone, updated_customer.phone_e164)
-            |> assign(:loyalty_error, nil)
-            |> assign(:redeeming?, false)
-            |> close_redeem()
-            |> consume_cash_tender()
-            |> assign(:last_cash_change, cash_change)
-            |> assign(:print_note, note)
-            |> assign(:print_failed?, failed?)
-            |> assign(:print_note_error?, note_error?)
-            |> assign(:categories, Menu.list_menu())
-
-          socket =
-            if failed? do
-              socket
-              |> assign(:last_order, order)
-              |> remember_review_order(order)
-              |> clear_place_flash()
-            else
-              socket
-              |> assign(:last_order, nil)
-              |> remember_review_order(order)
-              |> put_place_flash(flash)
-            end
-
-          {:noreply, socket}
+          {:noreply,
+           socket
+           |> assign(:loyalty_customer, updated_customer)
+           |> assign(:loyalty_phone, updated_customer.phone_e164)
+           |> assign(:loyalty_error, nil)
+           |> assign(:redeeming?, false)
+           |> close_redeem()
+           |> consume_cash_tender()
+           |> assign(:last_cash_change, cash_change)
+           |> assign(:print_note, note)
+           |> assign(:print_failed?, failed?)
+           |> assign(:print_note_error?, note_error?)
+           |> assign(:categories, Menu.list_menu())
+           |> assign(:last_order, order)
+           |> remember_review_order(order)
+           |> assign(
+             :ticket_loyalty_note,
+             "Redeemed · #{order.number} · #{updated_customer.points_balance} pts left"
+           )
+           |> clear_place_flash()}
 
         {:error, :insufficient_points} ->
           {:noreply,
@@ -2179,6 +2193,7 @@ defmodule EspresoWeb.StaffPosLive do
               price_id: line.price_id,
               name: line.name,
               size: line.size,
+              category: line[:category],
               quantity: line.quantity,
               price: line.price
             }
@@ -2230,60 +2245,39 @@ defmodule EspresoWeb.StaffPosLive do
 
             cash_change = if(change, do: %{tendered: tendered, change: change})
 
-            loyalty_note = loyalty_place_note(order)
-
-            socket =
-              socket
-              |> clear_cart_undo()
-              |> assign(:cart, [])
-              |> assign(:card_sizes, %{})
-              |> assign(:added_product_id, nil)
-              |> assign(:error, nil)
-              |> assign(:submission_error, nil)
-              |> assign(:payment_choice, :paid)
-              |> assign(:paid_via, "cash")
-              |> assign(:customer_name, "Walk-in")
-              |> clear_loyalty_identity()
-              |> assign(:variant_editor_key, nil)
-              |> assign(:cash_tender_open?, false)
-              |> assign(:cash_tendered, "")
-              |> assign(:cash_tender_error, nil)
-              |> assign(:cash_tender_token, nil)
-              |> assign(:cash_tender_purpose, :order)
-              |> assign(:cash_tender_total, nil)
-              |> assign(:fulfillment, :pickup)
-              |> assign(:table_number, "")
-              |> assign(:placing_order?, false)
-              |> assign(:notes, "")
-              |> assign(:notes_open?, false)
-              |> assign(:categories, Menu.list_menu())
-              |> assign(:last_cash_change, cash_change)
-              |> assign(:print_note, note)
-              |> assign(:print_failed?, failed?)
-              |> assign(:print_note_error?, note_error?)
-
-            socket =
-              if failed? do
-                socket
-                |> assign(:last_order, order)
-                |> remember_review_order(order)
-                |> clear_place_flash()
-              else
-                flash = place_flash_message(order, note, cash_change, loyalty_note)
-
-                socket
-                |> assign(
-                  :last_order,
-                  if(match?({:ok, _, _, {:client_dispatch, _, _, _}}, settle_result),
-                    do: order,
-                    else: nil
-                  )
-                )
-                |> remember_review_order(order)
-                |> put_place_flash(flash)
-              end
-
-            {:noreply, socket}
+            {:noreply,
+             socket
+             |> clear_cart_undo()
+             |> assign(:cart, [])
+             |> assign(:card_sizes, %{})
+             |> assign(:added_product_id, nil)
+             |> assign(:error, nil)
+             |> assign(:submission_error, nil)
+             |> assign(:payment_choice, :paid)
+             |> assign(:paid_via, "cash")
+             |> assign(:customer_name, "Walk-in")
+             |> clear_loyalty_identity()
+             |> assign(:variant_editor_key, nil)
+             |> assign(:cash_tender_open?, false)
+             |> assign(:cash_tendered, "")
+             |> assign(:cash_tender_error, nil)
+             |> assign(:cash_tender_token, nil)
+             |> assign(:cash_tender_purpose, :order)
+             |> assign(:cash_tender_total, nil)
+             |> assign(:fulfillment, :pickup)
+             |> assign(:table_number, "")
+             |> assign(:placing_order?, false)
+             |> assign(:notes, "")
+             |> assign(:notes_open?, false)
+             |> assign(:categories, Menu.list_menu())
+             |> assign(:last_cash_change, cash_change)
+             |> assign(:print_note, note)
+             |> assign(:print_failed?, failed?)
+             |> assign(:print_note_error?, note_error?)
+             |> assign(:last_order, order)
+             |> remember_review_order(order)
+             |> assign(:ticket_loyalty_note, loyalty_place_note(order))
+             |> clear_place_flash()}
 
           {:error, :empty_cart} ->
             {:noreply,
@@ -2690,6 +2684,7 @@ defmodule EspresoWeb.StaffPosLive do
               price_id: price.id,
               name: product.name,
               size: price.size,
+              category: category_name,
               price: price.price,
               quantity: quantity,
               image: image
@@ -2873,6 +2868,7 @@ defmodule EspresoWeb.StaffPosLive do
     |> assign(:print_retry_token, nil)
     |> assign(:print_note_error?, false)
     |> assign(:last_cash_change, nil)
+    |> assign(:ticket_loyalty_note, nil)
     |> assign(:error, nil)
     |> assign(:submission_error, nil)
     |> assign(:payment_choice, :paid)
@@ -2941,21 +2937,6 @@ defmodule EspresoWeb.StaffPosLive do
     |> assign(:review_open?, false)
   end
 
-  defp put_place_flash(socket, flash) do
-    socket = clear_place_flash(socket)
-    token = make_ref()
-
-    timer =
-      if connected?(socket) do
-        Process.send_after(self(), {:clear_place_flash, token}, 4_000)
-      end
-
-    socket
-    |> assign(:place_flash, flash)
-    |> assign(:place_flash_token, token)
-    |> assign(:place_flash_timer, timer)
-  end
-
   defp clear_place_flash(socket) do
     if timer = socket.assigns[:place_flash_timer] do
       Process.cancel_timer(timer)
@@ -2970,31 +2951,6 @@ defmodule EspresoWeb.StaffPosLive do
   defp cart_undo_label(%{kind: :ticket}), do: "Ticket cleared"
   defp cart_undo_label(%{kind: :variant}), do: "Size changed"
   defp cart_undo_label(_undo), do: "Item removed"
-
-  defp place_flash_message(order, print_note, cash_change, loyalty_note) do
-    base =
-      "#{order.number} · #{order.customer_name} · #{Orders.status_label(order.status)} · #{Orders.payment_label(order)}"
-
-    extras =
-      [
-        loyalty_note,
-        print_note,
-        if(cash_change,
-          do: "Cash received #{Menu.format_price(cash_change.tendered)}",
-          else: nil
-        ),
-        if(cash_change,
-          do: "Change #{Menu.format_price(cash_change.change)}",
-          else: nil
-        )
-      ]
-      |> Enum.reject(&is_nil/1)
-
-    case extras do
-      [] -> base
-      list -> Enum.join([base | list], " · ")
-    end
-  end
 
   defp blank_notes(notes) when is_binary(notes) do
     trimmed = String.trim(notes)

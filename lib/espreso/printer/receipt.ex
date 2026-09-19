@@ -136,9 +136,8 @@ defmodule Espreso.Printer.Receipt do
   end
 
   defp kitchen_item_lines(item) do
-    size = if item.size in [nil, ""], do: "", else: " #{item.size}"
     qty = item.quantity || 1
-    name = "#{item.name}#{size}"
+    name = Orders.prep_item_name(item)
 
     [
       EscPos.bold_on(),
@@ -219,11 +218,10 @@ defmodule Espreso.Printer.Receipt do
   end
 
   defp item_lines(item) do
-    size = if item.size in [nil, ""], do: "", else: " #{item.size}"
     qty = item.quantity || 1
     unit = money(item.unit_price)
     line = money(item.line_total || Decimal.mult(item.unit_price || Decimal.new(0), qty))
-    name = "#{item.name}#{size}"
+    name = Orders.prep_item_name(item)
 
     [
       EscPos.bold_on(),
