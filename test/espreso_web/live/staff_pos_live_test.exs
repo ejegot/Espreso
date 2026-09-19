@@ -84,6 +84,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
     conn = log_in(conn, barista)
     {:ok, view, _html} = live(conn, ~p"/pos")
     assert has_element?(view, "#pos-loyalty-entry", "Add Loyalty")
+    assert has_element?(view, ".staff-pos-ticket-identity #pos-customer-name")
+    assert has_element?(view, ".staff-pos-ticket-identity #pos-loyalty-entry")
     refute has_element?(view, "#pos-loyalty-history")
 
     view = find_loyalty(view, "09175550001")
@@ -205,10 +207,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
-    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
-    view |> element("#pos-size-#{price_12.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "12oz")
+    add_product(view, americano, "12oz")
 
     _view = find_loyalty(view, "09175550013")
     submit_order(view)
@@ -244,10 +244,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
-    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
-    view |> element("#pos-size-#{price_12.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "12oz")
+    add_product(view, americano, "12oz")
 
     _view = find_loyalty(view, "09175550014")
     submit_order(view)
@@ -582,9 +580,9 @@ defmodule EspresoWeb.StaffPosLiveTest do
   } do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
-    assert has_element?(view, "#pos-product-#{espresso.id}", "Regular")
-    assert has_element?(view, "#pos-product-#{espresso.id} .staff-pos-size-chips", "Regular")
-    refute has_element?(view, "#pos-product-#{espresso.id} .staff-pos-product-sizes--empty")
+    assert has_element?(view, "#pos-product-#{espresso.id}", "Espresso")
+    refute has_element?(view, "#pos-product-#{espresso.id} .staff-pos-size-chips")
+    refute has_element?(view, "#pos-size-picker")
     refute has_element?(view, "#pos-product-#{espresso.id} .staff-pos-product-desc")
     refute has_element?(view, "#pos-card-qty-#{espresso.id}")
     assert has_element?(view, "#pos-product-#{espresso.id}[aria-label='Add Espresso']")
@@ -638,9 +636,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
     price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
     key = "#{americano.id}-#{price_12.id}"
 
-    view |> element("#pos-size-#{price_12.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "12oz")
+    add_product(view, americano, "12oz")
     view |> element(~s(button[phx-click="remove"][phx-value-key="#{key}"])) |> render_click()
 
     view |> element("#pos-cart-undo-action") |> render_click()
@@ -664,10 +661,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
     key_12 = "#{americano.id}-#{price_12.id}"
 
     view |> element("#pos-product-#{espresso.id}") |> render_click()
-    view |> element("#pos-size-#{price_8.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
-    view |> element("#pos-size-#{price_12.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "8oz")
+    add_product(view, americano, "12oz")
 
     remove_line(view, espresso_key)
     remove_line(view, key_8)
@@ -691,7 +686,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     remove_line(view, espresso_key)
     assert has_element?(view, "#pos-cart-undo")
 
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "8oz")
 
     refute has_element?(view, "#pos-cart-undo")
     refute has_element?(view, "#pos-line-#{espresso_key}")
@@ -725,8 +720,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     view |> element("#pos-product-#{espresso.id}") |> render_click()
     view |> element("#pos-product-#{espresso.id}") |> render_click()
-    view |> element("#pos-size-#{price_12.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "12oz")
     view |> element("#pos-fulfillment-dine-in") |> render_click()
     view |> element("#pos-pay-gcash") |> render_click()
 
@@ -758,7 +752,6 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-notes", "Less ice")
     assert has_element?(view, "#pos-fulfillment-dine-in.is-active")
     assert has_element?(view, "#pos-pay-gcash.is-active")
-    assert has_element?(view, "#pos-size-#{price_12.id}.is-active")
     assert has_element?(view, "#pos-clear-ticket")
   end
 
@@ -772,7 +765,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     espresso_key = "#{espresso.id}-#{hd(espresso.product_prices).id}"
 
     view |> element("#pos-product-#{espresso.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "8oz")
     remove_line(view, espresso_key)
     assert has_element?(view, "#pos-cart-undo")
 
@@ -783,7 +776,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-cart-empty")
   end
 
-  test "multi-price product selects size on card then add to cart", %{
+  test "multi-price product opens a size picker; tapping a size adds it", %{
     conn: conn,
     barista: barista,
     americano: americano
@@ -791,20 +784,32 @@ defmodule EspresoWeb.StaffPosLiveTest do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
     assert has_element?(view, "#pos-product-#{americano.id}", "Americano")
-    assert has_element?(view, "#pos-product-#{americano.id} .staff-pos-size-chips")
+    refute has_element?(view, "#pos-product-#{americano.id} .staff-pos-size-chips")
     refute has_element?(view, "#pos-size-picker")
-
-    price_8 = Enum.find(americano.product_prices, &(&1.size == "8oz"))
-    view |> element("#pos-size-#{price_8.id}") |> render_click()
-    assert has_element?(view, "#pos-product-#{americano.id} .staff-pos-product-price", "₱110")
-
-    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
-    view |> element("#pos-size-#{price_12.id}") |> render_click()
-
-    assert has_element?(view, "#pos-product-#{americano.id} .staff-pos-product-price", "₱120")
+    assert has_element?(
+             view,
+             "#pos-product-#{americano.id}[aria-label='Choose size for Americano']"
+           )
+    assert has_element?(view, "#pos-product-#{americano.id}", "8oz · 12oz")
+    assert has_element?(view, "#pos-product-#{americano.id}", "from ₱110")
 
     view |> element("#pos-product-#{americano.id}") |> render_click()
 
+    assert has_element?(view, "#pos-size-picker")
+    assert has_element?(view, "#pos-cart-empty")
+    price_8 = Enum.find(americano.product_prices, &(&1.size == "8oz"))
+    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
+    assert has_element?(view, "#pos-size-#{price_8.id}", "8oz")
+    assert has_element?(view, "#pos-size-#{price_8.id}", "₱110")
+    assert has_element?(view, "#pos-size-#{price_12.id}", "12oz")
+    assert has_element?(view, "#pos-size-#{price_12.id}", "₱120")
+
+    view |> element("#pos-size-cancel") |> render_click()
+    refute has_element?(view, "#pos-size-picker")
+    assert has_element?(view, "#pos-cart-empty")
+
+    add_product(view, americano, "12oz")
+    refute has_element?(view, "#pos-size-picker")
     assert has_element?(view, "#pos-cart-lines", "Americano")
     assert has_element?(view, "#pos-cart-lines", "12oz")
     assert has_element?(view, "#pos-total", "₱120")
@@ -823,9 +828,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
     key_12 = "#{americano.id}-#{price_12.id}"
     espresso_key = "#{espresso.id}-#{hd(espresso.product_prices).id}"
 
-    view |> element("#pos-size-#{price_12.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "12oz")
+    add_product(view, americano, "12oz")
     view |> element("#pos-product-#{espresso.id}") |> render_click()
     view |> element("#pos-fulfillment-dine-in") |> render_click()
     view |> element("#pos-pay-gcash") |> render_click()
@@ -857,7 +861,6 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-notes", "Less ice")
     assert has_element?(view, "#pos-fulfillment-dine-in.is-active")
     assert has_element?(view, "#pos-pay-gcash.is-active")
-    assert has_element?(view, "#pos-size-#{price_8.id}.is-active")
     assert has_element?(view, "#pos-cart-undo", "Size changed")
   end
 
@@ -874,12 +877,10 @@ defmodule EspresoWeb.StaffPosLiveTest do
     key_12 = "#{americano.id}-#{price_12.id}"
     espresso_key = "#{espresso.id}-#{hd(espresso.product_prices).id}"
 
-    view |> element("#pos-size-#{price_12.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "12oz")
     view |> element("#pos-product-#{espresso.id}") |> render_click()
-    view |> element("#pos-size-#{price_8.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "8oz")
+    add_product(view, americano, "8oz")
 
     open_variant_editor(view, key_12)
     change_variant(view, key_12, price_8.id)
@@ -902,8 +903,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     americano_key = "#{americano.id}-#{price_8.id}"
     espresso_key = "#{espresso.id}-#{hd(espresso.product_prices).id}"
 
-    view |> element("#pos-size-#{price_8.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "8oz")
     view |> element("#pos-product-#{espresso.id}") |> render_click()
     remove_line(view, espresso_key)
 
@@ -926,8 +926,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     key_8 = "#{americano.id}-#{price_8.id}"
     espresso_price = hd(espresso.product_prices)
 
-    view |> element("#pos-size-#{price_8.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "8oz")
     view |> element("#pos-product-#{espresso.id}") |> render_click()
 
     assert has_element?(
@@ -966,8 +965,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
-    view |> element("#pos-size-#{first.id}") |> render_click()
     view |> element("#pos-product-#{duplicate_label.id}") |> render_click()
+    view |> element("#pos-size-#{first.id}") |> render_click()
     source_key = "#{duplicate_label.id}-#{first.id}"
     target_key = "#{duplicate_label.id}-#{second.id}"
     open_variant_editor(view, source_key)
@@ -980,8 +979,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute has_element?(view, "#pos-line-#{source_key}")
     assert has_element?(view, "#pos-line-#{target_key}", "₱130")
 
-    view |> element("#pos-size-#{ambiguous_first.id}") |> render_click()
     view |> element("#pos-product-#{ambiguous.id}") |> render_click()
+    view |> element("#pos-size-#{ambiguous_first.id}") |> render_click()
 
     refute has_element?(
              view,
@@ -1000,11 +999,9 @@ defmodule EspresoWeb.StaffPosLiveTest do
     key_8 = "#{americano.id}-#{price_8.id}"
     key_12 = "#{americano.id}-#{price_12.id}"
 
-    view |> element("#pos-size-#{price_8.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
-    view |> element("#pos-size-#{price_12.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "8oz")
+    add_product(view, americano, "8oz")
+    add_product(view, americano, "12oz")
 
     open_variant_editor(view, key_12)
     change_variant(view, key_12, price_8.id)
@@ -1012,7 +1009,6 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     assert has_element?(view, "#pos-line-#{key_8} .staff-pos-qty", "2")
     assert has_element?(view, "#pos-line-#{key_12} .staff-pos-qty", "1")
-    assert has_element?(view, "#pos-size-#{price_12.id}.is-active")
     refute has_element?(view, "#pos-cart-undo")
   end
 
@@ -1027,9 +1023,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
     key_8 = "#{americano.id}-#{price_8.id}"
     key_12 = "#{americano.id}-#{price_12.id}"
 
-    view |> element("#pos-size-#{price_12.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "12oz")
+    add_product(view, americano, "12oz")
     open_variant_editor(view, key_12)
     change_variant(view, key_12, price_8.id)
 
@@ -1042,7 +1037,6 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> element("#pos-cart-undo-action") |> render_click()
 
     assert has_element?(view, "#pos-line-#{key_8} .staff-pos-qty", "2")
-    assert has_element?(view, "#pos-size-#{price_8.id}.is-active")
     refute has_element?(view, "#pos-cart-variant-chooser-#{key_8}")
   end
 
@@ -1057,9 +1051,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
     key_8 = "#{americano.id}-#{price_8.id}"
     key_12 = "#{americano.id}-#{price_12.id}"
 
-    view |> element("#pos-size-#{price_12.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "12oz")
+    add_product(view, americano, "12oz")
     open_variant_editor(view, key_12)
     change_variant(view, key_12, price_8.id)
     submit_order(view)
@@ -1155,10 +1148,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
     view |> element("#pos-product-#{espresso.id}") |> render_click()
-
-    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
-    view |> element("#pos-size-#{price_12.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "12oz")
 
     espresso_key = "#{espresso.id}-#{hd(espresso.product_prices).id}"
 
@@ -1282,10 +1272,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
     americano: americano
   } do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
-    price_8 = Enum.find(americano.product_prices, &(&1.size == "8oz"))
-    view |> element("#pos-size-#{price_8.id}") |> render_click()
     view |> element("#pos-product-#{espresso.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "8oz")
 
     view |> form("#pos-order-form") |> render_submit()
 
@@ -1393,9 +1381,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     americano: americano
   } do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
-    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
-    view |> element("#pos-size-#{price_12.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "12oz")
     view |> element("#pos-fulfillment-dine-in") |> render_click()
     view |> element("#pos-notes-toggle") |> render_click()
 
@@ -1437,10 +1423,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
     americano: americano
   } do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
-    price_8 = Enum.find(americano.product_prices, &(&1.size == "8oz"))
-    view |> element("#pos-size-#{price_8.id}") |> render_click()
     view |> element("#pos-product-#{espresso.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "8oz")
     view |> form("#pos-order-form") |> render_submit()
 
     token = live_assigns(view).cash_tender_token
@@ -1518,10 +1502,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
     americano: americano
   } do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
-    price_8 = Enum.find(americano.product_prices, &(&1.size == "8oz"))
-    view |> element("#pos-size-#{price_8.id}") |> render_click()
     view |> element("#pos-product-#{espresso.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "8oz")
     view |> element("#pos-notes-toggle") |> render_click()
 
     view
@@ -1680,7 +1662,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
   } do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
     view |> element("#pos-product-#{espresso.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "8oz")
     americano_line = Enum.find(live_assigns(view).cart, &(&1.product_id == americano.id))
     update_price!(Repo.get!(ProductPrice, americano_line.price_id), "135")
 
@@ -1697,8 +1679,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
   } do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
     price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
-    view |> element("#pos-size-#{price_12.id}") |> render_click()
-    view |> element("#pos-product-#{americano.id}") |> render_click()
+    add_product(view, americano, "12oz")
     update_price!(price_12, "135")
 
     submit_order(view)
@@ -2095,8 +2076,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
   test "product taps do not dismiss print-failure recovery", %{
     conn: conn,
     barista: barista,
-    espresso: espresso,
-    americano: americano
+    espresso: espresso
   } do
     previous_printer_config = Application.get_env(:espreso, Espreso.Printer)
 
@@ -2119,8 +2099,6 @@ defmodule EspresoWeb.StaffPosLiveTest do
     end)
 
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
-    price_12 = Enum.find(americano.product_prices, &(&1.size == "12oz"))
-    view |> element("#pos-size-#{price_12.id}") |> render_click()
     view |> element("#pos-fulfillment-dine-in") |> render_click()
 
     view
@@ -2424,6 +2402,19 @@ defmodule EspresoWeb.StaffPosLiveTest do
     conn
     |> Phoenix.ConnTest.init_test_session(%{})
     |> Plug.Conn.put_session(:user_id, user.id)
+  end
+
+  defp add_product(view, product, size) do
+    view |> element("#pos-product-#{product.id}") |> render_click()
+
+    prices = product.product_prices
+
+    if length(prices) > 1 do
+      price = Enum.find(prices, &(&1.size == size)) || List.first(prices)
+      view |> element("#pos-size-#{price.id}") |> render_click()
+    end
+
+    view
   end
 
   defp open_loyalty(view) do

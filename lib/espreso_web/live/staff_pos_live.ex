@@ -63,6 +63,7 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:cart_undo_timer, nil)
      |> assign(:variant_editor_key, nil)
      |> assign(:card_sizes, %{})
+     |> assign(:size_picker_product_id, nil)
      |> assign(:added_product_id, nil)
      |> assign(:last_order, nil)
      |> assign(:print_note, nil)
@@ -110,6 +111,7 @@ defmodule EspresoWeb.StaffPosLive do
              "add_to_cart",
              "add_product",
              "select_size",
+             "cancel_size",
              "inc",
              "dec",
              "remove",
@@ -249,25 +251,35 @@ defmodule EspresoWeb.StaffPosLive do
     {:noreply, socket}
   end
 
-  def handle_event("add_to_cart", %{"product-id" => product_id}, socket) do
+  def handle_event("add_to_cart", %{"product-id" => product_id} = params, socket) do
     product_id = String.to_integer(product_id)
 
     with {category_name, %{product_prices: prices} = product} <-
-           find_product_entry(socket.assigns.categories, product_id),
-         %{} = price <- selected_price(product, prices, socket.assigns.card_sizes) do
-      if connected?(socket), do: Process.send_after(self(), :clear_added_product, 1_200)
+           find_product_entry(socket.assigns.categories, product_id) do
+      cond do
+        picker_required?(prices, params) ->
+          {:noreply, assign(socket, :size_picker_product_id, product_id)}
 
-      {:noreply,
-       socket
-       |> clear_cart_undo()
-       |> assign(:variant_editor_key, nil)
-       |> assign(:cart, add_line(socket.assigns.cart, product, price, category_name, 1))
-       |> assign(:added_product_id, product_id)
-       |> assign(:error, nil)
-       |> assign(:last_order, nil)
-       |> assign(:print_note, nil)
-       |> assign(:print_note_error?, false)
-       |> clear_place_flash()}
+        match?(%{}, picker_price(product, prices, socket.assigns.card_sizes, params)) ->
+          price = picker_price(product, prices, socket.assigns.card_sizes, params)
+          if connected?(socket), do: Process.send_after(self(), :clear_added_product, 1_200)
+
+          {:noreply,
+           socket
+           |> clear_cart_undo()
+           |> assign(:variant_editor_key, nil)
+           |> assign(:size_picker_product_id, nil)
+           |> assign(:cart, add_line(socket.assigns.cart, product, price, category_name, 1))
+           |> assign(:added_product_id, product_id)
+           |> assign(:error, nil)
+           |> assign(:last_order, nil)
+           |> assign(:print_note, nil)
+           |> assign(:print_note_error?, false)
+           |> clear_place_flash()}
+
+        true ->
+          {:noreply, assign(socket, :error, "Product is unavailable.")}
+      end
     else
       _ ->
         {:noreply, assign(socket, :error, "Product is unavailable.")}
@@ -281,10 +293,12 @@ defmodule EspresoWeb.StaffPosLive do
 
   def handle_event("select_size", params, socket) do
     {:noreply, socket} = handle_event("select_card_size", params, socket)
-    handle_event("add_to_cart", %{"product-id" => params["product-id"]}, socket)
+    handle_event("add_to_cart", params, socket)
   end
 
-  def handle_event("cancel_size", _params, socket), do: {:noreply, socket}
+  def handle_event("cancel_size", _params, socket) do
+    {:noreply, assign(socket, :size_picker_product_id, nil)}
+  end
 
   def handle_event("inc", %{"key" => key}, socket) do
     {:noreply, assign(socket, :cart, update_qty(socket.assigns.cart, key, 1))}
@@ -968,9 +982,11 @@ defmodule EspresoWeb.StaffPosLive do
                   phx-click="add_to_cart"
                   phx-value-product-id={product.id}
                   aria-label={
-                    if @added_product_id == product.id,
-                      do: "Added #{product.name}",
-                      else: "Add #{product.name}"
+                    cond do
+                      @added_product_id == product.id -> "Added #{product.name}"
+                      length(product.product_prices) > 1 -> "Choose size for #{product.name}"
+                      true -> "Add #{product.name}"
+                    end
                   }
                 >
                   <div class="staff-pos-product-card-media" aria-hidden="true">
@@ -990,33 +1006,14 @@ defmodule EspresoWeb.StaffPosLive do
                   </div>
                   <div class="staff-pos-product-card-body">
                     <h3 class="staff-pos-product-name">{product.name}</h3>
-                    <div
-                      class="staff-pos-product-sizes"
-                      role="radiogroup"
-                      aria-label={"Size for #{product.name}"}
+                    <p
+                      :if={length(product.product_prices) > 1}
+                      class="staff-pos-product-size-hint"
                     >
-                      <div class="staff-pos-size-chips">
-                        <button
-                          :for={price <- product.product_prices}
-                          type="button"
-                          class={[
-                            "staff-pos-size-chip",
-                            selected_price_id(product, @card_sizes) == price.id && "is-active"
-                          ]}
-                          id={"pos-size-#{price.id}"}
-                          phx-click="select_card_size"
-                          phx-value-product-id={product.id}
-                          phx-value-price-id={price.id}
-                          aria-pressed={
-                            to_string(selected_price_id(product, @card_sizes) == price.id)
-                          }
-                        >
-                          {size_label(price.size)}
-                        </button>
-                      </div>
-                    </div>
+                      {Enum.map_join(pos_size_prices(product.product_prices), " · ", &size_label(&1.size))}
+                    </p>
                     <p class="staff-pos-product-price">
-                      {displayed_price_label(product, @card_sizes)}
+                      {price_label(product)}
                     </p>
                   </div>
                 </article>
@@ -1196,49 +1193,51 @@ defmodule EspresoWeb.StaffPosLive do
                       </button>
                     </div>
 
-                    <label class="staff-pos-field" for="pos-customer-name">
-                      <span class="staff-pos-field-label">Name</span>
-                      <input
-                        type="text"
-                        class="staff-pos-field-input"
-                        id="pos-customer-name"
-                        name="customer_name"
-                        value={@customer_name}
-                        phx-change="set_customer_name"
-                        phx-debounce="300"
-                        autocomplete="off"
-                        maxlength="60"
-                        placeholder="Walk-in"
-                      />
-                    </label>
+                    <div class="staff-pos-ticket-identity">
+                      <label class="staff-pos-field staff-pos-field--name" for="pos-customer-name">
+                        <span class="staff-pos-field-label">Name</span>
+                        <input
+                          type="text"
+                          class="staff-pos-field-input"
+                          id="pos-customer-name"
+                          name="customer_name"
+                          value={@customer_name}
+                          phx-change="set_customer_name"
+                          phx-debounce="300"
+                          autocomplete="off"
+                          maxlength="60"
+                          placeholder="Walk-in"
+                        />
+                      </label>
 
-                    <div class="staff-pos-loyalty-entry-wrap" id="pos-loyalty">
-                      <button
-                        type="button"
-                        id="pos-loyalty-entry"
-                        class={[
-                          "staff-pos-loyalty-entry",
-                          @loyalty_customer && "is-linked",
-                          @loyalty_customer &&
-                            @loyalty_customer.points_balance >= Loyalty.redeem_cost() &&
-                            "is-ready",
-                          loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer) &&
-                            "is-attention"
-                        ]}
-                        phx-click="open_loyalty"
-                        aria-expanded={to_string(@loyalty_open?)}
-                        aria-controls="pos-loyalty-modal"
-                      >
-                        {loyalty_entry_label(@loyalty_customer, @loyalty_phone)}
-                      </button>
-                      <p
-                        :if={loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)}
-                        class="staff-pos-submission-error"
-                        id="pos-loyalty-find-hint"
-                      >
-                        Find this customer before placing the order.
-                      </p>
+                      <div class="staff-pos-loyalty-entry-wrap" id="pos-loyalty">
+                        <button
+                          type="button"
+                          id="pos-loyalty-entry"
+                          class={[
+                            "staff-pos-loyalty-entry",
+                            @loyalty_customer && "is-linked",
+                            @loyalty_customer &&
+                              @loyalty_customer.points_balance >= Loyalty.redeem_cost() &&
+                              "is-ready",
+                            loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer) &&
+                              "is-attention"
+                          ]}
+                          phx-click="open_loyalty"
+                          aria-expanded={to_string(@loyalty_open?)}
+                          aria-controls="pos-loyalty-modal"
+                        >
+                          {loyalty_entry_label(@loyalty_customer, @loyalty_phone)}
+                        </button>
+                      </div>
                     </div>
+                    <p
+                      :if={loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)}
+                      class="staff-pos-submission-error"
+                      id="pos-loyalty-find-hint"
+                    >
+                      Find this customer before placing the order.
+                    </p>
 
                     <button
                       :if={@cart != [] or @notes_open? or order_note(%{notes: @notes}) != nil}
@@ -1501,8 +1500,58 @@ defmodule EspresoWeb.StaffPosLive do
           redeem_error={@redeem_error}
           redeeming?={@redeeming?}
         />
+
+        <%= if product =
+                 not @cash_tender_open? and
+                   size_picker_product(@categories, @size_picker_product_id) do %>
+          <.size_picker product={product} />
+        <% end %>
       </div>
     </.staff_shell>
+    """
+  end
+
+  defp size_picker(assigns) do
+    ~H"""
+    <div
+      id="pos-size-picker"
+      class="staff-pos-size-picker"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pos-size-picker-title"
+    >
+      <button
+        type="button"
+        class="staff-pos-size-picker-backdrop"
+        phx-click="cancel_size"
+        aria-label="Close size picker"
+      />
+      <div class="staff-pos-size-picker-panel staff-pos-modal-panel">
+        <header class="staff-pos-size-picker-head">
+          <div>
+            <p class="staff-pos-size-picker-eyebrow">Choose size</p>
+            <h2 class="staff-pos-size-picker-title" id="pos-size-picker-title">{@product.name}</h2>
+          </div>
+          <button type="button" class="staff-pos-size-cancel" id="pos-size-cancel" phx-click="cancel_size">
+            Cancel
+          </button>
+        </header>
+        <div class="staff-pos-size-options" id="pos-size-options">
+          <button
+            :for={price <- pos_size_prices(@product.product_prices)}
+            type="button"
+            class="staff-pos-size-option"
+            id={"pos-size-#{price.id}"}
+            phx-click="select_size"
+            phx-value-product-id={@product.id}
+            phx-value-price-id={price.id}
+          >
+            <span class="staff-pos-size-option-name">{size_label(price.size)}</span>
+            <span class="staff-pos-size-option-price">{Menu.format_price(price.price)}</span>
+          </button>
+        </div>
+      </div>
+    </div>
     """
   end
 
@@ -2267,6 +2316,7 @@ defmodule EspresoWeb.StaffPosLive do
     |> assign(:cash_tender_token, Integer.to_string(System.unique_integer([:positive])))
     |> assign(:cash_tender_purpose, purpose)
     |> assign(:cash_tender_total, total)
+    |> assign(:size_picker_product_id, nil)
     |> assign(:error, nil)
   end
 
@@ -2448,6 +2498,19 @@ defmodule EspresoWeb.StaffPosLive do
   defp size_label(size) when is_binary(size), do: size
   defp size_label(_), do: "Regular"
 
+  defp pos_size_prices(prices) when is_list(prices) do
+    Enum.sort_by(prices, &pos_size_sort_key/1)
+  end
+
+  defp pos_size_sort_key(%{size: size}) when is_binary(size) do
+    case Regex.run(~r/\d+/, size) do
+      [digits] -> {1, String.to_integer(digits), size}
+      _ -> {2, 0, size}
+    end
+  end
+
+  defp pos_size_sort_key(_), do: {0, 0, ""}
+
   defp selected_price_id(%{product_prices: [price]}, _card_sizes), do: price.id
 
   defp selected_price_id(%{id: product_id, product_prices: prices}, card_sizes) do
@@ -2465,10 +2528,30 @@ defmodule EspresoWeb.StaffPosLive do
     Enum.find(prices, &(&1.id == price_id)) || List.first(prices)
   end
 
-  defp displayed_price_label(%{product_prices: prices} = product, card_sizes) do
-    case selected_price(product, prices, card_sizes) do
-      %{price: price} -> Menu.format_price(price)
-      _ -> price_label(product)
+  defp picker_required?(prices, params) when is_list(prices) do
+    length(prices) > 1 and is_nil(params["price-id"])
+  end
+
+  defp picker_price(product, prices, card_sizes, %{"price-id" => price_id}) do
+    parsed =
+      case Integer.parse(to_string(price_id)) do
+        {id, ""} -> id
+        _ -> selected_price_id(product, card_sizes)
+      end
+
+    Enum.find(prices, &(&1.id == parsed)) || selected_price(product, prices, card_sizes)
+  end
+
+  defp picker_price(product, prices, card_sizes, _params) do
+    selected_price(product, prices, card_sizes)
+  end
+
+  defp size_picker_product(_categories, nil), do: nil
+
+  defp size_picker_product(categories, product_id) when is_integer(product_id) do
+    case find_product_entry(categories, product_id) do
+      {_category, product} -> product
+      _ -> nil
     end
   end
 
@@ -2669,6 +2752,7 @@ defmodule EspresoWeb.StaffPosLive do
     |> clear_place_flash()
     |> assign(:cart, [])
     |> assign(:card_sizes, %{})
+    |> assign(:size_picker_product_id, nil)
     |> assign(:variant_editor_key, nil)
     |> assign(:added_product_id, nil)
     |> assign(:last_order, nil)
