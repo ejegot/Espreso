@@ -114,13 +114,20 @@ defmodule EspresoWeb.StaffHomeLive do
   def render(assigns) do
     ~H"""
     <.staff_shell current={:home} current_user={@current_user} page_title="Home" chrome={:bar}>
-      <main class="staff-home-main staff-home-hub staff-home-desk" id="staff-home-desk">
+      <main
+        class={[
+          "staff-home-main staff-home-hub staff-home-desk",
+          @today_visible? && "staff-home-desk--money",
+          not @today_visible? && "staff-home-desk--counter"
+        ]}
+        id="staff-home-desk"
+      >
         <header class="staff-home-identity" id="staff-home-identity">
           <p class="staff-home-greeting" id="staff-home-greeting">{@greeting}</p>
           <p class="staff-home-identity-role">{User.role_label(@current_user.role)}</p>
         </header>
 
-        <div class="staff-home-desk-stage">
+        <div class={["staff-home-desk-stage", @today_visible? && "staff-home-desk-stage--split"]}>
           <section
             :if={@today_visible?}
             class="staff-home-today"
@@ -174,7 +181,7 @@ defmodule EspresoWeb.StaffHomeLive do
         <section class="staff-home-desk-tools" aria-label="Now">
           <div class="staff-home-secondary">
             <.link
-              :for={item <- @desk_tools}
+              :for={item <- @launch_tools}
               navigate={item.path}
               class={["staff-home-tool-link", item[:class]]}
               id={"staff-home-#{item.id}"}
@@ -188,6 +195,17 @@ defmodule EspresoWeb.StaffHomeLive do
                   {item.count}
                 </span>
               </span>
+              <span class="staff-home-tool-body">{item.body}</span>
+            </.link>
+          </div>
+          <div :if={@shift_tools != []} class="staff-home-tertiary">
+            <.link
+              :for={item <- @shift_tools}
+              navigate={item.path}
+              class={["staff-home-tool-link", "staff-home-tool-link--quiet", item[:class]]}
+              id={"staff-home-#{item.id}"}
+            >
+              <span class="staff-home-tool-label">{item.title}</span>
               <span class="staff-home-tool-body">{item.body}</span>
             </.link>
           </div>
@@ -255,7 +273,14 @@ defmodule EspresoWeb.StaffHomeLive do
     |> assign(:printer_on_home?, money? and Printer.enabled?())
     |> assign(:greeting, staff_greeting(user))
     |> assign(:primary, primary_tiles(user))
-    |> assign(:desk_tools, desk_tools(user, overview))
+    |> then(fn socket ->
+      tools = desk_tools(user, overview)
+      {shift_tools, launch_tools} = Enum.split_with(tools, &(&1.id == "my-shifts"))
+
+      socket
+      |> assign(:launch_tools, launch_tools)
+      |> assign(:shift_tools, shift_tools)
+    end)
   end
 
   defp staff_greeting(%User{name: name}) do
