@@ -188,7 +188,8 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   def handle_event("open_mark_paid", %{"id" => id}, socket) do
     with {order_id, ""} <- Integer.parse(id),
-         %Espreso.Orders.Order{} = order <- Repo.get(Espreso.Orders.Order, order_id) do
+         %Espreso.Orders.Order{} = order <-
+           Espreso.Orders.Order |> Repo.get(order_id) |> Repo.preload(:items) do
       if modal_payment_action?(order) do
         {:noreply, assign(socket, :mark_paid_order, order)}
       else
@@ -950,10 +951,7 @@ defmodule EspresoWeb.StaffOrdersLive do
             <span class="staff-order-item-qty">{item.quantity} ×</span>
             <span class="staff-order-item-detail">
               <span class="staff-order-item-name">{item.name}</span>
-              <span
-                :if={item.size || Orders.temperature_meta(item)}
-                class="staff-order-item-meta"
-              >
+              <span :if={item.size || Orders.temperature_meta(item)} class="staff-order-item-meta">
                 <span :if={item.size} class="staff-order-item-size">{item.size}</span>
                 <span :if={item.size && Orders.temperature_meta(item)} class="staff-order-item-dot">
                   ·
@@ -992,72 +990,72 @@ defmodule EspresoWeb.StaffOrdersLive do
 
       <div class="staff-order-actions">
         <div class="staff-order-actions-row">
-        <div
-          :if={@needs_pay?}
-          class={[
-            "staff-order-pay-actions",
-            "staff-order-pay-actions--primary",
-            @awaiting_pay? && "staff-order-pay-actions--waiting"
-          ]}
-        >
-          <p :if={waiting_for_online_payment?(@order)} class="staff-order-payment-waiting">
-            Waiting for online payment
-          </p>
-          {payment_action_buttons(%{
-            order: @order,
-            id_prefix: "ticket",
-            lane: @lane,
-            mark_paid_permit: @mark_paid_permit
-          })}
-        </div>
+          <div
+            :if={@needs_pay?}
+            class={[
+              "staff-order-pay-actions",
+              "staff-order-pay-actions--primary",
+              @awaiting_pay? && "staff-order-pay-actions--waiting"
+            ]}
+          >
+            <p :if={waiting_for_online_payment?(@order)} class="staff-order-payment-waiting">
+              Waiting for online payment
+            </p>
+            {payment_action_buttons(%{
+              order: @order,
+              id_prefix: "ticket",
+              lane: @lane,
+              mark_paid_permit: @mark_paid_permit
+            })}
+          </div>
 
-        <div
-          :if={
-            (@order.status == "received" and not Orders.unpaid?(@order)) or
-              (@order.status == "preparing" and not Orders.unpaid?(@order)) or
-              (@order.status == "ready" and not Orders.unpaid?(@order))
-          }
-          class="staff-order-kitchen-actions"
-        >
-          <button
-            :if={@order.status == "received" and not Orders.unpaid?(@order)}
-            type="button"
-            class="staff-action staff-action-primary"
-            id={"order-prepare-#{@order.id}"}
-            phx-click="set_status"
-            phx-value-id={@order.id}
-            phx-value-status="preparing"
+          <div
+            :if={
+              (@order.status == "received" and not Orders.unpaid?(@order)) or
+                (@order.status == "preparing" and not Orders.unpaid?(@order)) or
+                (@order.status == "ready" and not Orders.unpaid?(@order))
+            }
+            class="staff-order-kitchen-actions"
           >
-            Prepare
-          </button>
-          <button
-            :if={@order.status == "preparing" and not Orders.unpaid?(@order)}
-            type="button"
-            class="staff-action staff-action-primary"
-            id={"order-ready-#{@order.id}"}
-            phx-click="set_status"
-            phx-value-id={@order.id}
-            phx-value-status="ready"
-          >
-            Ready
-          </button>
-          <button
-            :if={@order.status == "ready" and not Orders.unpaid?(@order)}
-            type="button"
-            class="staff-action staff-action-primary staff-action-complete"
-            id={"ready-complete-#{@order.id}"}
-            phx-click="complete_order"
-            phx-value-id={@order.id}
-          >
-            Picked up
-          </button>
-        </div>
+            <button
+              :if={@order.status == "received" and not Orders.unpaid?(@order)}
+              type="button"
+              class="staff-action staff-action-primary"
+              id={"order-prepare-#{@order.id}"}
+              phx-click="set_status"
+              phx-value-id={@order.id}
+              phx-value-status="preparing"
+            >
+              Prepare
+            </button>
+            <button
+              :if={@order.status == "preparing" and not Orders.unpaid?(@order)}
+              type="button"
+              class="staff-action staff-action-primary"
+              id={"order-ready-#{@order.id}"}
+              phx-click="set_status"
+              phx-value-id={@order.id}
+              phx-value-status="ready"
+            >
+              Ready
+            </button>
+            <button
+              :if={@order.status == "ready" and not Orders.unpaid?(@order)}
+              type="button"
+              class="staff-action staff-action-primary staff-action-complete"
+              id={"ready-complete-#{@order.id}"}
+              phx-click="complete_order"
+              phx-value-id={@order.id}
+            >
+              Picked up
+            </button>
+          </div>
 
-        <details
-          :if={ticket_overflow_actions?(@order)}
-          class="staff-order-more"
-          id={"order-more-#{@order.id}"}
-        >
+          <details
+            :if={ticket_overflow_actions?(@order)}
+            class="staff-order-more"
+            id={"order-more-#{@order.id}"}
+          >
             <summary class="staff-order-more-summary" aria-label="More actions">⋯</summary>
             <div class="staff-order-more-panel">
               <button
@@ -1277,7 +1275,7 @@ defmodule EspresoWeb.StaffOrdersLive do
        })
        when wallet in ["gcash", "maya"] do
     if BusinessSettings.qrph_manual?() do
-      {:modal, [{wallet, wallet_label(wallet), :primary}]}
+      {:modal, [{wallet, "Confirm #{wallet_label(wallet)}", :primary}]}
     else
       :waiting
     end
@@ -1508,6 +1506,7 @@ defmodule EspresoWeb.StaffOrdersLive do
       |> assign(:suggested_paid_via, suggested_paid_via(order))
       |> assign(:mark_paid_options, options)
       |> assign(:mark_paid_note, mark_paid_note(order))
+      |> assign(:note, order_note(order))
 
     ~H"""
     <div class="staff-mark-paid-modal" id="mark-paid-modal" role="dialog" aria-modal="true">
@@ -1523,13 +1522,40 @@ defmodule EspresoWeb.StaffOrdersLive do
             <p class="staff-mark-paid-modal-eyebrow">Mark paid</p>
             <h2 class="staff-mark-paid-modal-title">{@order.number}</h2>
             <p class="staff-mark-paid-modal-sub">
-              {@order.customer_name} · {Orders.format_total(@order)}
+              {@order.customer_name} · {fulfillment_short(@order)} · {Orders.format_total(@order)}
             </p>
           </div>
           <button type="button" class="staff-mark-paid-modal-close" phx-click="close_mark_paid">
             ×
           </button>
         </header>
+
+        <ul class="staff-mark-paid-modal-items" id="mark-paid-modal-items">
+          <li :for={item <- @order.items} class="staff-mark-paid-modal-item">
+            <span class="staff-mark-paid-modal-item-qty">{item.quantity} ×</span>
+            <span class="staff-mark-paid-modal-item-detail">
+              <span class="staff-mark-paid-modal-item-name">{item.name}</span>
+              <span
+                :if={item.size || Orders.temperature_meta(item)}
+                class="staff-mark-paid-modal-item-meta"
+              >
+                <span :if={item.size}>{item.size}</span>
+                <span :if={item.size && Orders.temperature_meta(item)}> · </span>
+                <span
+                  :if={meta = Orders.temperature_meta(item)}
+                  class={"staff-mark-paid-modal-item-temp is-#{meta.tone}"}
+                >
+                  {meta.label}
+                </span>
+              </span>
+            </span>
+          </li>
+        </ul>
+
+        <div :if={@note} class="staff-mark-paid-modal-order-note">
+          <p class="staff-mark-paid-modal-order-note-label">Note</p>
+          <p class="staff-mark-paid-modal-order-note-body">{@note}</p>
+        </div>
 
         <p class="staff-mark-paid-modal-note">{@mark_paid_note}</p>
 

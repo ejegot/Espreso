@@ -12358,7 +12358,9 @@ body:has(.staff-nav-drawer.is-open) {
 .staff-mark-paid-modal-panel {
   position: relative;
   z-index: 1;
-  width: min(100%, 24rem);
+  width: min(100%, 26rem);
+  max-height: min(40rem, calc(100dvh - 2rem));
+  overflow-y: auto;
   padding: 1.15rem 1.1rem 1.25rem;
   border-radius: 1rem;
   background: #fff;
@@ -12588,10 +12590,81 @@ body:has(.staff-nav-drawer.is-open) {
   line-height: 1.45;
 }
 
+.staff-mark-paid-modal-items {
+  list-style: none;
+  margin: 0 0 0.85rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, var(--cs-cream, #f4efe3) 70%, #fff);
+}
+
+.staff-mark-paid-modal-item {
+  display: grid;
+  grid-template-columns: 1.7rem minmax(0, 1fr);
+  gap: 0.1rem 0.3rem;
+  align-items: baseline;
+}
+
+.staff-mark-paid-modal-item + .staff-mark-paid-modal-item {
+  margin-top: 0.35rem;
+}
+
+.staff-mark-paid-modal-item-qty {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.staff-mark-paid-modal-item-name {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--cs-brown, #2d2018);
+}
+
+.staff-mark-paid-modal-item-meta {
+  display: block;
+  color: color-mix(in srgb, var(--cs-brown, #2d2018) 58%, #b0a098);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.staff-mark-paid-modal-item-temp.is-hot {
+  color: #9a3412;
+}
+
+.staff-mark-paid-modal-item-temp.is-iced {
+  color: #0e7490;
+}
+
+.staff-mark-paid-modal-order-note {
+  margin: 0 0 0.85rem;
+  padding: 0.4rem 0.55rem;
+  border-left: 3px solid var(--cs-brown, #2d2018);
+  background: color-mix(in srgb, var(--cs-cream, #f4efe3) 80%, #fff);
+}
+
+.staff-mark-paid-modal-order-note-label {
+  margin: 0;
+  color: var(--cs-brown, #2d2018);
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.staff-mark-paid-modal-order-note-body {
+  margin: 0.1rem 0 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
 .staff-mark-paid-modal-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem;
+}
+
+.staff-mark-paid-modal-options:has(> :only-child) {
+  grid-template-columns: 1fr;
 }
 
 .staff-mark-paid-option {
