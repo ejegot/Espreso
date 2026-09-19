@@ -2639,8 +2639,8 @@ defmodule EspresoWeb.MenuLive do
   end
 
   # Customer-facing My Orders labels only — DB status remains unchanged.
-  defp customer_my_order_status_label(%{status: "ready"}), do: "Ready — come to counter"
-  defp customer_my_order_status_label(%{status: "completed"}), do: "Picked up ✓"
+  defp customer_my_order_status_label(%{status: "ready"}), do: "Ready for pick up"
+  defp customer_my_order_status_label(%{status: "completed"}), do: "Done"
   defp customer_my_order_status_label(%{status: "preparing"}), do: "Preparing"
 
   defp customer_my_order_status_label(%{payment_status: "awaiting_payment"}),

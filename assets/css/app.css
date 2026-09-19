@@ -8608,11 +8608,16 @@ a.staff-home-card:focus-visible {
 .staff-pos-page .staff-pos-place-flash-orders {
   flex: 0 0 auto;
   margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: inherit;
+  font: inherit;
   font-size: 0.74rem;
   font-weight: 800;
   text-decoration: underline;
   text-underline-offset: 0.16rem;
+  cursor: pointer;
 }
 
 .staff-pos-page .staff-pos-notes-toggle {
@@ -9200,6 +9205,125 @@ a.staff-home-card:focus-visible {
   border-color: color-mix(in srgb, var(--cs-orange) 45%, transparent);
   background: color-mix(in srgb, var(--cs-orange) 6%, #fff);
   outline: none;
+}
+
+.staff-pos-order-review {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.staff-pos-order-review-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: rgba(24, 16, 12, 0.42);
+  cursor: pointer;
+}
+
+.staff-pos-order-review-panel {
+  position: relative;
+  z-index: 1;
+  width: min(28rem, calc(100vw - 2rem));
+  max-height: min(36rem, calc(100dvh - 2rem));
+  overflow: auto;
+  padding: 1.15rem 1.2rem 1.2rem;
+  background: #fff;
+}
+
+.staff-pos-order-review-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
+.staff-pos-order-review-eyebrow {
+  margin: 0 0 0.15rem;
+  color: var(--cs-beige);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.staff-pos-order-review-title {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.staff-pos-order-review-done {
+  min-height: 2.65rem;
+  padding: 0 0.9rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--elilai-forest, #394331) 16%, transparent);
+  background: #fff;
+  color: var(--elilai-cacao, #2e3529);
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.staff-pos-order-review-meta {
+  margin: 0 0 0.75rem;
+  color: color-mix(in srgb, #382010 62%, #b0a098);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.staff-pos-order-review-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.staff-pos-order-review-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.4rem;
+  align-items: baseline;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.staff-pos-order-review-size {
+  display: block;
+  color: color-mix(in srgb, #382010 55%, #b0a098);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.staff-pos-order-review-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin: 0.9rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--cs-line);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.staff-pos-order-review-total strong {
+  font-size: 1.25rem;
+}
+
+@media (min-width: 760px) {
+  .staff-pos-order-review-panel {
+    width: min(34rem, calc(100vw - 3rem));
+    padding: 1.35rem 1.45rem 1.4rem;
+  }
 }
 
 .staff-pos-page .staff-empty {
@@ -16932,11 +17056,13 @@ body:has(.home-page-landing) {
 /* C5b — linear progress tracker + cancelled exception */
 .order-page .order-progress {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.35rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
   list-style: none;
-  margin: 0.85rem 0 0;
-  padding: 0.75rem 0.35rem 0.55rem;
+  width: 100%;
+  max-width: 19.5rem;
+  margin: 0.85rem auto 0;
+  padding: 0.75rem 0.55rem 0.55rem;
   border: 1px solid rgba(56, 32, 16, 0.1);
   border-radius: 0.9rem;
   background: color-mix(in srgb, #faf7f4 88%, #fff);
@@ -17162,14 +17288,18 @@ body:has(.home-page-landing) {
 
 .order-page .order-qrph-payment--hero {
   display: grid;
-  gap: 0.85rem;
-  margin-bottom: 1.15rem;
-  padding: 1.25rem 1rem 1.35rem;
+  gap: 0.45rem;
+  margin-bottom: 0;
+  padding: 0.7rem 0.75rem 0.85rem;
   border-color: color-mix(in srgb, #f85020 22%, rgba(56, 32, 16, 0.12));
 }
 
 .order-page .order-card--confirm .order-qrph-payment {
-  margin-top: 0.35rem;
+  margin-top: 0;
+}
+
+.order-page .order-card--pay {
+  padding-bottom: 0.35rem;
 }
 
 .order-page .order-card--pay .order-title--pay {
@@ -17178,7 +17308,7 @@ body:has(.home-page-landing) {
 
 .order-page .order-qrph-hero {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.15rem;
   justify-items: center;
   text-align: center;
 }
@@ -17187,7 +17317,7 @@ body:has(.home-page-landing) {
   margin: 0;
   color: #382010;
   font-family: "DM Sans", sans-serif;
-  font-size: clamp(1.65rem, 7vw, 2.15rem);
+  font-size: 1.35rem;
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1.1;
@@ -17305,20 +17435,55 @@ body:has(.home-page-landing) {
 
 .order-page .order-qrph-codes {
   display: grid;
-  gap: 1rem;
+  gap: 0.3rem;
   justify-items: center;
+}
+
+.order-page .order-qrph-or {
+  margin: 0;
+  color: #7a5a48;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.order-page .order-qrph-counter-hint {
+  margin: 0;
+  text-align: center;
+  color: #382010;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.3;
 }
 
 .order-page .order-qrph-code {
   display: grid;
-  gap: 0.55rem;
   justify-items: center;
   margin: 0;
-  width: min(100%, 15rem);
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.order-page .order-qrph-code--thumb {
+  gap: 0.2rem;
+}
+
+.order-page .order-qrph-code-name {
+  color: #5c4a40;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .order-page .order-qrph-code--hero {
-  width: min(100%, 17.5rem);
+  width: auto;
 }
 
 .order-page .order-qrph-code figcaption {
@@ -17333,20 +17498,109 @@ body:has(.home-page-landing) {
 
 .order-page .order-qrph-code img {
   display: block;
-  width: min(100%, 14rem);
+  width: 4.75rem;
   height: auto;
-  padding: 0.65rem;
+  object-fit: contain;
+  padding: 0.15rem;
   border: 1px solid rgba(56, 32, 16, 0.1);
-  border-radius: 0.9rem;
+  border-radius: 0.55rem;
   background: #fff;
-  box-shadow: 0 8px 22px rgba(56, 32, 16, 0.08);
 }
 
 .order-page .order-qrph-code--hero img {
-  width: min(100%, 16.5rem);
-  padding: 0.75rem;
+  width: 4.75rem;
+  height: auto;
+  padding: 0.15rem;
+  border-radius: 0.55rem;
+  box-shadow: none;
+}
+
+.order-page .order-qrph-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+}
+
+.order-page .order-qrph-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgba(56, 32, 16, 0.48);
+  cursor: pointer;
+}
+
+.order-page .order-qrph-modal-panel {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+  width: min(100%, 20rem);
+  padding: 1.15rem 1rem 1rem;
   border-radius: 1rem;
-  box-shadow: 0 12px 28px rgba(56, 32, 16, 0.1);
+  background: #fff;
+  text-align: center;
+}
+
+.order-page .order-qrph-modal-amount {
+  margin: 0;
+  color: #382010;
+  font-family: "DM Sans", sans-serif;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.order-page .order-qrph-modal-number {
+  margin: 0;
+  color: #7a5a48;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.order-page .order-qrph-modal-panel img {
+  width: min(100%, 14rem);
+  height: auto;
+  padding: 0.4rem;
+  border: 1px solid rgba(56, 32, 16, 0.1);
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.order-page .order-qrph-modal-name {
+  margin: 0;
+  color: #382010;
+  font-family: "DM Sans", sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.order-page .order-qrph-modal-hint {
+  margin: 0;
+  max-width: 16rem;
+  color: #7a5a48;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.order-page .order-qrph-modal-close {
+  margin-top: 0.35rem;
+  min-height: 2.4rem;
+  padding: 0.4rem 1.1rem;
+  border: 0;
+  border-radius: 0.7rem;
+  background: #382010;
+  color: #fff;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .order-page .order-qrph-amount-block {
@@ -17359,14 +17613,15 @@ body:has(.home-page-landing) {
 .order-page .order-qrph-amount {
   margin: 0;
   display: grid;
-  gap: 0.1rem;
+  gap: 0.05rem;
   justify-items: center;
+  text-align: center;
 }
 
 .order-page .order-qrph-amount-label {
   color: #b0a098;
   font-family: "DM Sans", sans-serif;
-  font-size: 0.72rem;
+  font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -17375,10 +17630,10 @@ body:has(.home-page-landing) {
 .order-page .order-qrph-amount strong {
   color: #382010;
   font-family: "DM Sans", sans-serif;
-  font-size: clamp(1.55rem, 6.5vw, 1.95rem);
+  font-size: 1.45rem;
   font-weight: 800;
   letter-spacing: -0.02em;
-  line-height: 1.15;
+  line-height: 1.1;
 }
 
 .order-page .order-qrph-scan-hint {
@@ -17401,11 +17656,11 @@ body:has(.home-page-landing) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 3rem;
-  padding: 0.75rem 1rem;
-  border-radius: 0.85rem;
+  min-height: 2.55rem;
+  padding: 0.45rem 1rem;
+  border-radius: 0.75rem;
   font-family: "DM Sans", sans-serif;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 800;
   letter-spacing: -0.01em;
   text-decoration: none;
@@ -17451,16 +17706,16 @@ body:has(.home-page-landing) {
 }
 
 .order-page .order-qrph-waiting {
-  margin: 0.75rem 0 0;
+  margin: 0.15rem 0 0;
   padding: 0;
   border: 0;
   background: transparent;
   text-align: center;
   color: #7a5a48;
   font-family: "DM Sans", sans-serif;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.3;
 }
 
 .order-page .sr-only {

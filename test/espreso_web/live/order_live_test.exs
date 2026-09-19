@@ -64,7 +64,7 @@ defmodule EspresoWeb.OrderLiveTest do
     refute render(view) =~ "Received — kitchen has it"
 
     assert {:ok, _} = Orders.update_status(preparing, "ready")
-    assert has_element?(view, "#order-status-message", "Ready — please come to counter")
+    assert has_element?(view, "#order-status-message", "Ready for pick up")
     assert has_element?(view, "#order-hint", "Show #{order.number} at the counter")
     refute has_element?(view, "#order-hint", "Payment is due at the counter")
 
@@ -101,30 +101,63 @@ defmodule EspresoWeb.OrderLiveTest do
     {:ok, _} = Orders.mark_paid(order)
     {:ok, ready} = Orders.update_status(order, "ready")
     {:ok, view, html} = live(conn, ~p"/order/#{order.number}")
-    assert has_element?(view, "#order-status-message", "Ready — please come to counter")
+    assert has_element?(view, "#order-status-message", "Ready for pick up")
     assert has_element?(view, ~s(#order-progress [data-step="ready"][data-state="current"]))
     refute html =~ ~r/>Received — kitchen has it</
 
     assert {:ok, _} = Orders.complete_order(ready)
-    assert has_element?(view, "#order-complete-state")
-    assert has_element?(view, ".order-complete-badge", "Order complete")
-    assert has_element?(view, "#order-status-message", "Picked up ✓")
+    assert has_element?(view, ~s(#order-complete-state[data-returning="true"]))
+    refute has_element?(view, ".order-complete-badge")
+    assert has_element?(view, "#order-status-message", "All done")
 
     assert has_element?(
              view,
              "#order-hint",
-             "Your order has been picked up. Thank you for visiting CoffeeSpot."
+             "Thank you — heading back to the menu."
            )
 
     refute has_element?(view, "#order-progress")
-    assert has_element?(view, "#order-receipt")
+    refute has_element?(view, "#order-receipt")
     assert has_element?(view, ".order-number", order.number)
 
     hint = view |> element("#order-hint") |> render()
     refute hint =~ ~r/pay/i
     refute hint =~ ~r/claim/i
+    refute hint =~ ~r/picked up/i
     refute render(view) =~ "Received — kitchen has it"
-    assert has_element?(view, "a.order-more-link", "Order More")
+    refute render(view) =~ "Picked up"
+    assert has_element?(view, "a.order-more-link", "Back to menu")
+
+    send(view.pid, :return_to_menu)
+    assert_redirect(view, "/menu?stage=menu")
+  end
+
+  test "completed order from history stays as a receipt, not a live picked-up screen", %{
+    conn: conn
+  } do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "History Complete",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, _} = Orders.mark_paid(order)
+    {:ok, ready} = Orders.update_status(order, "ready")
+    {:ok, _} = Orders.complete_order(ready)
+
+    {:ok, view, html} = live(conn, ~p"/order/#{order.number}")
+    assert has_element?(view, "#order-complete-state")
+    refute has_element?(view, ~s(#order-complete-state[data-returning="true"]))
+    assert has_element?(view, "#order-status-message", "Thank you")
+    assert has_element?(view, "#order-hint", "This order is done.")
+    assert has_element?(view, "#order-receipt")
+    refute has_element?(view, "#order-progress")
+    refute html =~ "Picked up"
+    assert has_element?(view, "a.order-more-link", "Back to menu")
   end
 
   test "customer order confirmation shows View My Order and Order More", %{conn: conn} do
@@ -231,17 +264,11 @@ defmodule EspresoWeb.OrderLiveTest do
     refute has_element?(view, "#order-confirm-recap")
 
     assert {:ok, _} = Orders.mark_paid_from_paymongo(order.number)
-    assert has_element?(view, "#order-confirm-title", "Order confirmed")
-
-    assert has_element?(
-             view,
-             "#order-confirm-lede",
-             "Your order is in. Takeout — pick it up at the counter when it's ready."
-           )
-
-    assert has_element?(view, "#order-confirm-recap .order-confirm-recap-total", "₱100")
-
-    refute has_element?(view, "#order-confirm-title", "Payment processing")
+    refute has_element?(view, "#order-confirm")
+    assert has_element?(view, "#order-chrome-title", "Your order")
+    assert has_element?(view, "#order-status-message", "Preparing your order")
+    assert has_element?(view, "#order-progress")
+    assert has_element?(view, "#order-paid-badge", "Paid ✓")
   end
 
   test "dine-in order confirmation shows dine-in lede without table", %{conn: conn} do
@@ -364,7 +391,7 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, ~s(#order-progress [data-step="received"][aria-current="step"]))
     assert has_element?(view, ~s(#order-progress [data-step="preparing"][data-state="upcoming"]))
     assert has_element?(view, ~s(#order-progress [data-step="ready"][data-state="upcoming"]))
-    assert has_element?(view, ~s(#order-progress [data-step="completed"][data-state="upcoming"]))
+    refute has_element?(view, ~s(#order-progress [data-step="completed"]))
 
     assert {:ok, _} = Orders.mark_paid(order)
     assert {:ok, preparing} = Orders.update_status(order, "preparing")
@@ -373,7 +400,7 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, ~s(#order-progress [data-step="preparing"][aria-current="step"]))
 
     assert {:ok, ready} = Orders.update_status(preparing, "ready")
-    assert has_element?(view, "#order-status-message", "Ready — please come to counter")
+    assert has_element?(view, "#order-status-message", "Ready for pick up")
 
     assert has_element?(
              view,
@@ -384,10 +411,11 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, ~s(#order-progress [data-step="ready"][aria-current="step"]))
 
     assert {:ok, _} = Orders.complete_order(ready)
-    assert has_element?(view, "#order-status-message", "Picked up ✓")
-    assert has_element?(view, "#order-hint", "Your order has been picked up")
+    assert has_element?(view, "#order-status-message", "All done")
+    assert has_element?(view, "#order-hint", "Thank you — heading back to the menu.")
     assert has_element?(view, "#order-complete-state")
     refute has_element?(view, "#order-progress")
+    refute render(view) =~ "Picked up"
   end
 
   test "paid preparing order does not tell the customer to pay", %{conn: conn} do
@@ -413,7 +441,7 @@ defmodule EspresoWeb.OrderLiveTest do
     refute render(view) =~ ~r/claim/i
   end
 
-  test "awaiting_payment order shows counter-scan pay screen without QR image", %{conn: conn} do
+  test "awaiting_payment order shows counter pay first and optional QR modal", %{conn: conn} do
     set_payments_mode!("qrph_manual")
 
     setting = Espreso.BusinessSettings.get()
@@ -444,16 +472,37 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, "#order-qrph-awaiting", "GCash")
     assert has_element?(view, "#order-qrph-amount", "₱120")
     assert has_element?(view, "#order-qrph-waiting", "Waiting for staff to confirm.")
-    assert has_element?(view, ~s(#order-qrph-open-gcash[href="gcash://"]), "Open GCash")
+    assert has_element?(view, "#order-qrph-counter-hint", "Scan the QR at the counter")
+    refute has_element?(view, "#order-qrph-open-gcash")
     refute has_element?(view, "#order-qrph-open-maya")
+    assert has_element?(view, "#order-qrph-or", "Or pay here")
+    assert has_element?(
+             view,
+             ~s(#order-qrph-code-gcash img[src="/images/gcash-qrph.png"][alt="GCash QR"])
+           )
+
+    assert has_element?(view, "#order-qrph-code-gcash", "GCash")
+    refute has_element?(view, "#order-qrph-code-maya")
+    refute has_element?(view, "#order-qrph-modal")
     refute html =~ "Scan the GCash QR at the counter"
     refute html =~ "Open GCash on this phone"
     refute html =~ "I’ve paid"
-    refute html =~ "/images/gcash-qrph.png"
     refute html =~ "/images/maya-qrph.png"
-    refute html =~ "alt=\"GCash QRPh code\""
     refute has_element?(view, "#order-progress")
-    assert has_element?(view, "#order-receipt .order-payment", "Awaiting GCash payment")
+    refute has_element?(view, "#order-receipt")
+    refute has_element?(view, "#order-order-more")
+    refute has_element?(view, "#order-elilai-rewards")
+
+    view |> element("#order-qrph-code-gcash") |> render_click()
+    assert has_element?(view, "#order-qrph-modal")
+    assert has_element?(view, "#order-qrph-modal-img[src='/images/gcash-qrph.png']")
+    assert has_element?(view, "#order-qrph-modal-title", "GCash")
+    assert has_element?(view, "#order-qrph-modal", "₱120")
+    assert has_element?(view, "#order-qrph-modal", order.number)
+    refute render(view) =~ "gcash://"
+
+    view |> element("#order-qrph-modal-close") |> render_click()
+    refute has_element?(view, "#order-qrph-modal")
 
     assert {:ok, _} = Orders.mark_paid(order, paid_via: "gcash")
     refute has_element?(view, "#order-qrph-payment")
@@ -495,19 +544,34 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, "#order-confirm-qrph")
     assert has_element?(view, "#order-confirm-qrph-number", order.number)
     assert has_element?(view, "#order-confirm-qrph-amount", "₱95")
-    assert has_element?(view, ~s(#order-confirm-qrph-open-gcash[href="gcash://"]), "Open GCash")
+    refute has_element?(view, "#order-confirm-qrph-open-gcash")
     assert has_element?(view, "#order-confirm-qrph-waiting", "Waiting for staff to confirm.")
-    refute html =~ "scan the QR at the counter"
-    refute html =~ "/images/gcash-qrph.png"
+    assert has_element?(view, "#order-confirm-qrph-counter-hint", "Scan the QR at the counter")
+    assert has_element?(view, "#order-confirm-qrph-or", "Or pay here")
+    assert has_element?(
+             view,
+             ~s(#order-confirm-qrph-code-gcash img[src="/images/gcash-qrph.png"][alt="GCash QR"])
+           )
+
+    refute html =~ "gcash://"
+    refute html =~ "I’ve paid"
     refute has_element?(view, "#order-confirm-title", "Order confirmed")
     refute has_element?(view, "#order-confirm-recap")
     refute has_element?(view, "#order-confirm-number")
 
     assert {:ok, _} = Orders.mark_paid(order, paid_via: "gcash")
-    assert has_element?(view, "#order-confirm-title", "Order confirmed")
+    refute has_element?(view, "#order-confirm")
     refute has_element?(view, "#order-confirm-qrph")
-    assert has_element?(view, "#order-confirm-number", order.number)
-    assert has_element?(view, "#order-confirm-recap .order-confirm-recap-total", "₱95")
+    assert has_element?(view, "#order-chrome-title", "Your order")
+    assert has_element?(view, "#order-status-message", "Preparing your order")
+    assert has_element?(view, "#order-paid-badge", "Paid ✓")
+    assert has_element?(view, "#order-progress")
+    assert has_element?(
+             view,
+             ~s(#order-progress [data-step="preparing"][data-state="current"][aria-current="step"])
+           )
+
+    refute has_element?(view, "#order-view-my-order")
   end
 
   test "anonymous order does not show ELIlai Rewards", %{conn: conn} do

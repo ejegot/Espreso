@@ -66,6 +66,8 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:size_picker_product_id, nil)
      |> assign(:added_product_id, nil)
      |> assign(:last_order, nil)
+     |> assign(:review_order, nil)
+     |> assign(:review_open?, false)
      |> assign(:print_note, nil)
      |> assign(:error, nil)
      |> assign(:submission_error, nil), layout: false}
@@ -132,7 +134,9 @@ defmodule EspresoWeb.StaffPosLive do
              "set_fulfillment",
              "set_payment_method",
              "set_payment_choice",
-             "set_paid_via"
+             "set_paid_via",
+             "open_order_review",
+             "close_order_review"
            ] do
     {:noreply, socket}
   end
@@ -364,6 +368,28 @@ defmodule EspresoWeb.StaffPosLive do
 
   def handle_event("new_order", _params, socket) do
     {:noreply, reset_ticket(socket)}
+  end
+
+  def handle_event("open_order_review", _params, socket) do
+    order = socket.assigns[:review_order] || socket.assigns.last_order
+
+    cond do
+      is_nil(order) ->
+        {:noreply, socket}
+
+      match?(%Ecto.Association.NotLoaded{}, Map.get(order, :items)) ->
+        {:noreply,
+         socket
+         |> assign(:review_order, Espreso.Repo.preload(order, :items))
+         |> assign(:review_open?, true)}
+
+      true ->
+        {:noreply, assign(socket, :review_open?, true)}
+    end
+  end
+
+  def handle_event("close_order_review", _params, socket) do
+    {:noreply, assign(socket, :review_open?, false)}
   end
 
   def handle_event("dismiss_place_flash", _params, socket) do
@@ -1051,9 +1077,14 @@ defmodule EspresoWeb.StaffPosLive do
                 aria-atomic="true"
               >
                 <span>{@place_flash}</span>
-                <.link navigate={~p"/orders"} class="staff-pos-place-flash-orders">
-                  View Orders
-                </.link>
+                <button
+                  type="button"
+                  class="staff-pos-place-flash-orders"
+                  id="pos-view-order"
+                  phx-click="open_order_review"
+                >
+                  View Order
+                </button>
                 <button
                   type="button"
                   class="staff-pos-place-flash-dismiss"
@@ -1139,9 +1170,14 @@ defmodule EspresoWeb.StaffPosLive do
                     >
                       New Order
                     </button>
-                    <.link navigate={~p"/orders"} class="staff-pos-view-orders">
-                      View Orders
-                    </.link>
+                    <button
+                      type="button"
+                      class="staff-pos-view-orders"
+                      id="pos-confirmation-view-order"
+                      phx-click="open_order_review"
+                    >
+                      View Order
+                    </button>
                   </div>
                 </div>
               <% else %>
@@ -1507,6 +1543,8 @@ defmodule EspresoWeb.StaffPosLive do
                    size_picker_product(@categories, @size_picker_product_id) do %>
           <.size_picker product={product} />
         <% end %>
+
+        <.order_review :if={@review_open? and @review_order} order={@review_order} />
       </div>
     </.staff_shell>
     """
@@ -1551,6 +1589,62 @@ defmodule EspresoWeb.StaffPosLive do
             <span class="staff-pos-size-option-price">{Menu.format_price(price.price)}</span>
           </button>
         </div>
+      </div>
+    </div>
+    """
+  end
+
+  defp order_review(assigns) do
+    ~H"""
+    <div
+      id="pos-order-review"
+      class="staff-pos-order-review"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pos-order-review-title"
+    >
+      <button
+        type="button"
+        class="staff-pos-order-review-backdrop"
+        phx-click="close_order_review"
+        aria-label="Close order review"
+      />
+      <div class="staff-pos-order-review-panel staff-pos-modal-panel">
+        <header class="staff-pos-order-review-head">
+          <div>
+            <p class="staff-pos-order-review-eyebrow">Saved sale</p>
+            <h2 class="staff-pos-order-review-title" id="pos-order-review-title">
+              {@order.number}
+            </h2>
+          </div>
+          <button
+            type="button"
+            class="staff-pos-order-review-done"
+            id="pos-order-review-done"
+            phx-click="close_order_review"
+          >
+            Done
+          </button>
+        </header>
+        <p class="staff-pos-order-review-meta">
+          {Orders.fulfillment_label(@order.fulfillment)} · {@order.customer_name} · {Orders.payment_label(
+            @order
+          )}
+        </p>
+        <ul class="staff-pos-order-review-items" id="pos-order-review-items">
+          <li :for={item <- @order.items} class="staff-pos-order-review-item">
+            <span class="staff-pos-order-review-qty">{item.quantity} ×</span>
+            <span class="staff-pos-order-review-name">
+              {item.name}
+              <span :if={item.size} class="staff-pos-order-review-size">{item.size}</span>
+            </span>
+            <span class="staff-pos-order-review-line">{Menu.format_price(item.line_total)}</span>
+          </li>
+        </ul>
+        <p class="staff-pos-order-review-total" id="pos-order-review-total">
+          <span>Total</span>
+          <strong>{Menu.format_price(@order.total)}</strong>
+        </p>
       </div>
     </div>
     """
@@ -2003,10 +2097,12 @@ defmodule EspresoWeb.StaffPosLive do
             if failed? do
               socket
               |> assign(:last_order, order)
+              |> remember_review_order(order)
               |> clear_place_flash()
             else
               socket
               |> assign(:last_order, nil)
+              |> remember_review_order(order)
               |> put_place_flash(flash)
             end
 
@@ -2159,6 +2255,7 @@ defmodule EspresoWeb.StaffPosLive do
               if failed? do
                 socket
                 |> assign(:last_order, order)
+                |> remember_review_order(order)
                 |> clear_place_flash()
               else
                 flash = place_flash_message(order, note, cash_change, loyalty_note)
@@ -2171,6 +2268,7 @@ defmodule EspresoWeb.StaffPosLive do
                     else: nil
                   )
                 )
+                |> remember_review_order(order)
                 |> put_place_flash(flash)
               end
 
@@ -2757,6 +2855,8 @@ defmodule EspresoWeb.StaffPosLive do
     |> assign(:variant_editor_key, nil)
     |> assign(:added_product_id, nil)
     |> assign(:last_order, nil)
+    |> assign(:review_order, nil)
+    |> assign(:review_open?, false)
     |> assign(:print_note, nil)
     |> assign(:print_failed?, false)
     |> assign(:print_retry_token, nil)
@@ -2822,6 +2922,12 @@ defmodule EspresoWeb.StaffPosLive do
     socket
     |> assign(:cart_undo, nil)
     |> assign(:cart_undo_timer, nil)
+  end
+
+  defp remember_review_order(socket, order) do
+    socket
+    |> assign(:review_order, order)
+    |> assign(:review_open?, false)
   end
 
   defp put_place_flash(socket, flash) do
