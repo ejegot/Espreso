@@ -55,6 +55,8 @@ defmodule EspresoWeb.AdminUsersLiveTest do
     view |> element("#staff-team-add-toggle") |> render_click()
     assert has_element?(view, "#staff-team-add")
     assert has_element?(view, "#admin-user-form")
+    refute has_element?(view, "#staff-team-add-modal-container[phx-click-away]")
+    assert has_element?(view, ~s(#staff-team-add-modal-container[phx-key="escape"]))
 
     view
     |> form("#admin-user-form", %{

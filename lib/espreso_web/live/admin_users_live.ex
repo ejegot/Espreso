@@ -229,10 +229,7 @@ defmodule EspresoWeb.AdminUsersLive do
   def render(assigns) do
     ~H"""
     <.staff_shell current={:staff} current_user={@current_user} page_title="Staff" chrome={:bar}>
-      <main
-        class={["staff-team-page", @adding? && @users != [] && "staff-team-page--adding"]}
-        id="staff-team-page"
-      >
+      <main class="staff-team-page" id="staff-team-page">
         <header class="staff-team-head">
           <div class="staff-team-head-copy">
             <p class="staff-team-eyebrow">Team</p>
@@ -461,34 +458,38 @@ defmodule EspresoWeb.AdminUsersLive do
           </article>
         </section>
 
-        <section
-          :if={@adding? or @users == []}
-          class={["staff-team-add", @users != [] && "staff-team-add--panel"]}
-          id="staff-team-add"
-          aria-label="Add staff"
+        <.modal
+          :if={@adding?}
+          id="staff-team-add-modal"
+          show
+          click_away={false}
+          autofocus={false}
+          on_cancel={JS.push("toggle_add")}
         >
-          <h3 class="staff-team-section-title">Add staff</h3>
-          <p class="staff-team-section-hint">Create a Staff, Manager, or Owner account.</p>
-          <.form for={@form} id="admin-user-form" phx-submit="save" class="staff-team-form">
-            <.input field={@form[:name]} type="text" label="Name" required />
-            <.input field={@form[:email]} type="email" label="Email" required />
-            <.input field={@form[:password]} type="password" label="Password" required />
-            <.input field={@form[:role]} type="select" label="Role" options={role_options()} />
-            <div class="staff-team-actions">
-              <button
-                type="submit"
-                class="staff-team-btn staff-team-btn--primary"
-                id="staff-team-create"
-                phx-disable-with="Creating…"
-              >
-                Create account
-              </button>
-              <button :if={@users != []} type="button" class="staff-team-btn" phx-click="toggle_add">
-                Cancel
-              </button>
-            </div>
-          </.form>
-        </section>
+          <section class="staff-team-add" id="staff-team-add" aria-label="Add staff">
+            <h3 class="staff-confirm-dialog-title">Add staff</h3>
+            <p class="staff-confirm-dialog-copy">Create a Staff, Manager, or Owner account.</p>
+            <.form for={@form} id="admin-user-form" phx-submit="save" class="staff-team-form">
+              <.input field={@form[:name]} type="text" label="Name" required />
+              <.input field={@form[:email]} type="email" label="Email" required />
+              <.input field={@form[:password]} type="password" label="Password" required />
+              <.input field={@form[:role]} type="select" label="Role" options={role_options()} />
+              <div class="staff-confirm-dialog-actions">
+                <button
+                  type="submit"
+                  class="staff-team-btn staff-team-btn--primary"
+                  id="staff-team-create"
+                  phx-disable-with="Creating…"
+                >
+                  Create account
+                </button>
+                <button type="button" class="staff-team-btn" phx-click="toggle_add">
+                  Cancel
+                </button>
+              </div>
+            </.form>
+          </section>
+        </.modal>
 
         <.modal
           :if={@confirm}
