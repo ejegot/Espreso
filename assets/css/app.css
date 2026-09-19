@@ -4081,6 +4081,17 @@ body:has(.menu-page-locked) {
   margin-bottom: 0.85rem;
 }
 
+.dashboard-staff-note {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+  padding: 0.85rem 0 0.35rem;
+}
+
+.dashboard-staff-note .staff-empty {
+  margin: 0;
+}
+
 .dashboard-lede {
   margin: 0 !important;
   color: var(--dash-muted) !important;
@@ -4199,10 +4210,28 @@ body:has(.menu-page-locked) {
 
 /* —— Staff Home: operational launchpad —— */
 .staff-home-desk {
-  width: min(calc(100% - 1.5rem), 52rem) !important;
+  width: min(calc(100% - 1.5rem), 64rem) !important;
   display: grid;
   gap: 0.85rem;
   padding: 0.55rem 0 1.35rem !important;
+}
+
+.staff-home-desk-stage {
+  display: grid;
+  gap: 0.85rem;
+}
+
+@media (min-width: 800px) {
+  .staff-home-desk-stage:has(.staff-home-today) {
+    grid-template-columns: minmax(0, 1.1fr) minmax(16rem, 0.9fr);
+    align-items: stretch;
+  }
+
+  .staff-home-desk-stage .staff-home-primary,
+  .staff-home-desk-stage .staff-home-pos-cta {
+    height: 100%;
+    min-height: 0;
+  }
 }
 
 .staff-home-identity {
@@ -4544,6 +4573,11 @@ body:has(.menu-page-locked) {
 .staff-home-printer-btn:last-child {
   background: #fff;
   color: var(--cs-orange, #f85020);
+}
+
+.staff-home-printer--compact {
+  padding: 0.4rem 0.65rem;
+  box-shadow: none;
 }
 
 .staff-home-printer-note {

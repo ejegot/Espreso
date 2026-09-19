@@ -7,7 +7,7 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
   alias Espreso.Orders
   alias Espreso.Shifts
 
-  test "manager home shows paid breakdown and close tile; barista sees close without paid breakdown",
+  test "manager home shows paid breakdown; barista desk has Orders without close or money mix",
        %{
          conn: conn
        } do
@@ -43,7 +43,7 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
     {:ok, manager_view, _html} = live(manager_conn, ~p"/staff")
     assert has_element?(manager_view, "#staff-home-paid-breakdown", "Cash")
     assert has_element?(manager_view, "#staff-home-paid-breakdown", "₱75")
-    assert has_element?(manager_view, "#staff-home-close", "Close shift")
+    refute has_element?(manager_view, "#staff-home-close")
     refute has_element?(manager_view, "#staff-home-today-barista")
 
     barista_conn =
@@ -53,14 +53,17 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
 
     {:ok, barista_view, _html} = live(barista_conn, ~p"/staff")
     refute has_element?(barista_view, "#staff-home-paid-breakdown")
-    assert has_element?(barista_view, "#staff-home-close", "Close shift")
-    assert has_element?(barista_view, "#staff-home-today-barista")
+    refute has_element?(barista_view, "#staff-home-close")
+    refute has_element?(barista_view, "#staff-home-today")
+    assert has_element?(barista_view, "#staff-home-orders", "Orders")
+    assert has_element?(barista_view, "#staff-home-unpaid", "Unpaid")
+    assert has_element?(barista_view, "#staff-home-my-shifts", "My shifts")
 
     assert {:ok, _} = Shifts.record_close(manager, %{counted_cash: "75"})
 
     {:ok, closed_view, _html} = live(manager_conn, ~p"/staff")
     assert has_element?(closed_view, "#staff-home-shift-closed", "Closed")
-    assert has_element?(closed_view, "#staff-home-close", "Shift closed")
+    refute has_element?(closed_view, "#staff-home-close")
   end
 
   test "dashboard shows today by payment for manager", %{conn: conn} do
@@ -89,13 +92,8 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
     assert has_element?(view, "#dashboard-paid-breakdown", "Payment methods")
     assert has_element?(view, "#dashboard-paid-breakdown", "Maya")
     assert has_element?(view, "#dashboard-paid-breakdown", "₱95")
-    assert has_element?(view, "#dashboard-paid-breakdown a", "Close shift")
-
-    assert has_element?(
-             view,
-             "#dashboard-panel-transactions[href='/transactions']",
-             "Transactions"
-           )
+    refute has_element?(view, "#dashboard-paid-breakdown a", "Close shift")
+    refute has_element?(view, "#dashboard-panel-transactions")
   end
 
   test "unpaid badge shows today's unpaid count and updates after mark_paid", %{conn: conn} do
