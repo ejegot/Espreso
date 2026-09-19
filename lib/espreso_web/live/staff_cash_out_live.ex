@@ -78,6 +78,25 @@ defmodule EspresoWeb.StaffCashOutLive do
     end
   end
 
+  def handle_event("ask_void", %{"cash_out_id" => id}, socket) do
+    cash_out = Enum.find(socket.assigns.cash_outs, &("#{&1.id}" == id))
+
+    if socket.assigns.can_void? and cash_out && cash_out.status == "recorded" and
+         not socket.assigns.shop_day_closed? do
+      {:noreply,
+       socket
+       |> assign(:voiding, cash_out)
+       |> assign(:void_reason, "")
+       |> assign(:void_error, nil)}
+    else
+      {:noreply, put_flash(socket, :error, "Unable to void that Cash Out.")}
+    end
+  end
+
+  def handle_event("cancel_void", _params, socket) do
+    {:noreply, clear_voiding(socket)}
+  end
+
   def handle_event("void", %{"cash_out_id" => id, "reason" => reason}, socket) do
     user = socket.assigns.current_user
 
@@ -88,28 +107,42 @@ defmodule EspresoWeb.StaffCashOutLive do
           {:noreply,
            socket
            |> put_flash(:info, "Cash Out voided")
+           |> clear_voiding()
            |> reload_list()}
 
         {:error, :shop_day_closed} ->
           {:noreply,
-           put_flash(
-             socket,
+           socket
+           |> clear_voiding()
+           |> put_flash(
              :error,
              "This shop day is already closed. Cash Out transactions can no longer be changed."
            )}
 
         {:error, :already_voided} ->
-          {:noreply, put_flash(socket, :error, "That Cash Out is already voided.")}
+          {:noreply,
+           socket
+           |> clear_voiding()
+           |> put_flash(:error, "That Cash Out is already voided.")}
 
         {:error, :unauthorized} ->
-          {:noreply, put_flash(socket, :error, "You don’t have permission to void Cash Outs.")}
+          {:noreply,
+           socket
+           |> clear_voiding()
+           |> put_flash(:error, "You don’t have permission to void Cash Outs.")}
 
         {:error, %Ecto.Changeset{} = changeset} ->
-          {:noreply, put_flash(socket, :error, void_error(changeset))}
+          {:noreply,
+           socket
+           |> assign(:void_reason, reason)
+           |> assign(:void_error, void_error(changeset))}
       end
     else
       _ ->
-        {:noreply, put_flash(socket, :error, "Unable to void that Cash Out.")}
+        {:noreply,
+         socket
+         |> clear_voiding()
+         |> put_flash(:error, "Unable to void that Cash Out.")}
     end
   end
 
@@ -270,31 +303,16 @@ defmodule EspresoWeb.StaffCashOutLive do
                 </p>
               </div>
 
-              <form
+              <button
                 :if={@can_void? and entry.status == "recorded" and not @shop_day_closed?}
-                id={"staff-cash-out-void-form-#{entry.id}"}
-                phx-submit="void"
-                class="staff-cash-out-void-form"
+                type="button"
+                class="staff-shell-tool staff-shell-tool--quiet"
+                id={"staff-cash-out-void-#{entry.id}"}
+                phx-click="ask_void"
+                phx-value-cash_out_id={entry.id}
               >
-                <input type="hidden" name="cash_out_id" value={entry.id} />
-                <input
-                  type="text"
-                  name="reason"
-                  required
-                  maxlength="500"
-                  placeholder="Void reason"
-                  class="staff-cash-out-input staff-cash-out-void-reason"
-                  id={"staff-cash-out-void-reason-#{entry.id}"}
-                />
-                <button
-                  type="submit"
-                  class="staff-shell-tool staff-shell-tool--quiet"
-                  id={"staff-cash-out-void-#{entry.id}"}
-                  phx-disable-with="Voiding…"
-                >
-                  Void
-                </button>
-              </form>
+                Void
+              </button>
             </li>
           </ul>
 
@@ -381,6 +399,64 @@ defmodule EspresoWeb.StaffCashOutLive do
             Load more
           </button>
         </section>
+
+        <.modal
+          :if={@voiding}
+          id="staff-cash-out-void-modal"
+          show
+          click_away={false}
+          autofocus={false}
+          on_cancel={JS.push("cancel_void")}
+        >
+          <div class="staff-confirm-dialog">
+            <p class="staff-confirm-dialog-title">Void this Cash Out?</p>
+            <p class="staff-confirm-dialog-copy">
+              {Menu.format_price(@voiding.amount)} · {@voiding.category}
+              <span :if={@voiding.note}>· {@voiding.note}</span>
+            </p>
+            <form
+              id={"staff-cash-out-void-form-#{@voiding.id}"}
+              phx-submit="void"
+              class="staff-cash-out-void-form"
+            >
+              <input type="hidden" name="cash_out_id" value={@voiding.id} />
+              <label class="staff-cash-out-field">
+                <span>Void reason</span>
+                <input
+                  type="text"
+                  name="reason"
+                  value={@void_reason}
+                  required
+                  maxlength="500"
+                  placeholder="Why this Cash Out should be voided"
+                  class="staff-cash-out-input staff-cash-out-void-reason"
+                  id={"staff-cash-out-void-reason-#{@voiding.id}"}
+                />
+              </label>
+              <p :if={@void_error} class="staff-cash-out-error" id="staff-cash-out-void-error">
+                {@void_error}
+              </p>
+              <div class="staff-confirm-dialog-actions">
+                <button
+                  type="submit"
+                  class="staff-team-btn staff-team-btn--danger"
+                  id={"staff-cash-out-void-confirm-#{@voiding.id}"}
+                  phx-disable-with="Voiding…"
+                >
+                  Void Cash Out
+                </button>
+                <button
+                  type="button"
+                  class="staff-team-btn"
+                  id="staff-cash-out-void-cancel"
+                  phx-click="cancel_void"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </.modal>
       </main>
     </.staff_shell>
     """
@@ -422,6 +498,9 @@ defmodule EspresoWeb.StaffCashOutLive do
     |> assign(:note, "")
     |> assign(:form_error, nil)
     |> assign(:last_recorded, nil)
+    |> assign(:voiding, nil)
+    |> assign(:void_reason, "")
+    |> assign(:void_error, nil)
     |> reset_cash_out_history()
   end
 
@@ -464,6 +543,13 @@ defmodule EspresoWeb.StaffCashOutLive do
 
   defp barista?(%User{role: "barista"}), do: true
   defp barista?(_), do: false
+
+  defp clear_voiding(socket) do
+    socket
+    |> assign(:voiding, nil)
+    |> assign(:void_reason, "")
+    |> assign(:void_error, nil)
+  end
 
   defp format_shop_time(%DateTime{} = at) do
     at

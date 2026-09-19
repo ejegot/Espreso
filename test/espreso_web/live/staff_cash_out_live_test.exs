@@ -93,6 +93,14 @@ defmodule EspresoWeb.StaffCashOutLiveTest do
 
     {:ok, view, _} = live(log_in(conn, manager), ~p"/staff/cash-out")
 
+    refute has_element?(view, "#staff-cash-out-void-modal")
+
+    view |> element("#staff-cash-out-void-#{cash_out.id}") |> render_click()
+
+    assert has_element?(view, "#staff-cash-out-void-modal", "Void this Cash Out?")
+    refute has_element?(view, "#staff-cash-out-void-modal-container[phx-click-away]")
+    assert has_element?(view, ~s(#staff-cash-out-void-modal-container[phx-key="escape"]))
+
     view
     |> form("#staff-cash-out-void-form-#{cash_out.id}", %{reason: "Wrong amount"})
     |> render_submit()
@@ -101,7 +109,11 @@ defmodule EspresoWeb.StaffCashOutLiveTest do
     assert has_element?(view, "#staff-cash-out-total", "₱0")
   end
 
-  test "more nav includes Cash Out; Home desk does not", %{conn: conn, barista: barista, manager: manager} do
+  test "more nav includes Cash Out; Home desk does not", %{
+    conn: conn,
+    barista: barista,
+    manager: manager
+  } do
     assert {:ok, _} = StaffShifts.open_shift_for_login(barista)
 
     {:ok, barista_home, _} = live(log_in(conn, barista), ~p"/staff")

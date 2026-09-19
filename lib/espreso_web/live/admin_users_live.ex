@@ -427,32 +427,6 @@ defmodule EspresoWeb.AdminUsersLive do
                   </button>
                 </div>
               </.form>
-
-              <div
-                :if={confirming?(@confirm, :clear_pin, user.id)}
-                class="staff-team-confirm"
-                id={"staff-team-confirm-clear-pin-#{user.id}"}
-              >
-                <p class="staff-team-confirm-title">Clear this staff member’s PIN?</p>
-                <p class="staff-team-confirm-copy">
-                  They will need a new PIN before they can use PIN login again.
-                </p>
-                <div class="staff-team-actions">
-                  <button
-                    type="button"
-                    class="staff-team-btn staff-team-btn--danger"
-                    id={"confirm-clear-pin-#{user.id}"}
-                    phx-click="clear_pin"
-                    phx-value-id={user.id}
-                    phx-disable-with="Clearing…"
-                  >
-                    Clear PIN
-                  </button>
-                  <button type="button" class="staff-team-btn" phx-click="cancel_confirm">
-                    Cancel
-                  </button>
-                </div>
-              </div>
             </div>
 
             <div :if={!(@editing && @editing.id == user.id)} class="staff-team-actions">
@@ -483,32 +457,6 @@ defmodule EspresoWeb.AdminUsersLive do
               >
                 Enable
               </button>
-            </div>
-
-            <div
-              :if={confirming?(@confirm, :disable, user.id)}
-              class="staff-team-confirm"
-              id={"staff-team-confirm-disable-#{user.id}"}
-            >
-              <p class="staff-team-confirm-title">Disable this staff account?</p>
-              <p class="staff-team-confirm-copy">
-                They will no longer be able to use the employee app until re-enabled.
-              </p>
-              <div class="staff-team-actions">
-                <button
-                  type="button"
-                  class="staff-team-btn staff-team-btn--danger"
-                  id={"confirm-disable-#{user.id}"}
-                  phx-click="toggle_active"
-                  phx-value-id={user.id}
-                  phx-disable-with="Disabling…"
-                >
-                  Disable account
-                </button>
-                <button type="button" class="staff-team-btn" phx-click="cancel_confirm">
-                  Cancel
-                </button>
-              </div>
             </div>
           </article>
         </section>
@@ -541,6 +489,69 @@ defmodule EspresoWeb.AdminUsersLive do
             </div>
           </.form>
         </section>
+
+        <.modal
+          :if={@confirm}
+          id="staff-team-confirm"
+          show
+          click_away={false}
+          autofocus={false}
+          on_cancel={JS.push("cancel_confirm")}
+        >
+          <div
+            :if={confirming?(@confirm, :disable, confirm_id(@confirm))}
+            class="staff-confirm-dialog"
+            id={"staff-team-confirm-disable-#{confirm_id(@confirm)}"}
+          >
+            <p class="staff-confirm-dialog-title">Disable this staff account?</p>
+            <p class="staff-confirm-dialog-copy">
+              {confirm_name(@users, @confirm)} will no longer be able to use the employee app until
+              re-enabled.
+            </p>
+            <div class="staff-confirm-dialog-actions">
+              <button
+                type="button"
+                class="staff-team-btn staff-team-btn--danger"
+                id={"confirm-disable-#{confirm_id(@confirm)}"}
+                phx-click="toggle_active"
+                phx-value-id={confirm_id(@confirm)}
+                phx-disable-with="Disabling…"
+              >
+                Disable account
+              </button>
+              <button type="button" class="staff-team-btn" phx-click="cancel_confirm">
+                Cancel
+              </button>
+            </div>
+          </div>
+
+          <div
+            :if={confirming?(@confirm, :clear_pin, confirm_id(@confirm))}
+            class="staff-confirm-dialog"
+            id={"staff-team-confirm-clear-pin-#{confirm_id(@confirm)}"}
+          >
+            <p class="staff-confirm-dialog-title">Clear this staff member’s PIN?</p>
+            <p class="staff-confirm-dialog-copy">
+              {confirm_name(@users, @confirm)} will need a new PIN before they can use PIN login
+              again.
+            </p>
+            <div class="staff-confirm-dialog-actions">
+              <button
+                type="button"
+                class="staff-team-btn staff-team-btn--danger"
+                id={"confirm-clear-pin-#{confirm_id(@confirm)}"}
+                phx-click="clear_pin"
+                phx-value-id={confirm_id(@confirm)}
+                phx-disable-with="Clearing…"
+              >
+                Clear PIN
+              </button>
+              <button type="button" class="staff-team-btn" phx-click="cancel_confirm">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </.modal>
       </main>
     </.staff_shell>
     """
@@ -576,4 +587,13 @@ defmodule EspresoWeb.AdminUsersLive do
   end
 
   defp confirming?(_, _, _), do: false
+
+  defp confirm_id({_action, id}), do: id
+
+  defp confirm_name(users, {_action, id}) do
+    case Enum.find(users, &(to_string(&1.id) == to_string(id))) do
+      %{name: name} -> name
+      _ -> "This staff member"
+    end
+  end
 end
