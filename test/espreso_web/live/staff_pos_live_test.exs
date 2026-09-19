@@ -390,6 +390,47 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-loyalty-entry.is-attention")
   end
 
+  test "Loyalty modal Find does not use click-away; Done and Escape still close", %{
+    conn: conn,
+    barista: barista
+  } do
+    {:ok, customer} =
+      Espreso.Customers.find_or_create_by_phone("09175550023", %{name: "Find Stay"})
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view = open_loyalty(view)
+
+    assert has_element?(view, "#pos-loyalty-modal")
+    refute has_element?(view, "#pos-loyalty-modal-container[phx-click-away]")
+    assert has_element?(view, ~s(#pos-loyalty-modal-container[phx-key="escape"]))
+    assert has_element?(view, ~s(#pos-loyalty-modal-container[phx-window-keydown]))
+    refute has_element?(view, "#pos-loyalty-phone[autofocus]")
+    assert has_element?(view, ~s(#pos-loyalty-done[type="button"]))
+    assert has_element?(view, ~s(#pos-loyalty-modal button[aria-label="close"]))
+
+    view
+    |> form("#pos-loyalty-form", %{loyalty_phone: "09175550023"})
+    |> render_submit()
+
+    assert has_element?(view, "#pos-loyalty-modal")
+    assert has_element?(view, "#pos-loyalty-status", "Find Stay")
+    assert live_assigns(view).loyalty_customer.id == customer.id
+    assert live_assigns(view).loyalty_open? == true
+
+    view |> element("#pos-loyalty-done") |> render_click()
+    refute has_element?(view, "#pos-loyalty-modal")
+    assert live_assigns(view).loyalty_customer.id == customer.id
+
+    view = open_loyalty(view)
+    assert has_element?(view, "#pos-loyalty-modal")
+    assert has_element?(view, ~s(#pos-loyalty-modal-container[phx-key="escape"]))
+
+    view |> render_click("close_loyalty", %{})
+    refute has_element?(view, "#pos-loyalty-modal")
+    assert live_assigns(view).loyalty_open? == false
+    assert live_assigns(view).loyalty_customer.id == customer.id
+  end
+
   test "Find submit in Loyalty modal resolves customer without prior change flush", %{
     conn: conn,
     barista: barista

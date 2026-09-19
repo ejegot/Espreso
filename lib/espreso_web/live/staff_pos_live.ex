@@ -1644,7 +1644,13 @@ defmodule EspresoWeb.StaffPosLive do
 
   defp loyalty_modal(assigns) do
     ~H"""
-    <.modal id="pos-loyalty-modal" show={true} on_cancel={JS.push("close_loyalty")}>
+    <.modal
+      id="pos-loyalty-modal"
+      show={true}
+      on_cancel={JS.push("close_loyalty")}
+      click_away={false}
+      autofocus={false}
+    >
       <div
         class={[
           "staff-pos-loyalty-modal",
