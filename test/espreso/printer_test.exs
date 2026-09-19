@@ -36,7 +36,9 @@ defmodule Espreso.PrinterTest do
     assert byte_size(receipt) > 0
 
     assert {:client_dispatch, drawer} = Printer.dispatch_drawer()
-    assert drawer == <<0x1B, 0x70, 0x00, 0x19, 0xFA>>
+    assert drawer == Printer.drawer_bytes()
+    assert :binary.match(drawer, <<0x1B, 0x70, 0x00, 0x19, 0xFA>>) != :nomatch
+    assert :binary.match(drawer, <<0x1B, 0x70, 0x01, 0x19, 0xFA>>) != :nomatch
 
     assert Printer.after_paid(order, "cash") == {:error, :use_client_bridge}
   end
@@ -148,7 +150,29 @@ defmodule Espreso.PrinterTest do
 
     assert Printer.dispatch_receipt(order) == :dispatched
     receipt = Task.await(printer_task, 2_000)
-    refute receipt == <<0x1B, 0x70, 0x00, 0x19, 0xFA>>
+    refute receipt == Printer.drawer_bytes()
+    assert :binary.match(receipt, <<0x1B, 0x70>>) == :nomatch
+  end
+
+  test "dispatch_receipt can append a drawer kick after the cash receipt" do
+    restore_printer_config_on_exit()
+    {port, printer_task} = start_test_printer!()
+    set_test_printer_port(port)
+
+    order = %Order{
+      number: "CS-CASH-KICK",
+      paid_via: "cash",
+      total: Decimal.new("75"),
+      inserted_at: ~N[2026-09-05 12:00:00],
+      items: []
+    }
+
+    assert Printer.dispatch_receipt(order, open_drawer: true) == :dispatched
+    receipt = Task.await(printer_task, 2_000)
+    assert receipt =~ "CS-CASH-KICK"
+    {kick_at, _} = :binary.match(receipt, <<0x1B, 0x70>>)
+    {cut_at, _} = :binary.match(receipt, <<0x1D, 0x56, 0x00>>)
+    assert kick_at < cut_at
   end
 
   test "dispatch_receipt classifies connection failure as definite" do
@@ -178,13 +202,13 @@ defmodule Espreso.PrinterTest do
     assert :binary.match(expected, <<0x1B, 0x70>>) == :nomatch
   end
 
-  test "dispatch_drawer sends exactly one pin-2 drawer kick command" do
+  test "dispatch_drawer sends init plus pin-2 and pin-5 kicks" do
     restore_printer_config_on_exit()
     {port, printer_task} = start_test_printer!()
     set_test_printer_port(port)
 
     assert Printer.dispatch_drawer() == :dispatched
-    assert Task.await(printer_task, 2_000) == <<0x1B, 0x70, 0x00, 0x19, 0xFA>>
+    assert Task.await(printer_task, 2_000) == Printer.drawer_bytes()
   end
 
   test "Kitchen and Drawer dispatch classify connection failure as definite" do

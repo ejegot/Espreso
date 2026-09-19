@@ -752,26 +752,24 @@ defmodule EspresoWeb.StaffPosLive do
       when not is_nil(order) and not is_nil(token) do
     paid_via = order.paid_via || "cash"
 
-    result =
+    {permit, result} =
       case socket.assigns[:print_retry_permit] do
         retry_permit when is_binary(retry_permit) ->
-          Espreso.PhysicalActionCoordinator.execute_settle_physical(
-            order.id,
-            retry_permit,
-            paid_via,
-            staff_name: socket.assigns.current_user.name
-          )
+          {retry_permit,
+           Espreso.PhysicalActionCoordinator.execute_settle_physical(
+             order.id,
+             retry_permit,
+             paid_via,
+             staff_name: socket.assigns.current_user.name
+           )}
 
         _ ->
-          {_permit, settle_result} =
-            PrinterClientBridge.settle_physical_for_paid_order(order, paid_via,
-              staff_name: socket.assigns.current_user.name
-            )
-
-          settle_result
+          PrinterClientBridge.settle_physical_for_paid_order(order, paid_via,
+            staff_name: socket.assigns.current_user.name
+          )
       end
 
-    {:noreply, apply_pos_physical_result(socket, order, paid_via, result)}
+    {:noreply, apply_pos_physical_result(socket, order, paid_via, result, permit)}
   end
 
   def handle_event("reprint_receipt", _params, socket), do: {:noreply, socket}
@@ -794,7 +792,7 @@ defmodule EspresoWeb.StaffPosLive do
             Espreso.Repo.get(Espreso.Orders.Order, order_id_int(order_id))
 
         paid_via = (order && (order.paid_via || "cash")) || "cash"
-        {:noreply, apply_pos_physical_result(socket, order, paid_via, result)}
+        {:noreply, apply_pos_physical_result(socket, order, paid_via, result, permit)}
 
       {order_id, action, permit, request_id, client_result}
       when action in [:receipt_reprint, :kitchen, :drawer] ->
@@ -817,7 +815,7 @@ defmodule EspresoWeb.StaffPosLive do
 
             note =
               cond do
-                ok? and flow == "raw_drawer" -> "Kaha opened."
+                ok? and flow == "raw_drawer" -> "Drawer opened."
                 ok? -> "Test print sent."
                 true -> Map.get(params, "error") || "Printer failed."
               end
@@ -877,7 +875,7 @@ defmodule EspresoWeb.StaffPosLive do
           end
         else
           {:noreply,
-           assign(socket, :print_note, "Kaha opens for cash payments only.")
+           assign(socket, :print_note, "Drawer opens for cash payments only.")
            |> assign(:print_note_error?, true)}
         end
 
@@ -1032,11 +1030,12 @@ defmodule EspresoWeb.StaffPosLive do
                   </div>
                   <div class="staff-pos-product-card-body">
                     <h3 class="staff-pos-product-name">{product.name}</h3>
-                    <p
-                      :if={length(product.product_prices) > 1}
-                      class="staff-pos-product-size-hint"
-                    >
-                      {Enum.map_join(pos_size_prices(product.product_prices), " · ", &size_label(&1.size))}
+                    <p :if={length(product.product_prices) > 1} class="staff-pos-product-size-hint">
+                      {Enum.map_join(
+                        pos_size_prices(product.product_prices),
+                        " · ",
+                        &size_label(&1.size)
+                      )}
                     </p>
                     <p class="staff-pos-product-price">
                       {price_label(product)}
@@ -1159,7 +1158,7 @@ defmodule EspresoWeb.StaffPosLive do
                         id="pos-open-kaha"
                         phx-click="open_drawer"
                       >
-                        Kaha
+                        Drawer
                       </button>
                     </div>
                     <button
@@ -1571,7 +1570,12 @@ defmodule EspresoWeb.StaffPosLive do
             <p class="staff-pos-size-picker-eyebrow">Choose size</p>
             <h2 class="staff-pos-size-picker-title" id="pos-size-picker-title">{@product.name}</h2>
           </div>
-          <button type="button" class="staff-pos-size-cancel" id="pos-size-cancel" phx-click="cancel_size">
+          <button
+            type="button"
+            class="staff-pos-size-cancel"
+            id="pos-size-cancel"
+            phx-click="cancel_size"
+          >
             Cancel
           </button>
         </header>
@@ -3072,7 +3076,7 @@ defmodule EspresoWeb.StaffPosLive do
   defp print_note_result(:ok, paid_via) do
     note =
       if Printer.cash_like?(paid_via || "cash") do
-        "Receipt printed · kaha opened"
+        "Receipt printed · drawer opened"
       else
         "Receipt printed"
       end
@@ -3088,7 +3092,7 @@ defmodule EspresoWeb.StaffPosLive do
 
   defp print_note_result(_, _), do: {nil, false, false}
 
-  defp apply_pos_physical_result(socket, order, paid_via, result, permit \\ nil)
+  defp apply_pos_physical_result(socket, order, paid_via, result, permit)
 
   defp apply_pos_physical_result(socket, order, paid_via, :disabled, _permit) do
     {note, failed?, note_error?} = print_note_result(:disabled, paid_via)
@@ -3139,13 +3143,13 @@ defmodule EspresoWeb.StaffPosLive do
     {note, failed?, note_error?, retry_permit} =
       case physical do
         {:dispatched, :receipt_and_drawer} ->
-          {"Receipt printed · kaha opened.", false, false, nil}
+          {"Receipt printed · drawer opened.", false, false, nil}
 
         {:dispatched, :receipt} ->
           {"Receipt printed.", false, false, nil}
 
         {:dispatched, :drawer} ->
-          {"Kaha opened.", false, false, nil}
+          {"Drawer opened.", false, false, nil}
 
         :disabled ->
           {"Printing disabled", false, false, nil}
@@ -3154,7 +3158,7 @@ defmodule EspresoWeb.StaffPosLive do
           {"Sending receipt to printer…", false, false, nil}
 
         {:client_dispatch, :drawer, _b64, _req} ->
-          {"Opening kaha…", false, false, nil}
+          {"Opening drawer…", false, false, nil}
 
         {:definite_failure, _phase, reason, next_permit} ->
           prefix = if(retrying?, do: "Print failed", else: "Order saved · print failed")
@@ -3197,7 +3201,7 @@ defmodule EspresoWeb.StaffPosLive do
 
   defp apply_pos_single_physical(socket, {:dispatched, _}, _order_id, :drawer, _permit) do
     socket
-    |> assign(:print_note, "Kaha opened.")
+    |> assign(:print_note, "Drawer opened.")
     |> assign(:print_note_error?, false)
   end
 
@@ -3228,7 +3232,7 @@ defmodule EspresoWeb.StaffPosLive do
 
   defp apply_pos_single_physical(socket, {:definite_failure, reason, _}, _, :drawer, _) do
     socket
-    |> assign(:print_note, "Could not open kaha (#{inspect(reason)}).")
+    |> assign(:print_note, "Could not open drawer (#{inspect(reason)}).")
     |> assign(:print_note_error?, true)
   end
 
@@ -3260,7 +3264,7 @@ defmodule EspresoWeb.StaffPosLive do
     case Printer.dispatch_drawer() do
       {:client_dispatch, bytes} ->
         socket
-        |> assign(:print_note, "Opening kaha…")
+        |> assign(:print_note, "Opening drawer…")
         |> assign(:print_note_error?, false)
         |> push_event("elilai-printer", %{
           action: "raw_drawer",
@@ -3272,18 +3276,18 @@ defmodule EspresoWeb.StaffPosLive do
         })
 
       :dispatched ->
-        assign(socket, :print_note, "Kaha opened.") |> assign(:print_note_error?, false)
+        assign(socket, :print_note, "Drawer opened.") |> assign(:print_note_error?, false)
 
       :disabled ->
         assign(socket, :print_note, "Printer is not enabled.")
         |> assign(:print_note_error?, false)
 
       {:definite_failure, reason} ->
-        assign(socket, :print_note, "Could not open kaha (#{inspect(reason)}).")
+        assign(socket, :print_note, "Could not open drawer (#{inspect(reason)}).")
         |> assign(:print_note_error?, true)
 
       other ->
-        assign(socket, :print_note, "Could not open kaha (#{inspect(other)}).")
+        assign(socket, :print_note, "Could not open drawer (#{inspect(other)}).")
         |> assign(:print_note_error?, true)
     end
   end

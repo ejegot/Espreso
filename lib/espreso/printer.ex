@@ -69,14 +69,14 @@ defmodule Espreso.Printer do
   Only valid for `:lan_server`. Prefer coordinator + client bridge in production.
   """
   def after_cash_paid(%Order{} = order, opts \\ []) do
-    with :ok <- print_receipt(order, opts),
+    with :ok <- print_receipt(order, Keyword.put(opts, :open_drawer, true)),
          :ok <- open_drawer() do
       :ok
     end
   end
 
   @doc """
-  After wallet / non-cash paid: print receipt only (no kaha).
+  After wallet / non-cash paid: print receipt only (no drawer).
   """
   def after_wallet_paid(%Order{} = order, opts \\ []), do: print_receipt(order, opts)
 
@@ -102,7 +102,7 @@ defmodule Espreso.Printer do
   end
 
   def print_receipt(%Order{} = order, opts \\ []) do
-    send_bytes(Receipt.build(order, opts), "receipt #{order.number}")
+    send_bytes(receipt_payload(order, opts), "receipt #{order.number}")
   end
 
   @doc """
@@ -112,7 +112,7 @@ defmodule Espreso.Printer do
   paper output was physically confirmed by the printer.
   """
   def dispatch_receipt(%Order{} = order, opts \\ []) do
-    Receipt.build(order, opts)
+    receipt_payload(order, opts)
     |> dispatch_payload("receipt #{order.number}")
   end
 
@@ -125,20 +125,24 @@ defmodule Espreso.Printer do
     |> dispatch_payload("kitchen #{order.number}")
   end
 
-  def open_drawer(pin \\ :pin2) do
+  def open_drawer(pin \\ :both) do
     send_bytes(drawer_bytes(pin), "drawer #{pin}")
   end
 
-  def dispatch_drawer(pin \\ :pin2) do
+  def dispatch_drawer(pin \\ :both) do
     drawer_bytes(pin)
     |> dispatch_payload("drawer #{pin}")
   end
 
-  def drawer_bytes(pin \\ :pin2) do
-    case pin do
-      :pin5 -> EscPos.drawer_kick_pin5()
-      _ -> EscPos.drawer_kick_pin2()
-    end
+  def drawer_bytes(pin \\ :both) do
+    kicks =
+      case pin do
+        :pin2 -> EscPos.drawer_kick_pin2()
+        :pin5 -> EscPos.drawer_kick_pin5()
+        _ -> EscPos.drawer_kick_pin2() <> EscPos.drawer_kick_pin5()
+      end
+
+    EscPos.init() <> kicks
   end
 
   def encode_payload(bytes) when is_binary(bytes), do: Base.encode64(bytes)
@@ -176,9 +180,41 @@ defmodule Espreso.Printer do
   def cash_like?("counter"), do: true
   def cash_like?(_), do: false
 
+  @doc """
+  Customer QR / online orders print a compact kitchen ticket after staff confirm.
+  POS and counter-pay keep the customer receipt.
+  """
+  def kitchen_ticket_after_paid?(%Order{payment_method: "online"}), do: true
+  def kitchen_ticket_after_paid?(_), do: false
+
   def describe_result(:ok), do: "receipt printed"
   def describe_result(:disabled), do: nil
   def describe_result({:error, reason}), do: "print failed (#{inspect(reason)})"
+
+  defp receipt_payload(%Order{} = order, opts) do
+    Receipt.build(order, opts)
+    |> maybe_append_drawer(opts)
+  end
+
+  defp maybe_append_drawer(bytes, opts) do
+    if Keyword.get(opts, :open_drawer, false) do
+      insert_drawer_before_cut(bytes)
+    else
+      bytes
+    end
+  end
+
+  # HS-802UL ignores commands after GS V cut in the same job. Test Drawer works
+  # because it is kick-only; cash receipts must pulse before cut.
+  defp insert_drawer_before_cut(bytes) do
+    cut = EscPos.cut()
+    kicks = EscPos.drawer_kick_pin2() <> EscPos.drawer_kick_pin5()
+
+    case :binary.split(bytes, cut) do
+      [before, rest] -> before <> kicks <> cut <> rest
+      [_] -> bytes <> drawer_bytes()
+    end
+  end
 
   defp dispatch_payload(bytes, label) when is_binary(bytes) do
     case transport() do

@@ -2228,10 +2228,10 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> element("#pos-retry-print") |> render_click()
     assert [receipt_bytes, drawer_bytes] = Task.await(printer_task, 2_000)
     assert receipt_bytes != drawer_bytes
-    assert drawer_bytes == <<0x1B, 0x70, 0x00, 0x19, 0xFA>>
+    assert drawer_bytes == Espreso.Printer.drawer_bytes()
 
     assert has_element?(view, "#pos-confirmation.is-success", "Print complete · order saved")
-    assert has_element?(view, "#pos-print-note", "Receipt printed · kaha opened.")
+    assert has_element?(view, "#pos-print-note", "Receipt printed · drawer opened.")
     refute has_element?(view, "#pos-print-note.is-error")
     refute has_element?(view, "#pos-retry-print")
     assert live_assigns(view).print_retry_token == nil
@@ -2279,7 +2279,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> render_click("reprint_receipt", %{"token" => second_token})
     assert [receipt_bytes, drawer_bytes] = Task.await(printer_task, 2_000)
     assert receipt_bytes != drawer_bytes
-    assert drawer_bytes == <<0x1B, 0x70, 0x00, 0x19, 0xFA>>
+    assert drawer_bytes == Espreso.Printer.drawer_bytes()
     assert live_assigns(view).print_retry_token == nil
     assert has_element?(view, "#pos-confirmation.is-success")
   end
@@ -2315,8 +2315,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
     set_test_printer_port(port)
     view |> render_click("reprint_receipt", %{"token" => new_token})
 
-    assert [_receipt_bytes, <<0x1B, 0x70, 0x00, 0x19, 0xFA>>] =
-             Task.await(printer_task, 2_000)
+    assert [_receipt_bytes, drawer_bytes] = Task.await(printer_task, 2_000)
+    assert drawer_bytes == Espreso.Printer.drawer_bytes()
 
     assert has_element?(view, "#pos-confirmation.is-success")
   end
@@ -2352,7 +2352,54 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert live_assigns(view).print_retry_token == nil
   end
 
-  test "Kitchen and Kaha actions use result-appropriate note styling", %{
+  test "cash POS native client sends a drawer job after the receipt confirms", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    restore_printer_config_on_exit()
+
+    Application.put_env(
+      :espreso,
+      Espreso.Printer,
+      enabled: true,
+      transport: :native_client,
+      host: nil,
+      port: 9100
+    )
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    submit_order(view)
+
+    assert_push_event(view, "elilai-printer", %{
+      action: "settle_physical",
+      flow: "receipt",
+      permit: receipt_permit,
+      request_id: receipt_req,
+      order_id: order_id
+    })
+
+    render_hook(view, "elilai_printer_result", %{
+      "order_id" => order_id,
+      "action" => "settle_physical",
+      "permit" => receipt_permit,
+      "request_id" => receipt_req,
+      "ok" => true,
+      "flow" => "receipt"
+    })
+
+    assert_push_event(view, "elilai-printer", %{
+      action: "settle_physical",
+      flow: "drawer",
+      data_base64: drawer_b64
+    })
+
+    assert Base.decode64!(drawer_b64) == Espreso.Printer.drawer_bytes()
+    assert has_element?(view, "#pos-print-note", "Opening drawer")
+  end
+
+  test "Kitchen and Drawer actions use result-appropriate note styling", %{
     conn: conn,
     barista: barista,
     espresso: espresso
@@ -2373,26 +2420,17 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> element("#pos-product-#{espresso.id}") |> render_click()
     submit_order(view)
 
-    {kitchen_port, kitchen_task} = start_test_printer!(1)
-    set_test_printer_port(kitchen_port)
-    view |> element("#pos-print-kitchen") |> render_click()
-    Task.await(kitchen_task, 2_000)
-
-    assert has_element?(view, "#pos-print-note", "Kitchen ticket printed.")
-    refute has_element?(view, "#pos-print-note.is-error")
-
     {drawer_port, drawer_task} = start_test_printer!(1)
     set_test_printer_port(drawer_port)
     view |> element("#pos-open-kaha") |> render_click()
     Task.await(drawer_task, 2_000)
 
-    assert has_element?(view, "#pos-print-note", "Kaha opened.")
+    assert has_element?(view, "#pos-print-note", "Drawer opened.")
     refute has_element?(view, "#pos-print-note.is-error")
 
     set_test_printer_port(1)
-    view |> element("#pos-print-kitchen") |> render_click()
-    assert has_element?(view, "#pos-print-note.is-error", "Kitchen print failed")
-    assert has_element?(view, "#pos-retry-print")
+    view |> element("#pos-open-kaha") |> render_click()
+    assert has_element?(view, "#pos-print-note.is-error", "Could not open drawer")
   end
 
   test "staff home hub links barista to Orders and POS", %{

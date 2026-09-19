@@ -1691,7 +1691,38 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     assert [receipt_bytes, drawer_bytes] = Task.await(printer_task, 2_000)
     assert receipt_bytes =~ order.number
+    assert :binary.match(receipt_bytes, <<0x1B, 0x70>>) != :nomatch
     assert drawer_bytes == drawer_kick_bytes()
+    assert Repo.get!(Espreso.Orders.Order, order.id).payment_status == "paid"
+  end
+
+  test "Mark Paid GCash QR dispatches a kitchen ticket without a drawer command", %{conn: conn} do
+    restore_printer_config_on_exit()
+    set_payments_mode!("qrph_manual")
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Latte", size: "12oz", quantity: 1, price: Decimal.new("120")}],
+        %{
+          customer_name: "QR Kitchen",
+          fulfillment: :pickup,
+          payment_method: :online,
+          payment_intent: :gcash
+        }
+      )
+
+    {port, printer_task} = start_test_printer!(1)
+    set_test_printer_port(port)
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    view |> element("#ticket-new-mark-paid-#{order.id}") |> render_click()
+    view |> element("#mark-paid-modal-gcash") |> render_click()
+
+    assert [bytes] = Task.await(printer_task, 2_000)
+    assert bytes =~ "KITCHEN"
+    assert bytes =~ order.number
+    refute bytes =~ "TOTAL"
+    refute bytes == drawer_kick_bytes()
+    assert has_element?(view, "#orders-flash", "Kitchen ticket printed.")
     assert Repo.get!(Espreso.Orders.Order, order.id).payment_status == "paid"
   end
 
@@ -2004,7 +2035,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     assert [drawer_bytes] = Task.await(drawer_task, 2_000)
     assert drawer_bytes == drawer_kick_bytes()
-    assert has_element?(view, "#orders-flash", "Kaha command dispatched.")
+    assert has_element?(view, "#orders-flash", "Drawer command dispatched.")
 
     next_drawer = live_assigns(view).drawer_permits[order.id]
     refute next_drawer == drawer_permit
@@ -2091,7 +2122,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
       "permit" => kitchen_permit
     })
 
-    assert has_element?(view, "#orders-flash", "Kaha request is stale.")
+    assert has_element?(view, "#orders-flash", "Drawer request is stale.")
 
     view
     |> render_click("open_drawer", %{
@@ -2100,7 +2131,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
       "permit" => drawer_permit
     })
 
-    assert has_element?(view, "#orders-flash", "Kaha request is stale.")
+    assert has_element?(view, "#orders-flash", "Drawer request is stale.")
 
     wallet_drawer_permit =
       PhysicalActionCoordinator.permits(:drawer, [wallet_order.id])
@@ -2132,7 +2163,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
       "permit" => unpaid_drawer_permit
     })
 
-    assert has_element?(view, "#orders-flash", "Only paid orders can open Kaha.")
+    assert has_element?(view, "#orders-flash", "Only paid orders can open the drawer.")
 
     missing_kitchen_permit =
       PhysicalActionCoordinator.permits(:kitchen, [unpaid.id])
@@ -2199,6 +2230,9 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     assert has_element?(view, "#orders-flash", "no longer eligible for Kitchen")
 
+    {drawer_port, drawer_task} = start_test_printer!(1)
+    set_test_printer_port(drawer_port)
+
     view
     |> render_click("open_drawer", %{
       "id" => to_string(completed.id),
@@ -2206,7 +2240,9 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
       "permit" => drawer_permit
     })
 
-    assert has_element?(view, "#orders-flash", "no longer eligible for Kaha")
+    assert [drawer_bytes] = Task.await(drawer_task, 2_000)
+    assert drawer_bytes == drawer_kick_bytes()
+    assert has_element?(view, "#orders-flash", "Drawer command dispatched.")
 
     disabled_order = paid_order!("cash")
     {:ok, disabled_view, _html} = live(conn, ~p"/orders")
@@ -2252,7 +2288,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     drawer_retry = live_assigns(view).drawer_permits[order.id]
     refute drawer_retry == drawer_permit
     assert live_assigns(view).kitchen_permits[order.id] == kitchen_retry
-    assert has_element?(view, "#orders-flash", "Kaha could not connect")
+    assert has_element?(view, "#orders-flash", "Drawer could not connect")
   end
 
   defp paid_order!(paid_via) do
@@ -2320,7 +2356,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     {port, task}
   end
 
-  defp drawer_kick_bytes, do: <<0x1B, 0x70, 0x00, 0x19, 0xFA>>
+  defp drawer_kick_bytes, do: Printer.drawer_bytes()
 
   defp with_pubsub_debounce(ms, fun) when is_integer(ms) and is_function(fun, 0) do
     previous = Application.get_env(:espreso, :staff_pubsub_reload_debounce_ms)

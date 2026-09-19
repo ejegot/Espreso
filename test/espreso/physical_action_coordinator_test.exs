@@ -112,6 +112,26 @@ defmodule Espreso.PhysicalActionCoordinatorTest do
     assert order_id == completed.id
   end
 
+  test "completed paid cash orders remain eligible for drawer retry" do
+    parent = self()
+
+    start_coordinator_with(
+      dispatch_drawer: fn order, _opts ->
+        send(parent, {:completed_drawer, order.id})
+        :dispatched
+      end
+    )
+
+    order = paid_order!()
+    {:ok, ready} = Orders.update_status(order, "ready")
+    {:ok, completed} = Orders.complete_order(ready)
+    permit = permit_for(completed.id, :drawer)
+
+    assert {:dispatched, _next_permit} = execute(completed.id, :drawer, permit)
+    assert_receive {:completed_drawer, order_id}
+    assert order_id == completed.id
+  end
+
   test "concurrent claims of one permit execute exactly one receipt" do
     parent = self()
 
@@ -481,6 +501,46 @@ defmodule Espreso.PhysicalActionCoordinatorTest do
     assert paid.paid_via == "gcash"
     assert_receive {:wallet_receipt, order_id}
     assert order_id == order.id
+    refute_receive {:unexpected_drawer, _}
+  end
+
+  test "online wallet Mark Paid dispatches a kitchen ticket without receipt or drawer" do
+    parent = self()
+
+    Espreso.BusinessSettings.get()
+    |> Ecto.Changeset.change(%{payments_mode: "qrph_manual"})
+    |> Espreso.Repo.update!()
+
+    start_coordinator_with(
+      dispatch_receipt: fn order, _opts ->
+        send(parent, {:unexpected_receipt, order.id})
+        :dispatched
+      end,
+      dispatch_kitchen: fn order, _opts ->
+        send(parent, {:wallet_kitchen, order.id})
+        :dispatched
+      end,
+      dispatch_drawer: fn order, _opts ->
+        send(parent, {:unexpected_drawer, order.id})
+        :dispatched
+      end
+    )
+
+    order = unpaid_order!(%{payment_method: :online, payment_intent: :gcash})
+    permit = permit_for(order.id, :mark_paid)
+
+    assert {:ok, :transitioned, paid, {:dispatched, :receipt}} =
+             PhysicalActionCoordinator.execute_mark_paid(
+               order.id,
+               permit,
+               "gcash",
+               server: @server
+             )
+
+    assert paid.paid_via == "gcash"
+    assert_receive {:wallet_kitchen, order_id}
+    assert order_id == order.id
+    refute_receive {:unexpected_receipt, _}
     refute_receive {:unexpected_drawer, _}
   end
 
