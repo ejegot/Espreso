@@ -15,6 +15,7 @@ defmodule Espreso.PhysicalActionCoordinator do
   @actions [:receipt_reprint, :kitchen, :drawer, :mark_paid, :settle_physical]
   @eligible_statuses ~w(received preparing ready)
   @receipt_reprint_statuses ~w(received preparing ready completed)
+  @drawer_statuses ~w(received preparing ready completed)
 
   def start_link(opts \\ []) do
     name = Keyword.get(opts, :name, __MODULE__)
@@ -274,7 +275,15 @@ defmodule Espreso.PhysicalActionCoordinator do
         _from,
         state
       ) do
-    confirm_awaiting_client(state, order_id, action, permit_id, request_id, client_result, staff_name)
+    confirm_awaiting_client(
+      state,
+      order_id,
+      action,
+      permit_id,
+      request_id,
+      client_result,
+      staff_name
+    )
   end
 
   def handle_call(:acknowledge_recovery, _from, state) do
@@ -477,7 +486,23 @@ defmodule Espreso.PhysicalActionCoordinator do
          staff_name,
          operation
        ) do
-    case state.dispatchers.receipt_reprint.(order, staff_name: staff_name) do
+    kitchen? = Printer.kitchen_ticket_after_paid?(order)
+
+    dispatcher =
+      if kitchen? do
+        state.dispatchers.kitchen
+      else
+        state.dispatchers.receipt_reprint
+      end
+
+    dispatch_opts =
+      if kitchen? do
+        [staff_name: staff_name]
+      else
+        [staff_name: staff_name, open_drawer: Printer.cash_like?(paid_via)]
+      end
+
+    case dispatcher.(order, dispatch_opts) do
       {:client_dispatch, bytes} ->
         await_client_phase(state, key, permit_id, order, paid_via, operation, :receipt, bytes)
 
@@ -930,7 +955,7 @@ defmodule Espreso.PhysicalActionCoordinator do
       not Printer.cash_like?(order.paid_via || "counter") ->
         {:error, :payment_not_cash_like}
 
-      order.status not in @eligible_statuses ->
+      order.status not in @drawer_statuses ->
         {:error, :order_not_eligible}
 
       not Printer.enabled?() ->

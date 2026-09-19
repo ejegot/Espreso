@@ -183,7 +183,7 @@ defmodule EspresoWeb.StaffOrdersLive do
   end
 
   def handle_event("open_drawer", _params, socket) do
-    {:noreply, assign(socket, :flash_note, "Kaha request is stale. Drawer was not opened.")}
+    {:noreply, assign(socket, :flash_note, "Drawer request is stale. Drawer was not opened.")}
   end
 
   def handle_event("open_mark_paid", %{"id" => id}, socket) do
@@ -1164,7 +1164,7 @@ defmodule EspresoWeb.StaffOrdersLive do
                 }
                 phx-value-phase="drawer"
               >
-                Kaha
+                Drawer
               </button>
             </div>
           </details>
@@ -1589,7 +1589,7 @@ defmodule EspresoWeb.StaffOrdersLive do
   defp paid_via_label(other) when is_binary(other), do: other
   defp paid_via_label(_), do: "paid"
 
-  defp mark_paid_flash(%{number: number, status: status}, paid_via, result) do
+  defp mark_paid_flash(%{number: number, status: status} = order, paid_via, result) do
     base = "#{number} marked paid (#{paid_via_label(paid_via)})."
 
     base =
@@ -1601,26 +1601,39 @@ defmodule EspresoWeb.StaffOrdersLive do
 
     case result do
       :ok ->
-        if Printer.cash_like?(paid_via) do
-          base <> " Receipt printed · kaha opened."
+        cond do
+          Printer.cash_like?(paid_via) ->
+            base <> " Receipt printed · drawer opened."
+
+          Printer.kitchen_ticket_after_paid?(order) ->
+            base <> " Kitchen ticket printed."
+
+          true ->
+            base <> " Receipt printed."
+        end
+
+      {:dispatched, :receipt_and_drawer} ->
+        base <> " Receipt printed · drawer opened."
+
+      {:dispatched, :receipt} ->
+        if Printer.kitchen_ticket_after_paid?(order) do
+          base <> " Kitchen ticket printed."
         else
           base <> " Receipt printed."
         end
 
-      {:dispatched, :receipt_and_drawer} ->
-        base <> " Receipt printed · kaha opened."
-
-      {:dispatched, :receipt} ->
-        base <> " Receipt printed."
-
       {:dispatched, :drawer} ->
-        base <> " Kaha opened."
+        base <> " Drawer opened."
 
       {:client_dispatch, :receipt, _, _} ->
-        base <> " Sending receipt to printer…"
+        if Printer.kitchen_ticket_after_paid?(order) do
+          base <> " Sending kitchen ticket…"
+        else
+          base <> " Sending receipt to printer…"
+        end
 
       {:client_dispatch, :drawer, _, _} ->
-        base <> " Opening kaha…"
+        base <> " Opening drawer…"
 
       {:definite_failure, _phase, :printer_disabled, _permit} ->
         base
@@ -2141,13 +2154,13 @@ defmodule EspresoWeb.StaffOrdersLive do
     do: "Kitchen ticket command dispatched."
 
   defp physical_action_note(:drawer, {:dispatched, _next_permit}),
-    do: "Kaha command dispatched."
+    do: "Drawer command dispatched."
 
   defp physical_action_note(:kitchen, {:definite_failure, reason, _retry_permit}),
     do: "Kitchen could not connect to the printer (#{inspect(reason)}). Try again."
 
   defp physical_action_note(:drawer, {:definite_failure, reason, _retry_permit}),
-    do: "Kaha could not connect to the printer (#{inspect(reason)}). Try again."
+    do: "Drawer could not connect to the printer (#{inspect(reason)}). Try again."
 
   defp physical_action_note(:kitchen, {:uncertain, reason}),
     do:
@@ -2155,19 +2168,19 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   defp physical_action_note(:drawer, {:uncertain, reason}),
     do:
-      "Kaha outcome uncertain (#{inspect(reason)}). The drawer may already have opened; do not retry automatically."
+      "Drawer outcome uncertain (#{inspect(reason)}). The drawer may already have opened; do not retry automatically."
 
   defp physical_action_note(:kitchen, {:duplicate, _result}),
     do: "This Kitchen request was already handled. No additional ticket was sent."
 
   defp physical_action_note(:drawer, {:duplicate, _result}),
-    do: "This Kaha request was already handled. Drawer was not opened again."
+    do: "This Drawer request was already handled. Drawer was not opened again."
 
   defp physical_action_note(:kitchen, {:stale, _reason}),
     do: "Kitchen request is stale. No ticket was sent."
 
   defp physical_action_note(:drawer, {:stale, _reason}),
-    do: "Kaha request is stale. Drawer was not opened."
+    do: "Drawer request is stale. Drawer was not opened."
 
   defp physical_action_note(action, {:recovery_required, _reason})
        when action in [:kitchen, :drawer],
@@ -2180,16 +2193,16 @@ defmodule EspresoWeb.StaffOrdersLive do
     do: "Order no longer exists. Drawer was not opened."
 
   defp physical_action_note(:drawer, {:ineligible, :order_not_paid}),
-    do: "Only paid orders can open Kaha. Drawer was not opened."
+    do: "Only paid orders can open the drawer. Drawer was not opened."
 
   defp physical_action_note(:drawer, {:ineligible, :payment_not_cash_like}),
-    do: "Kaha is only available for cash-like payments. Drawer was not opened."
+    do: "Drawer is only available for cash-like payments. Drawer was not opened."
 
   defp physical_action_note(:kitchen, {:ineligible, :order_not_eligible}),
     do: "This order is no longer eligible for Kitchen. No ticket was sent."
 
   defp physical_action_note(:drawer, {:ineligible, :order_not_eligible}),
-    do: "This order is no longer eligible for Kaha. Drawer was not opened."
+    do: "This order is no longer eligible for Drawer. Drawer was not opened."
 
   defp physical_action_note(:kitchen, {:ineligible, :printer_disabled}),
     do: "Printer is not enabled on this server. No kitchen ticket was sent."
