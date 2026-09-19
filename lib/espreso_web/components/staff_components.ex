@@ -54,7 +54,10 @@ defmodule EspresoWeb.StaffComponents do
           id="staff-pos-rail"
           aria-label="Staff"
         >
-          <div class="staff-pos-rail-brand" title="Elilai Kafe">
+          <div
+            class="staff-pos-rail-brand"
+            title={"#{@current_user.name} · #{User.role_label(@current_user.role)} · Elilai Kafe"}
+          >
             <img
               src={~p"/images/elilai-kafe/elilai-kafe-logo.png"}
               alt=""
@@ -88,26 +91,36 @@ defmodule EspresoWeb.StaffComponents do
             </.link>
           </nav>
 
-          <button
-            type="button"
-            id="staff-nav-menu-open"
-            class={[
-              "staff-pos-rail-link staff-nav-menu-open",
-              @chrome == :rail && "staff-nav-menu-open--rail",
-              @chrome == :bar && "staff-nav-menu-open--bar",
-              @drawer_active? && "is-active"
-            ]}
-            phx-click="toggle"
-            phx-target="#staff-nav-drawer"
-            data-staff-nav-menu-open
-            aria-expanded="false"
-            aria-controls="staff-nav-drawer-panel"
-            aria-label="Open navigation menu"
-            title="Menu"
-          >
-            <.icon name="hero-bars-3" class="staff-pos-rail-icon" />
-            <span class="sr-only">Menu</span>
-          </button>
+          <div class="staff-pos-rail-end">
+            <div :if={@tools != []} class="staff-pos-rail-tools">
+              {render_slot(@tools)}
+            </div>
+            <.live_component
+              :if={@current == :orders}
+              module={EspresoWeb.StaffNotificationsComponent}
+              id="staff-notifications"
+            />
+            <button
+              type="button"
+              id="staff-nav-menu-open"
+              class={[
+                "staff-pos-rail-link staff-nav-menu-open",
+                @chrome == :rail && "staff-nav-menu-open--rail",
+                @chrome == :bar && "staff-nav-menu-open--bar",
+                @drawer_active? && "is-active"
+              ]}
+              phx-click="toggle"
+              phx-target="#staff-nav-drawer"
+              data-staff-nav-menu-open
+              aria-expanded="false"
+              aria-controls="staff-nav-drawer-panel"
+              aria-label="Open navigation menu"
+              title="Menu"
+            >
+              <.icon name="hero-bars-3" class="staff-pos-rail-icon" />
+              <span class="sr-only">Menu</span>
+            </button>
+          </div>
         </header>
 
         <div class={[

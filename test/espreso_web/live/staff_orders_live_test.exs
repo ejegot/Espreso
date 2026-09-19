@@ -27,21 +27,23 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     %{conn: conn, barista: barista}
   end
 
-  test "Orders header keeps title and tools without center brand logo", %{
-    conn: conn,
-    barista: barista
+  test "Orders header is a compact icon bar with board tools", %{
+    conn: conn
   } do
     {:ok, view, _html} = live(conn, ~p"/orders")
 
-    assert has_element?(view, "#staff-shell .staff-shell-bar--orders")
-    assert has_element?(view, ".staff-shell-orders-title", "Orders")
-    refute has_element?(view, ".staff-shell-orders-brand")
+    assert has_element?(view, "#staff-pos-rail.staff-pos-rail--bar")
+    assert has_element?(view, ".staff-shell-title", "Orders")
+    refute has_element?(view, "#staff-shell")
+    refute has_element?(view, ".staff-shell-orders-title")
+    refute has_element?(view, ".staff-shell-bar--orders")
+    refute has_element?(view, ".staff-shell-user--orders")
 
-    assert has_element?(
-             view,
-             ".staff-shell-tools-block--orders .staff-shell-user--orders",
-             "#{barista.name} · Staff"
-           )
+    assert has_element?(view, "#staff-nav-orders.is-active")
+    assert has_element?(view, "#staff-nav-home")
+    assert has_element?(view, "#staff-nav-pos")
+    assert has_element?(view, "#staff-pos-rail #staff-nav-menu-open")
+    refute has_element?(view, ".staff-nav-menu-open-text")
 
     assert has_element?(view, "#orders-new-header-link[href='#orders-new']", "New")
     assert has_element?(view, "#unpaid-drawer-toggle", "Unpaid")

@@ -40,9 +40,11 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
              view,
              "header.staff-auth-brand img.staff-auth-logo[src='/images/elilai-kafe/elilai-kafe-mark-login.png']"
            )
+
     assert html =~ "/images/elilai-kafe/elilai-kafe-mark-login.webp"
     assert has_element?(view, "header.staff-auth-brand p.staff-auth-wordmark", "ELILAI KAFE")
     refute html =~ "/images/elilai-kafe/elilai-kafe-mark.png"
+
     assert has_element?(
              view,
              "aside.staff-auth-visual source[type='image/webp'][srcset='/images/elilai-kafe/login-brand-panel.webp']"
@@ -77,21 +79,16 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
       assert html =~ ~s(href="/elilai-kafe.webmanifest")
       assert html =~ ~s(href="/images/elilai-kafe/apple-touch-icon.png")
 
-      if path == ~p"/pos" do
+      if path in [~p"/pos", ~p"/orders"] do
         assert has_element?(
                  view,
                  "#staff-pos-rail img.staff-pos-rail-logo[src='/images/elilai-kafe/elilai-kafe-logo.png']"
                )
       else
-        if path == ~p"/orders" do
-          assert has_element?(view, "#staff-shell .staff-shell-brand-label", "Elilai Kafe")
-          refute has_element?(view, "#staff-shell img.staff-shell-brand-logo")
-        else
-          assert has_element?(
-                   view,
-                   "#staff-shell img.staff-shell-brand-logo[src='/images/elilai-kafe/elilai-kafe-logo.jpg']"
-                 )
-        end
+        assert has_element?(
+                 view,
+                 "#staff-shell img.staff-shell-brand-logo[src='/images/elilai-kafe/elilai-kafe-logo.jpg']"
+               )
       end
     end
   end
