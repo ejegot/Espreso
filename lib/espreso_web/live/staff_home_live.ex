@@ -104,7 +104,7 @@ defmodule EspresoWeb.StaffHomeLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.staff_shell current={:home} current_user={@current_user} page_title="Home">
+    <.staff_shell current={:home} current_user={@current_user} page_title="Home" chrome={:bar}>
       <main class="staff-home-main staff-home-hub staff-home-desk" id="staff-home-desk">
         <header class="staff-home-identity" id="staff-home-identity">
           <p class="staff-home-greeting" id="staff-home-greeting">{@greeting}</p>

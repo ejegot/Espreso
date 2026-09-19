@@ -228,7 +228,7 @@ defmodule EspresoWeb.AdminUsersLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.staff_shell current={:staff} current_user={@current_user} page_title="Staff">
+    <.staff_shell current={:staff} current_user={@current_user} page_title="Staff" chrome={:bar}>
       <main class="staff-team-page" id="staff-team-page">
         <header class="staff-team-head">
           <div class="staff-team-head-copy">

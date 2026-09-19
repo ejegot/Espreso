@@ -54,7 +54,7 @@ defmodule EspresoWeb.StaffAttendanceLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.staff_shell current={:attendance} current_user={@current_user} page_title="Staff attendance">
+    <.staff_shell current={:attendance} current_user={@current_user} page_title="Staff attendance" chrome={:bar}>
       <main class="staff-attendance" id="staff-attendance">
         <header class="staff-attendance-head">
           <div>

@@ -25,7 +25,7 @@ defmodule EspresoWeb.StaffMyShiftsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.staff_shell current={:my_shifts} current_user={@current_user} page_title="My shifts">
+    <.staff_shell current={:my_shifts} current_user={@current_user} page_title="My shifts" chrome={:bar}>
       <main class="staff-my-shifts" id="staff-my-shifts">
         <header class="staff-my-shifts-head">
           <div>

@@ -23,7 +23,7 @@ defmodule EspresoWeb.DashboardLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.staff_shell current={:dashboard} current_user={@current_user} page_title="Dashboard">
+    <.staff_shell current={:dashboard} current_user={@current_user} page_title="Dashboard" chrome={:bar}>
       <main class="staff-home-main dashboard-page" id="staff-dashboard">
         <header class="dashboard-head">
           <p class="staff-home-lede dashboard-lede">

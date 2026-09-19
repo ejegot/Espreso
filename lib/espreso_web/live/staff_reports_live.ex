@@ -63,7 +63,7 @@ defmodule EspresoWeb.StaffReportsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.staff_shell current={:reports} current_user={@current_user} page_title="Sales Report">
+    <.staff_shell current={:reports} current_user={@current_user} page_title="Sales Report" chrome={:bar}>
       <main class="staff-reports" id="staff-reports">
         <header class="staff-reports-head">
           <div>

@@ -53,7 +53,7 @@ defmodule EspresoWeb.AdminAvailabilityLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.staff_shell current={:availability} current_user={@current_user} page_title="Availability">
+    <.staff_shell current={:availability} current_user={@current_user} page_title="Availability" chrome={:bar}>
       <main class="staff-orders-main staff-admin-main">
         <p :if={@flash_note} class="staff-admin-note" id="availability-flash">{@flash_note}</p>
         <p class="staff-auth-lede">

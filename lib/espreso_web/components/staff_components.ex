@@ -8,6 +8,7 @@ defmodule EspresoWeb.StaffComponents do
 
   alias Espreso.Accounts.Authorization
   alias Espreso.Accounts.User
+  alias Espreso.Orders
   alias EspresoWeb.StaffNavDrawerComponent
 
   use EspresoWeb, :verified_routes
@@ -28,11 +29,19 @@ defmodule EspresoWeb.StaffComponents do
     primary = Enum.filter(items, &(&1.key in @primary_nav_keys))
     drawer = Enum.reject(items, &(&1.key in @primary_nav_keys))
 
+    orders_badge_count =
+      if assigns.current == :pos do
+        assigns.orders_badge_count
+      else
+        Orders.new_lane_count()
+      end
+
     assigns =
       assigns
       |> assign(:primary_nav, primary)
       |> assign(:drawer_nav, drawer)
       |> assign(:drawer_active?, assigns.current not in @primary_nav_keys)
+      |> assign(:orders_badge_count, orders_badge_count)
 
     ~H"""
     <div
@@ -96,7 +105,7 @@ defmodule EspresoWeb.StaffComponents do
               {render_slot(@tools)}
             </div>
             <.live_component
-              :if={@current == :orders}
+              :if={@current != :pos}
               module={EspresoWeb.StaffNotificationsComponent}
               id="staff-notifications"
             />

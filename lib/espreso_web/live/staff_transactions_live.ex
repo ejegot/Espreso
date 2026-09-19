@@ -130,7 +130,7 @@ defmodule EspresoWeb.StaffTransactionsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.staff_shell current={:transactions} current_user={@current_user} page_title="Transactions">
+    <.staff_shell current={:transactions} current_user={@current_user} page_title="Transactions" chrome={:bar}>
       <main class="staff-transactions" id="staff-transactions">
         <header class="staff-transactions-head">
           <div>

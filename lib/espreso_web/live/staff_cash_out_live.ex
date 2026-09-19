@@ -120,7 +120,7 @@ defmodule EspresoWeb.StaffCashOutLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.staff_shell current={:cash_out} current_user={@current_user} page_title="Cash Out">
+    <.staff_shell current={:cash_out} current_user={@current_user} page_title="Cash Out" chrome={:bar}>
       <main class="staff-cash-out" id="staff-cash-out">
         <header class="staff-cash-out-head">
           <p class="staff-home-desk-eyebrow">Drawer</p>
