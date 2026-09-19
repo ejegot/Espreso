@@ -53,51 +53,55 @@ defmodule EspresoWeb.AdminAvailabilityLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.staff_shell current={:availability} current_user={@current_user} page_title="Availability" chrome={:bar}>
-      <main class="staff-orders-main staff-admin-main">
+    <.staff_shell
+      current={:availability}
+      current_user={@current_user}
+      page_title="Availability"
+      chrome={:bar}
+    >
+      <main class="staff-admin-main staff-availability" id="staff-availability">
         <p :if={@flash_note} class="staff-admin-note" id="availability-flash">{@flash_note}</p>
-        <p class="staff-auth-lede">
-          Mark items unavailable when sold out (86). Unavailable items stay listed so you can restore them.
-        </p>
+        <header class="staff-availability-head">
+          <p class="staff-availability-eyebrow">Menu</p>
+          <h2 class="staff-availability-title">Availability</h2>
+          <p class="staff-availability-lede">
+            Mark items unavailable when sold out (86). Unavailable items stay listed so you can restore them.
+          </p>
+        </header>
 
         <section
           :for={category <- @categories}
-          class="staff-orders-section"
+          class="staff-availability-category"
           id={"availability-category-#{category.name}"}
         >
           <h2>{category.name}</h2>
 
-          <article
-            :for={product <- category.products}
-            class="staff-order-card"
-            id={"availability-product-#{product.id}"}
-          >
-            <header class="staff-order-head">
-              <div>
-                <p class="staff-order-number">{product.name}</p>
-                <p class="staff-order-meta">
+          <div class="staff-availability-grid">
+            <article
+              :for={product <- category.products}
+              class={[
+                "staff-availability-item",
+                !product.available && "is-unavailable"
+              ]}
+              id={"availability-product-#{product.id}"}
+            >
+              <div class="staff-availability-copy">
+                <p class="staff-availability-name">{product.name}</p>
+                <p class="staff-availability-state">
                   {if product.available, do: "Available", else: "Unavailable"}
                 </p>
               </div>
-              <div class="staff-order-badges">
-                <span class={"staff-badge staff-badge--pay-#{if product.available, do: "paid", else: "unpaid"}"}>
-                  {if product.available, do: "Available", else: "Unavailable"}
-                </span>
-              </div>
-            </header>
-
-            <div class="staff-order-actions">
               <button
                 type="button"
-                class="staff-action"
+                class="staff-availability-toggle"
                 phx-click="toggle"
                 phx-value-id={product.id}
                 id={"availability-toggle-#{product.id}"}
               >
                 {if product.available, do: "Mark unavailable", else: "Mark available"}
               </button>
-            </div>
-          </article>
+            </article>
+          </div>
         </section>
       </main>
     </.staff_shell>
