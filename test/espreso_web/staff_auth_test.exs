@@ -473,10 +473,15 @@ defmodule EspresoWeb.StaffAuthTest do
     refute render(view) =~ "Owner Menu"
     assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-transactions", "Transactions")
     assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-customers", "Customers")
+    assert has_element?(view, "#staff-nav-drawer-group-service", "Service")
+    assert has_element?(view, "#staff-nav-drawer-group-shift", "Shift")
+    refute has_element?(view, "#staff-nav-drawer-group-manage")
     assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-my_shifts", "My shifts")
     assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-cash_out", "Cash Out")
     assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-close", "Close shift")
     assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-logout", "Log out")
+    refute has_element?(view, "#staff-nav-dashboard")
+    refute has_element?(view, "#staff-nav-reports")
 
     view |> element("#staff-nav-menu-open") |> render_click()
     assert has_element?(view, "#staff-nav-drawer-panel.is-open")
@@ -511,6 +516,34 @@ defmodule EspresoWeb.StaffAuthTest do
     refute render(barista_view) =~ "Staff Menu"
     refute render(barista_view) =~ "Manager Menu"
     refute render(barista_view) =~ "Owner Menu"
+  end
+
+  test "drawer groups secondary destinations by Service, Shift, and Manage", %{
+    conn: conn,
+    owner: owner,
+    manager: manager,
+    barista: barista
+  } do
+    {:ok, barista_view, _html} = live(log_in(conn, barista), ~p"/staff")
+    assert has_element?(barista_view, "#staff-nav-drawer-group-service", "Service")
+    assert has_element?(barista_view, "#staff-nav-drawer-group-shift", "Shift")
+    refute has_element?(barista_view, "#staff-nav-drawer-group-manage")
+    refute has_element?(barista_view, "#staff-nav-attendance")
+
+    {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/staff")
+    assert has_element?(manager_view, "#staff-nav-drawer-group-service", "Service")
+    assert has_element?(manager_view, "#staff-nav-drawer-group-shift", "Shift")
+    assert has_element?(manager_view, "#staff-nav-drawer-group-manage", "Manage")
+    assert has_element?(manager_view, "#staff-nav-drawer-group-manage #staff-nav-dashboard", "Dashboard")
+    assert has_element?(manager_view, "#staff-nav-drawer-group-manage #staff-nav-reports", "Reports")
+    assert has_element?(manager_view, "#staff-nav-drawer-group-manage #staff-nav-availability", "Availability")
+    refute has_element?(manager_view, "#staff-nav-staff")
+    refute has_element?(manager_view, "#staff-nav-settings")
+    refute has_element?(manager_view, "#staff-nav-my_shifts")
+
+    {:ok, owner_view, _html} = live(log_in(conn, owner), ~p"/staff")
+    assert has_element?(owner_view, "#staff-nav-drawer-group-manage #staff-nav-staff", "Staff")
+    assert has_element?(owner_view, "#staff-nav-drawer-group-manage #staff-nav-settings", "Settings")
   end
 
   test "manager can access staff routes but not user management", %{

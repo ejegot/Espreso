@@ -9,6 +9,12 @@ defmodule EspresoWeb.StaffNavDrawerComponent do
 
   alias Espreso.Accounts.User
 
+  @groups [
+    {:service, "Service"},
+    {:shift, "Shift"},
+    {:manage, "Manage"}
+  ]
+
   @impl true
   def update(assigns, socket) do
     role_title = User.role_label(assigns.current_user.role)
@@ -17,6 +23,7 @@ defmodule EspresoWeb.StaffNavDrawerComponent do
      socket
      |> assign(assigns)
      |> assign(:role_title, role_title)
+     |> assign(:groups, grouped_items(assigns.items))
      |> assign_new(:open?, fn -> false end)}
   end
 
@@ -89,19 +96,27 @@ defmodule EspresoWeb.StaffNavDrawerComponent do
         </header>
 
         <div class="staff-nav-drawer-body">
-          <.link
-            :for={item <- @items}
-            navigate={item.path}
-            class={[
-              "staff-nav-drawer-link",
-              @current == item.key && "is-active"
-            ]}
-            id={"staff-nav-#{item.key}"}
-            aria-current={if(@current == item.key, do: "page", else: nil)}
+          <section
+            :for={group <- @groups}
+            class="staff-nav-drawer-group"
+            id={"staff-nav-drawer-group-#{group.key}"}
+            aria-label={group.title}
           >
-            <.icon name={item.icon} class="staff-nav-drawer-link-icon" />
-            <span>{item.label}</span>
-          </.link>
+            <p class="staff-nav-drawer-group-label">{group.title}</p>
+            <.link
+              :for={item <- group.items}
+              navigate={item.path}
+              class={[
+                "staff-nav-drawer-link",
+                @current == item.key && "is-active"
+              ]}
+              id={"staff-nav-#{item.key}"}
+              aria-current={if(@current == item.key, do: "page", else: nil)}
+            >
+              <.icon name={item.icon} class="staff-nav-drawer-link-icon" />
+              <span>{item.label}</span>
+            </.link>
+          </section>
         </div>
 
         <footer class="staff-nav-drawer-foot">
@@ -118,5 +133,15 @@ defmodule EspresoWeb.StaffNavDrawerComponent do
       </nav>
     </div>
     """
+  end
+
+  defp grouped_items(items) do
+    by_group = Enum.group_by(items, & &1.group)
+
+    for {key, title} <- @groups,
+        grouped = Map.get(by_group, key, []),
+        grouped != [] do
+      %{key: key, title: title, items: grouped}
+    end
   end
 end
