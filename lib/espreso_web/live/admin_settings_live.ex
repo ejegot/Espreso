@@ -39,30 +39,61 @@ defmodule EspresoWeb.AdminSettingsLive do
   def render(assigns) do
     ~H"""
     <.staff_shell current={:settings} current_user={@current_user} page_title="Settings" chrome={:bar}>
-      <main class="staff-orders-main staff-admin-main">
+      <main class="staff-admin-main staff-settings" id="staff-settings">
         <p :if={@flash_note} class="staff-admin-note" id="settings-flash">{@flash_note}</p>
-        <p class="staff-auth-lede">
-          Signed in as {@current_user.name} (Owner). Update public contact, hours, and social links.
-        </p>
+        <header class="staff-settings-head">
+          <p class="staff-settings-eyebrow">Shop</p>
+          <h2 class="staff-settings-title">Settings</h2>
+          <p class="staff-settings-lede">
+            Signed in as {@current_user.name} (Owner). Update public contact, hours, and social links.
+          </p>
+        </header>
 
-        <section class="staff-auth-card staff-admin-form-card">
-          <h2 class="staff-admin-heading">Shop details</h2>
-          <.form for={@form} id="admin-settings-form" phx-submit="save" class="staff-auth-form">
+        <.form for={@form} id="admin-settings-form" phx-submit="save" class="staff-settings-form">
+          <section
+            class="staff-settings-card"
+            id="settings-shop"
+            aria-labelledby="settings-shop-title"
+          >
+            <h2 class="staff-settings-card-title" id="settings-shop-title">Shop</h2>
             <.input field={@form[:business_name]} type="text" label="Business name" required />
             <.input field={@form[:address]} type="text" label="Address" required />
             <.input field={@form[:phone]} type="text" label="Phone" required />
             <.input field={@form[:email]} type="email" label="Email" required />
+          </section>
+
+          <section
+            class="staff-settings-card"
+            id="settings-hours"
+            aria-labelledby="settings-hours-title"
+          >
+            <h2 class="staff-settings-card-title" id="settings-hours-title">Hours</h2>
             <.input
               field={@form[:hours_text]}
               type="textarea"
               label="Hours (one line per entry)"
               required
             />
+          </section>
+
+          <section
+            class="staff-settings-card"
+            id="settings-social"
+            aria-labelledby="settings-social-title"
+          >
+            <h2 class="staff-settings-card-title" id="settings-social-title">Social</h2>
             <.input field={@form[:instagram_url]} type="url" label="Instagram URL" required />
             <.input field={@form[:facebook_url]} type="url" label="Facebook URL" required />
             <.input field={@form[:tiktok_url]} type="url" label="TikTok URL" required />
-            <h3 class="staff-admin-heading">Payments</h3>
-            <p class="staff-auth-lede">
+          </section>
+
+          <section
+            class="staff-settings-card"
+            id="settings-payments"
+            aria-labelledby="settings-payments-title"
+          >
+            <h2 class="staff-settings-card-title" id="settings-payments-title">Payments</h2>
+            <p class="staff-settings-card-note">
               Counter-only hides online pay on the menu. QRPh manual shows GCash/Maya QR codes — upload images to
               <code>priv/static</code>
               and enter their public paths below.
@@ -85,9 +116,12 @@ defmodule EspresoWeb.AdminSettingsLive do
               label="Maya QRPh image path"
               placeholder="/images/maya-qrph.png"
             />
+          </section>
+
+          <div class="staff-settings-save">
             <button type="submit" class="menu-basket-checkout">Save settings</button>
-          </.form>
-        </section>
+          </div>
+        </.form>
       </main>
     </.staff_shell>
     """

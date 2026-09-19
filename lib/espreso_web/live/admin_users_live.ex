@@ -229,7 +229,10 @@ defmodule EspresoWeb.AdminUsersLive do
   def render(assigns) do
     ~H"""
     <.staff_shell current={:staff} current_user={@current_user} page_title="Staff" chrome={:bar}>
-      <main class="staff-team-page" id="staff-team-page">
+      <main
+        class={["staff-team-page", @adding? && @users != [] && "staff-team-page--adding"]}
+        id="staff-team-page"
+      >
         <header class="staff-team-head">
           <div class="staff-team-head-copy">
             <p class="staff-team-eyebrow">Team</p>
@@ -514,7 +517,7 @@ defmodule EspresoWeb.AdminUsersLive do
 
         <section
           :if={@adding? or @users == []}
-          class="staff-team-add"
+          class={["staff-team-add", @users != [] && "staff-team-add--panel"]}
           id="staff-team-add"
           aria-label="Add staff"
         >

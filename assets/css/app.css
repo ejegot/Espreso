@@ -9523,6 +9523,190 @@ a.staff-home-card:focus-visible {
   width: min(calc(100% - 2rem), 40rem);
 }
 
+.staff-app .staff-admin-main.staff-availability,
+.staff-app .staff-admin-main.staff-settings {
+  width: min(calc(100% - 1.5rem), 72rem);
+  padding: 0.75rem 0 1.5rem;
+}
+
+.staff-availability-head,
+.staff-settings-head {
+  margin-bottom: 0.85rem;
+}
+
+.staff-availability-eyebrow,
+.staff-settings-eyebrow {
+  margin: 0;
+  color: color-mix(in srgb, var(--elilai-forest, #394331) 55%, #f4efe3);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.staff-availability-title,
+.staff-settings-title {
+  margin: 0.15rem 0 0;
+  color: var(--elilai-forest, #394331);
+  font-size: clamp(1.2rem, 2.4vw, 1.45rem);
+  font-weight: 800;
+}
+
+.staff-availability-lede,
+.staff-settings-lede {
+  margin: 0.3rem 0 0;
+  max-width: 42rem;
+  color: color-mix(in srgb, var(--elilai-forest, #394331) 58%, #f4efe3);
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.staff-availability-category {
+  margin-bottom: 1.1rem;
+}
+
+.staff-availability-category h2 {
+  margin: 0 0 0.45rem;
+  color: var(--elilai-forest, #394331);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.staff-availability-grid {
+  display: grid;
+  gap: 0.4rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 720px) {
+  .staff-availability-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.staff-availability-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: center;
+  min-height: 3.15rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--elilai-forest, #394331) 12%, transparent);
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.staff-availability-item.is-unavailable {
+  background: color-mix(in srgb, #f4efe3 70%, #fff);
+}
+
+.staff-availability-name {
+  margin: 0;
+  color: #2e3529;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.staff-availability-state {
+  margin: 0.1rem 0 0;
+  color: color-mix(in srgb, #2e3529 55%, #f4efe3);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.staff-availability-toggle {
+  min-height: 2.2rem;
+  padding: 0.3rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--elilai-forest, #394331) 22%, transparent);
+  border-radius: 0.55rem;
+  background: #fff;
+  color: var(--elilai-forest, #394331);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.staff-settings-form {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 800px) {
+  .staff-settings-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .staff-settings-save {
+    grid-column: 1 / -1;
+  }
+}
+
+.staff-settings-card {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.85rem 0.9rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--elilai-forest, #394331) 12%, transparent);
+  border-radius: 0.9rem;
+  background: #fff;
+}
+
+.staff-settings-card-title {
+  margin: 0;
+  color: var(--elilai-forest, #394331);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.staff-settings-card-note {
+  margin: 0;
+  color: color-mix(in srgb, var(--elilai-forest, #394331) 58%, #f4efe3);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.staff-settings-save {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.staff-settings-save .menu-basket-checkout {
+  min-width: 10rem;
+}
+
+@media (min-width: 800px) {
+  .staff-team-page {
+    width: min(calc(100% - 1.5rem), 72rem);
+  }
+
+  .staff-team-page--adding {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem);
+    align-items: start;
+    column-gap: 0.9rem;
+  }
+
+  .staff-team-page--adding .staff-team-head,
+  .staff-team-page--adding .staff-team-note,
+  .staff-team-page--adding .staff-team-summary {
+    grid-column: 1 / -1;
+  }
+
+  .staff-team-add--panel {
+    position: sticky;
+    top: 3.4rem;
+  }
+}
+
 /* —— Staff Team / PIN management (Owner) —— */
 .staff-team-page {
   --team-forest: var(--elilai-forest, #394331);
@@ -9530,7 +9714,7 @@ a.staff-home-card:focus-visible {
   --team-ink: var(--team-forest);
   --team-muted: color-mix(in srgb, var(--team-forest) 55%, var(--team-ivory));
   --team-line: color-mix(in srgb, var(--team-forest) 14%, transparent);
-  width: min(calc(100% - 1.5rem), 48rem);
+  width: min(calc(100% - 1.5rem), 64rem);
   margin-inline: auto;
   padding: 0.75rem 0 1.35rem;
   color: var(--team-ink);
@@ -10933,7 +11117,7 @@ body:has(.staff-nav-drawer.is-open) {
 
   /* —— 5. Admin content width —— */
   .staff-app .staff-admin-main {
-    width: min(calc(100% - 1.5rem), 40rem);
+    width: min(calc(100% - 1.5rem), 68rem);
   }
 
   .staff-app .staff-reports {
@@ -10942,6 +11126,7 @@ body:has(.staff-nav-drawer.is-open) {
 
   /* —— 6. Shared form scale —— */
   .staff-app .staff-auth-form label,
+  .staff-app .staff-settings-form label,
   .staff-app .staff-auth-field > span,
   .staff-app .staff-customer-field span,
   .staff-app .staff-team-edit-label,
@@ -10960,6 +11145,9 @@ body:has(.staff-nav-drawer.is-open) {
   .staff-app .staff-auth-form input:not([type="checkbox"]):not([type="hidden"]),
   .staff-app .staff-auth-form select,
   .staff-app .staff-auth-form textarea,
+  .staff-app .staff-settings-form input:not([type="checkbox"]):not([type="hidden"]),
+  .staff-app .staff-settings-form select,
+  .staff-app .staff-settings-form textarea,
   .staff-app .staff-auth-field input,
   .staff-app .staff-auth-select,
   .staff-app .staff-team-input,
@@ -10982,6 +11170,7 @@ body:has(.staff-nav-drawer.is-open) {
   }
 
   .staff-app .staff-auth-form .menu-basket-checkout,
+  .staff-app .staff-settings-save .menu-basket-checkout,
   .staff-app .staff-customer-search-actions button,
   .staff-app .staff-reports-export-btn,
   .staff-app .staff-cash-out-submit,
@@ -21886,9 +22075,9 @@ a.brune-contact-value:focus-visible {
   --txn-muted: color-mix(in srgb, var(--txn-forest) 55%, var(--txn-ivory));
   --txn-line: color-mix(in srgb, var(--txn-forest) 14%, transparent);
   --txn-surface: #fffef9;
-  width: min(100%, 78rem);
+  width: min(100%, 92rem);
   margin: 0 auto;
-  padding: 0.85rem 1rem 1rem;
+  padding: 0.65rem 0.85rem 1rem;
   color: var(--txn-ink);
 }
 
@@ -22072,8 +22261,8 @@ a.brune-contact-value:focus-visible {
 
 .staff-transaction-row {
   width: 100%;
-  min-height: 3.65rem;
-  padding: 0.55rem 0.7rem;
+  min-height: 4.25rem;
+  padding: 0.7rem 0.85rem;
   border: 0;
   border-bottom: 1px solid color-mix(in srgb, var(--txn-forest) 8%, transparent);
   background: #fff;
@@ -22741,9 +22930,11 @@ a.brune-contact-value:focus-visible {
   --att-ivory: var(--elilai-ivory, #f4efe3);
   --att-muted: color-mix(in srgb, var(--att-forest) 58%, #fff);
   display: grid;
-  gap: 1.15rem;
-  padding: 1rem 1rem 1.75rem;
-  max-width: 42rem;
+  gap: 0.85rem;
+  padding: 0.75rem 1rem 1.5rem;
+  width: min(calc(100% - 0.5rem), 64rem);
+  max-width: 64rem;
+  margin-inline: auto;
 }
 
 /* —— Staff Sales Reports (Excel export) —— */
@@ -22882,6 +23073,13 @@ a.brune-contact-value:focus-visible {
   gap: 0.75rem;
 }
 
+@media (min-width: 800px) {
+  .staff-attendance-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+}
+
 .staff-attendance-date-nav {
   display: flex;
   flex-wrap: wrap;
@@ -23008,11 +23206,14 @@ a.brune-contact-value:focus-visible {
 
 .staff-attendance-empty {
   display: grid;
-  gap: 0.28rem;
-  justify-items: center;
-  padding: 2.25rem 1rem;
+  gap: 0.35rem;
+  justify-items: start;
+  padding: 0.85rem 0.95rem;
+  border: 1px dashed color-mix(in srgb, var(--att-forest) 18%, transparent);
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--att-ivory) 55%, #fff);
   color: var(--att-muted);
-  text-align: center;
+  text-align: left;
 }
 
 .staff-attendance-empty strong {
@@ -23032,13 +23233,29 @@ a.brune-contact-value:focus-visible {
   --co-muted: color-mix(in srgb, #394331 58%, #7a7468);
   display: grid;
   gap: 0.95rem;
-  padding: 1rem 1rem 2rem;
-  max-width: 42rem;
+  padding: 0.75rem 1rem 2rem;
+  width: min(calc(100% - 0.5rem), 72rem);
+  max-width: 72rem;
+  margin-inline: auto;
 }
 
 .staff-cash-out-head {
   display: grid;
   gap: 0.25rem;
+}
+
+@media (min-width: 900px) {
+  .staff-cash-out {
+    grid-template-columns: minmax(18rem, 0.85fr) minmax(0, 1.15fr);
+    align-items: start;
+  }
+
+  .staff-cash-out-head,
+  .staff-cash-out-blocked,
+  .staff-cash-out-confirm,
+  .staff-cash-out-history {
+    grid-column: 1 / -1;
+  }
 }
 
 .staff-cash-out-form,
@@ -23334,9 +23551,9 @@ a.brune-contact-value:focus-visible {
   --cust-muted: color-mix(in srgb, var(--cust-forest) 55%, var(--cust-ivory));
   --cust-line: color-mix(in srgb, var(--cust-forest) 14%, transparent);
   --cust-surface: #fffef9;
-  width: min(100%, 52rem);
+  width: min(100%, 72rem);
   margin: 0 auto;
-  padding: 0.85rem 1rem 1.5rem;
+  padding: 0.75rem 1rem 1.5rem;
   color: var(--cust-ink);
 }
 
@@ -23393,6 +23610,13 @@ a.brune-contact-value:focus-visible {
   border: 1px solid var(--cust-line);
   border-radius: 0.85rem;
   background: var(--cust-surface);
+}
+
+@media (min-width: 720px) {
+  .staff-customer-search {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
 }
 
 .staff-customer-field {
