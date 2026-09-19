@@ -187,7 +187,11 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
              "Espresso"
            )
 
-    assert has_element?(view, "#{detail_id(order.id, "preparing")} .staff-order-fulfillment", "Take Out")
+    assert has_element?(
+             view,
+             "#{detail_id(order.id, "preparing")} .staff-order-fulfillment",
+             "Take Out"
+           )
   end
 
   test "legacy counter Cash opens the same modal while wallet actions remain direct", %{
@@ -1383,12 +1387,21 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     {:ok, order} =
       Orders.create_order(
-        [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("120")}],
+        [
+          %{
+            name: "Americano",
+            size: "12oz",
+            category: "COLD",
+            quantity: 1,
+            price: Decimal.new("120")
+          }
+        ],
         %{
           customer_name: "QR Guest",
-          fulfillment: :pickup,
+          fulfillment: :dine_in,
           payment_method: :online,
-          payment_intent: :gcash
+          payment_intent: :gcash,
+          notes: "Less ice"
         }
       )
 
@@ -1403,7 +1416,24 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     view |> element("#ticket-new-mark-paid-#{order.id}") |> render_click()
 
-    assert has_element?(view, "#mark-paid-modal-gcash.is-suggested", "GCash")
+    assert has_element?(view, "#mark-paid-modal-items", "Americano")
+    assert has_element?(view, "#mark-paid-modal-items", "12oz")
+
+    assert has_element?(
+             view,
+             "#mark-paid-modal-items .staff-mark-paid-modal-item-temp.is-iced",
+             "Iced"
+           )
+
+    assert has_element?(view, "#mark-paid-modal .staff-mark-paid-modal-sub", "Dine In")
+
+    assert has_element?(
+             view,
+             "#mark-paid-modal .staff-mark-paid-modal-order-note-body",
+             "Less ice"
+           )
+
+    assert has_element?(view, "#mark-paid-modal-gcash.is-suggested", "Confirm GCash")
     refute has_element?(view, "#mark-paid-modal-maya")
     refute has_element?(view, "#mark-paid-modal-cash")
     refute has_element?(view, "#mark-paid-modal-counter")
@@ -1439,7 +1469,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert has_element?(view, "#ticket-new-mark-paid-#{order.id}", "Mark paid")
     view |> element("#ticket-new-mark-paid-#{order.id}") |> render_click()
 
-    assert has_element?(view, "#mark-paid-modal-maya.is-suggested", "Maya")
+    assert has_element?(view, "#mark-paid-modal-maya.is-suggested", "Confirm Maya")
     refute has_element?(view, "#mark-paid-modal-gcash")
     refute has_element?(view, "#mark-paid-modal-cash")
 
