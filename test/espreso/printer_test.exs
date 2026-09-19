@@ -65,6 +65,7 @@ defmodule Espreso.PrinterTest do
         %OrderItem{
           name: "Americano",
           size: "12oz",
+          category: "COLD",
           quantity: 1,
           unit_price: Decimal.new("95"),
           line_total: Decimal.new("95")
@@ -82,7 +83,7 @@ defmodule Espreso.PrinterTest do
     receipt = Receipt.build(order, staff_name: "Jun")
 
     assert receipt =~ "CS-ABC123"
-    assert receipt =~ "Americano"
+    assert receipt =~ "Americano 12oz Iced"
     assert receipt =~ "Espresso"
     assert receipt =~ "Walk-in"
     assert receipt =~ "TOTAL"
@@ -110,7 +111,7 @@ defmodule Espreso.PrinterTest do
       table_number: "5",
       notes: "Less ice",
       items: [
-        %OrderItem{name: "Scarlet Berry", size: "16oz", quantity: 2}
+        %OrderItem{name: "Scarlet Berry", size: "16oz", category: "COLD", quantity: 2}
       ]
     }
 
@@ -119,7 +120,7 @@ defmodule Espreso.PrinterTest do
     assert ticket =~ "KITCHEN"
     assert ticket =~ "CS-KIT001"
     assert ticket =~ "Dine-in"
-    assert ticket =~ "2x Scarlet Berry 16oz"
+    assert ticket =~ "2x Scarlet Berry 16oz Iced"
     assert ticket =~ "NOTE"
     assert ticket =~ "Less ice"
     assert ticket =~ "Cashier: Ana"

@@ -2083,6 +2083,7 @@ defmodule EspresoWeb.MenuLive do
         product,
         price,
         qty,
+        category_name,
         Menu.product_image(category_name, product.name)
       )
 
@@ -2095,7 +2096,7 @@ defmodule EspresoWeb.MenuLive do
     |> assign(:bag_add_delta, qty)
   end
 
-  defp add_line(cart, product, price, quantity, image) do
+  defp add_line(cart, product, price, quantity, category_name, image) do
     key = line_key(product.id, price)
     size = size_label(price)
 
@@ -2108,6 +2109,7 @@ defmodule EspresoWeb.MenuLive do
               product_id: product.id,
               name: product.name,
               size: size,
+              category: category_name,
               price: price.price,
               quantity: quantity,
               image: image

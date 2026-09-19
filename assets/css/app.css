@@ -2556,6 +2556,20 @@ body:has(.menu-page-locked) {
   color: var(--brune-muted, #6b6b6b);
 }
 
+.order-item-temp {
+  margin: 0.1rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.order-item-temp.is-hot {
+  color: #9a3412;
+}
+
+.order-item-temp.is-iced {
+  color: #0e7490;
+}
+
 .order-item-price,
 .order-total strong,
 .staff-order-total {
@@ -5565,6 +5579,20 @@ a.staff-home-card:focus-visible {
 .staff-pos-cart-size {
   color: var(--brune-muted, #6b6b6b);
   font-weight: 500;
+}
+
+.staff-pos-cart-temp {
+  margin: 0.05rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.staff-pos-cart-temp.is-hot {
+  color: #9a3412;
+}
+
+.staff-pos-cart-temp.is-iced {
+  color: #0e7490;
 }
 
 .staff-pos-cart-amount {
@@ -8990,6 +9018,7 @@ a.staff-home-card:focus-visible {
   padding: 0.35rem 0.25rem;
   font-size: 0.78rem;
   letter-spacing: 0.03em;
+  text-transform: none;
 }
 
 .staff-orders-page .staff-order-secondary-row {
@@ -9082,6 +9111,12 @@ a.staff-home-card:focus-visible {
   justify-content: flex-start;
 }
 
+.staff-orders-page .staff-order-more-panel .staff-action-cancel {
+  border: 1px solid color-mix(in srgb, #b42318 28%, var(--cs-line));
+  background: transparent;
+  color: color-mix(in srgb, #b42318 72%, var(--cs-brown));
+}
+
 .staff-orders-page .staff-order-pay-via {
   display: inline-flex;
   align-items: center;
@@ -9102,8 +9137,8 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-orders-page .staff-order-pay-state {
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 .staff-orders-refresh {
@@ -9524,11 +9559,34 @@ a.staff-home-card:focus-visible {
   font-weight: 700;
 }
 
-.staff-pos-order-review-size {
+.staff-pos-order-review-name {
+  min-width: 0;
+}
+
+.staff-pos-order-review-meta-line {
   display: block;
+  margin-top: 0.08rem;
+}
+
+.staff-pos-order-review-size {
+  display: inline;
   color: color-mix(in srgb, #382010 55%, #b0a098);
   font-size: 0.78rem;
   font-weight: 600;
+}
+
+.staff-pos-order-review-temp {
+  display: inline;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.staff-pos-order-review-temp.is-hot {
+  color: #9a3412;
+}
+
+.staff-pos-order-review-temp.is-iced {
+  color: #0e7490;
 }
 
 .staff-pos-order-review-total {
@@ -11670,28 +11728,39 @@ body:has(.staff-nav-drawer.is-open) {
   }
 
   .staff-orders-page .staff-order-number {
-    font-size: 1.08rem;
+    font-size: 1.18rem;
   }
 
   .staff-orders-page .staff-order-ticket--compact .staff-order-number {
-    font-size: 0.95rem;
+    font-size: 1.08rem;
   }
 
   .staff-orders-page .staff-order-name,
   .staff-orders-page .staff-order-ticket--compact .staff-order-name {
-    font-size: 0.92rem;
+    font-size: 1rem;
   }
 
   .staff-orders-page .staff-order-items {
-    font-size: 0.9rem;
-  }
-
-  .staff-orders-page .staff-order-fulfillment {
     font-size: 1.05rem;
   }
 
-  .staff-orders-page .staff-order-ticket--compact .staff-order-fulfillment {
-    font-size: 0.98rem;
+  .staff-orders-page .staff-order-item-size,
+  .staff-orders-page .staff-order-item-dot,
+  .staff-orders-page .staff-order-item-temp {
+    font-size: 0.82rem;
+  }
+
+  .staff-orders-page .staff-order-source {
+    font-size: 0.7rem;
+    min-height: 1.25rem;
+  }
+
+  .staff-orders-page .staff-order-ticket-head-side .staff-order-fulfillment {
+    font-size: 0.88rem;
+  }
+
+  .staff-orders-page .staff-order-pay-state {
+    font-size: 0.72rem;
   }
 }
 
@@ -11735,20 +11804,30 @@ body:has(.staff-nav-drawer.is-open) {
   padding: 0.28rem 0.32rem 0.24rem;
 }
 
-.staff-orders-page .staff-order-ticket-source-row {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.12rem;
+.staff-orders-page .staff-order-ticket-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.12rem 0.5rem;
+  align-items: start;
+  margin-bottom: 0.16rem;
 }
 
-.staff-orders-page .staff-order-ticket-id-row {
+.staff-orders-page .staff-order-ticket-head-main {
+  min-width: 0;
+}
+
+.staff-orders-page .staff-order-ticket-head-side {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.35rem;
-  margin-bottom: 0.08rem;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  min-width: 6.5rem;
+  text-align: right;
+}
+
+.staff-orders-page .staff-order-ticket-head-side .staff-order-fulfillment,
+.staff-orders-page .staff-order-ticket-head-side .staff-order-table {
+  white-space: nowrap;
 }
 
 .staff-orders-page .staff-order-source {
@@ -11759,8 +11838,8 @@ body:has(.staff-nav-drawer.is-open) {
   border-radius: 0.14rem;
   font-size: 0.6rem;
   font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 .staff-orders-page .staff-order-source--customer {
@@ -11823,7 +11902,7 @@ body:has(.staff-nav-drawer.is-open) {
 }
 
 .staff-orders-page .staff-order-name {
-  margin: 0.05rem 0 0.18rem;
+  margin: 0.08rem 0 0;
   font-size: 0.92rem;
   font-weight: 800;
   line-height: 1.12;
@@ -11874,10 +11953,39 @@ body:has(.staff-nav-drawer.is-open) {
   text-align: right;
 }
 
-.staff-orders-page .staff-order-item-size {
+.staff-orders-page .staff-order-item-name {
   display: block;
+}
+
+.staff-orders-page .staff-order-item-meta {
+  display: block;
+}
+
+.staff-orders-page .staff-order-item-size {
+  display: inline;
   color: color-mix(in srgb, var(--cs-brown) 58%, var(--cs-beige));
   font-size: 0.68rem;
+}
+
+.staff-orders-page .staff-order-item-dot {
+  margin: 0 0.12rem;
+  color: color-mix(in srgb, var(--cs-brown) 40%, var(--cs-beige));
+  font-size: 0.68rem;
+}
+
+.staff-orders-page .staff-order-item-temp {
+  display: inline;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.staff-orders-page .staff-order-item-temp.is-hot {
+  color: color-mix(in srgb, #9a3412 70%, var(--cs-brown));
+}
+
+.staff-orders-page .staff-order-item-temp.is-iced {
+  color: color-mix(in srgb, #0e7490 72%, var(--cs-brown));
 }
 
 .staff-orders-page .staff-order-note-block {
@@ -11919,10 +12027,11 @@ body:has(.staff-nav-drawer.is-open) {
 }
 
 .staff-orders-page .staff-order-fulfillment {
-  font-size: 0.86rem;
+  font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.01em;
   color: var(--cs-brown);
+  line-height: 1.15;
 }
 
 .staff-orders-page .staff-order-ticket--handoff .staff-order-meta {
@@ -11971,8 +12080,8 @@ body:has(.staff-nav-drawer.is-open) {
   border-radius: 0.14rem;
   font-size: 0.62rem;
   font-weight: 800;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 .staff-orders-page .staff-order-pay-state.staff-badge--pay-unpaid {
@@ -12028,6 +12137,30 @@ body:has(.staff-nav-drawer.is-open) {
   background: #fff;
 }
 
+.staff-orders-page .staff-order-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.28rem;
+}
+
+.staff-orders-page .staff-order-actions-row .staff-order-pay-actions,
+.staff-orders-page .staff-order-actions-row .staff-order-kitchen-actions {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.staff-orders-page .staff-order-actions-row .staff-order-more {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.staff-orders-page .staff-order-actions-row .staff-order-more-summary {
+  width: 2.75rem;
+  min-height: 2.75rem;
+  height: 100%;
+}
+
 .staff-orders-page .staff-order-ticket--compact .staff-order-actions {
   padding: 0.26rem 0.3rem 0.3rem;
 }
@@ -12066,6 +12199,12 @@ body:has(.staff-nav-drawer.is-open) {
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.staff-orders-page .staff-action-primary.staff-action-mark-paid,
+.staff-orders-page .staff-action-primary.staff-action-paid-via {
+  text-transform: none;
+  letter-spacing: 0.02em;
 }
 
 .staff-orders-page .staff-order-ticket--preparing .staff-action-primary {
@@ -12114,6 +12253,7 @@ body:has(.staff-nav-drawer.is-open) {
   color: var(--cs-orange);
   border: 1.5px solid color-mix(in srgb, var(--cs-orange) 55%, transparent);
   font-weight: 800;
+  text-transform: none;
 }
 
 .staff-orders-page .staff-badge--pay-paid {
@@ -12121,6 +12261,7 @@ body:has(.staff-nav-drawer.is-open) {
   color: #1b7a52;
   border: 1px solid color-mix(in srgb, #22a06b 28%, transparent);
   font-weight: 800;
+  text-transform: none;
 }
 
 .staff-orders-page .staff-badge--pay-awaiting_payment {
@@ -12128,6 +12269,7 @@ body:has(.staff-nav-drawer.is-open) {
   color: color-mix(in srgb, var(--cs-brown) 70%, var(--cs-orange));
   border: 1.5px dashed color-mix(in srgb, var(--cs-orange) 50%, transparent);
   font-weight: 800;
+  text-transform: none;
 }
 
 .staff-orders-page .staff-badge--completed {
@@ -12412,8 +12554,8 @@ body:has(.staff-nav-drawer.is-open) {
   color: #8a8a8a;
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 .staff-mark-paid-modal-title {
@@ -12490,6 +12632,8 @@ body:has(.staff-nav-drawer.is-open) {
 
 .staff-action-mark-paid {
   width: 100%;
+  text-transform: none;
+  letter-spacing: 0.02em;
 }
 
 .staff-orders-page .staff-orders-unpaid-drawer {

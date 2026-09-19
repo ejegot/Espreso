@@ -121,7 +121,8 @@ defmodule EspresoWeb.Api.V1.OrderController do
 
   defp line_to_cart(%{"product_id" => product_id} = line, menu) do
     with {:ok, product_id} <- parse_id(product_id),
-         {:ok, product, price} <- find_product_price(menu, product_id, line["price_id"]),
+         {:ok, category_name, product, price} <-
+           find_product_price(menu, product_id, line["price_id"]),
          {:ok, quantity} <- parse_quantity(line["quantity"]) do
       {:ok,
        %{
@@ -129,6 +130,7 @@ defmodule EspresoWeb.Api.V1.OrderController do
          price_id: price.id,
          name: product.name,
          size: price.size,
+         category: category_name,
          quantity: quantity,
          price: price.price
        }}
@@ -144,13 +146,13 @@ defmodule EspresoWeb.Api.V1.OrderController do
         if product.id == product_id do
           case select_price(product, price_id) do
             nil -> nil
-            price -> {product, price}
+            price -> {category.name, product, price}
           end
         end
       end)
     end)
     |> case do
-      {product, price} -> {:ok, product, price}
+      {category_name, product, price} -> {:ok, category_name, product, price}
       nil -> {:error, :not_found}
     end
   end

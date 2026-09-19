@@ -7,6 +7,7 @@ defmodule Espreso.Orders.OrderItem do
   schema "order_items" do
     field :name, :string
     field :size, :string
+    field :category, :string
     field :quantity, :integer
     field :unit_price, :decimal
     field :line_total, :decimal
@@ -18,7 +19,7 @@ defmodule Espreso.Orders.OrderItem do
 
   def changeset(item, attrs) do
     item
-    |> cast(attrs, [:name, :size, :quantity, :unit_price, :line_total, :order_id])
+    |> cast(attrs, [:name, :size, :category, :quantity, :unit_price, :line_total, :order_id])
     |> validate_required([:name, :quantity, :unit_price, :line_total])
     |> validate_number(:quantity, greater_than: 0)
     |> validate_number(:unit_price, greater_than_or_equal_to: 0)

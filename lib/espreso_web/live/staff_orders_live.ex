@@ -493,7 +493,7 @@ defmodule EspresoWeb.StaffOrdersLive do
       {:ok, completed} ->
         {:noreply,
          socket
-         |> assign(:flash_note, "#{completed.number} picked up.")
+         |> assign(:flash_note, "Picked up · #{completed.number}")
          |> load_orders()}
 
       {:error, :cancelled} ->
@@ -922,53 +922,57 @@ defmodule EspresoWeb.StaffOrdersLive do
       id={"order-card-#{@lane}-#{@order.id}"}
     >
       <div class="staff-order-ticket-body" id={"order-detail-#{@lane}-#{@order.id}"}>
-        <div :if={!@compact?} class="staff-order-ticket-source-row">
-          <span
-            class={["staff-order-source", @source_class]}
-            id={"order-source-#{@lane}-#{@order.id}"}
-          >
-            {@source_label}
-          </span>
-          <span :if={@table_label} class="staff-order-table" id={"order-table-#{@lane}-#{@order.id}"}>
-            {@table_label}
-          </span>
+        <div class="staff-order-ticket-head">
+          <div class="staff-order-ticket-head-main">
+            <p class="staff-order-number">{@order.number}</p>
+            <p :if={show_customer_name?(@order)} class="staff-order-name">{@order.customer_name}</p>
+          </div>
+          <div class="staff-order-ticket-head-side">
+            <span
+              class={["staff-order-source", @source_class]}
+              id={"order-source-#{@lane}-#{@order.id}"}
+            >
+              {@source_label}
+            </span>
+            <span class="staff-order-fulfillment">{fulfillment_short(@order)}</span>
+            <span
+              :if={@table_label}
+              class="staff-order-table"
+              id={"order-table-#{@lane}-#{@order.id}"}
+            >
+              {@table_label}
+            </span>
+          </div>
         </div>
-
-        <div :if={@compact?} class="staff-order-ticket-id-row">
-          <p class="staff-order-number">{@order.number}</p>
-          <span class={["staff-order-source", @source_class, "staff-order-source--inline"]}>
-            {@source_label}
-          </span>
-        </div>
-
-        <p :if={!@compact?} class="staff-order-number">{@order.number}</p>
-        <p :if={show_customer_name?(@order)} class="staff-order-name">{@order.customer_name}</p>
 
         <ul class="staff-order-items">
           <li :for={item <- @order.items} class="staff-order-item">
             <span class="staff-order-item-qty">{item.quantity} ×</span>
             <span class="staff-order-item-detail">
               <span class="staff-order-item-name">{item.name}</span>
-              <span :if={item.size} class="staff-order-item-size">{item.size}</span>
+              <span
+                :if={item.size || Orders.temperature_meta(item)}
+                class="staff-order-item-meta"
+              >
+                <span :if={item.size} class="staff-order-item-size">{item.size}</span>
+                <span :if={item.size && Orders.temperature_meta(item)} class="staff-order-item-dot">
+                  ·
+                </span>
+                <span
+                  :if={meta = Orders.temperature_meta(item)}
+                  class={"staff-order-item-temp is-#{meta.tone}"}
+                >
+                  {meta.label}
+                </span>
+              </span>
             </span>
           </li>
         </ul>
 
         <div :if={@note} class="staff-order-note-block">
-          <p class="staff-order-note-label">NOTE</p>
+          <p class="staff-order-note-label">Note</p>
           <p class="staff-order-notes">{@note}</p>
         </div>
-
-        <p class="staff-order-meta">
-          <span class="staff-order-fulfillment">{fulfillment_short(@order)}</span>
-          <span
-            :if={@compact? and @table_label}
-            class="staff-order-table staff-order-table--meta"
-            id={"order-table-#{@lane}-#{@order.id}"}
-          >
-            {@table_label}
-          </span>
-        </p>
 
         <div class="staff-order-ticket-foot">
           <div class="staff-order-pay">
@@ -987,6 +991,7 @@ defmodule EspresoWeb.StaffOrdersLive do
       </div>
 
       <div class="staff-order-actions">
+        <div class="staff-order-actions-row">
         <div
           :if={@needs_pay?}
           class={[
@@ -1048,28 +1053,23 @@ defmodule EspresoWeb.StaffOrdersLive do
           </button>
         </div>
 
-        <div
-          :if={show_cancel_action?(@order) or ticket_overflow_actions?(@order)}
-          class="staff-order-secondary-row"
+        <details
+          :if={ticket_overflow_actions?(@order)}
+          class="staff-order-more"
+          id={"order-more-#{@order.id}"}
         >
-          <button
-            :if={show_cancel_action?(@order)}
-            type="button"
-            class="staff-action staff-action-cancel"
-            id={"cancel-order-#{@order.id}"}
-            phx-value-id={@order.id}
-            phx-click="cancel_order"
-          >
-            Cancel
-          </button>
-
-          <details
-            :if={ticket_overflow_actions?(@order)}
-            class="staff-order-more"
-            id={"order-more-#{@order.id}"}
-          >
             <summary class="staff-order-more-summary" aria-label="More actions">⋯</summary>
             <div class="staff-order-more-panel">
+              <button
+                :if={show_cancel_action?(@order)}
+                type="button"
+                class="staff-action staff-action-cancel"
+                id={"cancel-order-#{@order.id}"}
+                phx-value-id={@order.id}
+                phx-click="cancel_order"
+              >
+                Cancel
+              </button>
               <button
                 :if={show_abandon_payment?(@order)}
                 type="button"
@@ -1187,7 +1187,7 @@ defmodule EspresoWeb.StaffOrdersLive do
 
     paid_print? = order.payment_status == "paid" and Printer.enabled?()
 
-    abandon? or kitchen? or paid_print?
+    show_cancel_action?(order) or abandon? or kitchen? or paid_print?
   end
 
   defp checkout_session_attached?(%{paymongo_checkout_session_id: session_id})
@@ -1249,7 +1249,7 @@ defmodule EspresoWeb.StaffOrdersLive do
           phx-click="open_mark_paid"
           phx-value-id={@order.id}
         >
-          Confirm payment
+          Mark paid
         </button>
         """
 
@@ -1520,7 +1520,7 @@ defmodule EspresoWeb.StaffOrdersLive do
       <div class="staff-mark-paid-modal-panel">
         <header class="staff-mark-paid-modal-head">
           <div>
-            <p class="staff-mark-paid-modal-eyebrow">Confirm payment</p>
+            <p class="staff-mark-paid-modal-eyebrow">Mark paid</p>
             <h2 class="staff-mark-paid-modal-title">{@order.number}</h2>
             <p class="staff-mark-paid-modal-sub">
               {@order.customer_name} · {Orders.format_total(@order)}
@@ -1797,7 +1797,7 @@ defmodule EspresoWeb.StaffOrdersLive do
   defp format_money(value), do: Espreso.Menu.format_price(value)
   defp new_cash_tender_token, do: Integer.to_string(System.unique_integer([:positive]))
 
-  defp source_badge(%{source: "pos"}), do: %{label: "WALK-IN", class: "staff-order-source--pos"}
+  defp source_badge(%{source: "pos"}), do: %{label: "Walk-in", class: "staff-order-source--pos"}
   defp source_badge(_), do: %{label: "QR", class: "staff-order-source--customer"}
 
   defp order_note(%{notes: notes}) when is_binary(notes) do
@@ -1818,19 +1818,19 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   defp freshly_received?(_, _), do: false
 
-  defp payment_state_label(%{payment_status: "paid"}), do: "PAID"
-  defp payment_state_label(%{payment_status: "awaiting_payment"}), do: "AWAITING PAYMENT"
-  defp payment_state_label(_), do: "UNPAID"
+  defp payment_state_label(%{payment_status: "paid"}), do: "Paid"
+  defp payment_state_label(%{payment_status: "awaiting_payment"}), do: "Waiting"
+  defp payment_state_label(_), do: "Unpaid"
 
-  defp paid_via_badge(%{payment_status: "paid", paid_via: "cash"}), do: "CASH"
-  defp paid_via_badge(%{payment_status: "paid", paid_via: "gcash"}), do: "GCASH"
-  defp paid_via_badge(%{payment_status: "paid", paid_via: "maya"}), do: "MAYA"
-  defp paid_via_badge(%{payment_status: "paid", paid_via: "paymongo"}), do: "PAYMONGO"
-  defp paid_via_badge(%{payment_status: "paid", paid_via: "counter"}), do: "COUNTER"
+  defp paid_via_badge(%{payment_status: "paid", paid_via: "cash"}), do: "Cash"
+  defp paid_via_badge(%{payment_status: "paid", paid_via: "gcash"}), do: "GCash"
+  defp paid_via_badge(%{payment_status: "paid", paid_via: "maya"}), do: "Maya"
+  defp paid_via_badge(%{payment_status: "paid", paid_via: "paymongo"}), do: "PayMongo"
+  defp paid_via_badge(%{payment_status: "paid", paid_via: "counter"}), do: "Counter"
   defp paid_via_badge(_), do: nil
 
-  defp fulfillment_short(%{fulfillment: "dine_in"}), do: "Dine-in"
-  defp fulfillment_short(%{fulfillment: "pickup"}), do: "Takeout"
+  defp fulfillment_short(%{fulfillment: "dine_in"}), do: "Dine In"
+  defp fulfillment_short(%{fulfillment: "pickup"}), do: "Take Out"
   defp fulfillment_short(_), do: "Order"
 
   defp table_label(%{table_number: n}) when is_binary(n) do

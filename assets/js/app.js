@@ -1140,16 +1140,17 @@ let liveSocket = new LiveSocket("/live", Socket, {
 })
 
 // Show progress bar on live navigation and form submits.
-// Employee tablet shell: keep topbar for real async work, but do not dim the page
-// or disable pointer-events (that made LiveView navigation feel frozen).
+// Employee tablet shell: skip the green topbar so POS settle/print does not
+// look like a loading screen, and do not dim the page.
 const isEmployeeApp = () =>
   document.documentElement?.dataset?.application === "elilai-kafe-employee"
 
 topbar.config({barColors: {0: "#3a8a3e"}, shadowColor: "rgba(58, 138, 62, 0.15)"})
 window.addEventListener("phx:page-loading-start", info => {
+  if (isEmployeeApp()) return
   topbar.show(200)
   const kind = info.detail?.kind
-  if (kind !== "initial" && kind !== "ignore" && !isEmployeeApp()) {
+  if (kind !== "initial" && kind !== "ignore") {
     document.documentElement.classList.add("page-is-loading")
   }
 })
