@@ -258,6 +258,7 @@ defmodule EspresoWeb.StaffComponents do
         label: "Transactions",
         icon: "hero-receipt-percent",
         path: ~p"/transactions",
+        group: :service,
         show?: Authorization.can?(user, :orders)
       },
       %{
@@ -265,41 +266,23 @@ defmodule EspresoWeb.StaffComponents do
         label: "Customers",
         icon: "hero-identification",
         path: ~p"/customers",
+        group: :service,
         show?: Authorization.can?(user, :orders)
-      },
-      %{
-        key: :my_shifts,
-        label: "My shifts",
-        icon: "hero-clock",
-        path: ~p"/staff/shifts",
-        show?: user.role == "barista"
       },
       %{
         key: :cash_out,
         label: "Cash Out",
         icon: "hero-banknotes",
         path: ~p"/staff/cash-out",
+        group: :shift,
         show?: Espreso.CashOuts.can_access?(user)
-      },
-      %{
-        key: :dashboard,
-        label: "Dashboard",
-        icon: "hero-chart-bar",
-        path: ~p"/dashboard",
-        show?: user.role in ["manager", "owner"]
-      },
-      %{
-        key: :reports,
-        label: "Reports",
-        icon: "hero-document-chart-bar",
-        path: ~p"/staff/reports",
-        show?: Authorization.can?(user, :reports)
       },
       %{
         key: :close,
         label: "Close shift",
         icon: "hero-lock-closed",
         path: ~p"/staff/close",
+        group: :shift,
         show?: Espreso.Shifts.can_access_close?(user)
       },
       %{
@@ -307,6 +290,31 @@ defmodule EspresoWeb.StaffComponents do
         label: "Staff attendance",
         icon: "hero-user-group",
         path: ~p"/staff/attendance",
+        group: :shift,
+        show?: Authorization.can?(user, :reports)
+      },
+      %{
+        key: :my_shifts,
+        label: "My shifts",
+        icon: "hero-clock",
+        path: ~p"/staff/shifts",
+        group: :shift,
+        show?: user.role == "barista"
+      },
+      %{
+        key: :dashboard,
+        label: "Dashboard",
+        icon: "hero-chart-bar",
+        path: ~p"/dashboard",
+        group: :manage,
+        show?: user.role in ["manager", "owner"]
+      },
+      %{
+        key: :reports,
+        label: "Reports",
+        icon: "hero-document-chart-bar",
+        path: ~p"/staff/reports",
+        group: :manage,
         show?: Authorization.can?(user, :reports)
       },
       %{
@@ -314,6 +322,7 @@ defmodule EspresoWeb.StaffComponents do
         label: "Availability",
         icon: "hero-cube",
         path: ~p"/admin/availability",
+        group: :manage,
         show?: Authorization.can?(user, :product_availability)
       },
       %{
@@ -321,6 +330,7 @@ defmodule EspresoWeb.StaffComponents do
         label: "Staff",
         icon: "hero-users",
         path: ~p"/admin/users",
+        group: :manage,
         show?: Authorization.can?(user, :user_management)
       },
       %{
@@ -328,6 +338,7 @@ defmodule EspresoWeb.StaffComponents do
         label: "Settings",
         icon: "hero-cog-6-tooth",
         path: ~p"/admin/settings",
+        group: :manage,
         show?: Authorization.can?(user, :business_settings)
       }
     ]
