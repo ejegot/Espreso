@@ -236,9 +236,30 @@ defmodule EspresoWeb.AdminUsersLive do
         <header class="staff-team-head">
           <div class="staff-team-head-copy">
             <p class="staff-team-eyebrow">Team</p>
-            <h2 class="staff-team-title">Staff management</h2>
-            <p class="staff-team-lede">Manage your team, roles, access, and PINs.</p>
+            <h2 class="staff-team-title">Staff</h2>
           </div>
+          <section class="staff-team-summary" id="staff-team-summary" aria-label="Team summary">
+            <div class="staff-team-summary-item">
+              <p class="staff-team-summary-value">{@summary.active}</p>
+              <p class="staff-team-summary-label">Active</p>
+            </div>
+            <div class="staff-team-summary-item">
+              <p class="staff-team-summary-value">{@summary.disabled}</p>
+              <p class="staff-team-summary-label">Disabled</p>
+            </div>
+            <div class="staff-team-summary-item">
+              <p class="staff-team-summary-value">{@summary.by_role.barista}</p>
+              <p class="staff-team-summary-label">Staff</p>
+            </div>
+            <div class="staff-team-summary-item">
+              <p class="staff-team-summary-value">{@summary.by_role.manager}</p>
+              <p class="staff-team-summary-label">Managers</p>
+            </div>
+            <div class="staff-team-summary-item">
+              <p class="staff-team-summary-value">{@summary.by_role.owner}</p>
+              <p class="staff-team-summary-label">Owners</p>
+            </div>
+          </section>
           <button
             type="button"
             class="staff-team-add-toggle"
@@ -250,29 +271,6 @@ defmodule EspresoWeb.AdminUsersLive do
         </header>
 
         <p :if={@flash_note} class="staff-team-note" id="staff-team-note">{@flash_note}</p>
-
-        <section class="staff-team-summary" id="staff-team-summary" aria-label="Team summary">
-          <div class="staff-team-summary-item">
-            <p class="staff-team-summary-value">{@summary.active}</p>
-            <p class="staff-team-summary-label">Active</p>
-          </div>
-          <div class="staff-team-summary-item">
-            <p class="staff-team-summary-value">{@summary.disabled}</p>
-            <p class="staff-team-summary-label">Disabled</p>
-          </div>
-          <div class="staff-team-summary-item">
-            <p class="staff-team-summary-value">{@summary.by_role.barista}</p>
-            <p class="staff-team-summary-label">Staff</p>
-          </div>
-          <div class="staff-team-summary-item">
-            <p class="staff-team-summary-value">{@summary.by_role.manager}</p>
-            <p class="staff-team-summary-label">Managers</p>
-          </div>
-          <div class="staff-team-summary-item">
-            <p class="staff-team-summary-value">{@summary.by_role.owner}</p>
-            <p class="staff-team-summary-label">Owners</p>
-          </div>
-        </section>
 
         <section class="staff-team-roster" id="staff-team-roster" aria-label="Staff roster">
           <div class="staff-team-roster-head">

@@ -97,8 +97,9 @@ defmodule EspresoWeb.AdminAvailabilityLive do
                 phx-click="toggle"
                 phx-value-id={product.id}
                 id={"availability-toggle-#{product.id}"}
+                aria-label={if(product.available, do: "Mark unavailable", else: "Mark available")}
               >
-                {if product.available, do: "Mark unavailable", else: "Mark available"}
+                {if product.available, do: "86", else: "Restock"}
               </button>
             </article>
           </div>

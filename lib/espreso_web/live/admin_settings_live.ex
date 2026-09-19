@@ -119,7 +119,9 @@ defmodule EspresoWeb.AdminSettingsLive do
           </section>
 
           <div class="staff-settings-save">
-            <button type="submit" class="menu-basket-checkout">Save settings</button>
+            <button type="submit" class="staff-settings-save-btn" id="settings-save">
+              Save settings
+            </button>
           </div>
         </.form>
       </main>

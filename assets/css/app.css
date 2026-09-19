@@ -4659,10 +4659,33 @@ body:has(.menu-page-locked) {
   --close-ink: var(--close-forest);
   --close-muted: color-mix(in srgb, var(--close-forest) 55%, var(--close-ivory));
   --close-line: color-mix(in srgb, var(--close-forest) 14%, transparent);
-  width: min(calc(100% - 1.5rem), 40rem);
+  width: min(calc(100% - 1.5rem), 64rem);
   margin-inline: auto;
   padding-block: 0.75rem 1.25rem;
   color: var(--close-ink);
+}
+
+@media (min-width: 900px) {
+  .staff-shift-close-desk {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    gap: 0.75rem 0.9rem;
+    align-items: start;
+  }
+
+  .staff-shift-close-blocked {
+    grid-column: 1 / -1;
+  }
+
+  .staff-shift-close-cash,
+  .staff-shift-close-cash-outs {
+    grid-column: 1;
+  }
+
+  .staff-shift-close-form {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+  }
 }
 
 .staff-shift-close-head {
@@ -5182,7 +5205,7 @@ body:has(.menu-page-locked) {
 
 @media (min-width: 768px) {
   .staff-shift-close {
-    width: min(calc(100% - 2rem), 44rem);
+    width: min(calc(100% - 2rem), 72rem);
   }
 }
 
@@ -9618,15 +9641,17 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-availability-toggle {
-  min-height: 2.2rem;
-  padding: 0.3rem 0.65rem;
+  min-height: 2.05rem;
+  min-width: 4.75rem;
+  padding: 0.22rem 0.55rem;
   border: 1px solid color-mix(in srgb, var(--elilai-forest, #394331) 22%, transparent);
-  border-radius: 0.55rem;
+  border-radius: 0.5rem;
   background: #fff;
   color: var(--elilai-forest, #394331);
   font: inherit;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 800;
+  letter-spacing: 0.02em;
   cursor: pointer;
   touch-action: manipulation;
 }
@@ -9679,8 +9704,25 @@ a.staff-home-card:focus-visible {
   justify-content: flex-end;
 }
 
-.staff-settings-save .menu-basket-checkout {
+.staff-settings-save-btn {
+  min-height: 2.5rem;
   min-width: 10rem;
+  padding: 0.55rem 1.1rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: var(--elilai-forest, #394331);
+  color: var(--elilai-ivory, #f4efe3);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.staff-settings-save-btn:hover,
+.staff-settings-save-btn:focus-visible {
+  filter: brightness(1.06);
+  outline: none;
 }
 
 @media (min-width: 800px) {
@@ -9696,8 +9738,7 @@ a.staff-home-card:focus-visible {
   }
 
   .staff-team-page--adding .staff-team-head,
-  .staff-team-page--adding .staff-team-note,
-  .staff-team-page--adding .staff-team-summary {
+  .staff-team-page--adding .staff-team-note {
     grid-column: 1 / -1;
   }
 
@@ -9723,10 +9764,10 @@ a.staff-home-card:focus-visible {
 .staff-team-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 0.75rem 1rem;
-  margin-bottom: 0.85rem;
+  gap: 0.65rem 0.85rem;
+  margin-bottom: 0.75rem;
 }
 
 .staff-team-eyebrow {
@@ -9808,8 +9849,17 @@ a.staff-home-card:focus-visible {
 .staff-team-summary {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.45rem;
-  margin-bottom: 0.85rem;
+  flex: 1 1 18rem;
+  gap: 0.3rem;
+  margin: 0;
+}
+
+.staff-team-head .staff-team-summary-item {
+  padding: 0.32rem 0.35rem;
+}
+
+.staff-team-head .staff-team-summary-value {
+  font-size: 1rem;
 }
 
 .staff-team-summary-item {
@@ -11121,7 +11171,7 @@ body:has(.staff-nav-drawer.is-open) {
   }
 
   .staff-app .staff-reports {
-    max-width: 40rem;
+    max-width: 64rem;
   }
 
   /* —— 6. Shared form scale —— */
@@ -11170,7 +11220,7 @@ body:has(.staff-nav-drawer.is-open) {
   }
 
   .staff-app .staff-auth-form .menu-basket-checkout,
-  .staff-app .staff-settings-save .menu-basket-checkout,
+  .staff-app .staff-settings-save-btn,
   .staff-app .staff-customer-search-actions button,
   .staff-app .staff-reports-export-btn,
   .staff-app .staff-cash-out-submit,
@@ -22795,7 +22845,9 @@ a.brune-contact-value:focus-visible {
   display: grid;
   gap: 1.1rem;
   padding: 1rem 1rem 1.75rem;
-  max-width: 40rem;
+  width: min(calc(100% - 1.5rem), 64rem);
+  max-width: 64rem;
+  margin-inline: auto;
 }
 
 .staff-my-shifts-head {
@@ -22924,6 +22976,19 @@ a.brune-contact-value:focus-visible {
   }
 }
 
+@media (min-width: 800px) {
+  .staff-my-shifts-desk {
+    display: grid;
+    grid-template-columns: minmax(16rem, 0.9fr) minmax(0, 1.1fr);
+    gap: 1.1rem;
+    align-items: start;
+  }
+
+  .staff-my-shifts-desk:not(:has(.staff-my-shifts-current)) .staff-my-shifts-history {
+    grid-column: 1 / -1;
+  }
+}
+
 /* —— Staff Attendance (PASS 5E) —— */
 .staff-attendance {
   --att-forest: var(--elilai-forest, #394331);
@@ -22945,7 +23010,9 @@ a.brune-contact-value:focus-visible {
   display: grid;
   gap: 1.15rem;
   padding: 1rem 1rem 1.75rem;
-  max-width: 36rem;
+  width: min(calc(100% - 1.5rem), 64rem);
+  max-width: 64rem;
+  margin-inline: auto;
 }
 
 .staff-reports-head {
@@ -22995,6 +23062,18 @@ a.brune-contact-value:focus-visible {
 @media (min-width: 520px) {
   .staff-reports-fields {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (min-width: 720px) {
+  .staff-reports-fields {
+    grid-template-columns: 1fr 1fr auto;
+    align-items: end;
+  }
+
+  .staff-reports-export-btn {
+    width: auto;
+    min-width: 10.5rem;
   }
 }
 
