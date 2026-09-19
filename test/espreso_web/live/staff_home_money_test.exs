@@ -41,6 +41,7 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
       |> Plug.Conn.put_session(:user_id, manager.id)
 
     {:ok, manager_view, _html} = live(manager_conn, ~p"/staff")
+    assert has_element?(manager_view, ".staff-home-desk-stage--split")
     assert has_element?(manager_view, "#staff-home-paid-breakdown", "Cash")
     assert has_element?(manager_view, "#staff-home-paid-breakdown", "₱75")
     refute has_element?(manager_view, "#staff-home-close")
@@ -55,6 +56,9 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
     refute has_element?(barista_view, "#staff-home-paid-breakdown")
     refute has_element?(barista_view, "#staff-home-close")
     refute has_element?(barista_view, "#staff-home-today")
+    refute has_element?(barista_view, ".staff-home-desk-stage--split")
+    assert has_element?(barista_view, ".staff-home-desk--counter")
+    assert has_element?(barista_view, "#staff-home-pos", "Open POS")
     assert has_element?(barista_view, "#staff-home-orders", "Orders")
     assert has_element?(barista_view, "#staff-home-unpaid", "Unpaid")
     assert has_element?(barista_view, "#staff-home-my-shifts", "My shifts")
