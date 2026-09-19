@@ -1,11 +1,13 @@
 defmodule EspresoWeb.StaffPosLiveTest do
   use EspresoWeb.ConnCase
 
+  import Ecto.Query
   import Phoenix.LiveViewTest
 
   alias Espreso.Accounts
   alias Espreso.Menu.{Category, Product, ProductPrice}
   alias Espreso.Orders
+  alias Espreso.Orders.Order
   alias Espreso.Repo
   alias EspresoWeb.StaffPosLive
 
@@ -167,7 +169,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     submit_order(view)
 
-    assert [order] = Orders.list_active_orders()
+    assert [order] = placed_orders()
     assert is_nil(order.customer_id)
     refute has_element?(view, "#pos-loyalty-status")
   end
@@ -188,7 +190,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     submit_order(view)
 
-    assert [order] = Orders.list_active_orders()
+    assert [order] = placed_orders()
     assert order.customer_id == customer.id
     refute has_element?(view, "#pos-loyalty-status")
     refute has_element?(view, "#pos-loyalty-history")
@@ -250,7 +252,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     _view = find_loyalty(view, "09175550014")
     submit_order(view)
 
-    assert [order] = Orders.list_active_orders()
+    assert [order] = placed_orders()
     assert order.payment_status == "paid"
     assert order.customer_id == customer.id
     assert Espreso.Loyalty.earn_pending?(order)
@@ -1057,7 +1059,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     change_variant(view, key_12, price_8.id)
     submit_order(view)
 
-    [order] = Orders.list_active_orders()
+    [order] = placed_orders()
     [item] = order.items
     assert item.size == "8oz"
     assert item.quantity == 2
@@ -1165,7 +1167,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     assert has_element?(view, "#pos-place-flash", "Paid at counter")
     assert has_element?(view, "#pos-place-flash", "Printing disabled")
-    assert has_element?(view, ~s(#pos-place-flash a[href="/orders"]), "View Orders")
+    assert has_element?(view, "#pos-place-flash #pos-view-order", "View Order")
     assert has_element?(view, "#pos-cart-empty")
     assert has_element?(view, "#pos-place-order[disabled]")
     refute has_element?(view, "#pos-retry-print")
@@ -1173,7 +1175,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     html = render(view)
 
-    [order] = Orders.list_active_orders()
+    [order] = placed_orders()
     assert order.number =~ Orders.order_number_pattern()
     assert html =~ order.number
     assert order.source == "pos"
@@ -1182,12 +1184,27 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert order.payment_method == "counter"
     assert order.payment_status == "paid"
     assert order.paid_via == "cash"
-    assert order.status == "preparing"
+    assert order.status == "completed"
     assert Decimal.equal?(order.total, Decimal.new("270"))
     assert length(order.items) == 2
 
     names = Enum.map(order.items, & &1.name) |> Enum.sort()
     assert names == ["Americano", "Espresso"]
+    assert Orders.list_active_orders() == []
+
+    view |> element("#pos-view-order") |> render_click()
+    assert has_element?(view, "#pos-order-review")
+    assert has_element?(view, "#pos-order-review-title", order.number)
+    assert has_element?(view, "#pos-order-review-items", "Espresso")
+    assert has_element?(view, "#pos-order-review-items", "Americano")
+    assert has_element?(view, "#pos-order-review-items", "12oz")
+    assert has_element?(view, "#pos-order-review-total", "₱270")
+
+    view |> element(".staff-pos-order-review-backdrop") |> render_click()
+    refute has_element?(view, "#pos-order-review")
+    assert [still] = placed_orders()
+    assert still.id == order.id
+    assert still.status == "completed"
 
     view |> element("#pos-place-flash-dismiss") |> render_click()
 
@@ -1369,7 +1386,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     |> render_submit()
 
     refute has_element?(view, "#cash-tender-modal")
-    [order] = Orders.list_active_orders()
+    [order] = placed_orders()
     assert order.paid_via == "cash"
     assert order.payment_status == "paid"
     assert Decimal.equal?(order.cash_tendered, Decimal.new("75.00"))
@@ -1523,14 +1540,14 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-place-flash", "Change ₱15")
     refute has_element?(view, "#cash-tender-modal")
 
-    [order] = Orders.list_active_orders()
+    [order] = placed_orders()
     assert order.customer_name == "Pedro"
     assert order.notes == "No sugar"
     assert order.payment_method == "counter"
     assert order.payment_status == "paid"
     assert order.paid_via == "cash"
     assert order.source == "pos"
-    assert order.status == "preparing"
+    assert order.status == "completed"
     assert Decimal.equal?(order.total, Decimal.new("185"))
     assert %DateTime{} = order.settled_at
     assert order.settled_by_user_id == barista.id
@@ -1567,7 +1584,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> render_click("confirm_cash_tender", params)
     view |> render_click("confirm_cash_tender", params)
 
-    assert length(Orders.list_active_orders()) == 1
+    assert length(placed_orders()) == 1
     refute has_element?(view, "#cash-tender-modal")
     refute has_element?(view, "#pos-submission-error")
   end
@@ -1582,7 +1599,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     submit_order(view)
 
-    assert [order] = Orders.list_active_orders()
+    assert [order] = placed_orders()
     assert Decimal.equal?(order.total, Decimal.new("75"))
     assert [%{unit_price: unit_price}] = order.items
     assert Decimal.equal?(unit_price, Decimal.new("75"))
@@ -1714,11 +1731,11 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute has_element?(view, "#cash-tender-modal")
     refute has_element?(view, "#pos-place-flash", "Cash received")
 
-    [order] = Orders.list_active_orders()
+    [order] = placed_orders()
     assert order.payment_method == "counter"
     assert order.payment_status == "paid"
     assert order.paid_via == "gcash"
-    assert order.status == "preparing"
+    assert order.status == "completed"
   end
 
   test "POS defaults to paid and can place paid counter order", %{
@@ -1742,12 +1759,12 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-place-flash", "Paid at counter")
     assert has_element?(view, "#pos-cart-empty")
 
-    [order] = Orders.list_active_orders()
+    [order] = placed_orders()
     assert order.source == "pos"
     assert order.payment_method == "counter"
     assert order.payment_status == "paid"
     assert order.paid_via == "cash"
-    assert order.status == "preparing"
+    assert order.status == "completed"
     assert has_element?(view, "#pos-pay-cash.is-active", "Cash")
     assert has_element?(view, "#pos-place-order", "Process Cash Order")
   end
@@ -1789,14 +1806,14 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-place-order", "Process Cash Order")
     refute has_element?(view, "#pos-wallet-confirmation-cue")
 
-    [order] = Orders.list_active_orders()
+    [order] = placed_orders()
     assert order.customer_name == "Maria"
     assert order.fulfillment == "dine_in"
     assert order.table_number in [nil, ""]
     assert order.payment_method == "counter"
     assert order.payment_status == "paid"
     assert order.paid_via == "gcash"
-    assert order.status == "preparing"
+    assert order.status == "completed"
   end
 
   test "switching from GCash back to Cash removes acknowledgement cue", %{
@@ -1830,10 +1847,10 @@ defmodule EspresoWeb.StaffPosLiveTest do
     submit_order(view)
     assert has_element?(view, "#pos-place-flash", "Paid at counter")
 
-    [order] = Orders.list_active_orders()
+    [order] = placed_orders()
     assert order.payment_status == "paid"
     assert order.paid_via == "cash"
-    assert order.status == "preparing"
+    assert order.status == "completed"
   end
 
   test "Place Order creates exactly one order; repeated place_order while placing is ignored", %{
@@ -1848,7 +1865,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     # Cart cleared — second place with empty cart is a no-op create.
     view |> render_click("place_order", %{})
 
-    assert length(Orders.list_active_orders()) == 1
+    assert length(placed_orders()) == 1
     assert has_element?(view, "#pos-place-flash")
     assert has_element?(view, "#pos-cart-empty")
     refute has_element?(view, "#pos-submission-error")
@@ -1900,7 +1917,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute has_element?(view, "#pos-place-order[disabled]")
     submit_order(view)
 
-    assert length(Orders.list_active_orders()) == 2
+    assert length(placed_orders()) == 2
     assert has_element?(view, "#pos-place-flash")
   end
 
@@ -1960,7 +1977,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-place-flash", "Maria")
     assert has_element?(view, ~s(#pos-customer-name[value="Walk-in"]))
 
-    [order] = Orders.list_active_orders()
+    [order] = placed_orders()
     assert order.customer_name == "Maria"
     assert order.notes == "Less ice"
   end
@@ -1975,7 +1992,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     submit_order(view, %{"customer_name" => "Maria"})
 
-    [order] = Orders.list_active_orders()
+    [order] = placed_orders()
     assert order.customer_name == "Maria"
     assert has_element?(view, ~s(#pos-customer-name[value="Walk-in"]))
   end
@@ -1991,7 +2008,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     submit_order(view, %{"customer_name" => "Walk-in", "notes" => "No sugar"})
 
-    [order] = Orders.list_active_orders()
+    [order] = placed_orders()
     assert order.notes == "No sugar"
   end
 
@@ -2005,7 +2022,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> element("#pos-product-#{espresso.id}") |> render_click()
     submit_order(view)
 
-    [order] = Orders.list_active_orders()
+    [order] = placed_orders()
     assert order.notes == nil
   end
 
@@ -2070,7 +2087,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     assert has_element?(view, "#pos-place-flash")
     refute has_element?(view, "#pos-submission-error")
-    assert length(Orders.list_active_orders()) == 1
+    assert length(placed_orders()) == 1
   end
 
   test "product taps do not dismiss print-failure recovery", %{
@@ -2114,7 +2131,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     submit_order(view)
 
-    [saved_order] = Orders.list_active_orders()
+    [saved_order] = placed_orders()
     assert has_element?(view, "#pos-confirmation", saved_order.number)
     assert has_element?(view, "#pos-confirmation.is-error", "Print failed · order saved")
     assert has_element?(view, "#pos-print-note.is-error", "Order saved · print failed")
@@ -2137,7 +2154,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-retry-print", "Retry print")
     assert has_element?(view, "#pos-new-order", "New Order")
     refute has_element?(view, "[id^='pos-cart-variant-trigger-']")
-    assert length(Orders.list_active_orders()) == 1
+    assert length(placed_orders()) == 1
 
     view |> element("#pos-retry-print") |> render_click()
     assert has_element?(view, "#pos-confirmation.is-error", "Print failed · order saved")
@@ -2166,7 +2183,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert live_assigns(view).cash_tender_error == nil
     assert live_assigns(view).cash_tender_token == nil
     assert live_assigns(view).last_cash_change == nil
-    assert length(Orders.list_active_orders()) == 1
+    assert length(placed_orders()) == 1
   end
 
   test "successful receipt retry shows recovered state and keeps recovery exits", %{
@@ -2224,13 +2241,13 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-confirmation.is-success", "Print complete · order saved")
     assert live_assigns(view).print_retry_token == nil
     assert has_element?(view, "#pos-new-order", "New Order")
-    assert has_element?(view, ~s(#pos-confirmation a[href="/orders"]), "View Orders")
+    assert has_element?(view, "#pos-confirmation-view-order", "View Order")
 
     view |> element("#pos-new-order") |> render_click()
     refute has_element?(view, "#pos-confirmation")
     assert has_element?(view, "#pos-cart-empty")
     assert has_element?(view, "#pos-pay-cash.is-active")
-    assert length(Orders.list_active_orders()) == 1
+    assert length(placed_orders()) == 1
   end
 
   test "failed Retry rotates its token and only the fresh token can print", %{
@@ -2404,6 +2421,14 @@ defmodule EspresoWeb.StaffPosLiveTest do
     |> Plug.Conn.put_session(:user_id, user.id)
   end
 
+  defp placed_orders do
+    Order
+    |> where([o], o.source == "pos")
+    |> order_by([o], asc: o.id)
+    |> preload(:items)
+    |> Repo.all()
+  end
+
   defp add_product(view, product, size) do
     view |> element("#pos-product-#{product.id}") |> render_click()
 
@@ -2562,6 +2587,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
           selected_category: nil,
           size_picker: nil,
           last_order: nil,
+          review_order: nil,
+          review_open?: false,
           print_note: nil,
           error: nil,
           submission_error: nil,

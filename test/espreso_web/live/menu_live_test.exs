@@ -1368,9 +1368,17 @@ defmodule EspresoWeb.MenuLiveTest do
 
     assert has_element?(order_view, "#order-confirm")
     assert has_element?(order_view, "#order-chrome-title", "Pay at counter")
-    assert has_element?(order_view, ~s(#order-confirm-qrph-open-gcash[href="gcash://"]))
+    refute has_element?(order_view, "#order-confirm-qrph-open-gcash")
     refute has_element?(order_view, "#order-confirm-title")
-    refute render(order_view) =~ "/images/coffeespot/gcash-qrph.png"
+
+    gcash_qr =
+      Espreso.BusinessSettings.payment_config().gcash_qrph_path ||
+        "/images/coffeespot/gcash-qrph.png"
+
+    assert has_element?(
+             order_view,
+             ~s(#order-confirm-qrph-code-gcash img[src="#{gcash_qr}"])
+           )
     [order] = Orders.list_active_orders()
     assert order.customer_name == "QR Guest"
     assert order.payment_method == "online"
@@ -1668,9 +1676,9 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#menu-my-order-#{received.number}", "Pay at counter")
     assert has_element?(view, "#menu-my-order-#{received.number} .menu-my-orders-status--unpaid")
     assert has_element?(view, "#menu-my-order-#{preparing.number}", "Preparing")
-    assert has_element?(view, "#menu-my-order-#{ready.number}", "Ready — come to counter")
+    assert has_element?(view, "#menu-my-order-#{ready.number}", "Ready for pick up")
     assert has_element?(view, "#menu-my-order-#{ready.number} .menu-my-orders-status--ready")
-    assert has_element?(view, "#menu-my-order-#{completed.number}", "Picked up ✓")
+    assert has_element?(view, "#menu-my-order-#{completed.number}", "Done")
     assert has_element?(view, "#menu-my-order-#{completed.number}", "3 items")
     assert has_element?(view, "#menu-my-order-#{completed.number} .menu-my-orders-when", "Today")
     refute has_element?(view, "#menu-my-order-#{cancelled.number}")
@@ -1681,7 +1689,7 @@ defmodule EspresoWeb.MenuLiveTest do
     assert completed_ready_again.status == "completed"
     refute has_element?(view, ~s(#menu-my-order-#{ready.number}[data-status="ready"]))
     assert has_element?(view, ~s(#menu-my-order-#{ready.number}[data-status="completed"]))
-    assert has_element?(view, "#menu-my-order-#{ready.number}", "Picked up ✓")
+    assert has_element?(view, "#menu-my-order-#{ready.number}", "Done")
   end
 
   test "/menu My Orders ignores malformed and missing numbers", %{conn: conn} do

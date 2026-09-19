@@ -995,10 +995,11 @@ defmodule Espreso.OrdersTest do
     assert paid.payment_method == "counter"
     assert paid.payment_status == "paid"
     assert paid.source == "pos"
-    assert paid.status == "preparing"
+    assert paid.status == "completed"
     assert %DateTime{} = paid.settled_at
     assert paid.settlement_source == "pos"
     assert paid.settlement_time_estimated == false
+    refute Enum.any?(Orders.list_active_orders(), &(&1.id == paid.id))
 
     assert {:ok, online} =
              Orders.create_order(lines, %{

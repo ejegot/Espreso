@@ -151,7 +151,7 @@ defmodule Espreso.Orders do
           paid_via: paid_via,
           payment_intent: payment_intent,
           source: source,
-          status: if(payment_status == "paid", do: "preparing", else: "received"),
+          status: initial_kitchen_status(payment_status, source),
           total: total,
           customer_id: customer_id,
           loyalty_free_amount_centavos: loyalty_free
@@ -1588,6 +1588,10 @@ defmodule Espreso.Orders do
 
   defp normalize_source(value) when value in [:pos, "pos"], do: "pos"
   defp normalize_source(_), do: "customer"
+
+  defp initial_kitchen_status("paid", "pos"), do: "completed"
+  defp initial_kitchen_status("paid", _), do: "preparing"
+  defp initial_kitchen_status(_, _), do: "received"
 
   defp topic, do: "orders"
   defp topic(order_id) when is_integer(order_id), do: "orders:#{order_id}"
