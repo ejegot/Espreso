@@ -94,7 +94,7 @@ defmodule EspresoWeb.StaffCustomerLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.staff_shell current={:customers} current_user={@current_user} page_title={@page_title}>
+    <.staff_shell current={:customers} current_user={@current_user} page_title={@page_title} chrome={:bar}>
       <main class="staff-customer" id="staff-customer">
         <%= if @live_action == :show and @customer do %>
           <.customer_detail

@@ -5741,6 +5741,24 @@ a.staff-home-card:focus-visible {
   overflow: hidden;
 }
 
+.staff-app.staff-app--bar {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.staff-app.staff-app--bar > .staff-pos-rail.staff-pos-rail--bar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: #fff;
+}
+
+.staff-app.staff-app--bar > .staff-shell-body--bar {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .staff-app:has(.staff-pos-shell-root) {
   height: 100dvh;
   overflow: hidden;

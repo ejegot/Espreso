@@ -137,7 +137,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
       |> assign(:snapshot_cash, snapshot_cash)
 
     ~H"""
-    <.staff_shell current={:close} current_user={@current_user} page_title="Close shift">
+    <.staff_shell current={:close} current_user={@current_user} page_title="Close shift" chrome={:bar}>
       <main class="staff-home-main staff-shift-close" id="staff-shift-close">
         <header class="staff-shift-close-head">
           <p class="staff-home-desk-eyebrow">End of day</p>

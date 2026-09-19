@@ -102,6 +102,9 @@ defmodule EspresoWeb.StaffAuthTest do
   } do
     {:ok, owner_view, _html} = live(log_in(conn, owner), ~p"/dashboard")
     assert has_element?(owner_view, ".staff-shell-title", "Dashboard")
+    assert has_element?(owner_view, "#staff-pos-rail.staff-pos-rail--bar")
+    refute has_element?(owner_view, "#staff-shell")
+    assert has_element?(owner_view, "#staff-pos-rail #staff-notifications")
     assert has_element?(owner_view, "#staff-nav-orders", "Orders")
     assert has_element?(owner_view, "#staff-nav-pos", "POS")
     assert has_element?(owner_view, "#staff-nav-dashboard.is-active", "Dashboard")
@@ -473,6 +476,10 @@ defmodule EspresoWeb.StaffAuthTest do
   } do
     {:ok, barista_view, _html} = live(log_in(conn, barista), ~p"/staff")
     assert has_element?(barista_view, ".staff-shell-title", "Home")
+    assert has_element?(barista_view, "#staff-pos-rail.staff-pos-rail--bar")
+    refute has_element?(barista_view, "#staff-shell")
+    assert has_element?(barista_view, "#staff-pos-rail #staff-notifications")
+    assert has_element?(barista_view, "#staff-nav-home.is-active")
     assert has_element?(barista_view, "#staff-home-identity")
     assert has_element?(barista_view, "#staff-home-greeting")
     assert render(barista_view) =~ ~r/Good (morning|afternoon|evening), /

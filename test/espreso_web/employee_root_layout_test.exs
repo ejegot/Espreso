@@ -79,17 +79,10 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
       assert html =~ ~s(href="/elilai-kafe.webmanifest")
       assert html =~ ~s(href="/images/elilai-kafe/apple-touch-icon.png")
 
-      if path in [~p"/pos", ~p"/orders"] do
-        assert has_element?(
-                 view,
-                 "#staff-pos-rail img.staff-pos-rail-logo[src='/images/elilai-kafe/elilai-kafe-logo.png']"
-               )
-      else
-        assert has_element?(
-                 view,
-                 "#staff-shell img.staff-shell-brand-logo[src='/images/elilai-kafe/elilai-kafe-logo.jpg']"
-               )
-      end
+      assert has_element?(
+               view,
+               "#staff-pos-rail img.staff-pos-rail-logo[src='/images/elilai-kafe/elilai-kafe-logo.png']"
+             )
     end
   end
 
