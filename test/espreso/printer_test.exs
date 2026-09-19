@@ -89,10 +89,11 @@ defmodule Espreso.PrinterTest do
     assert receipt =~ "TOTAL"
     assert receipt =~ "P95.00"
     assert receipt =~ "P170.00"
-    assert receipt =~ "Cash"
+    assert receipt =~ "Tendered"
     assert receipt =~ "P200.00"
     assert receipt =~ "Change"
     assert receipt =~ "P30.00"
+    refute receipt =~ "Cash"
     assert receipt =~ "9/5/26 8:00 PM"
     assert receipt =~ "Employee: Jun"
     assert receipt =~ "84 Lilac St., Marikina City"
@@ -127,6 +128,37 @@ defmodule Espreso.PrinterTest do
     refute ticket =~ "TOTAL"
     refute ticket =~ "P120"
     refute ticket =~ "Wi-Fi"
+  end
+
+  test "cash receipt prints tendered once, not a second Cash line" do
+    order = %Order{
+      number: "CS-CASH1",
+      paid_via: "cash",
+      total: Decimal.new("160"),
+      cash_tendered: Decimal.new("200"),
+      change_due: Decimal.new("40"),
+      items: []
+    }
+
+    receipt = Receipt.build(order)
+    refute receipt =~ "Cash"
+    assert receipt =~ "TOTAL"
+    assert receipt =~ "Tendered"
+    assert receipt =~ "Change"
+  end
+
+  test "non-cash receipt prints the wallet once" do
+    order = %Order{
+      number: "CS-GCASH1",
+      paid_via: "gcash",
+      total: Decimal.new("180"),
+      items: []
+    }
+
+    receipt = Receipt.build(order)
+    assert receipt =~ "GCash"
+    refute receipt =~ "Tendered"
+    refute receipt =~ "Change"
   end
 
   test "dispatch_receipt reports dispatched and sends receipt bytes only" do
