@@ -101,15 +101,15 @@ defmodule EspresoWeb.StaffCashOutLiveTest do
     assert has_element?(view, "#staff-cash-out-total", "₱0")
   end
 
-  test "home and more nav include Cash Out", %{conn: conn, barista: barista, manager: manager} do
+  test "more nav includes Cash Out; Home desk does not", %{conn: conn, barista: barista, manager: manager} do
     assert {:ok, _} = StaffShifts.open_shift_for_login(barista)
 
     {:ok, barista_home, _} = live(log_in(conn, barista), ~p"/staff")
-    assert has_element?(barista_home, "#staff-home-cash-out", "Cash Out")
+    refute has_element?(barista_home, "#staff-home-cash-out")
     assert has_element?(barista_home, "#staff-nav-cash_out", "Cash Out")
 
     {:ok, manager_home, _} = live(log_in(conn, manager), ~p"/staff")
-    assert has_element?(manager_home, "#staff-home-cash-out", "Cash Out")
+    refute has_element?(manager_home, "#staff-home-cash-out")
     assert has_element?(manager_home, "#staff-nav-cash_out", "Cash Out")
   end
 

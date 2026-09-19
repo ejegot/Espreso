@@ -3,7 +3,6 @@ defmodule EspresoWeb.StaffHomeLive do
 
   alias Espreso.Accounts.Authorization
   alias Espreso.Accounts.User
-  alias Espreso.CashOuts
   alias Espreso.Menu
   alias Espreso.Orders
   alias Espreso.Printer
@@ -38,7 +37,8 @@ defmodule EspresoWeb.StaffHomeLive do
          })}
 
       other ->
-        {:noreply, assign(socket, :printer_note, printer_action_note(map_test_result(other), "Test print"))}
+        {:noreply,
+         assign(socket, :printer_note, printer_action_note(map_test_result(other), "Test print"))}
     end
   end
 
@@ -59,7 +59,11 @@ defmodule EspresoWeb.StaffHomeLive do
 
       other ->
         {:noreply,
-         assign(socket, :printer_note, printer_action_note(map_drawer_result(other), "Test Drawer"))}
+         assign(
+           socket,
+           :printer_note,
+           printer_action_note(map_drawer_result(other), "Test Drawer")
+         )}
     end
   end
 
@@ -70,9 +74,14 @@ defmodule EspresoWeb.StaffHomeLive do
 
         note =
           cond do
-            ok? and flow == "raw_drawer" -> "Test Drawer: ok"
-            ok? -> "Test print: ok"
-            true -> "#{if(flow == "raw_drawer", do: "Test Drawer", else: "Test print")}: #{Map.get(params, "error") || "failed"}"
+            ok? and flow == "raw_drawer" ->
+              "Test Drawer: ok"
+
+            ok? ->
+              "Test print: ok"
+
+            true ->
+              "#{if(flow == "raw_drawer", do: "Test Drawer", else: "Test print")}: #{Map.get(params, "error") || "failed"}"
           end
 
         {:noreply, assign(socket, :printer_note, note)}
@@ -111,37 +120,23 @@ defmodule EspresoWeb.StaffHomeLive do
           <p class="staff-home-identity-role">{User.role_label(@current_user.role)}</p>
         </header>
 
-        <section class="staff-home-primary" aria-label="Primary action">
-          <.link
-            :for={item <- @primary}
-            navigate={item.path}
-            class={["staff-home-pos-cta", item[:class]]}
-            id={"staff-home-#{item.id}"}
+        <div class="staff-home-desk-stage">
+          <section
+            :if={@today_visible?}
+            class="staff-home-today"
+            id="staff-home-today"
+            aria-label="Today"
           >
-            <span class="staff-home-pos-cta-kicker">{item.eyebrow}</span>
-            <span class="staff-home-pos-cta-title">{item.title}</span>
-            <span class="staff-home-pos-cta-body">{item.body}</span>
-            <span class="staff-home-pos-cta-action">{item.cta}</span>
-          </.link>
-        </section>
+            <div class="staff-home-today-head">
+              <p class="staff-home-today-eyebrow">Today</p>
+              <p :if={@shift_close} class="staff-home-today-closed" id="staff-home-shift-closed">
+                Closed · {Shifts.format_closed_at(@shift_close.closed_at)}
+                <span :if={@shift_close.closed_by_user}>
+                  by {@shift_close.closed_by_user.name}
+                </span>
+              </p>
+            </div>
 
-        <section
-          :if={@today_visible?}
-          class="staff-home-today"
-          id="staff-home-today"
-          aria-label="Today"
-        >
-          <div class="staff-home-today-head">
-            <p class="staff-home-today-eyebrow">Today</p>
-            <p :if={@shift_close} class="staff-home-today-closed" id="staff-home-shift-closed">
-              Closed · {Shifts.format_closed_at(@shift_close.closed_at)}
-              <span :if={@shift_close.closed_by_user}>
-                by {@shift_close.closed_by_user.name}
-              </span>
-            </p>
-          </div>
-
-          <%= if @sales do %>
             <div class="staff-home-today-row">
               <p class="staff-home-today-total">
                 {Menu.format_price(@sales.todays_paid_total)}
@@ -159,24 +154,27 @@ defmodule EspresoWeb.StaffHomeLive do
                 <span class="staff-paid-breakdown-count">{row.count}</span>
               </li>
             </ul>
-          <% else %>
-            <div class="staff-home-today-row staff-home-today-row--compact">
-              <p class="staff-home-today-meta" id="staff-home-today-barista">
-                {@overview.received_count} new · {@overview.preparing_count} preparing · {@overview.unpaid_active_count} unpaid · {@overview.todays_count} orders today
-              </p>
-            </div>
-          <% end %>
-        </section>
+          </section>
 
-        <section
-          :for={group <- @shortcut_groups}
-          class="staff-home-shortcut-group"
-          aria-label={group.title}
-        >
-          <p class="staff-home-shortcut-eyebrow">{group.title}</p>
+          <section class="staff-home-primary" aria-label="Primary action">
+            <.link
+              :for={item <- @primary}
+              navigate={item.path}
+              class={["staff-home-pos-cta", item[:class]]}
+              id={"staff-home-#{item.id}"}
+            >
+              <span class="staff-home-pos-cta-kicker">{item.eyebrow}</span>
+              <span class="staff-home-pos-cta-title">{item.title}</span>
+              <span class="staff-home-pos-cta-body">{item.body}</span>
+              <span class="staff-home-pos-cta-action">{item.cta}</span>
+            </.link>
+          </section>
+        </div>
+
+        <section class="staff-home-desk-tools" aria-label="Now">
           <div class="staff-home-secondary">
             <.link
-              :for={item <- group.items}
+              :for={item <- @desk_tools}
               navigate={item.path}
               class={["staff-home-tool-link", item[:class]]}
               id={"staff-home-#{item.id}"}
@@ -196,8 +194,8 @@ defmodule EspresoWeb.StaffHomeLive do
         </section>
 
         <section
-          :if={@printer_enabled?}
-          class="staff-home-printer"
+          :if={@printer_on_home?}
+          class="staff-home-printer staff-home-printer--compact"
           id="staff-home-printer"
           aria-label="Printer"
         >
@@ -253,11 +251,11 @@ defmodule EspresoWeb.StaffHomeLive do
     |> assign(:breakdown, breakdown)
     |> assign(:via_rows, if(breakdown, do: Orders.paid_via_rows(breakdown), else: []))
     |> assign(:shift_close, shift_close)
-    |> assign(:today_visible?, today_visible?(overview, sales, shift_close))
-    |> assign(:printer_enabled?, Printer.enabled?())
+    |> assign(:today_visible?, money?)
+    |> assign(:printer_on_home?, money? and Printer.enabled?())
     |> assign(:greeting, staff_greeting(user))
-    |> assign(:primary, primary_tiles(user, overview))
-    |> assign(:shortcut_groups, shortcut_groups(user, shift_close))
+    |> assign(:primary, primary_tiles(user))
+    |> assign(:desk_tools, desk_tools(user, overview))
   end
 
   defp staff_greeting(%User{name: name}) do
@@ -289,21 +287,7 @@ defmodule EspresoWeb.StaffHomeLive do
     end
   end
 
-  defp today_visible?(_overview, _sales, shift_close) when not is_nil(shift_close), do: true
-
-  defp today_visible?(overview, sales, nil) do
-    cond do
-      match?(%{todays_paid_count: count} when count > 0, sales) -> true
-      match?(%{active_count: count} when count > 0, overview) -> true
-      match?(%{unpaid_active_count: count} when count > 0, overview) -> true
-      match?(%{received_count: count} when count > 0, overview) -> true
-      match?(%{preparing_count: count} when count > 0, overview) -> true
-      match?(%{todays_count: count} when count > 0, overview) -> true
-      true -> false
-    end
-  end
-
-  defp primary_tiles(%User{} = user, _overview) do
+  defp primary_tiles(%User{} = user) do
     [
       %{
         id: "pos",
@@ -319,123 +303,37 @@ defmodule EspresoWeb.StaffHomeLive do
     |> Enum.filter(& &1.show?)
   end
 
-  defp shortcut_groups(%User{} = user, shift_close) do
+  defp desk_tools(%User{} = user, overview) do
     unpaid_count = Orders.count_todays_unpaid()
-    overview = Orders.dashboard_overview()
-
-    service =
-      [
-        %{
-          id: "orders",
-          title: "Orders",
-          body: orders_body(overview),
-          path: ~p"/orders",
-          count: overview.received_count,
-          show?: Authorization.can?(user, :orders)
-        },
-        %{
-          id: "unpaid",
-          title: "Unpaid",
-          body: "Confirm counter & QR",
-          path: ~p"/orders?unpaid=1",
-          count: unpaid_count,
-          show?: Authorization.can?(user, :orders),
-          class: "staff-home-tool-link--attention"
-        },
-        %{
-          id: "transactions",
-          title: "Transactions",
-          body: "Daily receipts & reprints",
-          path: ~p"/transactions",
-          count: nil,
-          show?: Authorization.can?(user, :orders)
-        },
-        %{
-          id: "customers",
-          title: "Loyalty / Customers",
-          body: "Find customers & history",
-          path: ~p"/customers",
-          count: nil,
-          show?: Authorization.can?(user, :orders)
-        }
-      ]
-      |> Enum.filter(& &1.show?)
-
-    shift =
-      [
-        %{
-          id: "my-shifts",
-          title: "My shifts",
-          body: "Time In, Time Out & sales",
-          path: ~p"/staff/shifts",
-          count: nil,
-          show?: user.role == "barista"
-        },
-        %{
-          id: "cash-out",
-          title: "Cash Out",
-          body: "Drawer expense for the shop",
-          path: ~p"/staff/cash-out",
-          count: nil,
-          show?: CashOuts.can_access?(user)
-        },
-        %{
-          id: "close",
-          title: if(shift_close, do: "Shift closed", else: "Close shift"),
-          body: if(shift_close, do: "View close snapshot", else: "Totals & counted cash"),
-          path: ~p"/staff/close",
-          count: nil,
-          show?: Shifts.can_access_close?(user),
-          class: "staff-home-tool-link--close"
-        }
-      ]
-      |> Enum.filter(& &1.show?)
-
-    manage =
-      [
-        %{
-          id: "dashboard",
-          title: "Dashboard",
-          body: "Sales & activity",
-          path: ~p"/dashboard",
-          count: nil,
-          show?: manager_or_owner?(user)
-        },
-        %{
-          id: "availability",
-          title: "Availability",
-          body: "Sold out / in stock",
-          path: ~p"/admin/availability",
-          count: nil,
-          show?: Authorization.can?(user, :product_availability)
-        },
-        %{
-          id: "staff",
-          title: "Staff",
-          body: "Accounts & PINs",
-          path: ~p"/admin/users",
-          count: nil,
-          show?: user.role == "owner",
-          class: "staff-home-tool-link--owner"
-        },
-        %{
-          id: "settings",
-          title: "Settings",
-          body: "Payments & shop",
-          path: ~p"/admin/settings",
-          count: nil,
-          show?: user.role == "owner",
-          class: "staff-home-tool-link--owner"
-        }
-      ]
-      |> Enum.filter(& &1.show?)
 
     [
-      %{title: "Service", items: service},
-      %{title: "Shift", items: shift},
-      %{title: "Manage", items: manage}
+      %{
+        id: "orders",
+        title: "Orders",
+        body: orders_body(overview),
+        path: ~p"/orders",
+        count: overview.received_count,
+        show?: Authorization.can?(user, :orders)
+      },
+      %{
+        id: "unpaid",
+        title: "Unpaid",
+        body: "Confirm counter & QR",
+        path: ~p"/orders?unpaid=1",
+        count: unpaid_count,
+        show?: Authorization.can?(user, :orders),
+        class: "staff-home-tool-link--attention"
+      },
+      %{
+        id: "my-shifts",
+        title: "My shifts",
+        body: "Time In, Time Out & sales",
+        path: ~p"/staff/shifts",
+        count: nil,
+        show?: user.role == "barista"
+      }
     ]
-    |> Enum.reject(&(&1.items == []))
+    |> Enum.filter(& &1.show?)
   end
 
   defp manager_or_owner?(%User{role: role}), do: role in ["manager", "owner"]
