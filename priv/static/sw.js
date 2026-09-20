@@ -26,6 +26,50 @@ self.addEventListener("activate", event => {
   )
 })
 
+self.addEventListener("push", event => {
+  let data = {}
+
+  try {
+    data = event.data ? event.data.json() : {}
+  } catch (_error) {
+    data = {}
+  }
+
+  const title = data.title || "CoffeeSpot"
+  const body = data.body || ""
+  const url = data.url || "/menu"
+  const tag = data.tag || "coffeespot-order"
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: "/images/elilai-kafe/app-icon-192.png",
+      badge: "/images/elilai-kafe/app-icon-192.png",
+      data: {url},
+      tag,
+      renotify: true
+    })
+  )
+})
+
+self.addEventListener("notificationclick", event => {
+  event.notification.close()
+  const url = event.notification.data?.url || "/menu"
+
+  event.waitUntil(
+    self.clients.matchAll({type: "window", includeUncontrolled: true}).then(clients => {
+      for (const client of clients) {
+        if ("focus" in client && client.url && client.url.includes(url)) {
+          return client.focus()
+        }
+      }
+
+      if (self.clients.openWindow) return self.clients.openWindow(url)
+      return undefined
+    })
+  )
+})
+
 self.addEventListener("fetch", event => {
   if (!isCacheableRequest(event.request)) return
 

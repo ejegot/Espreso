@@ -39,6 +39,7 @@ defmodule EspresoWeb.OrderLiveTest do
 
     refute html =~ "Status: "
     refute has_element?(view, "#order-confirm")
+    assert has_element?(view, "#order-push-prompt", "Get a ping on your phone")
 
     more_href =
       view
@@ -53,7 +54,13 @@ defmodule EspresoWeb.OrderLiveTest do
     assert {:ok, _} = Orders.mark_paid(order)
     assert {:ok, preparing} = Orders.update_status(order, "preparing")
     assert has_element?(view, "#order-status-message", "Preparing your order")
-    assert has_element?(view, "#order-hint", "We're preparing it — keep this screen for updates.")
+
+    assert has_element?(
+             view,
+             "#order-hint",
+             "We're preparing it — we'll ping your phone if you allowed notifications."
+           )
+
     assert has_element?(view, ~s(#order-progress [data-step="received"][data-state="completed"]))
 
     assert has_element?(
@@ -416,7 +423,13 @@ defmodule EspresoWeb.OrderLiveTest do
     assert {:ok, _} = Orders.mark_paid(order)
     assert {:ok, preparing} = Orders.update_status(order, "preparing")
     assert has_element?(view, "#order-status-message", "Preparing your order")
-    assert has_element?(view, "#order-hint", "We're preparing it — keep this screen for updates.")
+
+    assert has_element?(
+             view,
+             "#order-hint",
+             "We're preparing it — we'll ping your phone if you allowed notifications."
+           )
+
     assert has_element?(view, ~s(#order-progress [data-step="preparing"][aria-current="step"]))
 
     assert {:ok, ready} = Orders.update_status(preparing, "ready")
@@ -454,7 +467,13 @@ defmodule EspresoWeb.OrderLiveTest do
 
     {:ok, view, html} = live(conn, ~p"/order/#{order.number}")
     assert has_element?(view, "#order-status-message", "Preparing your order")
-    assert has_element?(view, "#order-hint", "We're preparing it — keep this screen for updates.")
+
+    assert has_element?(
+             view,
+             "#order-hint",
+             "We're preparing it — we'll ping your phone if you allowed notifications."
+           )
+
     assert has_element?(view, ~s(#order-progress [data-step="preparing"][data-state="current"]))
     assert html =~ "Paid at counter"
     refute has_element?(view, "#order-hint", "Payment is due")
@@ -496,6 +515,7 @@ defmodule EspresoWeb.OrderLiveTest do
     refute has_element?(view, "#order-qrph-open-gcash")
     refute has_element?(view, "#order-qrph-open-maya")
     assert has_element?(view, "#order-qrph-or", "Or pay here")
+
     assert has_element?(
              view,
              ~s(#order-qrph-code-gcash img[src="/images/gcash-qrph.png"][alt="GCash QR"])
@@ -568,6 +588,7 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, "#order-confirm-qrph-waiting", "Waiting for staff to confirm.")
     assert has_element?(view, "#order-confirm-qrph-counter-hint", "Scan the QR at the counter")
     assert has_element?(view, "#order-confirm-qrph-or", "Or pay here")
+
     assert has_element?(
              view,
              ~s(#order-confirm-qrph-code-gcash img[src="/images/gcash-qrph.png"][alt="GCash QR"])
@@ -586,6 +607,7 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, "#order-status-message", "Preparing your order")
     assert has_element?(view, "#order-paid-badge", "Paid ✓")
     assert has_element?(view, "#order-progress")
+
     assert has_element?(
              view,
              ~s(#order-progress [data-step="preparing"][data-state="current"][aria-current="step"])
@@ -765,6 +787,57 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, "#order-confirm")
     assert has_element?(view, "#order-elilai-rewards", "ELIlai Rewards")
     assert has_element?(view, "#order-elilai-rewards-body", "after payment")
+  end
+
+  test "QR order page saves a push subscription and can dismiss the prompt", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Notify Me",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/order/#{order.number}")
+    assert has_element?(view, "#order-push-prompt")
+
+    view |> element("#order-push-dismiss") |> render_click()
+    refute has_element?(view, "#order-push-prompt")
+
+    {:ok, view, _html} = live(conn, ~p"/order/#{order.number}")
+    assert has_element?(view, "#order-push-prompt")
+
+    view
+    |> element("#order-push-prompt")
+    |> render_hook("enable_order_push", %{
+      "endpoint" => "https://fcm.googleapis.com/fcm/send/abcdefghijklmnopqrstuvwxyz0123456789",
+      "p256dh" => String.duplicate("B", 32),
+      "auth" => String.duplicate("A", 16)
+    })
+
+    refute has_element?(view, "#order-push-prompt")
+    assert Espreso.Repo.get_by(Espreso.CustomerPush.Subscription, order_id: order.id)
+  end
+
+  test "POS orders do not show the customer push prompt", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Walk In",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_status: :paid,
+          paid_via: "cash",
+          source: :pos,
+          skip_authoritative_prices: true
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/order/#{order.number}")
+    refute has_element?(view, "#order-push-prompt")
   end
 
   defp set_payments_mode!(mode) do

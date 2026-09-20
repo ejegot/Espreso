@@ -90,3 +90,13 @@ config :swoosh, :api_client, false
 config :espreso, :paymongo,
   secret_key: System.get_env("PAYMONGO_SECRET_KEY"),
   webhook_secret: System.get_env("PAYMONGO_WEBHOOK_SECRET")
+
+# Local-only VAPID keys so QR push can be tried on localhost. Production uses
+# WEB_PUSH_PUBLIC_KEY / WEB_PUSH_PRIVATE_KEY.
+config :espreso, Espreso.CustomerPush,
+  adapter: Espreso.CustomerPush.WebPush,
+  async: true,
+  subject: "mailto:hello@coffeespot.ph",
+  public_key:
+    "BI1vl_TcObbT4uggQRVoSlx5-76oJV6ZzNcjQnvuPbXGxissmqXUYbibMgJnuzUVnS1IfGWxrbvsPeMKJQM-lug",
+  private_key: "9aZRySbmHb3eAjGkKPym82jQb04PV2ESgDR1QBlMLZo"

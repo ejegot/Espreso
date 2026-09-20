@@ -1168,13 +1168,115 @@ window.addEventListener("phx:page-loading-stop", _info => {
   page.classList.add("is-entering")
 })
 
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return Promise.resolve(null)
+
+  return navigator.serviceWorker.register("/sw.js")
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/")
+  const raw = atob(base64)
+  const output = new Uint8Array(raw.length)
+
+  for (let i = 0; i < raw.length; i += 1) {
+    output[i] = raw.charCodeAt(i)
+  }
+
+  return output
+}
+
+Hooks.OrderPushPrompt = {
+  mounted() {
+    this.dismissKey = `coffeespot.orderPush.dismissed.${this.el.dataset.orderNumber || ""}`
+    this.allowBtn = this.el.querySelector("[data-order-push-allow]")
+
+    if (this.wasDismissed()) {
+      this.el.hidden = true
+      return
+    }
+
+    if (!this.pushSupported()) {
+      this.el.hidden = true
+      return
+    }
+
+    this.onAllow = () => this.subscribe()
+    this.allowBtn?.addEventListener("click", this.onAllow)
+    this.maybeResubscribe()
+  },
+
+  destroyed() {
+    this.allowBtn?.removeEventListener("click", this.onAllow)
+  },
+
+  wasDismissed() {
+    try {
+      return localStorage.getItem(this.dismissKey) === "1"
+    } catch (_error) {
+      return false
+    }
+  },
+
+  pushSupported() {
+    return (
+      "serviceWorker" in navigator &&
+      "PushManager" in window &&
+      "Notification" in window
+    )
+  },
+
+  async maybeResubscribe() {
+    try {
+      const registration = await navigator.serviceWorker.ready
+      const existing = await registration.pushManager.getSubscription()
+      if (!existing) return
+      this.pushSubscription(existing)
+    } catch (_error) {
+      // Ignore unsupported / permission-denied browsers.
+    }
+  },
+
+  async subscribe() {
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission !== "granted") {
+        try {
+          localStorage.setItem(this.dismissKey, "1")
+        } catch (_error) {
+          // Ignore private-mode / storage failures.
+        }
+        this.pushEvent("dismiss_order_push", {})
+        return
+      }
+
+      await registerServiceWorker()
+      const registration = await navigator.serviceWorker.ready
+      const vapid = (this.el.dataset.vapidPublicKey || "").trim()
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapid)
+      })
+
+      this.pushSubscription(subscription)
+    } catch (_error) {
+      this.pushEvent("dismiss_order_push", {})
+    }
+  },
+
+  pushSubscription(subscription) {
+    const json = subscription.toJSON()
+    this.pushEvent("enable_order_push", {
+      endpoint: json.endpoint,
+      p256dh: json.keys?.p256dh,
+      auth: json.keys?.auth
+    })
+  }
+}
+
 function registerEmployeeServiceWorker() {
-  if (!("serviceWorker" in navigator)) return
-
-  const root = document.documentElement
-  if (root?.dataset.application !== "elilai-kafe-employee") return
-
-  navigator.serviceWorker.register("/sw.js")
+  registerServiceWorker()
 }
 
 // connect if there are any LiveViews on the page

@@ -2,6 +2,7 @@ defmodule EspresoWeb.OrderLive do
   use EspresoWeb, :live_view
 
   alias Espreso.BusinessSettings
+  alias Espreso.CustomerPush
   alias Espreso.Loyalty
   alias Espreso.Menu
   alias Espreso.Orders
@@ -20,7 +21,8 @@ defmodule EspresoWeb.OrderLive do
          |> assign(:payment_config, BusinessSettings.payment_config())
          |> assign(:confirming?, false)
          |> assign(:complete_return?, false)
-         |> assign(:qrph_code_open, nil), layout: false}
+         |> assign(:qrph_code_open, nil)
+         |> assign_push_prompt(), layout: false}
 
       order ->
         if connected?(socket), do: Orders.subscribe(order)
@@ -33,7 +35,8 @@ defmodule EspresoWeb.OrderLive do
          |> assign(:payment_config, payment_config)
          |> assign(:confirming?, false)
          |> assign(:complete_return?, false)
-         |> assign(:qrph_code_open, nil), layout: false}
+         |> assign(:qrph_code_open, nil)
+         |> assign_push_prompt(), layout: false}
     end
   end
 
@@ -80,6 +83,26 @@ defmodule EspresoWeb.OrderLive do
 
   def handle_event("close_qrph_code", _params, socket) do
     {:noreply, assign(socket, :qrph_code_open, nil)}
+  end
+
+  def handle_event("dismiss_order_push", _params, socket) do
+    {:noreply, assign(socket, :push_prompt_dismissed?, true)}
+  end
+
+  def handle_event("enable_order_push", params, socket) when is_map(params) do
+    case socket.assigns.order do
+      %Order{} = order ->
+        case CustomerPush.subscribe(order, params) do
+          {:ok, _subscription} ->
+            {:noreply, assign(socket, :push_subscribed?, true)}
+
+          {:error, _reason} ->
+            {:noreply, socket}
+        end
+
+      _ ->
+        {:noreply, socket}
+    end
   end
 
   @impl true
@@ -168,6 +191,12 @@ defmodule EspresoWeb.OrderLive do
           </dl>
 
           <.elilai_rewards :if={not show_qrph_payment?(@order)} order={@order} />
+
+          <.order_push_prompt
+            order={@order}
+            vapid_public_key={@push_vapid_public_key}
+            show={show_order_push_prompt?(@order, assigns)}
+          />
 
           <div :if={not show_qrph_payment?(@order)} class="order-actions order-actions--confirm">
             <.link
@@ -277,6 +306,13 @@ defmodule EspresoWeb.OrderLive do
             </p>
           </div>
 
+          <.order_push_prompt
+            :if={not show_qrph_payment?(@order)}
+            order={@order}
+            vapid_public_key={@push_vapid_public_key}
+            show={show_order_push_prompt?(@order, assigns)}
+          />
+
           <.elilai_rewards
             :if={not @complete_return? and not show_qrph_payment?(@order)}
             order={@order}
@@ -347,6 +383,51 @@ defmodule EspresoWeb.OrderLive do
   end
 
   defp menu_browse_path, do: ~p"/menu?stage=menu"
+
+  defp assign_push_prompt(socket) do
+    socket
+    |> assign(:push_vapid_public_key, CustomerPush.vapid_public_key_js())
+    |> assign(:push_prompt_dismissed?, false)
+    |> assign(:push_subscribed?, false)
+  end
+
+  defp show_order_push_prompt?(order, assigns) do
+    CustomerPush.promptable?(order) and
+      assigns.push_vapid_public_key != "" and
+      not assigns.push_prompt_dismissed? and
+      not assigns.push_subscribed?
+  end
+
+  defp order_push_prompt(assigns) do
+    ~H"""
+    <section
+      :if={@show}
+      id="order-push-prompt"
+      class="order-push-prompt"
+      phx-hook="OrderPushPrompt"
+      data-vapid-public-key={@vapid_public_key}
+      data-order-number={@order.number}
+    >
+      <p class="order-push-prompt-title">Get a ping on your phone</p>
+      <p class="order-push-prompt-lede">
+        We'll notify you when we're preparing, and when it's ready to pick up. You can leave this page after you allow notifications.
+      </p>
+      <div class="order-push-prompt-actions">
+        <button type="button" id="order-push-allow" class="order-push-allow" data-order-push-allow>
+          Notify me
+        </button>
+        <button
+          type="button"
+          id="order-push-dismiss"
+          class="order-push-dismiss"
+          phx-click="dismiss_order_push"
+        >
+          Not now
+        </button>
+      </div>
+    </section>
+    """
+  end
 
   defp order_chrome_title(nil, _confirming?), do: "Order"
 
@@ -545,7 +626,7 @@ defmodule EspresoWeb.OrderLive do
     do: "This order was cancelled. You can place a new order from the menu."
 
   defp customer_status_hint(%{status: "preparing"}, _),
-    do: "We're preparing it — keep this screen for updates."
+    do: "We're preparing it — we'll ping your phone if you allowed notifications."
 
   defp customer_status_hint(%{status: "ready", payment_status: "paid", number: number}, _),
     do: "Show #{number} at the counter."

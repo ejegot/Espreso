@@ -38,6 +38,7 @@ defmodule Espreso.Orders.Order do
     field :loyalty_free_amount_centavos, :integer, default: 0
 
     has_many :items, OrderItem
+    has_many :push_subscriptions, Espreso.CustomerPush.Subscription
     belongs_to :settled_by_user, User
     belongs_to :customer, Customer
 

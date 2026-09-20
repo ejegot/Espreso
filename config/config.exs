@@ -22,6 +22,13 @@ config :espreso, Espreso.Accounts.Token,
 
 # Shop ESC/POS printer.
 # transport: :off | :lan_server (Phoenix TCP on same LAN) | :native_client (tablet Capacitor)
+config :espreso, Espreso.CustomerPush,
+  adapter: Espreso.CustomerPush.WebPush,
+  async: true,
+  subject: "mailto:hello@coffeespot.ph",
+  public_key: nil,
+  private_key: nil
+
 config :espreso, Espreso.Printer,
   enabled: false,
   transport: :off,

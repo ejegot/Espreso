@@ -8,6 +8,7 @@ defmodule Espreso.Orders do
 
   alias Espreso.Repo
   alias Espreso.BusinessSettings
+  alias Espreso.CustomerPush
   alias Espreso.Loyalty
   alias Espreso.Orders.{Order, OrderItem, PaymentReconciliation}
   alias Espreso.Menu
@@ -1040,10 +1041,14 @@ defmodule Espreso.Orders do
         if status in ["preparing", "ready"] and unpaid?(current) do
           {:error, :payment_required}
         else
-          current
-          |> Order.status_changeset(status)
-          |> Repo.update()
-          |> broadcast()
+          result =
+            current
+            |> Order.status_changeset(status)
+            |> Repo.update()
+            |> broadcast()
+
+          notify_customer_push(current.status, result)
+          result
         end
     end
   end
@@ -1646,6 +1651,19 @@ defmodule Espreso.Orders do
 
   defp broadcast(other), do: other
 
+  defp notify_customer_push(previous_status, {:ok, %Order{} = order}) do
+    CustomerPush.notify_status_change(previous_status, order)
+  rescue
+    error ->
+      Logger.warning(
+        "customer push notify failed order=#{order.number} reason=#{Exception.message(error)}"
+      )
+
+      :ok
+  end
+
+  defp notify_customer_push(_previous_status, _result), do: :ok
+
   # Loyalty is a side-effect of payment truth. Failures must not undo paid status.
   # Pending work is durable as: paid + customer_id + no earn ledger row.
   defp attempt_loyalty_earn(%Order{} = order) do
@@ -1735,11 +1753,14 @@ defmodule Espreso.Orders do
 
     case count do
       1 ->
+        previous_status = order.status
         order = Repo.get!(Order, order_id)
         _ = attempt_loyalty_earn(order)
 
         case broadcast({:ok, order}) do
-          {:ok, broadcasted} -> {:ok, :transitioned, broadcasted}
+          {:ok, broadcasted} ->
+            notify_customer_push(previous_status, {:ok, broadcasted})
+            {:ok, :transitioned, broadcasted}
         end
 
       0 ->
