@@ -74,7 +74,8 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:submission_error, nil)
      |> assign(:pubsub_reload_timer, nil)
      |> assign(:pubsub_reload_token, nil)
-     |> assign(:orders_new_count, Orders.new_lane_count()), layout: false}
+     |> assign(:orders_new_count, Orders.new_lane_count())
+     |> reset_pos_product_stream(), layout: false}
   end
 
   @impl true
@@ -111,7 +112,7 @@ defmodule EspresoWeb.StaffPosLive do
   def handle_info({:clear_place_flash, _token}, socket), do: {:noreply, socket}
 
   def handle_info(:clear_added_product, socket) do
-    {:noreply, assign(socket, :added_product_id, nil)}
+    {:noreply, clear_pos_product_added(socket)}
   end
 
   def handle_info(
@@ -168,7 +169,8 @@ defmodule EspresoWeb.StaffPosLive do
      socket
      |> assign(:selected_category, name)
      |> assign(:menu_filter, nil)
-     |> assign(:error, nil)}
+     |> assign(:error, nil)
+     |> reset_pos_product_stream()}
   end
 
   def handle_event("select_category", _params, socket) do
@@ -180,7 +182,8 @@ defmodule EspresoWeb.StaffPosLive do
      socket
      |> assign(:selected_category, nil)
      |> assign(:menu_filter, :matcha)
-     |> assign(:error, nil)}
+     |> assign(:error, nil)
+     |> reset_pos_product_stream()}
   end
 
   def handle_event("select_filter", %{"filter" => "sweets"}, socket) do
@@ -188,15 +191,16 @@ defmodule EspresoWeb.StaffPosLive do
      socket
      |> assign(:selected_category, nil)
      |> assign(:menu_filter, :sweets)
-     |> assign(:error, nil)}
+     |> assign(:error, nil)
+     |> reset_pos_product_stream()}
   end
 
   def handle_event("search", params, socket) do
-    {:noreply, assign(socket, :search, Map.get(params, "q", ""))}
+    {:noreply, socket |> assign(:search, Map.get(params, "q", "")) |> reset_pos_product_stream()}
   end
 
   def handle_event("clear_search", _params, socket) do
-    {:noreply, assign(socket, :search, "")}
+    {:noreply, socket |> assign(:search, "") |> reset_pos_product_stream()}
   end
 
   def handle_event(
@@ -301,7 +305,8 @@ defmodule EspresoWeb.StaffPosLive do
            |> assign(:last_order, nil)
            |> assign(:print_note, nil)
            |> assign(:print_note_error?, false)
-           |> clear_place_flash()}
+           |> clear_place_flash()
+           |> mark_pos_product_added(product_id)}
 
         true ->
           {:noreply, assign(socket, :error, "Product is unavailable.")}
@@ -1013,84 +1018,83 @@ defmodule EspresoWeb.StaffPosLive do
                 </nav>
               </div>
 
-              <div class="staff-pos-products staff-pos-products--rows" id="pos-products">
+              <div
+                class="staff-pos-products staff-pos-products--rows"
+                id="pos-products"
+                phx-update="stream"
+              >
                 <article
-                  :for={
-                    {{product, img}, index} <-
-                      Enum.with_index(
-                        product_cards(
-                          @categories,
-                          @selected_category,
-                          @menu_filter,
-                          @search
-                        )
-                      )
-                  }
-                  class={[
-                    "staff-pos-product-card",
-                    @added_product_id == product.id && "is-added"
-                  ]}
-                  id={"pos-product-#{product.id}"}
+                  :for={{dom_id, card} <- @streams.pos_products}
+                  class={["staff-pos-product-card", card.added? && "is-added"]}
+                  id={dom_id}
                   role="button"
                   tabindex="0"
                   phx-click="add_to_cart"
-                  phx-value-product-id={product.id}
+                  phx-value-product-id={card.product.id}
                   aria-label={
                     cond do
-                      @added_product_id == product.id -> "Added #{product.name}"
-                      length(product.product_prices) > 1 -> "Choose size for #{product.name}"
-                      true -> "Add #{product.name}"
+                      card.added? ->
+                        "Added #{card.product.name}"
+
+                      length(card.product.product_prices) > 1 ->
+                        "Choose size for #{card.product.name}"
+
+                      true ->
+                        "Add #{card.product.name}"
                     end
                   }
                 >
                   <div class="staff-pos-product-card-media" aria-hidden="true">
                     <img
-                      src={img.src}
+                      src={card.img.src}
                       alt=""
-                      class={["staff-pos-product-img", img.packshot? && "is-packshot"]}
-                      loading="eager"
-                      fetchpriority={if index < 4, do: "high"}
+                      class={["staff-pos-product-img", card.img.packshot? && "is-packshot"]}
+                      loading={if card.index < 6, do: "eager", else: "lazy"}
+                      fetchpriority={if card.index < 4, do: "high", else: "low"}
                     />
                     <span
-                      :if={Menu.signature_product?(product.name)}
+                      :if={Menu.signature_product?(card.product.name)}
                       class="staff-pos-signature-badge"
                     >
                       ✦ SIGNATURE
                     </span>
                   </div>
                   <div class="staff-pos-product-card-body">
-                    <h3 class="staff-pos-product-name">{product.name}</h3>
-                    <p :if={length(product.product_prices) > 1} class="staff-pos-product-size-hint">
+                    <h3 class="staff-pos-product-name">{card.product.name}</h3>
+                    <p
+                      :if={length(card.product.product_prices) > 1}
+                      class="staff-pos-product-size-hint"
+                    >
                       {Enum.map_join(
-                        pos_size_prices(product.product_prices),
+                        pos_size_prices(card.product.product_prices),
                         " · ",
                         &size_label(&1.size)
                       )}
                     </p>
                     <p class="staff-pos-product-price">
-                      {price_label(product)}
+                      {price_label(card.product)}
                     </p>
                   </div>
                 </article>
-                <p
-                  :if={
-                    visible_product_entries(
-                      @categories,
-                      @selected_category,
-                      @menu_filter,
-                      @search
-                    ) == []
-                  }
-                  class="staff-empty"
-                  id="pos-products-empty"
-                >
-                  <%= if String.trim(@search) != "" do %>
-                    No products match “{@search}”.
-                  <% else %>
-                    No available products in this category.
-                  <% end %>
-                </p>
               </div>
+              <p
+                :if={
+                  visible_product_entries(
+                    @categories,
+                    @selected_category,
+                    @menu_filter,
+                    @search
+                  ) == []
+                }
+                class="staff-empty"
+                id="pos-products-empty"
+              >
+                <%= if String.trim(@search) != "" do %>
+                  No products match “{@search}”.
+                <% else %>
+                  No available products in this category.
+                <% end %>
+              </p>
             </section>
 
             <aside
@@ -2147,6 +2151,7 @@ defmodule EspresoWeb.StaffPosLive do
            |> assign(:print_failed?, failed?)
            |> assign(:print_note_error?, note_error?)
            |> assign(:categories, Menu.list_menu())
+           |> reset_pos_product_stream()
            |> assign(:last_order, order)
            |> remember_review_order(order)
            |> assign(
@@ -2292,6 +2297,7 @@ defmodule EspresoWeb.StaffPosLive do
              |> assign(:notes, "")
              |> assign(:notes_open?, false)
              |> assign(:categories, Menu.list_menu())
+             |> reset_pos_product_stream()
              |> assign(:last_cash_change, cash_change)
              |> assign(:print_note, note)
              |> assign(:print_failed?, failed?)
@@ -2318,6 +2324,7 @@ defmodule EspresoWeb.StaffPosLive do
              socket
              |> assign(:placing_order?, false)
              |> assign(:categories, Menu.list_menu())
+             |> reset_pos_product_stream()
              |> assign(:submission_error, "Price changed — please review your ticket.")}
 
           {:error, _changeset} ->
@@ -2602,6 +2609,85 @@ defmodule EspresoWeb.StaffPosLive do
 
   defp sweets_product?(%{name: name}), do: Menu.sweets_product_name?(name)
   defp sweets_product?(_), do: false
+
+  defp reset_pos_product_stream(socket) do
+    items = pos_product_stream_items(socket, socket.assigns.added_product_id)
+
+    stream(socket, :pos_products, items,
+      reset: true,
+      dom_id: &"pos-product-#{&1.id}"
+    )
+  end
+
+  defp mark_pos_product_added(socket, product_id) do
+    previous_id = socket.assigns.added_product_id
+
+    socket
+    |> assign(:added_product_id, product_id)
+    |> then(fn socket ->
+      socket =
+        if is_integer(previous_id) and previous_id != product_id do
+          insert_pos_product_card(socket, previous_id, false)
+        else
+          socket
+        end
+
+      insert_pos_product_card(socket, product_id, true)
+    end)
+  end
+
+  defp clear_pos_product_added(socket) do
+    id = socket.assigns.added_product_id
+    socket = assign(socket, :added_product_id, nil)
+
+    if is_integer(id) do
+      insert_pos_product_card(socket, id, false)
+    else
+      socket
+    end
+  end
+
+  defp insert_pos_product_card(socket, product_id, added?) do
+    case pos_product_stream_item(socket, product_id, added?) do
+      nil -> socket
+      item -> stream_insert(socket, :pos_products, item)
+    end
+  end
+
+  defp pos_product_stream_items(socket, added_id) do
+    socket.assigns.categories
+    |> product_cards(
+      socket.assigns.selected_category,
+      socket.assigns.menu_filter,
+      socket.assigns.search
+    )
+    |> Enum.with_index()
+    |> Enum.map(fn {{product, img}, index} ->
+      %{
+        id: product.id,
+        product: product,
+        img: img,
+        index: index,
+        added?: added_id == product.id
+      }
+    end)
+  end
+
+  defp pos_product_stream_item(socket, product_id, added?) do
+    case find_product_entry(socket.assigns.categories, product_id) do
+      {category_name, product} ->
+        %{
+          id: product.id,
+          product: product,
+          img: Menu.pos_product_image_meta(category_name || "", product.name),
+          index: 99,
+          added?: added?
+        }
+
+      _ ->
+        nil
+    end
+  end
 
   defp product_cards(categories, selected, filter, search) do
     Enum.map(visible_product_entries(categories, selected, filter, search), fn {category_name,
