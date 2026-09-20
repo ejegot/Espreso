@@ -107,9 +107,12 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
       refute html =~ ~s(data-application="elilai-kafe-employee")
       refute html =~ "elilai-kafe-employee-root"
       refute html =~ "/elilai-kafe.webmanifest"
-      refute html =~ ~s(name="apple-mobile-web-app-title")
       refute html =~ "/images/elilai-kafe/apple-touch-icon.png"
       refute html =~ "/images/elilai-kafe/elilai-kafe-logo.jpg"
+
+      assert html =~ ~s(href="/coffeespot.webmanifest")
+      assert html =~ ~s(name="apple-mobile-web-app-title" content="CoffeeSpot")
+      assert html =~ ~s(href="/images/coffeespot/apple-touch-icon.png")
     end
   end
 

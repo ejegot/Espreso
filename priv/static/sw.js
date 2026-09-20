@@ -1,11 +1,14 @@
-const STATIC_CACHE = "elilai-static-v1"
+const STATIC_CACHE = "elilai-static-v2"
 const STATIC_CACHE_PREFIX = "elilai-static-"
 const ALLOWED_PREFIXES = ["/assets/", "/fonts/"]
 const ALLOWED_EXACT_PATHS = [
   "/images/elilai-kafe/elilai-kafe-logo.jpg",
   "/images/elilai-kafe/app-icon-192.png",
   "/images/elilai-kafe/app-icon-512.png",
-  "/images/elilai-kafe/apple-touch-icon.png"
+  "/images/elilai-kafe/apple-touch-icon.png",
+  "/images/coffeespot/app-icon-192.png",
+  "/images/coffeespot/app-icon-512.png",
+  "/images/coffeespot/apple-touch-icon.png"
 ]
 
 self.addEventListener("install", event => {
@@ -43,8 +46,8 @@ self.addEventListener("push", event => {
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
-      icon: "/images/elilai-kafe/app-icon-192.png",
-      badge: "/images/elilai-kafe/app-icon-192.png",
+      icon: "/images/coffeespot/app-icon-192.png",
+      badge: "/images/coffeespot/app-icon-192.png",
       data: {url},
       tag,
       renotify: true
@@ -87,6 +90,7 @@ function isCacheableRequest(request) {
   const path = url.pathname
 
   if (path === "/elilai-kafe.webmanifest") return false
+  if (path === "/coffeespot.webmanifest") return false
   if (path.startsWith("/api/")) return false
   if (path === "/live" || path.startsWith("/live/")) return false
   if (path === "/socket" || path.startsWith("/socket/")) return false

@@ -27,7 +27,7 @@ defmodule EspresoWeb.ServiceWorkerTest do
     customer_root = File.read!(@customer_root_path)
 
     assert source =~ ~S|if (!("serviceWorker" in navigator)) return|
-    assert source =~ ~S|root?.dataset.application !== "elilai-kafe-employee"|
+    assert source =~ ~S|document.documentElement?.dataset?.application === "elilai-kafe-employee"|
     assert source =~ ~S|navigator.serviceWorker.register("/sw.js")|
     assert employee_root =~ ~S|data-application="elilai-kafe-employee"|
     refute customer_root =~ "elilai-kafe-employee"
@@ -37,15 +37,18 @@ defmodule EspresoWeb.ServiceWorkerTest do
   test "service worker contract is limited to the static allowlist" do
     source = File.read!(@service_worker_path)
 
-    assert source =~ "const STATIC_CACHE = \"elilai-static-v1\""
+    assert source =~ "const STATIC_CACHE = \"elilai-static-v2\""
     assert source =~ "const ALLOWED_PREFIXES = [\"/assets/\", \"/fonts/\"]"
     assert source =~ "\"/images/elilai-kafe/elilai-kafe-logo.jpg\""
     assert source =~ "\"/images/elilai-kafe/app-icon-192.png\""
     assert source =~ "\"/images/elilai-kafe/app-icon-512.png\""
     assert source =~ "\"/images/elilai-kafe/apple-touch-icon.png\""
+    assert source =~ "\"/images/coffeespot/app-icon-192.png\""
+    assert source =~ "\"/images/coffeespot/app-icon-512.png\""
+    assert source =~ "\"/images/coffeespot/apple-touch-icon.png\""
 
     refute source =~ ~S|path.startsWith("/images/")|
-    refute source =~ "\"/menu\""
+    refute source =~ ~S|"/menu",|
     refute source =~ "\"/order/\""
     refute source =~ "\"/login\""
     refute source =~ "\"/staff\""
@@ -55,6 +58,7 @@ defmodule EspresoWeb.ServiceWorkerTest do
     refute source =~ "\"/about\""
     refute source =~ "\"/contact\""
     assert source =~ "if (path === \"/elilai-kafe.webmanifest\") return false"
+    assert source =~ "if (path === \"/coffeespot.webmanifest\") return false"
   end
 
   test "service worker explicitly excludes navigation liveview api and mutation requests" do

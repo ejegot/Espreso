@@ -69,6 +69,50 @@ defmodule EspresoWeb.PwaManifestTest do
     assert is_list(body["icons"])
   end
 
+  @customer_manifest_path Path.expand("../../priv/static/coffeespot.webmanifest", __DIR__)
+  @customer_icon_192_path Path.expand(
+                            "../../priv/static/images/coffeespot/app-icon-192.png",
+                            __DIR__
+                          )
+  @customer_icon_512_path Path.expand(
+                            "../../priv/static/images/coffeespot/app-icon-512.png",
+                            __DIR__
+                          )
+  @customer_apple_icon_path Path.expand(
+                              "../../priv/static/images/coffeespot/apple-touch-icon.png",
+                              __DIR__
+                            )
+
+  test "customer manifest uses CoffeeSpot identity and menu start url" do
+    manifest =
+      @customer_manifest_path
+      |> File.read!()
+      |> Jason.decode!()
+
+    assert manifest["name"] == "CoffeeSpot"
+    assert manifest["short_name"] == "CoffeeSpot"
+    assert manifest["start_url"] == "/menu"
+    assert manifest["display"] == "standalone"
+    assert manifest["background_color"] == "#FAF7F4"
+    assert manifest["theme_color"] == "#FAF7F4"
+  end
+
+  test "customer icons exist and are served", %{conn: conn} do
+    assert File.exists?(@customer_icon_192_path)
+    assert File.exists?(@customer_icon_512_path)
+    assert File.exists?(@customer_apple_icon_path)
+
+    for path <- [
+          "/coffeespot.webmanifest",
+          "/images/coffeespot/app-icon-192.png",
+          "/images/coffeespot/app-icon-512.png",
+          "/images/coffeespot/apple-touch-icon.png"
+        ] do
+      response = get(conn, path)
+      assert response(response, 200)
+    end
+  end
+
   defp assert_asset_files! do
     assert File.exists?(@logo_path)
     assert File.exists?(@icon_192_path)
