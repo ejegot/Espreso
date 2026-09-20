@@ -10,6 +10,7 @@ defmodule EspresoWeb.StaffPosLive do
   alias Phoenix.LiveView.JS
 
   @cart_undo_timeout_ms 4_000
+  @pubsub_reload_debounce_ms 300
 
   @impl true
   def mount(_params, _session, socket) do
@@ -71,12 +72,33 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:print_note, nil)
      |> assign(:error, nil)
      |> assign(:submission_error, nil)
+     |> assign(:pubsub_reload_timer, nil)
+     |> assign(:pubsub_reload_token, nil)
      |> assign(:orders_new_count, Orders.new_lane_count()), layout: false}
   end
 
   @impl true
   def handle_info({:order_changed, _order}, socket) do
-    {:noreply, assign(socket, :orders_new_count, Orders.new_lane_count())}
+    {:noreply, schedule_badge_reload(socket)}
+  end
+
+  def handle_info({:coalesced_pos_badge, token}, socket) do
+    if socket.assigns.pubsub_reload_token == token do
+      count = Orders.new_lane_count()
+
+      socket =
+        socket
+        |> assign(:pubsub_reload_timer, nil)
+        |> assign(:pubsub_reload_token, nil)
+
+      if count == socket.assigns.orders_new_count do
+        {:noreply, socket}
+      else
+        {:noreply, assign(socket, :orders_new_count, count)}
+      end
+    else
+      {:noreply, socket}
+    end
   end
 
   def handle_info(
@@ -2888,6 +2910,42 @@ defmodule EspresoWeb.StaffPosLive do
     |> close_redeem()
     |> assign(:notes, "")
     |> assign(:notes_open?, false)
+  end
+
+  defp schedule_badge_reload(socket) do
+    socket = cancel_badge_reload(socket)
+    ms = pubsub_reload_debounce_ms()
+
+    if ms <= 0 do
+      count = Orders.new_lane_count()
+
+      if count == socket.assigns.orders_new_count do
+        socket
+      else
+        assign(socket, :orders_new_count, count)
+      end
+    else
+      token = make_ref()
+      timer = Process.send_after(self(), {:coalesced_pos_badge, token}, ms)
+
+      socket
+      |> assign(:pubsub_reload_timer, timer)
+      |> assign(:pubsub_reload_token, token)
+    end
+  end
+
+  defp cancel_badge_reload(socket) do
+    if timer = socket.assigns[:pubsub_reload_timer] do
+      Process.cancel_timer(timer)
+    end
+
+    socket
+    |> assign(:pubsub_reload_timer, nil)
+    |> assign(:pubsub_reload_token, nil)
+  end
+
+  defp pubsub_reload_debounce_ms do
+    Application.get_env(:espreso, :staff_pubsub_reload_debounce_ms, @pubsub_reload_debounce_ms)
   end
 
   defp ticket_draft(assigns) do

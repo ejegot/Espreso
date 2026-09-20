@@ -73,7 +73,14 @@ defmodule EspresoWeb.StaffNotificationsComponent do
         aria-label={notif_aria_label(@unread)}
       >
         <span class="staff-notif-bell-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
             <path d="M9.5 17a2.5 2.5 0 0 0 5 0" />
           </svg>
@@ -161,14 +168,14 @@ defmodule EspresoWeb.StaffNotificationsComponent do
 
     case notification_for(order, prev, snap) do
       nil ->
-        assign(socket, :snapshots, snapshots)
+        assign(socket, :snapshots, prune_snapshots(snapshots, socket.assigns.items, order.id))
 
       item ->
         items = [item | socket.assigns.items] |> Enum.take(@max_items)
 
         socket =
           socket
-          |> assign(:snapshots, snapshots)
+          |> assign(:snapshots, prune_snapshots(snapshots, items, order.id))
           |> assign(:items, items)
           |> assign(:unread, socket.assigns.unread + 1)
 
@@ -199,6 +206,7 @@ defmodule EspresoWeb.StaffNotificationsComponent do
   defp build(order, type, title, body) do
     %{
       id: "#{order.id}-#{type}-#{System.unique_integer([:positive])}",
+      order_id: order.id,
       type: type,
       title: title,
       body: body,
@@ -206,6 +214,17 @@ defmodule EspresoWeb.StaffNotificationsComponent do
       read?: false,
       order_number: order.number
     }
+  end
+
+  defp prune_snapshots(snapshots, items, keep_id) do
+    keep =
+      items
+      |> Enum.map(& &1.order_id)
+      |> Enum.reject(&is_nil/1)
+      |> Kernel.++([keep_id])
+      |> Enum.uniq()
+
+    Map.take(snapshots, keep)
   end
 
   defp order_body(order) do

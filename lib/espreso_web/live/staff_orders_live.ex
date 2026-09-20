@@ -106,20 +106,24 @@ defmodule EspresoWeb.StaffOrdersLive do
   def handle_event("set_status", %{"id" => id, "status" => status}, socket) do
     order = Espreso.Repo.get!(Espreso.Orders.Order, id)
 
-    case Orders.update_status(order, status) do
-      {:ok, _} ->
-        {:noreply, load_orders(assign(socket, :flash_note, nil))}
+    if order.status == status do
+      {:noreply, socket}
+    else
+      case Orders.update_status(order, status) do
+        {:ok, _} ->
+          {:noreply, load_orders(assign(socket, :flash_note, nil))}
 
-      {:error, :payment_required} ->
-        {:noreply,
-         assign(
-           socket,
-           :flash_note,
-           "Confirm payment before marking this order ready."
-         )}
+        {:error, :payment_required} ->
+          {:noreply,
+           assign(
+             socket,
+             :flash_note,
+             "Confirm payment before marking this order ready."
+           )}
 
-      {:error, _} ->
-        {:noreply, assign(socket, :flash_note, "Could not update order status.")}
+        {:error, _} ->
+          {:noreply, assign(socket, :flash_note, "Could not update order status.")}
+      end
     end
   end
 

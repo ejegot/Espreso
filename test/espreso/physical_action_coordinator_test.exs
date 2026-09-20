@@ -245,7 +245,7 @@ defmodule Espreso.PhysicalActionCoordinatorTest do
     refute later_drawer == next_drawer
   end
 
-  test "concurrent Kitchen and Drawer claims each dispatch once and all actions serialize" do
+  test "concurrent Kitchen and Drawer claims each dispatch once; printer I/O does not block other actions" do
     parent = self()
 
     start_coordinator_with(
@@ -278,7 +278,12 @@ defmodule Espreso.PhysicalActionCoordinatorTest do
         Task.async(fn -> execute(order.id, :drawer, drawer_permit) end)
       end)
 
-    refute_receive {:started, :drawer, _}, 25
+    assert_receive {:started, :drawer, ^order_id}, 50
+
+    assert PhysicalActionCoordinator.permits(:kitchen, [order.id], @server) == %{
+             order.id => nil
+           }
+
     assert_receive {:finished, :kitchen, ^order_id}
 
     kitchen_results = Task.await_many(kitchen_tasks)
@@ -288,7 +293,6 @@ defmodule Espreso.PhysicalActionCoordinatorTest do
     assert Enum.count(kitchen_results, &match?({:duplicate, :dispatched}, &1)) == 1
     assert Enum.count(drawer_results, &match?({:dispatched, _}, &1)) == 1
     assert Enum.count(drawer_results, &match?({:duplicate, :dispatched}, &1)) == 1
-    assert_receive {:started, :drawer, ^order_id}
     refute_receive {:started, _, _}
   end
 
@@ -848,8 +852,7 @@ defmodule Espreso.PhysicalActionCoordinatorTest do
     order = unpaid_order!()
     permit = permit_for(order.id, :mark_paid)
 
-    assert {:ok, :transitioned, paid,
-            {:client_dispatch, :receipt, receipt_b64, receipt_req}} =
+    assert {:ok, :transitioned, paid, {:client_dispatch, :receipt, receipt_b64, receipt_req}} =
              PhysicalActionCoordinator.execute_mark_paid(order.id, permit, "cash",
                server: @server
              )
@@ -858,8 +861,7 @@ defmodule Espreso.PhysicalActionCoordinatorTest do
     assert_receive {:client_receipt, _}
     refute_receive {:client_drawer, _}
 
-    assert {:ok, :transitioned, paid2,
-            {:client_dispatch, :drawer, drawer_b64, drawer_req}} =
+    assert {:ok, :transitioned, paid2, {:client_dispatch, :drawer, drawer_b64, drawer_req}} =
              PhysicalActionCoordinator.confirm_client_physical(
                order.id,
                :mark_paid,

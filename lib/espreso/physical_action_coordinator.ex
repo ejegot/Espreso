@@ -213,13 +213,13 @@ defmodule Espreso.PhysicalActionCoordinator do
 
   def handle_call(
         {:execute, order_id, action, permit_id, staff_name},
-        _from,
+        from,
         state
       ) do
     if mark_paid_conflict?(state, order_id, action) do
       {:reply, {:stale, :mark_paid_recovery_pending}, state}
     else
-      execute_claimed_physical_action(state, order_id, action, permit_id, staff_name)
+      execute_claimed_physical_action(state, from, order_id, action, permit_id, staff_name)
     end
   end
 
@@ -290,13 +290,38 @@ defmodule Espreso.PhysicalActionCoordinator do
     {:reply, :ok, %{state | recovery_required?: false, permits: %{}}}
   end
 
-  defp execute_claimed_physical_action(state, order_id, action, permit_id, staff_name) do
+  @impl true
+  def handle_info({:physical_dispatch_done, key, permit_id, result}, state) do
+    finish_physical_dispatch(state, key, permit_id, result)
+  end
+
+  def handle_info({:DOWN, monitor, :process, _pid, reason}, state) do
+    running =
+      Enum.find(state.permits, fn {_key, entry} ->
+        Map.get(entry, :task_monitor) == monitor
+      end)
+
+    case running do
+      {key, %{current: permit_id, state: :running}} when reason != :normal ->
+        finish_physical_dispatch(state, key, permit_id, {:uncertain, :dispatcher_crashed})
+
+      _ ->
+        {:noreply, state}
+    end
+  end
+
+  def handle_info(_msg, state), do: {:noreply, state}
+
+  defp execute_claimed_physical_action(state, from, order_id, action, permit_id, staff_name) do
     if action in @actions and action not in [:mark_paid, :settle_physical] do
       key = {order_id, action}
 
       case claim_status(state, key, permit_id) do
         :claimable ->
-          execute_claimed_action(state, key, order_id, action, permit_id, staff_name)
+          execute_claimed_action(state, from, key, order_id, action, permit_id, staff_name)
+
+        :in_flight ->
+          {:noreply, enqueue_execute_waiter(state, key, from)}
 
         {:duplicate, result} ->
           {:reply, {:duplicate, result}, state}
@@ -309,19 +334,74 @@ defmodule Espreso.PhysicalActionCoordinator do
     end
   end
 
-  defp execute_claimed_action(state, key, order_id, action, permit_id, staff_name) do
+  defp execute_claimed_action(state, from, key, order_id, action, permit_id, staff_name) do
     state = put_in(state, [:permits, key, :state], :running)
 
     case eligible_order(order_id, action) do
       {:ok, order} ->
-        result = state.dispatchers[action].(order, staff_name: staff_name)
-        complete_action(state, key, permit_id, result, action)
+        coordinator = self()
+        dispatcher = state.dispatchers[action]
+
+        {:ok, task} =
+          Task.start(fn ->
+            result = dispatcher.(order, staff_name: staff_name)
+            send(coordinator, {:physical_dispatch_done, key, permit_id, result})
+          end)
+
+        monitor = Process.monitor(task)
+
+        state =
+          update_in(state, [:permits, key], fn entry ->
+            entry
+            |> Map.put(:caller, from)
+            |> Map.put(:waiters, [])
+            |> Map.put(:task_pid, task)
+            |> Map.put(:task_monitor, monitor)
+          end)
+
+        {:noreply, state}
 
       {:error, reason} ->
         result = {:ineligible, reason}
         state = complete_without_next_permit(state, key, permit_id, result)
         {:reply, result, state}
     end
+  end
+
+  defp finish_physical_dispatch(state, key, permit_id, result) do
+    case Map.get(state.permits, key) do
+      %{state: :running, current: ^permit_id, caller: from} = entry ->
+        if monitor = Map.get(entry, :task_monitor) do
+          Process.demonitor(monitor, [:flush])
+        end
+
+        waiters = Map.get(entry, :waiters, [])
+        {:reply, reply, new_state} = complete_action(state, key, permit_id, result, elem(key, 1))
+        GenServer.reply(from, reply)
+
+        Enum.each(waiters, fn waiter ->
+          GenServer.reply(waiter, duplicate_execute_result(reply))
+        end)
+
+        {:noreply, new_state}
+
+      _ ->
+        {:noreply, state}
+    end
+  end
+
+  defp duplicate_execute_result({:dispatched, _next}), do: {:duplicate, :dispatched}
+
+  defp duplicate_execute_result({:definite_failure, reason, _retry}),
+    do: {:duplicate, {:definite_failure, reason}}
+
+  defp duplicate_execute_result({:client_dispatch, _b64, _request_id} = result),
+    do: {:duplicate, result}
+
+  defp duplicate_execute_result(result), do: {:duplicate, result}
+
+  defp enqueue_execute_waiter(state, key, from) do
+    update_in(state, [:permits, key, :waiters], fn waiters -> [from | List.wrap(waiters)] end)
   end
 
   defp execute_claimed_settle_physical(state, key, order_id, permit_id, paid_via, staff_name) do
@@ -992,6 +1072,9 @@ defmodule Espreso.PhysicalActionCoordinator do
       %{current: ^permit_id, state: :available} ->
         :claimable
 
+      %{current: ^permit_id, state: :running} ->
+        :in_flight
+
       %{current: ^permit_id, state: :awaiting_client, last_result: result} ->
         {:duplicate, result}
 
@@ -1048,6 +1131,9 @@ defmodule Espreso.PhysicalActionCoordinator do
         {nil, state}
 
       %{current: nil, state: :complete} when action in [:mark_paid, :settle_physical] ->
+        {nil, state}
+
+      %{state: :running} ->
         {nil, state}
 
       %{state: :awaiting_client} ->
