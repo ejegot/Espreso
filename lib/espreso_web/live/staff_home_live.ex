@@ -9,6 +9,8 @@ defmodule EspresoWeb.StaffHomeLive do
   alias Espreso.Shifts
   alias EspresoWeb.StaffNotifications
 
+  @pubsub_reload_debounce_ms 300
+
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket), do: Orders.subscribe()
@@ -17,6 +19,8 @@ defmodule EspresoWeb.StaffHomeLive do
      socket
      |> assign(:page_title, "Home")
      |> assign(:printer_note, nil)
+     |> assign(:pubsub_reload_timer, nil)
+     |> assign(:pubsub_reload_token, nil)
      |> assign_home_state(), layout: false}
   end
 
@@ -107,7 +111,19 @@ defmodule EspresoWeb.StaffHomeLive do
   def handle_info({:order_changed, order}, socket) do
     StaffNotifications.push_order_change(order)
 
-    {:noreply, assign_home_state(socket)}
+    {:noreply, schedule_pubsub_reload(socket)}
+  end
+
+  def handle_info({:coalesced_home_reload, token}, socket) do
+    if socket.assigns.pubsub_reload_token == token do
+      {:noreply,
+       socket
+       |> assign(:pubsub_reload_timer, nil)
+       |> assign(:pubsub_reload_token, nil)
+       |> assign_home_state()}
+    else
+      {:noreply, socket}
+    end
   end
 
   @impl true
@@ -254,7 +270,38 @@ defmodule EspresoWeb.StaffHomeLive do
     """
   end
 
+  defp schedule_pubsub_reload(socket) do
+    socket = cancel_pubsub_reload(socket)
+    ms = pubsub_reload_debounce_ms()
+
+    if ms <= 0 do
+      assign_home_state(socket)
+    else
+      token = make_ref()
+      timer = Process.send_after(self(), {:coalesced_home_reload, token}, ms)
+
+      socket
+      |> assign(:pubsub_reload_timer, timer)
+      |> assign(:pubsub_reload_token, token)
+    end
+  end
+
+  defp cancel_pubsub_reload(socket) do
+    if timer = socket.assigns[:pubsub_reload_timer] do
+      Process.cancel_timer(timer)
+    end
+
+    socket
+    |> assign(:pubsub_reload_timer, nil)
+    |> assign(:pubsub_reload_token, nil)
+  end
+
+  defp pubsub_reload_debounce_ms do
+    Application.get_env(:espreso, :staff_pubsub_reload_debounce_ms, @pubsub_reload_debounce_ms)
+  end
+
   defp assign_home_state(socket) do
+    socket = cancel_pubsub_reload(socket)
     user = socket.assigns.current_user
     overview = Orders.dashboard_overview()
     money? = manager_or_owner?(user)

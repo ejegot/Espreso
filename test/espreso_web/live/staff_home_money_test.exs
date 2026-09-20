@@ -157,6 +157,8 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
 
     {:ok, _} = Orders.mark_paid(unpaid, paid_via: "cash")
 
+    wait_for_home_reload(view)
+
     html_after = render(view)
     assert has_element?(view, "#staff-home-unpaid", "Unpaid")
     refute has_element?(view, "#staff-home-unpaid .staff-home-inline-count")
@@ -181,5 +183,12 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
 
     assert has_element?(view, "#staff-home-unpaid", "Unpaid")
     refute has_element?(view, "#staff-home-unpaid .staff-home-inline-count")
+  end
+
+  defp wait_for_home_reload(view) do
+    ms = Application.get_env(:espreso, :staff_pubsub_reload_debounce_ms, 300)
+    Process.sleep(ms + 50)
+    _ = :sys.get_state(view.pid)
+    :ok
   end
 end
