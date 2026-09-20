@@ -695,9 +695,19 @@ defmodule Espreso.Orders do
   Loads a single order with items for the staff API.
   """
   def get_order_for_api(id) when is_integer(id) do
-    case Repo.get(Order, id) |> Repo.preload(:items) do
+    case get_order(id) do
       nil -> {:error, :not_found}
       %Order{} = order -> {:ok, order}
+    end
+  end
+
+  @doc """
+  Loads one order with items, or `nil`.
+  """
+  def get_order(id) when is_integer(id) do
+    case Repo.get(Order, id) do
+      nil -> nil
+      %Order{} = order -> Repo.preload(order, :items)
     end
   end
 

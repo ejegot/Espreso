@@ -37,6 +37,7 @@ defmodule EspresoWeb.StaffOrdersLive do
      |> assign(:alert_banner, nil)
      |> assign(:pubsub_reload_timer, nil)
      |> assign(:pubsub_reload_token, nil)
+     |> assign(:pending_order_ids, MapSet.new())
      |> load_orders(), layout: false}
   end
 
@@ -54,6 +55,7 @@ defmodule EspresoWeb.StaffOrdersLive do
 
     socket =
       socket
+      |> assign(:pending_order_ids, MapSet.put(socket.assigns.pending_order_ids, order.id))
       |> maybe_set_alert_banner(order)
       |> schedule_pubsub_reload()
 
@@ -66,7 +68,7 @@ defmodule EspresoWeb.StaffOrdersLive do
        socket
        |> assign(:pubsub_reload_timer, nil)
        |> assign(:pubsub_reload_token, nil)
-       |> load_orders()}
+       |> apply_pending_order_changes()}
     else
       {:noreply, socket}
     end
@@ -111,7 +113,7 @@ defmodule EspresoWeb.StaffOrdersLive do
     else
       case Orders.update_status(order, status) do
         {:ok, _} ->
-          {:noreply, load_orders(assign(socket, :flash_note, nil))}
+          {:noreply, patch_board_order(assign(socket, :flash_note, nil), order.id)}
 
         {:error, :payment_required} ->
           {:noreply,
@@ -442,7 +444,7 @@ defmodule EspresoWeb.StaffOrdersLive do
         {:noreply,
          socket
          |> assign(:flash_note, "#{cancelled.number} cancelled.")
-         |> load_orders()}
+         |> patch_board_order(cancelled.id)}
 
       {:error, :paid} ->
         {:noreply, assign(socket, :flash_note, "Paid orders cannot be cancelled.")}
@@ -499,7 +501,7 @@ defmodule EspresoWeb.StaffOrdersLive do
         {:noreply,
          socket
          |> assign(:flash_note, "Picked up · #{completed.number}")
-         |> load_orders()}
+         |> patch_board_order(completed.id)}
 
       {:error, :cancelled} ->
         {:noreply, assign(socket, :flash_note, "Cancelled orders cannot be marked picked up.")}
@@ -1927,7 +1929,7 @@ defmodule EspresoWeb.StaffOrdersLive do
     ms = pubsub_reload_debounce_ms()
 
     if ms <= 0 do
-      load_orders(socket)
+      apply_pending_order_changes(socket)
     else
       token = make_ref()
       timer = Process.send_after(self(), {:coalesced_orders_reload, token}, ms)
@@ -1952,8 +1954,141 @@ defmodule EspresoWeb.StaffOrdersLive do
     Application.get_env(:espreso, :staff_pubsub_reload_debounce_ms, @pubsub_reload_debounce_ms)
   end
 
+  @board_patch_limit 6
+
+  defp apply_pending_order_changes(socket) do
+    ids = socket.assigns.pending_order_ids |> MapSet.to_list() |> Enum.sort()
+    socket = assign(socket, :pending_order_ids, MapSet.new())
+
+    cond do
+      ids == [] ->
+        load_orders(socket)
+
+      length(ids) > @board_patch_limit ->
+        load_orders(socket)
+
+      true ->
+        Enum.reduce(ids, socket, fn id, acc -> patch_board_order(acc, id) end)
+    end
+  end
+
+  defp patch_board_order(socket, %Espreso.Orders.Order{id: id}), do: patch_board_order(socket, id)
+
+  defp patch_board_order(socket, id) when is_integer(id) do
+    case Orders.get_order(id) do
+      nil ->
+        socket
+        |> update(:active_orders, &reject_order_id(&1, id))
+        |> update(:ready_orders, &reject_order_id(&1, id))
+        |> update(:unpaid_orders, &reject_order_id(&1, id))
+        |> drop_permits(id)
+
+      order ->
+        socket
+        |> put_order_on_board(order)
+        |> assign(:unpaid_orders, Orders.list_todays_unpaid())
+        |> refresh_permits_for(order)
+    end
+  end
+
+  defp patch_board_order(socket, id) when is_binary(id) do
+    case Integer.parse(id) do
+      {int, ""} -> patch_board_order(socket, int)
+      _ -> socket
+    end
+  end
+
+  defp put_order_on_board(socket, %{status: status} = order)
+       when status in ["cancelled", "completed"] do
+    socket
+    |> update(:active_orders, &reject_order_id(&1, order.id))
+    |> update(:ready_orders, &reject_order_id(&1, order.id))
+  end
+
+  defp put_order_on_board(socket, %{status: "ready"} = order) do
+    socket
+    |> update(:active_orders, &reject_order_id(&1, order.id))
+    |> update(:ready_orders, fn orders ->
+      [order | Enum.reject(orders, &(&1.id == order.id))]
+      |> Enum.take(@ready_lane_limit)
+    end)
+  end
+
+  defp put_order_on_board(socket, %{status: status} = order)
+       when status in ["received", "preparing"] do
+    socket
+    |> update(:ready_orders, &reject_order_id(&1, order.id))
+    |> update(:active_orders, fn orders ->
+      orders
+      |> Enum.reject(&(&1.id == order.id))
+      |> Kernel.++([order])
+      |> Enum.sort_by(&{&1.inserted_at, &1.id})
+    end)
+  end
+
+  defp put_order_on_board(socket, order) do
+    socket
+    |> update(:active_orders, &reject_order_id(&1, order.id))
+    |> update(:ready_orders, &reject_order_id(&1, order.id))
+  end
+
+  defp reject_order_id(orders, id), do: Enum.reject(orders, &(&1.id == id))
+
+  defp drop_permits(socket, id) do
+    socket
+    |> update(:reprint_permits, &Map.delete(&1, id))
+    |> update(:kitchen_permits, &Map.delete(&1, id))
+    |> update(:drawer_permits, &Map.delete(&1, id))
+    |> update(:mark_paid_permits, &Map.delete(&1, id))
+  end
+
+  defp refresh_permits_for(socket, order) do
+    id = order.id
+    socket = drop_permits(socket, id)
+
+    reprint =
+      if Printer.enabled?() and order.payment_status == "paid" and
+           order.status in ["received", "preparing", "ready"] do
+        PhysicalActionCoordinator.reprint_permits([id])
+      else
+        %{}
+      end
+
+    kitchen =
+      if Printer.enabled?() and order.status in ["received", "preparing", "ready"] do
+        PhysicalActionCoordinator.permits(:kitchen, [id])
+      else
+        %{}
+      end
+
+    drawer =
+      if Printer.enabled?() and order.payment_status == "paid" and
+           Printer.cash_like?(order.paid_via || "counter") and
+           order.status in ["received", "preparing", "ready", "completed"] do
+        PhysicalActionCoordinator.permits(:drawer, [id])
+      else
+        %{}
+      end
+
+    mark_paid =
+      if staff_mark_paid?(order) do
+        PhysicalActionCoordinator.permits(:mark_paid, [id])
+      else
+        %{}
+      end
+
+    socket
+    |> update(:reprint_permits, &Map.merge(&1, reprint))
+    |> update(:kitchen_permits, &Map.merge(&1, kitchen))
+    |> update(:drawer_permits, &Map.merge(&1, drawer))
+    |> update(:mark_paid_permits, &Map.merge(&1, mark_paid))
+  end
+
   defp load_orders(socket) do
-    socket = cancel_pubsub_reload(socket)
+    socket =
+      socket
+      |> cancel_pubsub_reload()
+      |> assign(:pending_order_ids, MapSet.new())
 
     active_orders = Orders.list_active_orders()
     ready_orders = Orders.list_recent_ready(@ready_lane_limit)
