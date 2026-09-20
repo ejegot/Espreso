@@ -1191,24 +1191,36 @@ Hooks.OrderPushPrompt = {
   mounted() {
     this.dismissKey = `coffeespot.orderPush.dismissed.${this.el.dataset.orderNumber || ""}`
     this.allowBtn = this.el.querySelector("[data-order-push-allow]")
+    this.lede = this.el.querySelector("[data-order-push-lede]")
+    this.iosHelp = this.el.querySelector("[data-order-push-ios]")
+    this.subscribing = false
 
     if (this.wasDismissed()) {
       this.el.hidden = true
       return
     }
 
-    if (!this.pushSupported()) {
+    if (this.iosNeedsHomeScreen()) {
+      this.showIosHelp()
+    } else if (!this.pushSupported()) {
       this.el.hidden = true
       return
     }
 
-    this.onAllow = () => this.subscribe()
+    this.onAllow = (event) => {
+      if (event.type === "touchend") event.preventDefault()
+      event.stopPropagation()
+      this.subscribe()
+    }
+
     this.allowBtn?.addEventListener("click", this.onAllow)
-    this.maybeResubscribe()
+    this.allowBtn?.addEventListener("touchend", this.onAllow, {passive: false})
+    if (!this.iosNeedsHomeScreen()) this.maybeResubscribe()
   },
 
   destroyed() {
     this.allowBtn?.removeEventListener("click", this.onAllow)
+    this.allowBtn?.removeEventListener("touchend", this.onAllow)
   },
 
   wasDismissed() {
@@ -1217,6 +1229,28 @@ Hooks.OrderPushPrompt = {
     } catch (_error) {
       return false
     }
+  },
+
+  isStandalonePwa() {
+    return (
+      window.matchMedia("(display-mode: standalone)").matches ||
+      window.navigator.standalone === true
+    )
+  },
+
+  isAppleMobile() {
+    const ua = window.navigator.userAgent || ""
+    if (/iPhone|iPad|iPod/i.test(ua)) return true
+    return window.navigator.platform === "MacIntel" && window.navigator.maxTouchPoints > 1
+  },
+
+  iosNeedsHomeScreen() {
+    return this.isAppleMobile() && !this.isStandalonePwa()
+  },
+
+  showIosHelp() {
+    if (this.lede) this.lede.hidden = true
+    if (this.iosHelp) this.iosHelp.hidden = false
   },
 
   pushSupported() {
@@ -1239,17 +1273,27 @@ Hooks.OrderPushPrompt = {
   },
 
   async subscribe() {
+    if (this.subscribing) return
+    this.subscribing = true
+
     try {
-      const permission = await Notification.requestPermission()
-      if (permission !== "granted") {
-        try {
-          localStorage.setItem(this.dismissKey, "1")
-        } catch (_error) {
-          // Ignore private-mode / storage failures.
+      if (this.iosNeedsHomeScreen()) {
+        this.showIosHelp()
+        if (navigator.share) {
+          try {
+            await navigator.share({
+              title: "CoffeeSpot",
+              url: window.location.href
+            })
+          } catch (_error) {
+            // User cancelled the share sheet.
+          }
         }
-        this.pushEvent("dismiss_order_push", {})
         return
       }
+
+      const permission = await Notification.requestPermission()
+      if (permission !== "granted") return
 
       await registerServiceWorker()
       const registration = await navigator.serviceWorker.ready
@@ -1261,7 +1305,9 @@ Hooks.OrderPushPrompt = {
 
       this.pushSubscription(subscription)
     } catch (_error) {
-      this.pushEvent("dismiss_order_push", {})
+      this.showIosHelp()
+    } finally {
+      this.subscribing = false
     }
   },
 

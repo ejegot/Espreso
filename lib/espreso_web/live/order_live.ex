@@ -148,7 +148,7 @@ defmodule EspresoWeb.OrderLive do
         >
           <p :if={not show_qrph_payment?(@order)} class="order-eyebrow">CoffeeSpot</p>
           <%= if show_qrph_payment?(@order) do %>
-            <%!-- Pay screen content is the QRPh section below (header already says Pay at counter). --%>
+            <%!-- Pay screen content is the QRPh section below (header is Pay with GCash / Maya). --%>
           <% else %>
             <%= if confirm_payment_processing?(@order) do %>
               <h1 class="order-title" id="order-confirm-title">Payment processing</h1>
@@ -165,6 +165,14 @@ defmodule EspresoWeb.OrderLive do
               {@order.number}
             </p>
           <% end %>
+
+          <.elilai_rewards :if={not show_qrph_payment?(@order)} order={@order} />
+
+          <.order_push_prompt
+            order={@order}
+            vapid_public_key={@push_vapid_public_key}
+            show={show_order_push_prompt?(@order, assigns)}
+          />
 
           <section
             :if={show_qrph_payment?(@order)}
@@ -189,14 +197,6 @@ defmodule EspresoWeb.OrderLive do
               <dd>{Orders.format_total(@order)}</dd>
             </div>
           </dl>
-
-          <.elilai_rewards :if={not show_qrph_payment?(@order)} order={@order} />
-
-          <.order_push_prompt
-            order={@order}
-            vapid_public_key={@push_vapid_public_key}
-            show={show_order_push_prompt?(@order, assigns)}
-          />
 
           <div :if={not show_qrph_payment?(@order)} class="order-actions order-actions--confirm">
             <.link
@@ -408,12 +408,20 @@ defmodule EspresoWeb.OrderLive do
       data-vapid-public-key={@vapid_public_key}
       data-order-number={@order.number}
     >
-      <p class="order-push-prompt-title">Get a ping on your phone</p>
-      <p class="order-push-prompt-lede">
-        We'll notify you when we're preparing, and when it's ready to pick up. You can leave this page after you allow notifications.
+      <p class="order-push-prompt-title">Get a ping</p>
+      <p class="order-push-prompt-lede" data-order-push-lede>
+        When it's preparing and ready to pick up.
+      </p>
+      <p class="order-push-prompt-lede order-push-ios-help" data-order-push-ios hidden>
+        iPhone: Share → Add to Home Screen, then open the icon.
       </p>
       <div class="order-push-prompt-actions">
-        <button type="button" id="order-push-allow" class="order-push-allow" data-order-push-allow>
+        <button
+          type="button"
+          id="order-push-allow"
+          class="order-push-allow"
+          data-order-push-allow
+        >
           Notify me
         </button>
         <button
@@ -433,7 +441,7 @@ defmodule EspresoWeb.OrderLive do
 
   defp order_chrome_title(order, true) do
     cond do
-      show_qrph_payment?(order) -> "Pay at counter"
+      show_qrph_payment?(order) -> qrph_title(order)
       confirm_payment_processing?(order) -> "Payment"
       true -> "Confirmed"
     end
@@ -445,7 +453,7 @@ defmodule EspresoWeb.OrderLive do
 
   defp page_title(order, true) do
     cond do
-      show_qrph_payment?(order) -> "Pay at counter"
+      show_qrph_payment?(order) -> qrph_title(order)
       confirm_payment_processing?(order) -> "Payment processing"
       true -> "Order confirmed"
     end
@@ -497,11 +505,11 @@ defmodule EspresoWeb.OrderLive do
     </p>
 
     <p class="order-qrph-counter-hint" id={"#{@id_prefix}-qrph-counter-hint"}>
-      Scan the QR at the counter
+      Scan this QR to pay. We'll confirm from {qrph_wallet_brand(@order) || "GCash"}.
     </p>
 
     <div :if={@qrph_codes != []} class="order-qrph-codes" id={"#{@id_prefix}-qrph-codes"}>
-      <p class="order-qrph-or" id={"#{@id_prefix}-qrph-or"}>Or pay here</p>
+      <p class="order-qrph-or" id={"#{@id_prefix}-qrph-or"}>Scan to pay</p>
       <button
         :for={code <- @qrph_codes}
         type="button"
@@ -542,7 +550,9 @@ defmodule EspresoWeb.OrderLive do
         <p id={"#{@id_prefix}-qrph-modal-title"} class="order-qrph-modal-name">
           {@open_code.label}
         </p>
-        <p class="order-qrph-modal-hint">Screenshot to pay, or scan at the counter.</p>
+        <p class="order-qrph-modal-hint" id={"#{@id_prefix}-qrph-modal-hint"}>
+          Scan to pay {Orders.format_total(@order)}.
+        </p>
         <button
           type="button"
           id={"#{@id_prefix}-qrph-modal-close"}

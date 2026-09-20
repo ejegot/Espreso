@@ -2460,6 +2460,10 @@ body:has(.menu-page-locked) {
   padding: 1.5rem 0 3rem;
 }
 
+.order-page .order-main {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+}
+
 .order-card,
 .staff-auth-card {
   padding: 1.5rem 1.35rem;
@@ -18764,6 +18768,8 @@ body:has(.home-page-landing) {
 }
 
 .order-page .order-push-prompt {
+  position: relative;
+  z-index: 5;
   margin: 1.25rem 0 0;
   padding: 1rem 1.05rem 1.05rem;
   border: 1px solid rgba(56, 32, 16, 0.12);
@@ -18797,12 +18803,15 @@ body:has(.home-page-landing) {
 
 .order-page .order-push-allow,
 .order-page .order-push-dismiss {
-  min-height: 2.6rem;
+  min-height: 2.75rem;
   padding: 0.45rem 0.95rem;
   border-radius: 999px;
   font-family: "DM Sans", sans-serif;
   font-size: 0.88rem;
   font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(56, 32, 16, 0.12);
 }
 
 .order-page .order-push-allow {

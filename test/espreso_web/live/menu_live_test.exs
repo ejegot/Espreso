@@ -1358,7 +1358,12 @@ defmodule EspresoWeb.MenuLiveTest do
     |> render_change()
 
     view |> element("button.menu-checkout-option", "GCash") |> render_click()
-    assert has_element?(view, ".menu-checkout-payment-note", "Scan QR at counter after this.")
+
+    assert has_element?(
+             view,
+             ".menu-checkout-payment-note",
+             "You'll pay with GCash on the next screen."
+           )
 
     {:ok, order_view, _html} =
       view
@@ -1367,7 +1372,7 @@ defmodule EspresoWeb.MenuLiveTest do
       |> follow_redirect(conn)
 
     assert has_element?(order_view, "#order-confirm")
-    assert has_element?(order_view, "#order-chrome-title", "Pay at counter")
+    assert has_element?(order_view, "#order-chrome-title", "Pay with GCash")
     refute has_element?(order_view, "#order-confirm-qrph-open-gcash")
     refute has_element?(order_view, "#order-confirm-title")
 
@@ -1379,6 +1384,7 @@ defmodule EspresoWeb.MenuLiveTest do
              order_view,
              ~s(#order-confirm-qrph-code-gcash img[src="#{gcash_qr}"])
            )
+
     [order] = Orders.list_active_orders()
     assert order.customer_name == "QR Guest"
     assert order.payment_method == "online"
@@ -1778,7 +1784,13 @@ defmodule EspresoWeb.MenuLiveTest do
     view |> element("#checkout-pay-gcash") |> render_click()
     assert has_element?(view, "#checkout-pay-gcash.is-active", "GCash")
     refute has_element?(view, "#checkout-pay-counter.is-active")
-    assert has_element?(view, "#checkout-payment-note", "Scan QR at counter after this.")
+
+    assert has_element?(
+             view,
+             "#checkout-payment-note",
+             "You'll pay with GCash on the next screen."
+           )
+
     assert has_element?(view, "button.menu-basket-checkout", "Place order")
   end
 

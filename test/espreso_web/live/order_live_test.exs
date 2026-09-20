@@ -39,7 +39,7 @@ defmodule EspresoWeb.OrderLiveTest do
 
     refute html =~ "Status: "
     refute has_element?(view, "#order-confirm")
-    assert has_element?(view, "#order-push-prompt", "Get a ping on your phone")
+    assert has_element?(view, "#order-push-prompt", "Get a ping")
 
     more_href =
       view
@@ -511,10 +511,19 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, "#order-qrph-awaiting", "GCash")
     assert has_element?(view, "#order-qrph-amount", "₱120")
     assert has_element?(view, "#order-qrph-waiting", "Waiting for staff to confirm.")
-    assert has_element?(view, "#order-qrph-counter-hint", "Scan the QR at the counter")
+
+    assert has_element?(
+             view,
+             "#order-qrph-counter-hint",
+             "Scan this QR to pay. We'll confirm from GCash."
+           )
+
+    refute has_element?(view, "#order-qrph-howto")
+    refute has_element?(view, "#order-qrph-copy")
+    refute has_element?(view, "#order-qrph-steps")
     refute has_element?(view, "#order-qrph-open-gcash")
     refute has_element?(view, "#order-qrph-open-maya")
-    assert has_element?(view, "#order-qrph-or", "Or pay here")
+    assert has_element?(view, "#order-qrph-or", "Scan to pay")
 
     assert has_element?(
              view,
@@ -539,6 +548,9 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, "#order-qrph-modal-title", "GCash")
     assert has_element?(view, "#order-qrph-modal", "₱120")
     assert has_element?(view, "#order-qrph-modal", order.number)
+
+    assert has_element?(view, "#order-qrph-modal-hint", "Scan to pay ₱120.")
+
     refute render(view) =~ "gcash://"
 
     view |> element("#order-qrph-modal-close") |> render_click()
@@ -577,7 +589,7 @@ defmodule EspresoWeb.OrderLiveTest do
 
     {:ok, view, html} = live(conn, ~p"/order/#{order.number}?confirm=1")
 
-    assert has_element?(view, "#order-chrome-title", "Pay at counter")
+    assert has_element?(view, "#order-chrome-title", "Pay with GCash")
     refute has_element?(view, ".brune-top")
     assert has_element?(view, "#order-confirm")
     refute has_element?(view, "#order-confirm-title")
@@ -585,9 +597,18 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, "#order-confirm-qrph-number", order.number)
     assert has_element?(view, "#order-confirm-qrph-amount", "₱95")
     refute has_element?(view, "#order-confirm-qrph-open-gcash")
+
     assert has_element?(view, "#order-confirm-qrph-waiting", "Waiting for staff to confirm.")
-    assert has_element?(view, "#order-confirm-qrph-counter-hint", "Scan the QR at the counter")
-    assert has_element?(view, "#order-confirm-qrph-or", "Or pay here")
+
+    assert has_element?(
+             view,
+             "#order-confirm-qrph-counter-hint",
+             "Scan this QR to pay. We'll confirm from GCash."
+           )
+
+    refute has_element?(view, "#order-confirm-qrph-howto")
+    refute has_element?(view, "#order-confirm-qrph-steps")
+    assert has_element?(view, "#order-confirm-qrph-or", "Scan to pay")
 
     assert has_element?(
              view,

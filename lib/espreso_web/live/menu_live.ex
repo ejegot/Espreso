@@ -3509,10 +3509,10 @@ defmodule EspresoWeb.MenuLive do
     do: "Continue to PayMongo to complete payment."
 
   defp payment_checkout_note(:gcash, "qrph_manual"),
-    do: "Scan QR at counter after this."
+    do: "You'll pay with GCash on the next screen."
 
   defp payment_checkout_note(:maya, "qrph_manual"),
-    do: "Scan QR at counter after this."
+    do: "You'll pay with Maya on the next screen."
 
   defp payment_checkout_note(_, _), do: "Pay at the counter when your order is ready."
 end
