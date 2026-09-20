@@ -18763,6 +18763,60 @@ body:has(.home-page-landing) {
   margin-top: 1.5rem;
 }
 
+.order-page .order-push-prompt {
+  margin: 1.25rem 0 0;
+  padding: 1rem 1.05rem 1.05rem;
+  border: 1px solid rgba(56, 32, 16, 0.12);
+  border-radius: 1rem;
+  background: #fffaf6;
+  text-align: left;
+}
+
+.order-page .order-push-prompt-title {
+  margin: 0;
+  color: #382010;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.order-page .order-push-prompt-lede {
+  margin: 0.4rem 0 0;
+  color: #5c4638;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.order-page .order-push-prompt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+
+.order-page .order-push-allow,
+.order-page .order-push-dismiss {
+  min-height: 2.6rem;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.order-page .order-push-allow {
+  border: 0;
+  background: #382010;
+  color: #fffaf6;
+}
+
+.order-page .order-push-dismiss {
+  border: 1px solid rgba(56, 32, 16, 0.18);
+  background: transparent;
+  color: #5c4638;
+}
+
 .order-page .order-card--confirm {
   text-align: center;
 }

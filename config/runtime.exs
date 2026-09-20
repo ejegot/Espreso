@@ -33,7 +33,9 @@ end
 # ESC/POS printer transport.
 # - PRINTER_TRANSPORT=native_client → tablet Capacitor sends to LAN (Fly-safe)
 # - PRINTER_HOST=x.x.x.x → Phoenix TCP on same LAN (shop trial / Mac)
-printer_transport = System.get_env("PRINTER_TRANSPORT") |> to_string() |> String.trim() |> String.downcase()
+printer_transport =
+  System.get_env("PRINTER_TRANSPORT") |> to_string() |> String.trim() |> String.downcase()
+
 printer_host = System.get_env("PRINTER_HOST")
 
 printer_receipt_opts = [
@@ -48,7 +50,8 @@ printer_receipt_opts = [
 
 cond do
   printer_transport in ~w(native_client client) ->
-    config :espreso, Espreso.Printer,
+    config :espreso,
+           Espreso.Printer,
            [
              enabled: true,
              transport: :native_client,
@@ -62,7 +65,8 @@ cond do
       System.get_env("PRINTER_ENABLED") in ~w(true 1) or true
 
     if printer_enabled? do
-      config :espreso, Espreso.Printer,
+      config :espreso,
+             Espreso.Printer,
              [
                enabled: true,
                transport: :lan_server,
@@ -129,8 +133,7 @@ if config_env() == :prod do
     ],
     secret_key_base: secret_key_base
 
-  config :espreso, Espreso.Accounts.Token,
-    signing_secret: secret_key_base
+  config :espreso, Espreso.Accounts.Token, signing_secret: secret_key_base
   #
   # To get SSL working, you will need to add the `https` key
   # to your endpoint configuration:
@@ -189,6 +192,19 @@ if config_env() == :prod and is_binary(paymongo_secret_key) and paymongo_secret_
   config :espreso, :paymongo,
     secret_key: paymongo_secret_key,
     webhook_secret: paymongo_webhook_secret
+end
+
+web_push_public = System.get_env("WEB_PUSH_PUBLIC_KEY")
+web_push_private = System.get_env("WEB_PUSH_PRIVATE_KEY")
+
+if is_binary(web_push_public) and web_push_public != "" and
+     is_binary(web_push_private) and web_push_private != "" do
+  config :espreso, Espreso.CustomerPush,
+    adapter: Espreso.CustomerPush.WebPush,
+    async: true,
+    subject: System.get_env("WEB_PUSH_SUBJECT") || "https://espreso.fly.dev",
+    public_key: web_push_public,
+    private_key: web_push_private
 end
 
 staff_password = System.get_env("STAFF_ORDERS_PASSWORD")

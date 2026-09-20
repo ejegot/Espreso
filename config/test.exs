@@ -55,3 +55,11 @@ config :espreso, Espreso.Loyalty.EarnReconciler, enabled: false
 
 # PubSub board/transaction reloads are immediate in tests unless a case overrides.
 config :espreso, :staff_pubsub_reload_debounce_ms, 0
+
+# Web Push is sync + in-process in tests (assert_received). Keys are dummy.
+config :espreso, Espreso.CustomerPush,
+  adapter: Espreso.CustomerPush.TestAdapter,
+  async: false,
+  subject: "mailto:test@example.com",
+  public_key: "BN7r3dGg_test_public_key_not_used_by_adapter___________",
+  private_key: "test_private_key_not_used_by_adapter"
