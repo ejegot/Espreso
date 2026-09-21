@@ -541,6 +541,7 @@ defmodule EspresoWeb.OrderLiveTest do
     refute has_element?(view, "#order-receipt")
     refute has_element?(view, "#order-order-more")
     refute has_element?(view, "#order-elilai-rewards")
+    assert has_element?(view, "#order-push-prompt", "Get a ping")
 
     view |> element("#order-qrph-code-gcash") |> render_click()
     assert has_element?(view, "#order-qrph-modal")
@@ -562,6 +563,7 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, "#order-status-message", "Preparing your order")
     assert has_element?(view, "#order-progress")
     assert has_element?(view, "#order-receipt .order-payment", "Paid via GCash")
+    assert has_element?(view, "#order-push-prompt", "Get a ping")
   end
 
   test "qrph confirm screen is pay-first until staff confirms", %{conn: conn} do
@@ -620,6 +622,7 @@ defmodule EspresoWeb.OrderLiveTest do
     refute has_element?(view, "#order-confirm-title", "Order confirmed")
     refute has_element?(view, "#order-confirm-recap")
     refute has_element?(view, "#order-confirm-number")
+    assert has_element?(view, "#order-push-prompt", "Get a ping")
 
     assert {:ok, _} = Orders.mark_paid(order, paid_via: "gcash")
     refute has_element?(view, "#order-confirm")
@@ -628,6 +631,7 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, "#order-status-message", "Preparing your order")
     assert has_element?(view, "#order-paid-badge", "Paid ✓")
     assert has_element?(view, "#order-progress")
+    assert has_element?(view, "#order-push-prompt", "Get a ping")
 
     assert has_element?(
              view,

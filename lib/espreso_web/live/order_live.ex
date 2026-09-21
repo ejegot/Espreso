@@ -127,6 +127,13 @@ defmodule EspresoWeb.OrderLive do
       </header>
 
       <main class="order-main">
+        <.order_push_prompt
+          :if={@order}
+          order={@order}
+          vapid_public_key={@push_vapid_public_key}
+          show={show_order_push_prompt?(@order, assigns)}
+        />
+
         <div :if={is_nil(@order)} class="order-card">
           <p class="order-eyebrow">Order</p>
           <h1 class="order-title">Order not found</h1>
@@ -167,12 +174,6 @@ defmodule EspresoWeb.OrderLive do
           <% end %>
 
           <.elilai_rewards :if={not show_qrph_payment?(@order)} order={@order} />
-
-          <.order_push_prompt
-            order={@order}
-            vapid_public_key={@push_vapid_public_key}
-            show={show_order_push_prompt?(@order, assigns)}
-          />
 
           <section
             :if={show_qrph_payment?(@order)}
@@ -305,13 +306,6 @@ defmodule EspresoWeb.OrderLive do
               {customer_status_hint(@order)}
             </p>
           </div>
-
-          <.order_push_prompt
-            :if={not show_qrph_payment?(@order)}
-            order={@order}
-            vapid_public_key={@push_vapid_public_key}
-            show={show_order_push_prompt?(@order, assigns)}
-          />
 
           <.elilai_rewards
             :if={not @complete_return? and not show_qrph_payment?(@order)}
