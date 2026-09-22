@@ -955,6 +955,87 @@ defmodule Espreso.Orders do
     }
   end
 
+  @doc """
+  Paid totals per Asia/Manila shop day for the last `days` days (including today).
+  Used by the owner/manager dashboard bar chart.
+  """
+  def paid_sales_chart(days \\ 7) when is_integer(days) and days > 0 do
+    today = shop_date_today()
+    today_start = shop_day_start_utc()
+    period_start = DateTime.add(today_start, -(days - 1), :day)
+
+    rows =
+      from(o in Order,
+        where:
+          o.payment_status == "paid" and not is_nil(o.settled_at) and
+            o.settled_at >= ^period_start,
+        select: {o.settled_at, o.total}
+      )
+      |> Repo.all()
+
+    grouped =
+      Enum.reduce(rows, %{}, fn {settled_at, total}, acc ->
+        date = shop_date_from_utc(settled_at)
+        {sum, count} = Map.get(acc, date, {Decimal.new("0"), 0})
+        Map.put(acc, date, {Decimal.add(sum, decimalize(total)), count + 1})
+      end)
+
+    dates = for offset <- 0..(days - 1), do: Date.add(today, offset - (days - 1))
+
+    max_amount =
+      dates
+      |> Enum.map(fn date ->
+        {amount, _} = Map.get(grouped, date, {Decimal.new("0"), 0})
+        amount
+      end)
+      |> Enum.reduce(Decimal.new("0"), &Decimal.max/2)
+
+    Enum.map(dates, fn date ->
+      {amount, count} = Map.get(grouped, date, {Decimal.new("0"), 0})
+
+      %{
+        date: date,
+        label: Calendar.strftime(date, "%a"),
+        day_label: Calendar.strftime(date, "%A"),
+        amount: amount,
+        count: count,
+        pct: chart_bar_pct(amount, max_amount)
+      }
+    end)
+  end
+
+  defp shop_date_from_utc(%DateTime{} = datetime) do
+    datetime
+    |> DateTime.add(@shop_utc_offset_seconds, :second)
+    |> DateTime.to_date()
+  end
+
+  defp shop_date_from_utc(%NaiveDateTime{} = datetime) do
+    datetime
+    |> DateTime.from_naive!("Etc/UTC")
+    |> shop_date_from_utc()
+  end
+
+  defp shop_date_from_utc(_), do: shop_date_today()
+
+  defp chart_bar_pct(%Decimal{} = amount, %Decimal{} = max_amount) do
+    cond do
+      Decimal.compare(max_amount, 0) != :gt ->
+        0
+
+      Decimal.compare(amount, 0) != :gt ->
+        0
+
+      true ->
+        amount
+        |> Decimal.div(max_amount)
+        |> Decimal.mult(Decimal.new(100))
+        |> Decimal.round(0)
+        |> Decimal.to_integer()
+        |> max(8)
+    end
+  end
+
   defp decimalize(%Decimal{} = value), do: value
   defp decimalize(value) when is_integer(value), do: Decimal.new(value)
   defp decimalize(value) when is_float(value), do: Decimal.from_float(value)

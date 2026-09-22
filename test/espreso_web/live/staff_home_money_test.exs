@@ -111,6 +111,9 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
     assert has_element?(view, "#dashboard-paid-breakdown", "Payment methods")
     assert has_element?(view, "#dashboard-paid-breakdown", "Maya")
     assert has_element?(view, "#dashboard-paid-breakdown", "₱95")
+    assert has_element?(view, "#dashboard-sales-chart", "Paid sales")
+    assert has_element?(view, "#dashboard-kpi-tickets", "1")
+    assert has_element?(view, "#dashboard-quick-actions", "Sales report")
     refute has_element?(view, "#dashboard-paid-breakdown a", "Close shift")
     refute has_element?(view, "#dashboard-panel-transactions")
   end

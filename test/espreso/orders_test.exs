@@ -1653,6 +1653,13 @@ defmodule Espreso.OrdersTest do
     assert Decimal.equal?(reports.period_paid_total, Decimal.new("0"))
   end
 
+  test "paid_sales_chart returns one bar per Manila shop day" do
+    chart = Orders.paid_sales_chart()
+    assert length(chart) == 7
+    assert Enum.all?(chart, &(&1.pct == 0))
+    assert List.last(chart).date == Orders.shop_date_today()
+  end
+
   test "reports_overview includes paid orders across last 7 Manila shop days only" do
     lines_75 = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
     lines_120 = [%{name: "Americano", size: "12oz", quantity: 1, price: Decimal.new("120")}]
