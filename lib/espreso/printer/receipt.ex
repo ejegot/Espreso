@@ -4,6 +4,7 @@ defmodule Espreso.Printer.Receipt do
   alias Espreso.Orders
   alias Espreso.Orders.Order
   alias Espreso.Printer.EscPos
+  alias Espreso.Shifts
 
   @doc """
   Builds an ESC/POS receipt.
@@ -108,6 +109,95 @@ defmodule Espreso.Printer.Receipt do
           EscPos.cut()
         ]
     )
+  end
+
+  @doc """
+  End-of-day drawer report for the sealed `ShiftClose` snapshot.
+  """
+  def build_day_report(close, opts \\ []) do
+    staff_name = opts |> Keyword.get(:staff_name) |> blank_to_nil()
+    shop_date = close.shop_date
+
+    date_label =
+      if match?(%Date{}, shop_date), do: Calendar.strftime(shop_date, "%b %-d, %Y"), else: ""
+
+    variance = close.variance
+    variance_label = variance_label(variance)
+
+    EscPos.join(
+      [
+        EscPos.init(),
+        EscPos.align_center(),
+        EscPos.bold_on(),
+        EscPos.size_double_height(),
+        EscPos.text_line(shop_name()),
+        EscPos.size_normal(),
+        EscPos.text_line("DAY REPORT"),
+        EscPos.bold_off(),
+        EscPos.text_line(date_label),
+        EscPos.feed(1),
+        EscPos.align_left(),
+        EscPos.separator(),
+        EscPos.columns("Opening cash", money(close.opening_cash)),
+        EscPos.columns("Cash sales", money(cash_sales_from_close(close))),
+        EscPos.columns("Expected", money(close.expected_cash)),
+        EscPos.columns("Counted", money(close.counted_cash)),
+        EscPos.bold_on(),
+        EscPos.columns(variance_label, money(variance)),
+        EscPos.bold_off(),
+        EscPos.separator(),
+        EscPos.columns("System paid", money(close.system_total)),
+        EscPos.text_line("#{close.system_count || 0} orders")
+      ] ++
+        day_report_via_lines(close) ++
+        [
+          EscPos.separator(),
+          EscPos.text_line(if(staff_name, do: "Closed by #{staff_name}", else: "Closed")),
+          EscPos.text_line(Shifts.format_closed_at(close.closed_at)),
+          EscPos.feed(2),
+          EscPos.cut()
+        ]
+    )
+  end
+
+  defp cash_sales_from_close(close), do: Shifts.cash_sales_total(close)
+
+  defp variance_label(%Decimal{} = variance) do
+    case Decimal.compare(variance, 0) do
+      :gt -> "Over"
+      :lt -> "Short"
+      :eq -> "Even"
+    end
+  end
+
+  defp variance_label(_), do: "Variance"
+
+  defp day_report_via_lines(%{by_via: by_via}) when is_map(by_via) do
+    Enum.flat_map(~w(cash gcash maya), fn via ->
+      entry = Map.get(by_via, via, %{})
+      total = Map.get(entry, "total") || Map.get(entry, :total)
+
+      if is_nil(total) or decimal_zero?(total) do
+        []
+      else
+        [EscPos.columns(Orders.paid_via_label(via), money(total))]
+      end
+    end)
+  end
+
+  defp day_report_via_lines(_), do: []
+
+  defp decimal_zero?(value) do
+    case value do
+      %Decimal{} = d ->
+        Decimal.compare(d, 0) == :eq
+
+      other ->
+        case Decimal.parse(to_string(other)) do
+          {d, _} -> Decimal.compare(d, 0) == :eq
+          :error -> true
+        end
+    end
   end
 
   defp payment_lines(order, paid_via, opts) do

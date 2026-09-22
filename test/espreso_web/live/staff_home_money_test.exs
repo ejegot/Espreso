@@ -44,6 +44,7 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
     assert has_element?(manager_view, ".staff-home-desk-stage--split")
     assert has_element?(manager_view, "#staff-home-paid-breakdown", "Cash")
     assert has_element?(manager_view, "#staff-home-paid-breakdown", "₱75")
+    assert has_element?(manager_view, "#staff-home-shop-open", "Opening cash not recorded")
     refute has_element?(manager_view, "#staff-home-close")
     refute has_element?(manager_view, "#staff-home-today-barista")
 
@@ -67,6 +68,7 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
 
     {:ok, closed_view, _html} = live(manager_conn, ~p"/staff")
     assert has_element?(closed_view, "#staff-home-shift-closed", "Closed")
+    refute has_element?(closed_view, "#staff-home-shop-open")
     refute has_element?(closed_view, "#staff-home-close")
   end
 

@@ -10,6 +10,9 @@ defmodule Espreso.Shifts.ShiftClose do
     field :system_count, :integer
     field :by_via, :map, default: %{}
     field :counted_cash, :decimal
+    field :opening_cash, :decimal
+    field :expected_cash, :decimal
+    field :variance, :decimal
     field :notes, :string
     field :closed_at, :utc_datetime
 
@@ -26,6 +29,9 @@ defmodule Espreso.Shifts.ShiftClose do
       :system_count,
       :by_via,
       :counted_cash,
+      :opening_cash,
+      :expected_cash,
+      :variance,
       :notes,
       :closed_by_user_id,
       :closed_at
@@ -42,5 +48,6 @@ defmodule Espreso.Shifts.ShiftClose do
     |> validate_length(:notes, max: 500)
     |> unique_constraint(:shop_date)
     |> foreign_key_constraint(:closed_by_user_id)
+    |> validate_number(:counted_cash, greater_than_or_equal_to: 0)
   end
 end

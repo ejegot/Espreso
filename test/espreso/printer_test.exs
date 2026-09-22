@@ -104,6 +104,33 @@ defmodule Espreso.PrinterTest do
     refute receipt =~ "?"
   end
 
+  test "day report prints drawer expected counted and variance" do
+    close = %Espreso.Shifts.ShiftClose{
+      shop_date: ~D[2026-09-22],
+      system_total: Decimal.new("215"),
+      system_count: 2,
+      counted_cash: Decimal.new("80"),
+      opening_cash: Decimal.new("500"),
+      expected_cash: Decimal.new("575"),
+      variance: Decimal.new("-495"),
+      closed_at: ~U[2026-09-22 10:00:00Z],
+      by_via: %{"cash" => %{"total" => "75", "count" => 1}}
+    }
+
+    report = Receipt.build_day_report(close, staff_name: "Ana")
+
+    assert report =~ "DAY REPORT"
+    assert report =~ "Opening cash"
+    assert report =~ "P500.00"
+    assert report =~ "Expected"
+    assert report =~ "P575.00"
+    assert report =~ "Counted"
+    assert report =~ "P80.00"
+    assert report =~ "Short"
+    assert report =~ "Closed by Ana"
+    refute report =~ "₱"
+  end
+
   test "receipt prints cash and wallet split lines" do
     order = %Order{
       number: "CS-SPLIT1",

@@ -176,6 +176,10 @@ defmodule Espreso.Printer do
     dispatch_payload(test_print_bytes(), "test print")
   end
 
+  def dispatch_day_report(close, opts \\ []) do
+    dispatch_payload(Receipt.build_day_report(close, opts), "day report")
+  end
+
   def cash_like?("cash"), do: true
   def cash_like?("counter"), do: true
   def cash_like?(_), do: false

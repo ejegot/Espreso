@@ -6,6 +6,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
   alias Espreso.CashOuts
   alias Espreso.Menu
   alias Espreso.Orders
+  alias Espreso.Printer
   alias Espreso.Shifts
   alias Espreso.StaffShifts
 
@@ -41,12 +42,23 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     if socket.assigns.blocked? do
       {:noreply, socket}
     else
-      {:noreply,
-       socket
-       |> assign(:counted_cash, Map.get(params, "counted_cash", ""))
-       |> assign(:notes, Map.get(params, "notes", ""))
-       |> assign(:confirming?, true)
-       |> assign(:form_error, nil)}
+      counted = Map.get(params, "counted_cash", "") |> to_string() |> String.trim()
+
+      if counted == "" do
+        {:noreply,
+         socket
+         |> assign(:counted_cash, counted)
+         |> assign(:notes, Map.get(params, "notes", ""))
+         |> assign(:confirming?, false)
+         |> assign(:form_error, "Enter the actual cash in the drawer.")}
+      else
+        {:noreply,
+         socket
+         |> assign(:counted_cash, counted)
+         |> assign(:notes, Map.get(params, "notes", ""))
+         |> assign(:confirming?, true)
+         |> assign(:form_error, nil)}
+      end
     end
   end
 
@@ -109,6 +121,12 @@ defmodule EspresoWeb.StaffShiftCloseLive do
            |> put_flash(:error, "You don’t have access to close shift.")
            |> push_navigate(to: ~p"/staff")}
 
+        {:error, :counted_cash_required} ->
+          {:noreply,
+           socket
+           |> assign(:confirming?, false)
+           |> assign(:form_error, "Enter the actual cash in the drawer.")}
+
         {:error, %Ecto.Changeset{} = changeset} ->
           {:noreply,
            socket
@@ -122,12 +140,73 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     {:noreply, append_close_history(socket)}
   end
 
+  def handle_event("print_day_report", params, socket) do
+    close = printable_close(socket, params)
+
+    if is_nil(close) do
+      {:noreply, assign(socket, :printer_note, "No sealed close to print.")}
+    else
+      staff_name = socket.assigns.current_user.name
+
+      case Printer.dispatch_day_report(close, staff_name: staff_name) do
+        {:client_dispatch, bytes} ->
+          {:noreply,
+           socket
+           |> assign(:printer_note, "Sending day report…")
+           |> push_event("elilai-printer", %{
+             action: "raw_test",
+             permit: "raw",
+             request_id: Integer.to_string(System.unique_integer([:positive])),
+             data_base64: Printer.encode_payload(bytes),
+             order_id: 0,
+             flow: "day_report"
+           })}
+
+        :dispatched ->
+          {:noreply, assign(socket, :printer_note, "Day report sent to printer.")}
+
+        :disabled ->
+          {:noreply, assign(socket, :printer_note, "Printer is disabled.")}
+
+        {:definite_failure, reason} ->
+          {:noreply, assign(socket, :printer_note, "Print failed (#{inspect(reason)}).")}
+
+        {:uncertain, reason} ->
+          {:noreply,
+           assign(socket, :printer_note, "Print outcome uncertain (#{inspect(reason)}).")}
+
+        other ->
+          {:noreply, assign(socket, :printer_note, "Print failed (#{inspect(other)}).")}
+      end
+    end
+  end
+
+  def handle_event(
+        "elilai_printer_result",
+        %{"flow" => "day_report", "ok" => ok} = params,
+        socket
+      ) do
+    ok? = ok in [true, "true"]
+
+    note =
+      if ok?,
+        do: "Day report printed.",
+        else: "Print failed (#{Map.get(params, "error") || "failed"})."
+
+    {:noreply, assign(socket, :printer_note, note)}
+  end
+
+  def handle_event("elilai_printer_result", _params, socket), do: {:noreply, socket}
+
   @impl true
   def render(assigns) do
     shop_date = close_shop_date(assigns)
     cash_total = open_cash_total(assigns)
     snapshot_rows = closed_via_rows(assigns[:close])
     snapshot_cash = snapshot_cash_total(assigns[:close])
+    opening_cash = assigns[:opening_cash_amount]
+    expected_cash = assigns[:expected_cash]
+    live_variance = live_variance(assigns[:counted_cash], expected_cash)
 
     assigns =
       assigns
@@ -135,6 +214,9 @@ defmodule EspresoWeb.StaffShiftCloseLive do
       |> assign(:cash_total, cash_total)
       |> assign(:snapshot_rows, snapshot_rows)
       |> assign(:snapshot_cash, snapshot_cash)
+      |> assign(:opening_cash, opening_cash)
+      |> assign(:expected_cash, expected_cash)
+      |> assign(:live_variance, live_variance)
 
     ~H"""
     <.staff_shell current={:close} current_user={@current_user} page_title="Close shift" chrome={:bar}>
@@ -239,14 +321,28 @@ defmodule EspresoWeb.StaffShiftCloseLive do
               </p>
             </section>
 
-            <div class="staff-shift-close-counted-display" id="staff-shift-close-sealed-counted">
-              <p class="staff-shift-close-section-label">Counted drawer cash</p>
-              <%= if @close.counted_cash do %>
-                <p class="staff-shift-close-cash-value">{Menu.format_price(@close.counted_cash)}</p>
-              <% else %>
-                <p class="staff-shift-close-section-hint">No drawer cash count was entered.</p>
-              <% end %>
+            <div class="staff-shift-close-counted-display" id="staff-shift-close-sealed-drawer">
+              <p class="staff-shift-close-section-label">Drawer</p>
+              <p class="staff-shift-close-section-hint">
+                Opening {drawer_money(@close.opening_cash)} · expected {drawer_money(
+                  @close.expected_cash
+                )}
+              </p>
+              <p class="staff-shift-close-cash-value" id="staff-shift-close-sealed-counted">
+                {drawer_money(@close.counted_cash)}
+              </p>
+              <p class="staff-shift-close-section-hint" id="staff-shift-close-sealed-variance">
+                {variance_copy(@close.variance)}
+              </p>
             </div>
+
+            <p
+              :if={@printer_note}
+              class="staff-shift-close-section-hint"
+              id="staff-shift-close-print-note"
+            >
+              {@printer_note}
+            </p>
 
             <section class="staff-shift-close-panel staff-shift-close-panel--secondary">
               <p class="staff-shift-close-section-label">Payment methods</p>
@@ -279,6 +375,15 @@ defmodule EspresoWeb.StaffShiftCloseLive do
             </p>
 
             <div class="staff-shift-close-nav">
+              <button
+                :if={Printer.enabled?()}
+                type="button"
+                class="staff-shift-close-submit"
+                id="staff-shift-close-print"
+                phx-click="print_day_report"
+              >
+                Print day report
+              </button>
               <.link
                 :if={@staff_shift_ended?}
                 href={~p"/logout"}
@@ -371,6 +476,26 @@ defmodule EspresoWeb.StaffShiftCloseLive do
               </p>
             </section>
 
+            <section
+              :if={!@blocked?}
+              class="staff-shift-close-cash"
+              id="staff-shift-close-drawer"
+              aria-label="Drawer expected"
+            >
+              <p class="staff-shift-close-section-label">Expected drawer</p>
+              <p class="staff-shift-close-cash-value">{Menu.format_price(@expected_cash)}</p>
+              <p
+                :if={@missing_opening?}
+                class="staff-shift-close-section-hint"
+                id="staff-shift-close-opening-gap"
+              >
+                Opening cash was not recorded. Expected uses ₱0 opening.
+              </p>
+              <p :if={!@missing_opening?} class="staff-shift-close-section-hint">
+                Opening {Menu.format_price(@opening_cash)} + cash sales − cash outs.
+              </p>
+            </section>
+
             <form
               :if={!@blocked?}
               id="staff-shift-close-form"
@@ -393,7 +518,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
                   />
                 </div>
                 <span class="staff-shift-close-section-hint" id="staff-shift-close-counted-hint">
-                  Optional — enter the cash physically counted at close.
+                  Required — actual cash in the drawer at close.
                 </span>
               </label>
 
@@ -509,8 +634,21 @@ defmodule EspresoWeb.StaffShiftCloseLive do
               </ul>
 
               <p :if={entry.close.counted_cash} class="staff-shift-close-history-counted">
-                Counted cash · {Menu.format_price(entry.close.counted_cash)}
+                Counted {Menu.format_price(entry.close.counted_cash)}
+                <span :if={entry.close.variance}>
+                  · {variance_copy(entry.close.variance)}
+                </span>
               </p>
+              <button
+                :if={Printer.enabled?()}
+                type="button"
+                class="staff-shift-close-history-more"
+                id={"staff-shift-close-print-#{Date.to_iso8601(entry.close.shop_date)}"}
+                phx-click="print_day_report"
+                phx-value-date={Date.to_iso8601(entry.close.shop_date)}
+              >
+                Print
+              </button>
               <p :if={entry.close.notes} class="staff-shift-close-history-notes">
                 {entry.close.notes}
               </p>
@@ -545,11 +683,9 @@ defmodule EspresoWeb.StaffShiftCloseLive do
               </span>
             </p>
             <p class="staff-confirm-dialog-meta" id="staff-shift-close-confirm-cash">
-              <%= if String.trim(@counted_cash || "") == "" do %>
-                No drawer cash count entered.
-              <% else %>
-                Counted drawer cash · ₱{@counted_cash}
-              <% end %>
+              Counted drawer cash · ₱{@counted_cash} · expected {Menu.format_price(@expected_cash)} · {variance_copy(
+                @live_variance
+              )}
             </p>
             <div class="staff-confirm-dialog-actions">
               <button
@@ -611,6 +747,11 @@ defmodule EspresoWeb.StaffShiftCloseLive do
           end
       end
 
+    shop_open = Shifts.get_open_for_date(shop_date)
+    opening_cash_amount = shop_open && shop_open.opening_cash
+    cash_sales = Shifts.cash_sales_total(breakdown)
+    expected_cash = Shifts.expected_drawer_cash(opening_cash_amount, cash_sales, cash_out_total)
+
     socket
     |> assign(:page_title, "Close shift")
     |> assign(:breakdown, breakdown)
@@ -623,6 +764,11 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     |> assign(:staff_shift_ended?, staff_shift_ended?)
     |> assign(:cash_outs, cash_outs)
     |> assign(:cash_out_total, cash_out_total)
+    |> assign(:shop_open, shop_open)
+    |> assign(:opening_cash_amount, opening_cash_amount)
+    |> assign(:expected_cash, expected_cash)
+    |> assign(:missing_opening?, is_nil(shop_open))
+    |> assign(:printer_note, nil)
     |> assign(:counted_cash, "")
     |> assign(:notes, "")
     |> assign(:confirming?, false)
@@ -753,4 +899,44 @@ defmodule EspresoWeb.StaffShiftCloseLive do
   end
 
   defp snapshot_entry_count(_), do: 0
+
+  defp printable_close(socket, params) do
+    case Map.get(params, "date") do
+      date when is_binary(date) and date != "" ->
+        case Date.from_iso8601(date) do
+          {:ok, shop_date} -> Shifts.get_close_for_date(shop_date)
+          _ -> nil
+        end
+
+      _ ->
+        socket.assigns[:close]
+    end
+  end
+
+  defp live_variance(counted_cash, expected_cash) do
+    counted = counted_cash |> to_string() |> String.trim()
+
+    if counted == "" do
+      nil
+    else
+      Shifts.drawer_variance(counted, expected_cash)
+    end
+  end
+
+  defp variance_copy(nil), do: "Enter counted cash to see over/short."
+
+  defp variance_copy(%Decimal{} = variance) do
+    abs = Decimal.abs(variance)
+
+    case Decimal.compare(variance, 0) do
+      :eq -> "Even with expected"
+      :gt -> "Over #{Menu.format_price(abs)}"
+      :lt -> "Short #{Menu.format_price(abs)}"
+    end
+  end
+
+  defp variance_copy(_), do: "Enter counted cash to see over/short."
+
+  defp drawer_money(nil), do: "—"
+  defp drawer_money(amount), do: Menu.format_price(amount)
 end

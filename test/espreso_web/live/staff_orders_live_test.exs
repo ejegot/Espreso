@@ -349,6 +349,83 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
            }
   end
 
+  test "Orders split payment continues to cash due then stores cash plus GCash", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Split Guest", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    view |> element("#ticket-new-paid-via-split-#{order.id}") |> render_click()
+
+    assert has_element?(view, "#split-pay-modal")
+    refute has_element?(view, "#orders-cash-tender-modal")
+
+    view |> element("#orders-split-cash") |> render_keyup(%{"value" => "25"})
+    view |> element("#orders-confirm-split") |> render_click()
+
+    refute has_element?(view, "#split-pay-modal")
+    assert has_element?(view, "#orders-cash-tender-modal", "Cash due")
+    assert has_element?(view, "#orders-cash-total", "₱25")
+    assert has_element?(view, "#orders-split-cash-summary", "GCash")
+    assert has_element?(view, "#orders-back-split", "Back")
+
+    confirm_cash_exact(view)
+
+    refute has_element?(view, "#orders-cash-tender-modal")
+    refute has_element?(view, "#split-pay-modal")
+
+    paid = Orders.get_order_by_number!(order.number) |> Repo.preload(:payment_splits)
+    assert paid.payment_status == "paid"
+    assert paid.paid_via == "cash"
+    assert Orders.split_payment_label(paid) == "Cash + GCash"
+
+    amounts =
+      paid.payment_splits
+      |> Enum.map(&{&1.paid_via, Decimal.to_string(&1.amount, :normal)})
+      |> Enum.sort()
+
+    assert amounts == [{"cash", "25.00"}, {"gcash", "50.00"}]
+    assert Decimal.equal?(paid.cash_tendered, Decimal.new("25.00"))
+  end
+
+  test "Orders split cash Back restores amounts and Cancel clears pending splits", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Split Back", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    view |> element("#ticket-new-paid-via-split-#{order.id}") |> render_click()
+    view |> element("#orders-split-wallet-maya") |> render_click()
+    view |> element("#orders-split-cash") |> render_keyup(%{"value" => "30"})
+    view |> element("#orders-confirm-split") |> render_click()
+
+    view |> element("#orders-back-split") |> render_click()
+
+    refute has_element?(view, "#orders-cash-tender-modal")
+    assert has_element?(view, "#split-pay-modal")
+    assert has_element?(view, "#orders-split-cash") 
+    assert live_assigns(view).split_cash == "30"
+    assert live_assigns(view).split_wallet == "maya"
+
+    view |> element("#orders-confirm-split") |> render_click()
+    view |> element("#orders-cancel-cash") |> render_click()
+
+    refute has_element?(view, "#split-pay-modal")
+    refute has_element?(view, "#orders-cash-tender-modal")
+    assert live_assigns(view).pending_splits == nil
+    assert live_assigns(view).pending_split_order_id == nil
+
+    view |> element("#ticket-new-paid-via-gcash-#{order.id}") |> render_click()
+
+    paid = Orders.get_order_by_number!(order.number) |> Repo.preload(:payment_splits)
+    assert paid.paid_via == "gcash"
+    assert paid.payment_splits == []
+  end
+
   test "stale Cash modal rejects an order paid elsewhere and repeated confirmation is inert", %{
     conn: conn
   } do

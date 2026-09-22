@@ -29,13 +29,13 @@ defmodule Espreso.ShiftsConcurrencyTest do
     task_a =
       Task.async(fn ->
         Ecto.Adapters.SQL.Sandbox.allow(Espreso.Repo, parent, self())
-        Shifts.record_close(barista, %{notes: "barista"})
+        Shifts.record_close(barista, %{counted_cash: "10", notes: "barista"})
       end)
 
     task_m =
       Task.async(fn ->
         Ecto.Adapters.SQL.Sandbox.allow(Espreso.Repo, parent, self())
-        Shifts.record_close(manager, %{notes: "manager"})
+        Shifts.record_close(manager, %{counted_cash: "10", notes: "manager"})
       end)
 
     results = [Task.await(task_a, 5_000), Task.await(task_m, 5_000)]

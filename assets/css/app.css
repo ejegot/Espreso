@@ -4275,6 +4275,46 @@ body:has(.menu-page-locked) {
   padding: 0.15rem 0.1rem 0;
 }
 
+.staff-home-shop-open {
+  display: grid;
+  gap: 0.28rem;
+  margin: 0.15rem 0 0.45rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--cs-orange, #f85020) 28%, transparent);
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--cs-orange, #f85020) 7%, #fff);
+}
+
+.staff-home-shop-open-title {
+  margin: 0;
+  color: var(--cs-brown, #382010);
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.staff-home-shop-open-body {
+  margin: 0;
+  color: color-mix(in srgb, var(--cs-brown, #382010) 62%, var(--cs-beige, #b0a098));
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.staff-home-shop-open-action {
+  justify-self: start;
+  margin-top: 0.15rem;
+  color: var(--cs-orange, #f85020);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.staff-home-shop-open-action:hover,
+.staff-home-shop-open-action:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+
 .staff-home-greeting {
   margin: 0;
   color: var(--elilai-cacao, #2e3529);
@@ -7372,10 +7412,8 @@ a.staff-home-card:focus-visible {
   line-height: 1.35;
 }
 
-.staff-pos-page.staff-pos-page--cafe .staff-pos-split {
-  display: grid;
-  gap: 0.45rem;
-  margin: 0 0 0.55rem;
+.staff-pos-page.staff-pos-page--cafe .staff-pos-split-modal .staff-pos-split {
+  margin: 0.35rem 0 0.75rem;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-split-hint {
@@ -9693,6 +9731,22 @@ a.staff-home-card:focus-visible {
 
 .staff-pos-order-review-temp.is-iced {
   color: #0e7490;
+}
+
+.staff-pos-order-review-splits {
+  display: grid;
+  gap: 0.28rem;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.staff-pos-order-review-splits li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .staff-pos-order-review-total {

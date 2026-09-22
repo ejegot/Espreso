@@ -50,7 +50,9 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     assert has_element?(view, "#staff-shift-close-cash", "Cash settled")
     assert has_element?(view, "#staff-shift-close-cash", "₱75")
     assert has_element?(view, "#staff-shift-close-counted-field", "Counted drawer cash")
-    assert has_element?(view, "#staff-shift-close-counted-hint", "Optional")
+    assert has_element?(view, "#staff-shift-close-drawer", "Expected drawer")
+    assert has_element?(view, "#staff-shift-close-opening-gap")
+    assert has_element?(view, "#staff-shift-close-counted-hint", "Required")
     assert has_element?(view, "#staff-shift-close-breakdown", "GCash")
     assert has_element?(view, "#staff-shift-close-breakdown", "₱140")
     assert has_element?(view, "#staff-shift-close-system", "System paid")
@@ -65,6 +67,8 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
 
     assert has_element?(view, "#staff-shift-close-confirm", "Record today’s close?")
     assert has_element?(view, "#staff-shift-close-confirm-cash", "Counted drawer cash · ₱80")
+    assert has_element?(view, "#staff-shift-close-confirm-cash", "expected ₱75")
+    assert has_element?(view, "#staff-shift-close-confirm-cash", "Over ₱5")
     assert has_element?(view, "#staff-shift-close-submit", "Confirm seal")
     refute has_element?(view, "#staff-shift-close-confirm-container[phx-click-away]")
     assert has_element?(view, ~s(#staff-shift-close-confirm-container[phx-key="escape"]))
@@ -83,7 +87,9 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     assert has_element?(view, "#staff-shift-close-sealed-breakdown", "GCash")
     assert has_element?(view, "#staff-shift-close-sealed-breakdown", "₱140")
     assert has_element?(view, "#staff-shift-close-sealed-cash", "₱75")
+    assert has_element?(view, "#staff-shift-close-sealed-drawer", "expected ₱75")
     assert has_element?(view, "#staff-shift-close-sealed-counted", "₱80")
+    assert has_element?(view, "#staff-shift-close-sealed-variance", "Over ₱5")
     assert has_element?(view, "#staff-shift-close-sealed-notes", "Balanced")
     assert has_element?(view, "#staff-shift-close-done a[href='/staff']", "Back to Home")
     assert has_element?(view, "#staff-shift-close-done a[href='/dashboard']", "Back to Dashboard")
@@ -104,6 +110,8 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     assert Decimal.equal?(close.system_total, Decimal.new("215"))
     assert close.system_count == 2
     assert Decimal.equal?(close.counted_cash, Decimal.new("80"))
+    assert Decimal.equal?(close.expected_cash, Decimal.new("75"))
+    assert Decimal.equal?(close.variance, Decimal.new("5"))
     assert StaffShifts.list_shifts_for_user(manager.id) == []
   end
 
@@ -152,14 +160,15 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     refute has_element?(view, "#staff-shift-close-form")
   end
 
-  test "prepare close with blank counted cash states no drawer count", %{conn: conn} do
+  test "prepare close with blank counted cash requires a count", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/staff/close")
 
     view
     |> form("#staff-shift-close-form", %{close: %{counted_cash: "", notes: ""}})
     |> render_submit()
 
-    assert has_element?(view, "#staff-shift-close-confirm-cash", "No drawer cash count entered.")
+    refute has_element?(view, "#staff-shift-close-confirm")
+    assert has_element?(view, "#staff-shift-close-error", "Enter the actual cash in the drawer.")
   end
 
   test "last-active barista can access and complete close with Time Out", %{conn: conn} do

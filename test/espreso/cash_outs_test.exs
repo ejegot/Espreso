@@ -124,7 +124,7 @@ defmodule Espreso.CashOutsTest do
     end
 
     test "blocked after shop day is sealed", %{manager: manager} do
-      assert {:ok, _} = Shifts.record_close(manager, %{})
+      assert {:ok, _} = Shifts.record_close(manager, %{counted_cash: "50"})
 
       assert {:error, :shop_day_closed} =
                CashOuts.create_cash_out(manager, %{amount: "50", category: "Other"})
@@ -219,7 +219,7 @@ defmodule Espreso.CashOutsTest do
       assert {:ok, cash_out} =
                CashOuts.create_cash_out(manager, %{amount: "75", category: "Cleaning"})
 
-      assert {:ok, _} = Shifts.record_close(manager, %{})
+      assert {:ok, _} = Shifts.record_close(manager, %{counted_cash: "50"})
 
       assert {:error, :shop_day_closed} =
                CashOuts.void_cash_out(cash_out, manager, "Too late")

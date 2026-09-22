@@ -278,6 +278,14 @@ defmodule EspresoWeb.StaffComponents do
         show?: Espreso.CashOuts.can_access?(user)
       },
       %{
+        key: :open_shop,
+        label: "Open shop",
+        icon: "hero-lock-open",
+        path: ~p"/staff/open",
+        group: :shift,
+        show?: Espreso.Shifts.can_access_open?(user)
+      },
+      %{
         key: :close,
         label: "Close shift",
         icon: "hero-lock-closed",

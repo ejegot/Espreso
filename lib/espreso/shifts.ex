@@ -14,8 +14,10 @@ defmodule Espreso.Shifts do
 
   alias Espreso.Accounts.Authorization
   alias Espreso.Accounts.User
+  alias Espreso.CashOuts
   alias Espreso.Orders
   alias Espreso.Repo
+  alias Espreso.Shifts.ShopDayOpen
   alias Espreso.Shifts.ShiftClose
   alias Espreso.StaffShifts
   alias Espreso.StaffShifts.StaffShift
@@ -117,6 +119,118 @@ defmodule Espreso.Shifts do
 
   def can_access_close?(_), do: false
 
+  def can_access_open?(user), do: can_access_close?(user)
+
+  @doc """
+  Today's shop-day opening cash, if recorded.
+  """
+  def get_todays_open do
+    get_open_for_date(Orders.shop_date_today())
+  end
+
+  def get_open_for_date(%Date{} = shop_date) do
+    ShopDayOpen
+    |> where([o], o.shop_date == ^shop_date)
+    |> preload(:opened_by_user)
+    |> Repo.one()
+  end
+
+  @doc """
+  Records opening drawer cash for today's shop date.
+
+  One open per shop day. Blocked after the day is already sealed.
+  Barista, manager, and owner may record it (attendance Time In is separate).
+  """
+  def record_open(%User{} = user, attrs \\ %{}) do
+    if can_access_open?(user) do
+      do_record_open(user, attrs)
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  defp do_record_open(%User{} = user, attrs) do
+    shop_date = Orders.shop_date_today()
+    opened_at = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    opening_cash =
+      parse_required_decimal(Map.get(attrs, :opening_cash) || Map.get(attrs, "opening_cash"))
+
+    notes = normalize_notes(Map.get(attrs, :notes) || Map.get(attrs, "notes"))
+
+    if is_nil(opening_cash) do
+      {:error, :opening_cash_required}
+    else
+      result =
+        Repo.transaction(fn ->
+          lock_shop_open!(shop_date)
+
+          if get_close_for_date(shop_date) do
+            Repo.rollback(:already_closed)
+          end
+
+          if get_open_for_date(shop_date) do
+            Repo.rollback(:already_open)
+          end
+
+          %ShopDayOpen{}
+          |> ShopDayOpen.changeset(%{
+            shop_date: shop_date,
+            opening_cash: opening_cash,
+            opened_at: opened_at,
+            opened_by_user_id: user.id,
+            notes: notes
+          })
+          |> Repo.insert()
+          |> case do
+            {:ok, open} ->
+              Repo.preload(open, :opened_by_user)
+
+            {:error, %Ecto.Changeset{errors: errors} = changeset} ->
+              if Keyword.has_key?(errors, :shop_date) do
+                Repo.rollback(:already_open)
+              else
+                Repo.rollback(changeset)
+              end
+          end
+        end)
+
+      case result do
+        {:ok, %ShopDayOpen{} = open} -> {:ok, open}
+        {:error, :already_open} -> {:error, :already_open}
+        {:error, :already_closed} -> {:error, :already_closed}
+        {:error, %Ecto.Changeset{} = changeset} -> {:error, changeset}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  @doc """
+  Expected drawer cash: opening + cash sales − cash outs.
+
+  Missing opening cash is treated as ₱0 so close still works, with a visible gap.
+  """
+  def expected_drawer_cash(opening_cash, cash_sales, cash_out_total) do
+    Decimal.sub(
+      Decimal.add(decimalize_money(opening_cash), decimalize_money(cash_sales)),
+      decimalize_money(cash_out_total)
+    )
+    |> Decimal.round(2)
+  end
+
+  def drawer_variance(counted_cash, expected_cash) do
+    Decimal.sub(decimalize_money(counted_cash), decimalize_money(expected_cash))
+    |> Decimal.round(2)
+  end
+
+  def cash_sales_total(%{by_via: by_via}) when is_map(by_via) do
+    entry = Map.get(by_via, "cash") || Map.get(by_via, :cash) || %{}
+    total = Map.get(entry, :total) || Map.get(entry, "total") || Decimal.new("0")
+    decimalize_money(total)
+  end
+
+  def cash_sales_total(_), do: Decimal.new("0")
+
   @doc """
   LiveView eligibility for an open (not yet sealed) shop day.
 
@@ -166,72 +280,92 @@ defmodule Espreso.Shifts do
     closed_at = DateTime.utc_now() |> DateTime.truncate(:second)
 
     counted_cash =
-      parse_optional_decimal(Map.get(attrs, :counted_cash) || Map.get(attrs, "counted_cash"))
+      parse_required_decimal(Map.get(attrs, :counted_cash) || Map.get(attrs, "counted_cash"))
 
     notes = normalize_notes(Map.get(attrs, :notes) || Map.get(attrs, "notes"))
 
-    result =
-      Repo.transaction(fn ->
-        lock_shop_close!(shop_date)
+    if is_nil(counted_cash) do
+      {:error, :counted_cash_required}
+    else
+      result =
+        Repo.transaction(fn ->
+          lock_shop_close!(shop_date)
 
-        case get_close_for_date(shop_date) do
-          %ShiftClose{} ->
-            Repo.rollback(:already_closed)
+          case get_close_for_date(shop_date) do
+            %ShiftClose{} ->
+              Repo.rollback(:already_closed)
 
-          nil ->
-            :ok
-        end
-
-        if mode == :barista do
-          StaffShifts.assert_last_active_closer!(user)
-        end
-
-        close =
-          %ShiftClose{}
-          |> ShiftClose.changeset(%{
-            shop_date: shop_date,
-            system_total: breakdown.total,
-            system_count: breakdown.count,
-            by_via: serialize_by_via(breakdown.by_via),
-            counted_cash: counted_cash,
-            notes: notes,
-            closed_by_user_id: user.id,
-            closed_at: closed_at
-          })
-          |> Repo.insert()
-          |> case do
-            {:ok, close} ->
-              close
-
-            {:error, %Ecto.Changeset{errors: errors} = changeset} ->
-              if Keyword.has_key?(errors, :shop_date) do
-                Repo.rollback(:already_closed)
-              else
-                Repo.rollback(changeset)
-              end
-          end
-
-        if mode == :barista do
-          case StaffShifts.do_close_open_shift!(user.id, closed_at, "shift_close") do
-            %StaffShift{} ->
+            nil ->
               :ok
-
-            :none ->
-              Repo.rollback(:not_on_shift)
           end
-        end
 
-        Repo.preload(close, :closed_by_user)
-      end)
+          if mode == :barista do
+            StaffShifts.assert_last_active_closer!(user)
+          end
 
-    case result do
-      {:ok, %ShiftClose{} = close} -> {:ok, close}
-      {:error, :already_closed} -> {:error, :already_closed}
-      {:error, :other_staff_active} -> {:error, :other_staff_active}
-      {:error, :not_on_shift} -> {:error, :not_on_shift}
-      {:error, %Ecto.Changeset{} = changeset} -> {:error, changeset}
-      {:error, reason} -> {:error, reason}
+          opening = get_open_for_date(shop_date)
+          opening_cash = opening && opening.opening_cash
+          cash_sales = cash_sales_total(breakdown)
+          cash_out_total = CashOuts.total_for_shop_date(shop_date)
+          expected_cash = expected_drawer_cash(opening_cash, cash_sales, cash_out_total)
+          variance = drawer_variance(counted_cash, expected_cash)
+
+          close =
+            %ShiftClose{}
+            |> ShiftClose.changeset(%{
+              shop_date: shop_date,
+              system_total: breakdown.total,
+              system_count: breakdown.count,
+              by_via: serialize_by_via(breakdown.by_via),
+              counted_cash: counted_cash,
+              opening_cash: opening_cash,
+              expected_cash: expected_cash,
+              variance: variance,
+              notes: notes,
+              closed_by_user_id: user.id,
+              closed_at: closed_at
+            })
+            |> Repo.insert()
+            |> case do
+              {:ok, close} ->
+                close
+
+              {:error, %Ecto.Changeset{errors: errors} = changeset} ->
+                if Keyword.has_key?(errors, :shop_date) do
+                  Repo.rollback(:already_closed)
+                else
+                  Repo.rollback(changeset)
+                end
+            end
+
+          if mode == :barista do
+            case StaffShifts.do_close_open_shift!(user.id, closed_at, "shift_close") do
+              %StaffShift{} ->
+                :ok
+
+              :none ->
+                Repo.rollback(:not_on_shift)
+            end
+          end
+
+          Repo.preload(close, :closed_by_user)
+        end)
+
+      case result do
+        {:ok, %ShiftClose{} = close} -> {:ok, close}
+        {:error, :already_closed} -> {:error, :already_closed}
+        {:error, :other_staff_active} -> {:error, :other_staff_active}
+        {:error, :not_on_shift} -> {:error, :not_on_shift}
+        {:error, %Ecto.Changeset{} = changeset} -> {:error, changeset}
+        {:error, reason} -> {:error, reason}
+      end
     end
+  end
+
+  defp lock_shop_open!(%Date{} = shop_date) do
+    key = :erlang.phash2({:espreso_shop_open, Date.to_iso8601(shop_date)})
+    Repo.query!("SELECT pg_advisory_xact_lock($1)", [key])
+    :ok
   end
 
   defp lock_shop_close!(%Date{} = shop_date) do
@@ -277,6 +411,29 @@ defmodule Espreso.Shifts do
   defp parse_optional_decimal(value) when is_integer(value), do: Decimal.new(value)
   defp parse_optional_decimal(value) when is_float(value), do: Decimal.from_float(value)
   defp parse_optional_decimal(_), do: nil
+
+  defp parse_required_decimal(value) do
+    case parse_optional_decimal(value) do
+      %Decimal{} = decimal ->
+        if Decimal.compare(decimal, 0) == :lt, do: nil, else: Decimal.round(decimal, 2)
+
+      _ ->
+        nil
+    end
+  end
+
+  defp decimalize_money(nil), do: Decimal.new("0")
+  defp decimalize_money(%Decimal{} = value), do: Decimal.round(value, 2)
+
+  defp decimalize_money(value) when is_binary(value) do
+    case Decimal.parse(String.trim(value)) do
+      {decimal, ""} -> Decimal.round(decimal, 2)
+      _ -> Decimal.new("0")
+    end
+  end
+
+  defp decimalize_money(value) when is_integer(value), do: Decimal.new(value)
+  defp decimalize_money(_), do: Decimal.new("0")
 
   defp normalize_notes(nil), do: nil
 

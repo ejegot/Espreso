@@ -36,6 +36,7 @@ defmodule EspresoWeb.StaffOrdersLive do
      |> assign(:cash_tender_token, nil)
      |> assign(:cash_tender_due, nil)
      |> assign(:pending_splits, nil)
+     |> assign(:pending_split_order_id, nil)
      |> assign(:split_pay_order, nil)
      |> assign(:split_cash, "")
      |> assign(:split_wallet, "gcash")
@@ -217,12 +218,16 @@ defmodule EspresoWeb.StaffOrdersLive do
   end
 
   def handle_event("open_split_pay", %{"id" => id}, socket) do
+    socket = load_orders(socket)
+
     with {order_id, ""} <- Integer.parse(id),
          %Espreso.Orders.Order{} = order <-
            Espreso.Orders.Order |> Repo.get(order_id) |> Repo.preload(:items),
          true <- split_payment_action?(order) do
       {:noreply,
        socket
+       |> close_cash_tender()
+       |> close_split_pay()
        |> assign(:split_pay_order, order)
        |> assign(:split_cash, "")
        |> assign(:split_wallet, "gcash")
@@ -262,8 +267,8 @@ defmodule EspresoWeb.StaffOrdersLive do
 
             {:noreply,
              socket
-             |> close_split_pay()
              |> assign(:pending_splits, splits)
+             |> assign(:pending_split_order_id, order.id)
              |> assign(:cash_tender_due, cash)
              |> assign(:cash_tender_order, order)
              |> assign(:cash_tendered, "")
@@ -288,8 +293,8 @@ defmodule EspresoWeb.StaffOrdersLive do
          permit when is_binary(permit) <- Map.get(socket.assigns.mark_paid_permits, order_id) do
       {:noreply,
        socket
+       |> close_split_pay()
        |> assign(:mark_paid_order, nil)
-       |> assign(:pending_splits, nil)
        |> assign(:cash_tender_due, nil)
        |> assign(:cash_tender_order, order)
        |> assign(:cash_tendered, "")
@@ -355,8 +360,12 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   def handle_event("order_cash_chip", _params, socket), do: {:noreply, socket}
 
-  def handle_event("cancel_order_cash_tender", _params, socket) do
+  def handle_event("back_order_cash_tender", _params, socket) do
     {:noreply, close_cash_tender(socket)}
+  end
+
+  def handle_event("cancel_order_cash_tender", _params, socket) do
+    {:noreply, abort_order_cash_tender(socket)}
   end
 
   def handle_event("confirm_order_cash_tender", params, socket) do
@@ -390,7 +399,7 @@ defmodule EspresoWeb.StaffOrdersLive do
         settlement_source: "staff_orders"
       ] ++
         cash_settlement_opts(params, paid_via) ++
-        split_settlement_opts(socket)
+        split_settlement_opts(socket, id, paid_via)
 
     result =
       PhysicalActionCoordinator.execute_mark_paid(id, permit, paid_via, settlement_opts)
@@ -400,7 +409,8 @@ defmodule EspresoWeb.StaffOrdersLive do
         {:noreply,
          socket
          |> assign(:mark_paid_order, nil)
-         |> assign(:pending_splits, nil)
+         |> close_cash_tender()
+         |> close_split_pay()
          |> update_mark_paid_recovery(paid.id, paid.paid_via || paid_via, physical_result)
          |> assign(:flash_note, mark_paid_flash(paid, paid_via, physical_result))
          |> PrinterClientBridge.maybe_push_mark_paid_physical(paid.id, permit, physical_result)
@@ -410,7 +420,8 @@ defmodule EspresoWeb.StaffOrdersLive do
         {:noreply,
          socket
          |> assign(:mark_paid_order, nil)
-         |> assign(:pending_splits, nil)
+         |> close_cash_tender()
+         |> close_split_pay()
          |> assign(:flash_note, mark_paid_flash(paid, paid.paid_via || paid_via, :disabled))
          |> load_orders()}
 
@@ -1432,6 +1443,8 @@ defmodule EspresoWeb.StaffOrdersLive do
       |> assign(:quick_tenders, cash_quick_tenders(total))
       |> assign(:confirm_enabled?, cash_tender_valid?(tender_state))
       |> assign(:mark_paid_permit, Map.get(assigns.mark_paid_permits, order.id))
+      |> assign(:split_tender?, split_tender?(assigns))
+      |> assign(:split_wallet_label, pending_wallet_label(assigns[:pending_splits]))
 
     ~H"""
     <div
@@ -1450,12 +1463,17 @@ defmodule EspresoWeb.StaffOrdersLive do
       <div class="staff-mark-paid-modal-panel staff-pos-cash-modal">
         <header class="staff-mark-paid-modal-head staff-pos-cash-modal-head">
           <div>
-            <p class="staff-mark-paid-modal-eyebrow">Cash payment</p>
+            <p class="staff-mark-paid-modal-eyebrow">
+              {if @split_tender?, do: "Split payment", else: "Cash payment"}
+            </p>
             <h2 id="orders-cash-tender-modal-title" class="staff-mark-paid-modal-title">
               Cash Received
             </h2>
             <p class="staff-mark-paid-modal-sub">
               {@order.number} · {@order.customer_name}
+            </p>
+            <p :if={@split_tender?} class="staff-mark-paid-modal-sub" id="orders-split-cash-summary">
+              Cash {format_money(@total)} + {@split_wallet_label} · order {Orders.format_total(@order)}
             </p>
           </div>
           <button
@@ -1469,8 +1487,8 @@ defmodule EspresoWeb.StaffOrdersLive do
         </header>
 
         <div class="staff-pos-cash-total" id="orders-cash-total">
-          <span>Order total</span>
-          <strong>{Orders.format_total(@order)}</strong>
+          <span>{if @split_tender?, do: "Cash due", else: "Order total"}</span>
+          <strong>{format_money(@total)}</strong>
         </div>
 
         <form
@@ -1507,7 +1525,11 @@ defmodule EspresoWeb.StaffOrdersLive do
                 match?({:exact, _, _}, @tender_state) && "is-selected"
               ]}
               phx-click="order_cash_exact"
-              aria-label="Set cash received to the exact order total"
+              aria-label={
+                if @split_tender?,
+                  do: "Set cash received to the cash portion",
+                  else: "Set cash received to the exact order total"
+              }
               data-dismiss-keyboard
             >
               Exact
@@ -1556,6 +1578,15 @@ defmodule EspresoWeb.StaffOrdersLive do
 
           <div class="staff-pos-cash-modal-actions">
             <button
+              :if={@split_tender?}
+              type="button"
+              class="staff-action"
+              id="orders-back-split"
+              phx-click="back_order_cash_tender"
+            >
+              Back
+            </button>
+            <button
               type="button"
               class="staff-action"
               id="orders-cancel-cash"
@@ -1584,6 +1615,7 @@ defmodule EspresoWeb.StaffOrdersLive do
   end
 
   defp split_pay_modal(%{split_pay_order: nil}), do: nil
+  defp split_pay_modal(%{cash_tender_order: %Espreso.Orders.Order{}}), do: nil
 
   defp split_pay_modal(assigns) do
     order = assigns.split_pay_order
@@ -1936,6 +1968,12 @@ defmodule EspresoWeb.StaffOrdersLive do
     end
   end
 
+  defp abort_order_cash_tender(socket) do
+    socket
+    |> close_cash_tender()
+    |> close_split_pay()
+  end
+
   defp close_cash_tender(socket) do
     socket
     |> assign(:cash_tender_order, nil)
@@ -1951,6 +1989,8 @@ defmodule EspresoWeb.StaffOrdersLive do
     |> assign(:split_cash, "")
     |> assign(:split_wallet, "gcash")
     |> assign(:split_error, nil)
+    |> assign(:pending_splits, nil)
+    |> assign(:pending_split_order_id, nil)
   end
 
   defp cash_tender_due(socket), do: cash_tender_due_from_assigns(socket.assigns)
@@ -1962,12 +2002,44 @@ defmodule EspresoWeb.StaffOrdersLive do
     end
   end
 
-  defp split_settlement_opts(socket) do
-    case socket.assigns[:pending_splits] do
-      splits when is_list(splits) and splits != [] -> [splits: splits]
-      _ -> []
+  defp split_settlement_opts(_socket, _order_id, paid_via) when paid_via != "cash", do: []
+
+  defp split_settlement_opts(socket, order_id, "cash") do
+    order_id = parse_order_id(order_id)
+
+    if is_integer(order_id) and socket.assigns[:pending_split_order_id] == order_id do
+      case socket.assigns[:pending_splits] do
+        splits when is_list(splits) and splits != [] -> [splits: splits]
+        _ -> []
+      end
+    else
+      []
     end
   end
+
+  defp parse_order_id(id) when is_integer(id), do: id
+
+  defp parse_order_id(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {int, ""} -> int
+      _ -> nil
+    end
+  end
+
+  defp parse_order_id(_), do: nil
+
+  defp split_tender?(assigns) do
+    is_list(assigns[:pending_splits]) and assigns.pending_splits != []
+  end
+
+  defp pending_wallet_label(splits) when is_list(splits) do
+    Enum.find_value(splits, fn
+      %{paid_via: via} when via in ["gcash", "maya"] -> Orders.paid_via_label(via)
+      _ -> nil
+    end) || "GCash"
+  end
+
+  defp pending_wallet_label(_), do: "GCash"
 
   defp split_payment_action?(%{payment_method: "counter", payment_intent: nil, payment_status: status})
        when status in ["unpaid", "awaiting_payment"],

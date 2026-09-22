@@ -1897,11 +1897,14 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> element("#pos-product-#{espresso.id}") |> render_click()
     view |> element("#pos-pay-split") |> render_click()
     assert has_element?(view, "#pos-pay-split.is-active", "Split")
+    assert has_element?(view, "#pos-split-modal")
     assert has_element?(view, "#pos-split-fields")
-    assert has_element?(view, "#pos-place-order", "Confirm Split & Process")
+    assert has_element?(view, "#pos-place-order", "Enter Split")
+    refute has_element?(view, "#pos-order-form #pos-split-cash")
 
     view |> element("#pos-split-cash") |> render_keyup(%{"value" => "25"})
-    submit_order(view)
+    view |> element("#pos-split-cash-exact") |> render_click()
+    view |> form("#pos-split-form") |> render_submit()
 
     [order] = placed_orders()
     order = Repo.preload(order, :payment_splits)
@@ -1915,6 +1918,10 @@ defmodule EspresoWeb.StaffPosLiveTest do
       |> Enum.sort()
 
     assert amounts == [{"cash", "25.00"}, {"gcash", "50.00"}]
+    assert has_element?(view, "#pos-confirmation")
+    assert has_element?(view, "#pos-split-breakdown", "Cash")
+    assert has_element?(view, "#pos-split-breakdown", "GCash")
+    refute has_element?(view, "#pos-split-modal")
   end
 
   test "Place Order creates exactly one order; repeated place_order while placing is ignored", %{

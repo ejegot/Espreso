@@ -113,6 +113,9 @@ defmodule Espreso.ShiftsTest do
     assert close.notes == "Drawer short"
     assert close.closed_by_user_id == manager.id
     assert close.by_via["cash"]["count"] == 1
+    assert Decimal.equal?(close.opening_cash || Decimal.new("0"), Decimal.new("0"))
+    assert Decimal.equal?(close.expected_cash, Decimal.new("120"))
+    assert Decimal.equal?(close.variance, Decimal.new("-4.50"))
     assert is_nil(StaffShifts.get_open_shift(manager))
     assert StaffShifts.list_shifts_for_user(manager.id) == []
 
@@ -124,8 +127,11 @@ defmodule Espreso.ShiftsTest do
 
   test "owner can record_close without StaffShift" do
     owner = owner!()
-    assert {:ok, close} = Shifts.record_close(owner, %{})
+    assert {:error, :counted_cash_required} = Shifts.record_close(owner, %{})
+    assert {:ok, close} = Shifts.record_close(owner, %{counted_cash: "0"})
     assert close.closed_by_user_id == owner.id
+    assert Decimal.equal?(close.expected_cash, Decimal.new("0"))
+    assert Decimal.equal?(close.variance, Decimal.new("0"))
     assert StaffShifts.list_shifts_for_user(owner.id) == []
   end
 
@@ -149,13 +155,13 @@ defmodule Espreso.ShiftsTest do
     assert {:ok, open_a} = StaffShifts.open_shift_for_login(a)
     assert {:ok, open_b} = StaffShifts.open_shift_for_login(b)
 
-    assert {:error, :other_staff_active} = Shifts.record_close(a, %{})
+    assert {:error, :other_staff_active} = Shifts.record_close(a, %{counted_cash: "10"})
     assert is_nil(Shifts.get_todays_close())
     assert StaffShifts.get_open_shift(a).id == open_a.id
     assert StaffShifts.get_open_shift(b).id == open_b.id
 
     assert {:ok, _} = StaffShifts.close_shift_for_logout(b.id)
-    assert {:ok, close} = Shifts.record_close(a, %{})
+    assert {:ok, close} = Shifts.record_close(a, %{counted_cash: "10"})
     assert close.closed_by_user_id == a.id
     assert Repo.get!(StaffShift, open_a.id).end_reason == "shift_close"
     assert Repo.get!(StaffShift, open_b.id).end_reason == "logout"
@@ -163,17 +169,48 @@ defmodule Espreso.ShiftsTest do
 
   test "barista without open StaffShift cannot close" do
     barista = barista!()
-    assert {:error, :not_on_shift} = Shifts.record_close(barista, %{})
+    assert {:error, :not_on_shift} = Shifts.record_close(barista, %{counted_cash: "0"})
     assert is_nil(Shifts.get_todays_close())
+  end
+
+  test "record_open is once per shop day and snapshots into close" do
+    manager = manager!()
+    barista = barista!()
+
+    assert {:error, :opening_cash_required} = Shifts.record_open(manager, %{})
+
+    assert {:ok, open} = Shifts.record_open(manager, %{opening_cash: "500"})
+    assert open.shop_date == Orders.shop_date_today()
+    assert Decimal.equal?(open.opening_cash, Decimal.new("500"))
+    assert open.opened_by_user_id == manager.id
+    assert {:error, :already_open} = Shifts.record_open(barista, %{opening_cash: "1"})
+
+    {:ok, order} =
+      Orders.create_order(lines("120"), %{
+        customer_name: "Cash",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, _} = Orders.mark_paid(order, paid_via: "cash")
+
+    {:ok, _} =
+      Espreso.CashOuts.create_cash_out(manager, %{amount: "20", category: "Other"})
+
+    assert {:ok, close} = Shifts.record_close(manager, %{counted_cash: "590"})
+    assert Decimal.equal?(close.opening_cash, Decimal.new("500"))
+    assert Decimal.equal?(close.expected_cash, Decimal.new("600"))
+    assert Decimal.equal?(close.variance, Decimal.new("-10"))
+    assert {:error, :already_closed} = Shifts.record_open(manager, %{opening_cash: "1"})
   end
 
   test "failed already_closed does not close barista StaffShift" do
     manager = manager!()
     barista = barista!()
     assert {:ok, open} = StaffShifts.open_shift_for_login(barista)
-    assert {:ok, _} = Shifts.record_close(manager, %{})
+    assert {:ok, _} = Shifts.record_close(manager, %{counted_cash: "25"})
 
-    assert {:error, :already_closed} = Shifts.record_close(barista, %{})
+    assert {:error, :already_closed} = Shifts.record_close(barista, %{counted_cash: "25"})
     assert StaffShifts.get_open_shift(barista).id == open.id
     assert is_nil(Repo.get!(StaffShift, open.id).ended_at)
   end

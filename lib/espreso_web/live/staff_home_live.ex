@@ -143,6 +143,20 @@ defmodule EspresoWeb.StaffHomeLive do
           <p class="staff-home-identity-role">{User.role_label(@current_user.role)}</p>
         </header>
 
+        <section :if={@shop_open_prompt?} class="staff-home-shop-open" id="staff-home-shop-open">
+          <p class="staff-home-shop-open-title">Opening cash not recorded</p>
+          <p class="staff-home-shop-open-body">
+            Opening shift: count the drawer once. Mid and close shifts skip this.
+          </p>
+          <.link
+            navigate={~p"/staff/open"}
+            class="staff-home-shop-open-action"
+            id="staff-home-shop-open-link"
+          >
+            Enter opening cash
+          </.link>
+        </section>
+
         <div class={["staff-home-desk-stage", @today_visible? && "staff-home-desk-stage--split"]}>
           <section
             :if={@today_visible?}
@@ -308,7 +322,12 @@ defmodule EspresoWeb.StaffHomeLive do
 
     breakdown = if money?, do: Orders.todays_paid_breakdown(), else: nil
     sales = if breakdown, do: Orders.sales_overview(), else: nil
-    shift_close = if money?, do: Shifts.get_todays_close(), else: nil
+    shop_open = Shifts.get_todays_open()
+    close = Shifts.get_todays_close()
+    shift_close = if money?, do: close, else: nil
+
+    shop_open_prompt? =
+      Shifts.can_access_open?(user) and is_nil(shop_open) and is_nil(close)
 
     socket
     |> assign(:overview, overview)
@@ -316,6 +335,8 @@ defmodule EspresoWeb.StaffHomeLive do
     |> assign(:breakdown, breakdown)
     |> assign(:via_rows, if(breakdown, do: Orders.paid_via_rows(breakdown), else: []))
     |> assign(:shift_close, shift_close)
+    |> assign(:shop_open, shop_open)
+    |> assign(:shop_open_prompt?, shop_open_prompt?)
     |> assign(:today_visible?, money?)
     |> assign(:printer_on_home?, money? and Printer.enabled?())
     |> assign(:greeting, staff_greeting(user))

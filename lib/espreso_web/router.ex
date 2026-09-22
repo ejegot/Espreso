@@ -116,6 +116,7 @@ defmodule EspresoWeb.Router do
 
     live_session :shift_close,
       on_mount: [{EspresoWeb.StaffAuth, :ensure_can_close_shift}] do
+      live "/staff/open", StaffShopOpenLive
       live "/staff/close", StaffShiftCloseLive
     end
 
