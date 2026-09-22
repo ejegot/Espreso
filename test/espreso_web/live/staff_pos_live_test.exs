@@ -1887,6 +1887,36 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert order.status == "completed"
   end
 
+  test "POS split payment stores cash plus GCash amounts", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    view |> element("#pos-pay-split") |> render_click()
+    assert has_element?(view, "#pos-pay-split.is-active", "Split")
+    assert has_element?(view, "#pos-split-fields")
+    assert has_element?(view, "#pos-place-order", "Confirm Split & Process")
+
+    view |> element("#pos-split-cash") |> render_keyup(%{"value" => "25"})
+    submit_order(view)
+
+    [order] = placed_orders()
+    order = Repo.preload(order, :payment_splits)
+    assert order.payment_status == "paid"
+    assert order.paid_via == "cash"
+    assert Orders.split_payment_label(order) == "Cash + GCash"
+
+    amounts =
+      order.payment_splits
+      |> Enum.map(&{&1.paid_via, Decimal.to_string(&1.amount, :normal)})
+      |> Enum.sort()
+
+    assert amounts == [{"cash", "25.00"}, {"gcash", "50.00"}]
+  end
+
   test "Place Order creates exactly one order; repeated place_order while placing is ignored", %{
     conn: conn,
     barista: barista,

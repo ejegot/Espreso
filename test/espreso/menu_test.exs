@@ -144,6 +144,94 @@ defmodule Espreso.MenuTest do
     end
   end
 
+  describe "create_product_as/2" do
+    test "manager can add a HOT drink with 8oz and 12oz prices" do
+      insert_category!("HOT")
+      manager = register!("Manager", "manager.additem@test.local", "manager")
+
+      assert {:ok, product} =
+               Menu.create_product_as(manager, %{
+                 "category" => "HOT",
+                 "name" => "Barako",
+                 "hot_price_mode" => "sizes",
+                 "price_8oz" => "155",
+                 "price_12oz" => "165"
+               })
+
+      assert product.name == "Barako"
+      assert product.available
+      assert is_nil(product.menu_group)
+
+      prices = Map.new(product.product_prices, &{&1.size, &1.price})
+      assert Decimal.equal?(prices["8oz"], Decimal.new("155"))
+      assert Decimal.equal?(prices["12oz"], Decimal.new("165"))
+
+      hot_menu = Menu.list_menu() |> Enum.find(&(&1.name == "HOT"))
+      assert Enum.any?(hot_menu.products, &(&1.id == product.id))
+    end
+
+    test "owner can add FOOD to a group and barista cannot add" do
+      insert_category!("FOOD")
+      owner = register!("Owner", "owner.additem@test.local", "owner")
+      barista = register!("Staff", "staff.additem@test.local", "barista")
+
+      assert {:error, :unauthorized} =
+               Menu.create_product_as(barista, %{
+                 "category" => "FOOD",
+                 "name" => "Chicken Teriyaki",
+                 "menu_group" => "Rice Meal",
+                 "price" => "189"
+               })
+
+      assert {:ok, product} =
+               Menu.create_product_as(owner, %{
+                 "category" => "FOOD",
+                 "name" => "Chicken Teriyaki",
+                 "menu_group" => "Rice Meal",
+                 "price" => "189"
+               })
+
+      food_menu = Menu.list_menu() |> Enum.find(&(&1.name == "FOOD"))
+      rice = Enum.find(food_menu.groups, &(&1.name == "Rice Meal"))
+      assert Enum.any?(rice.products, &(&1.id == product.id))
+      refute Menu.sweets_product?(product)
+    end
+
+    test "duplicate name in the same category is rejected" do
+      hot = insert_category!("HOT")
+      insert_product!(hot, "Espresso", true, [{nil, "75"}])
+      manager = register!("Manager", "manager.dupitem@test.local", "manager")
+
+      assert {:error, :name_taken} =
+               Menu.create_product_as(manager, %{
+                 "category" => "HOT",
+                 "name" => "Espresso",
+                 "hot_price_mode" => "single",
+                 "price" => "80"
+               })
+    end
+
+    test "manager can attach a custom photo used by product_image/2" do
+      hot = insert_category!("HOT")
+      product = insert_product!(hot, "Barako", true, [{"8oz", "155"}])
+      manager = register!("Manager", "manager.photo@test.local", "manager")
+      barista = register!("Staff", "staff.photo@test.local", "barista")
+      png = tiny_png()
+
+      assert {:error, :unauthorized} =
+               Menu.put_product_photo_as(barista, product.id, png, "image/png")
+
+      assert {:ok, updated} = Menu.put_product_photo_as(manager, product.id, png, "image/png")
+      assert updated.has_custom_photo
+      assert Menu.product_image("HOT", updated) =~ "/media/products/#{product.id}"
+      refute Menu.product_image("HOT", updated) == Menu.product_image("HOT", "Barako")
+
+      photo = Menu.get_product_photo(product.id)
+      assert photo.data == png
+      assert photo.content_type == "image/png"
+    end
+  end
+
   defp register!(name, email, role) do
     {:ok, user} =
       Espreso.Accounts.register_user(%{
@@ -363,6 +451,12 @@ defmodule Espreso.MenuTest do
     end)
 
     product
+  end
+
+  defp tiny_png do
+    Base.decode64!(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+    )
   end
 
   describe "format_price/1" do

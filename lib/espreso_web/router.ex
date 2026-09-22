@@ -83,6 +83,7 @@ defmodule EspresoWeb.Router do
     live "/order/:number", OrderLive
     live "/about", AboutLive
     live "/contact", ContactLive
+    get "/media/products/:id", ProductPhotoController, :show
   end
 
   scope "/", EspresoWeb do

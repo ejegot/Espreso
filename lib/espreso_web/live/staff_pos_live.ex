@@ -43,6 +43,8 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:table_number, "")
      |> assign(:payment_choice, :paid)
      |> assign(:paid_via, "cash")
+     |> assign(:split_cash, "")
+     |> assign(:split_wallet, "gcash")
      |> assign(:cash_tendered, "")
      |> assign(:cash_tender_open?, false)
      |> assign(:cash_tender_error, nil)
@@ -593,13 +595,18 @@ defmodule EspresoWeb.StaffPosLive do
   end
 
   def handle_event("set_payment_method", %{"method" => paid_via}, socket)
-      when paid_via in ["cash", "gcash", "maya"] do
+      when paid_via in ["cash", "gcash", "maya", "split"] do
     {:noreply,
      socket
      |> assign(:payment_choice, :paid)
      |> assign(:paid_via, paid_via)
      |> assign(:cash_tendered, "")
-     |> assign(:cash_tender_error, nil)}
+     |> assign(:cash_tender_error, nil)
+     |> then(fn socket ->
+       if paid_via == "split",
+         do: socket,
+         else: socket |> assign(:split_cash, "") |> assign(:split_wallet, "gcash")
+     end)}
   end
 
   def handle_event("set_payment_method", _params, socket), do: {:noreply, socket}
@@ -615,6 +622,18 @@ defmodule EspresoWeb.StaffPosLive do
 
   def handle_event("set_paid_via", %{"paid_via" => paid_via}, socket) do
     handle_event("set_payment_method", %{"method" => paid_via}, socket)
+  end
+
+  def handle_event("set_split_wallet", %{"wallet" => wallet}, socket)
+      when wallet in ["gcash", "maya"] do
+    {:noreply, assign(socket, :split_wallet, wallet)}
+  end
+
+  def handle_event("set_split_wallet", _params, socket), do: {:noreply, socket}
+
+  def handle_event("set_split_cash", params, socket) do
+    amount = Map.get(params, "split_cash") || Map.get(params, "value") || ""
+    {:noreply, assign(socket, :split_cash, String.trim(to_string(amount)))}
   end
 
   def handle_event(
@@ -680,7 +699,8 @@ defmodule EspresoWeb.StaffPosLive do
       token != socket.assigns.cash_tender_token ->
         {:noreply, assign(socket, :cash_tender_error, "This cash entry is no longer active.")}
 
-      socket.assigns.payment_choice != :paid or socket.assigns.paid_via != "cash" ->
+      socket.assigns.payment_choice != :paid or
+          socket.assigns.paid_via not in ["cash", "split"] ->
         {:noreply, assign(socket, :cash_tender_error, "Cash payment is no longer selected.")}
 
       socket.assigns.placing_order? or socket.assigns.redeeming? ->
@@ -917,6 +937,12 @@ defmodule EspresoWeb.StaffPosLive do
       |> assign(:customer_name, Map.get(params, "customer_name", socket.assigns.customer_name))
       |> assign(:notes, Map.get(params, "notes", socket.assigns.notes))
       |> assign(:submission_error, nil)
+      |> then(fn socket ->
+        case Map.get(params, "split_cash") do
+          amount when is_binary(amount) -> assign(socket, :split_cash, String.trim(amount))
+          _ -> socket
+        end
+      end)
 
     if socket.assigns.cash_tender_open? do
       {:noreply, socket}
@@ -931,6 +957,17 @@ defmodule EspresoWeb.StaffPosLive do
         :ok
         when socket.assigns.payment_choice == :paid and socket.assigns.paid_via == "cash" ->
           {:noreply, open_cash_tender(socket)}
+
+        :ok
+        when socket.assigns.payment_choice == :paid and socket.assigns.paid_via == "split" ->
+          case pos_split_specs(socket, cart_total(socket.assigns.cart)) do
+            {:ok, splits} ->
+              cash = split_cash_amount(splits)
+              {:noreply, open_cash_tender(socket, :order, cash)}
+
+            {:error, message} ->
+              {:noreply, assign(socket, :submission_error, message)}
+          end
 
         :ok ->
           create_pos_order(socket)
@@ -1521,7 +1558,80 @@ defmodule EspresoWeb.StaffPosLive do
                       >
                         Maya
                       </button>
+                      <button
+                        type="button"
+                        class={[
+                          "staff-pos-pay-chip",
+                          @payment_choice == :paid and @paid_via == "split" && "is-active"
+                        ]}
+                        id="pos-pay-split"
+                        phx-click="set_payment_method"
+                        phx-value-method="split"
+                        aria-pressed={to_string(@payment_choice == :paid and @paid_via == "split")}
+                      >
+                        Split
+                      </button>
                     </div>
+
+                    <div
+                      :if={@payment_choice == :paid and @paid_via == "split"}
+                      class="staff-pos-split"
+                      id="pos-split-fields"
+                    >
+                      <p class="staff-pos-split-hint">
+                        Cash plus GCash or Maya. Amounts must equal the total.
+                      </p>
+                      <div class="staff-pos-split-wallets" role="group" aria-label="Wallet for split">
+                        <button
+                          type="button"
+                          class={["staff-pos-pay-chip", @split_wallet == "gcash" && "is-active"]}
+                          id="pos-split-wallet-gcash"
+                          phx-click="set_split_wallet"
+                          phx-value-wallet="gcash"
+                        >
+                          GCash
+                        </button>
+                        <button
+                          type="button"
+                          class={["staff-pos-pay-chip", @split_wallet == "maya" && "is-active"]}
+                          id="pos-split-wallet-maya"
+                          phx-click="set_split_wallet"
+                          phx-value-wallet="maya"
+                        >
+                          Maya
+                        </button>
+                      </div>
+                      <label class="staff-pos-split-field" for="pos-split-cash">
+                        <span>Cash</span>
+                        <span class="staff-pos-cash-input-wrap">
+                          <span aria-hidden="true">₱</span>
+                          <input
+                            type="text"
+                            inputmode="decimal"
+                            autocomplete="off"
+                            id="pos-split-cash"
+                            name="split_cash"
+                            value={@split_cash}
+                            placeholder="0.00"
+                            phx-keyup="set_split_cash"
+                            phx-blur="set_split_cash"
+                            phx-debounce="150"
+                          />
+                        </span>
+                      </label>
+                      <div class="staff-pos-split-remainder" id="pos-split-wallet-amount">
+                        <span>{if @split_wallet == "maya", do: "Maya", else: "GCash"}</span>
+                        <strong>{Menu.format_price(split_wallet_remainder(assigns))}</strong>
+                      </div>
+                    </div>
+
+                    <p
+                      :if={@payment_choice == :paid and @paid_via == "split"}
+                      class="staff-pos-payment-cue"
+                      id="pos-split-confirmation-cue"
+                    >
+                      Confirm the wallet transfer, then enter cash received.
+                    </p>
 
                     <p
                       :if={@payment_choice == :paid and @paid_via in ["gcash", "maya"]}
@@ -1724,6 +1834,7 @@ defmodule EspresoWeb.StaffPosLive do
       |> assign(:tender_state, tender_state)
       |> assign(:quick_tenders, cash_quick_tenders(total))
       |> assign(:confirm_enabled?, cash_tender_valid?(tender_state))
+      |> assign(:split_tender?, assigns[:paid_via] == "split")
 
     ~H"""
     <.modal
@@ -1738,12 +1849,16 @@ defmodule EspresoWeb.StaffPosLive do
           <p class="staff-pos-cash-modal-eyebrow">Cash payment</p>
           <h2 id="cash-tender-modal-title">Cash Received</h2>
           <p id="cash-tender-modal-description">
-            Enter the cash handed to staff before creating this order.
+            <%= if @split_tender? do %>
+              Enter the cash portion of this split.
+            <% else %>
+              Enter the cash handed to staff before creating this order.
+            <% end %>
           </p>
         </header>
 
         <div class="staff-pos-cash-total" id="pos-cash-total">
-          <span>Total</span>
+          <span>{if @split_tender?, do: "Cash due", else: "Total"}</span>
           <strong>{Menu.format_price(@total)}</strong>
         </div>
 
@@ -2085,99 +2200,131 @@ defmodule EspresoWeb.StaffPosLive do
   defp do_confirm_redeem(socket, customer, quote) do
     socket = assign(socket, :redeeming?, true)
     paid? = socket.assigns.payment_choice == :paid
-    paid_via = if paid?, do: socket.assigns.paid_via, else: nil
-    {tendered, change} = cash_amounts(socket)
     amount_due = quote.amount_due
 
-    if paid? and paid_via == "cash" and Decimal.compare(amount_due, 0) == :gt and is_nil(tendered) do
-      {:noreply,
-       socket
-       |> assign(:redeeming?, false)
-       |> open_cash_tender(:redeem, amount_due)}
-    else
-      attrs =
-        %{
-          customer_name: String.trim(socket.assigns.customer_name),
-          notes: blank_notes(socket.assigns.notes),
-          fulfillment: socket.assigns.fulfillment,
-          table_number: nil,
-          payment_method: :counter,
-          payment_status: socket.assigns.payment_choice,
-          paid_via: paid_via,
-          source: :pos,
-          settled_by_user_id: socket.assigns.current_user.id,
-          settlement_source: :pos
-        }
-        |> maybe_put_cash_settlement(tendered)
+    cond do
+      paid? and socket.assigns.paid_via == "split" ->
+        case pos_split_specs(socket, amount_due) do
+          {:ok, splits} ->
+            cash = split_cash_amount(splits)
+            {tendered, change} = cash_amounts(socket)
 
-      case Loyalty.redeem_at_pos(customer.id, quote.selected_price.id, attrs) do
-        {:ok, %{order: order, customer: updated_customer}} ->
-          {permit, settle_result} =
-            if paid? do
-              PrinterClientBridge.settle_physical_for_paid_order(
-                order,
-                order.paid_via || paid_via || "cash",
-                staff_name: socket.assigns.current_user.name
-              )
+            if Decimal.compare(amount_due, 0) == :gt and is_nil(tendered) do
+              {:noreply,
+               socket
+               |> assign(:redeeming?, false)
+               |> open_cash_tender(:redeem, cash)}
             else
-              {nil, :disabled}
+              complete_redeem(socket, customer, quote, "cash", splits, tendered, change)
             end
 
-          socket =
-            socket
-            |> apply_pos_physical_result(
+          {:error, message} ->
+            {:noreply,
+             socket
+             |> assign(:redeeming?, false)
+             |> assign(:redeem_error, message)}
+        end
+
+      paid? and socket.assigns.paid_via == "cash" and Decimal.compare(amount_due, 0) == :gt and
+          is_nil(elem(cash_amounts(socket), 0)) ->
+        {:noreply,
+         socket
+         |> assign(:redeeming?, false)
+         |> open_cash_tender(:redeem, amount_due)}
+
+      true ->
+        paid_via = if paid?, do: socket.assigns.paid_via, else: nil
+        {tendered, change} = cash_amounts(socket)
+        complete_redeem(socket, customer, quote, paid_via, [], tendered, change)
+    end
+  end
+  defp complete_redeem(socket, customer, quote, paid_via, splits, tendered, change) do
+    paid? = socket.assigns.payment_choice == :paid
+    paid_via = if paid_via == "split", do: "cash", else: paid_via
+
+    attrs =
+      %{
+        customer_name: String.trim(socket.assigns.customer_name),
+        notes: blank_notes(socket.assigns.notes),
+        fulfillment: socket.assigns.fulfillment,
+        table_number: nil,
+        payment_method: :counter,
+        payment_status: socket.assigns.payment_choice,
+        paid_via: paid_via,
+        source: :pos,
+        settled_by_user_id: socket.assigns.current_user.id,
+        settlement_source: :pos
+      }
+      |> maybe_put_cash_settlement(tendered)
+      |> maybe_put_splits(splits)
+
+    case Loyalty.redeem_at_pos(customer.id, quote.selected_price.id, attrs) do
+      {:ok, %{order: order, customer: updated_customer}} ->
+        {permit, settle_result} =
+          if paid? do
+            PrinterClientBridge.settle_physical_for_paid_order(
               order,
-              order.paid_via || paid_via,
-              settle_result,
-              permit
+              order.paid_via || paid_via || "cash",
+              staff_name: socket.assigns.current_user.name
             )
+          else
+            {nil, :disabled}
+          end
 
-          note = socket.assigns.print_note
-          failed? = socket.assigns.print_failed?
-          note_error? = socket.assigns.print_note_error?
+        socket =
+          socket
+          |> apply_pos_physical_result(
+            order,
+            order.paid_via || paid_via,
+            settle_result,
+            permit
+          )
 
-          cash_change = if(change, do: %{tendered: tendered, change: change})
+        note = socket.assigns.print_note
+        failed? = socket.assigns.print_failed?
+        note_error? = socket.assigns.print_note_error?
 
-          {:noreply,
-           socket
-           |> assign(:loyalty_customer, updated_customer)
-           |> assign(:loyalty_phone, updated_customer.phone_e164)
-           |> assign(:loyalty_error, nil)
-           |> assign(:redeeming?, false)
-           |> close_redeem()
-           |> consume_cash_tender()
-           |> assign(:last_cash_change, cash_change)
-           |> assign(:print_note, note)
-           |> assign(:print_failed?, failed?)
-           |> assign(:print_note_error?, note_error?)
-           |> assign(:categories, Menu.list_menu())
-           |> reset_pos_product_stream()
-           |> assign(:last_order, order)
-           |> remember_review_order(order)
-           |> assign(
-             :ticket_loyalty_note,
-             "Redeemed · #{order.number} · #{updated_customer.points_balance} pts left"
-           )
-           |> clear_place_flash()}
+        cash_change = if(change, do: %{tendered: tendered, change: change})
 
-        {:error, :insufficient_points} ->
-          {:noreply,
-           socket
-           |> assign(:redeeming?, false)
-           |> assign(:redeem_error, "Not enough points.")}
+        {:noreply,
+         socket
+         |> assign(:loyalty_customer, updated_customer)
+         |> assign(:loyalty_phone, updated_customer.phone_e164)
+         |> assign(:loyalty_error, nil)
+         |> assign(:redeeming?, false)
+         |> close_redeem()
+         |> consume_cash_tender()
+         |> assign(:last_cash_change, cash_change)
+         |> assign(:print_note, note)
+         |> assign(:print_failed?, failed?)
+         |> assign(:print_note_error?, note_error?)
+         |> assign(:categories, Menu.list_menu())
+         |> reset_pos_product_stream()
+         |> assign(:last_order, order)
+         |> remember_review_order(order)
+         |> assign(
+           :ticket_loyalty_note,
+           "Redeemed · #{order.number} · #{updated_customer.points_balance} pts left"
+         )
+         |> clear_place_flash()}
 
-        {:error, :ineligible_product} ->
-          {:noreply,
-           socket
-           |> assign(:redeeming?, false)
-           |> assign(:redeem_error, "That drink is not eligible.")}
+      {:error, :insufficient_points} ->
+        {:noreply,
+         socket
+         |> assign(:redeeming?, false)
+         |> assign(:redeem_error, "Not enough points.")}
 
-        {:error, _} ->
-          {:noreply,
-           socket
-           |> assign(:redeeming?, false)
-           |> assign(:redeem_error, "Could not redeem. Try again.")}
-      end
+      {:error, :ineligible_product} ->
+        {:noreply,
+         socket
+         |> assign(:redeeming?, false)
+         |> assign(:redeem_error, "That drink is not eligible.")}
+
+      {:error, _} ->
+        {:noreply,
+         socket
+         |> assign(:redeeming?, false)
+         |> assign(:redeem_error, "Could not redeem. Try again.")}
     end
   end
 
@@ -2210,41 +2357,48 @@ defmodule EspresoWeb.StaffPosLive do
       :ok ->
         customer_name = String.trim(socket.assigns.customer_name)
         paid? = socket.assigns.payment_choice == :paid
-        paid_via = if paid?, do: socket.assigns.paid_via, else: nil
-        {tendered, change} = cash_amounts(socket)
+        total = cart_total(socket.assigns.cart)
 
-        lines =
-          Enum.map(socket.assigns.cart, fn line ->
-            %{
-              product_id: line.product_id,
-              price_id: line.price_id,
-              name: line.name,
-              size: line.size,
-              category: line[:category],
-              quantity: line.quantity,
-              price: line.price
-            }
-          end)
+        case pos_settlement(socket, total) do
+          {:error, message} ->
+            {:noreply, assign(socket, :submission_error, message)}
 
-        attrs =
-          %{
-            customer_name: customer_name,
-            notes: blank_notes(socket.assigns.notes),
-            fulfillment: socket.assigns.fulfillment,
-            table_number: nil,
-            payment_method: :counter,
-            payment_status: socket.assigns.payment_choice,
-            paid_via: paid_via,
-            source: :pos
-          }
-          |> maybe_put_cash_settlement(tendered)
-          |> Map.put(:settled_by_user_id, socket.assigns.current_user.id)
-          |> Map.put(:settlement_source, :pos)
-          |> maybe_put_customer_id(socket.assigns.loyalty_customer)
+          {:ok, paid_via, splits} ->
+            {tendered, change} = cash_amounts(socket)
 
-        socket = assign(socket, :placing_order?, true)
+            lines =
+              Enum.map(socket.assigns.cart, fn line ->
+                %{
+                  product_id: line.product_id,
+                  price_id: line.price_id,
+                  name: line.name,
+                  size: line.size,
+                  category: line[:category],
+                  quantity: line.quantity,
+                  price: line.price
+                }
+              end)
 
-        case Orders.create_order(lines, attrs) do
+            attrs =
+              %{
+                customer_name: customer_name,
+                notes: blank_notes(socket.assigns.notes),
+                fulfillment: socket.assigns.fulfillment,
+                table_number: nil,
+                payment_method: :counter,
+                payment_status: socket.assigns.payment_choice,
+                paid_via: paid_via,
+                source: :pos
+              }
+              |> maybe_put_cash_settlement(tendered)
+              |> maybe_put_splits(splits)
+              |> Map.put(:settled_by_user_id, socket.assigns.current_user.id)
+              |> Map.put(:settlement_source, :pos)
+              |> maybe_put_customer_id(socket.assigns.loyalty_customer)
+
+            socket = assign(socket, :placing_order?, true)
+
+            case Orders.create_order(lines, attrs) do
           {:ok, order} ->
             {permit, settle_result} =
               if paid? do
@@ -2282,6 +2436,8 @@ defmodule EspresoWeb.StaffPosLive do
              |> assign(:submission_error, nil)
              |> assign(:payment_choice, :paid)
              |> assign(:paid_via, "cash")
+             |> assign(:split_cash, "")
+             |> assign(:split_wallet, "gcash")
              |> assign(:customer_name, "Walk-in")
              |> clear_loyalty_identity()
              |> assign(:variant_editor_key, nil)
@@ -2327,11 +2483,21 @@ defmodule EspresoWeb.StaffPosLive do
              |> reset_pos_product_stream()
              |> assign(:submission_error, "Price changed — please review your ticket.")}
 
+          {:error, :invalid_payment_split} ->
+            {:noreply,
+             socket
+             |> assign(:placing_order?, false)
+             |> assign(
+               :submission_error,
+               "Split amounts must be cash plus GCash or Maya, and equal the total."
+             )}
+
           {:error, _changeset} ->
             {:noreply,
              socket
              |> assign(:placing_order?, false)
              |> assign(:submission_error, "Could not place order. Check items and try again.")}
+        end
         end
     end
   end
@@ -2422,6 +2588,7 @@ defmodule EspresoWeb.StaffPosLive do
 
   defp place_order_label(:paid, "gcash"), do: "Confirm GCash & Process"
   defp place_order_label(:paid, "maya"), do: "Confirm Maya & Process"
+  defp place_order_label(:paid, "split"), do: "Confirm Split & Process"
   defp place_order_label(_, _), do: "Process Cash Order"
 
   defp loyalty_place_note(%Espreso.Orders.Order{} = order) do
@@ -2596,7 +2763,7 @@ defmodule EspresoWeb.StaffPosLive do
   defp sweets_entries(categories) do
     Enum.flat_map(categories, fn category ->
       category.products
-      |> Enum.filter(&sweets_product?/1)
+      |> Enum.filter(&Menu.sweets_product?/1)
       |> Enum.map(&{category.name, &1})
     end)
   end
@@ -2606,9 +2773,6 @@ defmodule EspresoWeb.StaffPosLive do
   end
 
   defp matcha_product?(_), do: false
-
-  defp sweets_product?(%{name: name}), do: Menu.sweets_product_name?(name)
-  defp sweets_product?(_), do: false
 
   defp reset_pos_product_stream(socket) do
     items = pos_product_stream_items(socket, socket.assigns.added_product_id)
@@ -2679,7 +2843,7 @@ defmodule EspresoWeb.StaffPosLive do
         %{
           id: product.id,
           product: product,
-          img: Menu.pos_product_image_meta(category_name || "", product.name),
+          img: Menu.pos_product_image_meta(category_name || "", product),
           index: 99,
           added?: added?
         }
@@ -2692,7 +2856,7 @@ defmodule EspresoWeb.StaffPosLive do
   defp product_cards(categories, selected, filter, search) do
     Enum.map(visible_product_entries(categories, selected, filter, search), fn {category_name,
                                                                                 product} ->
-      {product, Menu.pos_product_image_meta(category_name || "", product.name)}
+      {product, Menu.pos_product_image_meta(category_name || "", product)}
     end)
   end
 
@@ -2779,7 +2943,7 @@ defmodule EspresoWeb.StaffPosLive do
 
   defp add_line(cart, product, price, category_name, quantity) do
     key = "#{product.id}-#{price.id}"
-    image = Menu.pos_product_image_meta(category_name || "", product.name).src
+    image = Menu.pos_product_image_meta(category_name || "", product).src
     quantity = max(quantity, 1)
 
     case Enum.find_index(cart, &(&1.key == key)) do
@@ -2981,6 +3145,8 @@ defmodule EspresoWeb.StaffPosLive do
     |> assign(:submission_error, nil)
     |> assign(:payment_choice, :paid)
     |> assign(:paid_via, "cash")
+    |> assign(:split_cash, "")
+    |> assign(:split_wallet, "gcash")
     |> assign(:cash_tender_open?, false)
     |> assign(:cash_tendered, "")
     |> assign(:cash_tender_error, nil)
@@ -3044,6 +3210,8 @@ defmodule EspresoWeb.StaffPosLive do
       :table_number,
       :payment_choice,
       :paid_via,
+      :split_cash,
+      :split_wallet,
       :cash_tendered,
       :card_sizes
     ])
@@ -3158,7 +3326,8 @@ defmodule EspresoWeb.StaffPosLive do
   end
 
   defp cash_amounts(socket) do
-    if socket.assigns.payment_choice == :paid and socket.assigns.paid_via == "cash" and
+    if socket.assigns.payment_choice == :paid and
+         socket.assigns.paid_via in ["cash", "split"] and
          not cash_short?(socket) do
       case cash_tender_state(socket.assigns.cash_tendered, cash_due_total(socket)) do
         {:exact, tendered, change} -> {tendered, change}
@@ -3169,6 +3338,91 @@ defmodule EspresoWeb.StaffPosLive do
       {nil, nil}
     end
   end
+
+  defp pos_settlement(socket, total) do
+    paid? = socket.assigns.payment_choice == :paid
+
+    cond do
+      not paid? ->
+        {:ok, nil, []}
+
+      socket.assigns.paid_via == "split" ->
+        case pos_split_specs(socket, total) do
+          {:ok, splits} -> {:ok, "cash", splits}
+          {:error, message} -> {:error, message}
+        end
+
+      true ->
+        {:ok, socket.assigns.paid_via, []}
+    end
+  end
+
+  defp pos_split_specs(socket, total) do
+    wallet = socket.assigns.split_wallet || "gcash"
+
+    case parse_money(socket.assigns.split_cash) do
+      {:ok, cash} ->
+        wallet_amount =
+          total
+          |> Decimal.round(2)
+          |> Decimal.sub(cash)
+          |> Decimal.round(2)
+
+        case Orders.prepare_payment_splits(
+               %{
+                 splits: [
+                   %{paid_via: "cash", amount: cash},
+                   %{paid_via: wallet, amount: wallet_amount}
+                 ]
+               },
+               total,
+               "counter",
+               "paid"
+             ) do
+          {:ok, splits} ->
+            {:ok, splits}
+
+          {:error, _} ->
+            {:error, "Enter a cash amount less than the total. The rest is #{wallet_label(wallet)}."}
+        end
+
+      :error ->
+        {:error, "Enter the cash portion of the split."}
+    end
+  end
+
+  defp split_cash_amount(splits) do
+    Enum.find_value(splits, fn
+      %{paid_via: "cash", amount: amount} -> amount
+      _ -> nil
+    end)
+  end
+
+  defp split_wallet_remainder(assigns) do
+    total = cart_total(assigns.cart)
+
+    case parse_money(assigns[:split_cash] || "") do
+      {:ok, cash} ->
+        remainder = Decimal.sub(Decimal.round(total, 2), cash) |> Decimal.round(2)
+
+        if Decimal.compare(remainder, 0) == :lt do
+          Decimal.new("0")
+        else
+          remainder
+        end
+
+      :error ->
+        total
+    end
+  end
+
+  defp wallet_label("maya"), do: "Maya"
+  defp wallet_label(_), do: "GCash"
+
+  defp maybe_put_splits(attrs, splits) when is_list(splits) and splits != [],
+    do: Map.put(attrs, :splits, splits)
+
+  defp maybe_put_splits(attrs, _), do: attrs
 
   defp cash_quick_tenders(total) do
     ["100", "200", "500", "1000"]

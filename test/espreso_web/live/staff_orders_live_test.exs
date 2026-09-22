@@ -102,6 +102,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     assert has_element?(view, "#ticket-new-paid-via-gcash-#{order.id}", "GCash")
     assert has_element?(view, "#ticket-new-paid-via-maya-#{order.id}", "Maya")
+    assert has_element?(view, "#ticket-new-paid-via-split-#{order.id}", "Split")
     assert has_element?(view, "#order-more-#{order.id} #cancel-order-#{order.id}", "Cancel")
     refute has_element?(view, "#ticket-new-mark-paid-#{order.id}")
     refute has_element?(view, "#order-prepare-#{order.id}")

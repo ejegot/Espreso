@@ -260,7 +260,7 @@ defmodule EspresoWeb.StaffTransactionsLive do
                 "staff-transaction-payment",
                 "staff-transaction-payment--#{order.paid_via || "other"}"
               ]}>
-                {Orders.paid_via_label(order.paid_via)}
+                {Orders.split_payment_label(order) || Orders.paid_via_label(order.paid_via)}
               </span>
               <span class="staff-transaction-receipt">
                 <strong>{format_shop_time(order.settled_at)}</strong>
@@ -312,7 +312,8 @@ defmodule EspresoWeb.StaffTransactionsLive do
                     "staff-transaction-payment",
                     "staff-transaction-payment--#{@selected_transaction.paid_via || "other"}"
                   ]}>
-                    {Orders.paid_via_label(@selected_transaction.paid_via)}
+                    {Orders.split_payment_label(@selected_transaction) ||
+                       Orders.paid_via_label(@selected_transaction.paid_via)}
                   </dd>
                 </div>
                 <div>

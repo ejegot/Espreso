@@ -104,6 +104,33 @@ defmodule Espreso.PrinterTest do
     refute receipt =~ "?"
   end
 
+  test "receipt prints cash and wallet split lines" do
+    order = %Order{
+      number: "CS-SPLIT1",
+      customer_name: "Walk-in",
+      fulfillment: "pickup",
+      paid_via: "cash",
+      total: Decimal.new("165"),
+      inserted_at: ~N[2026-09-05 12:00:00],
+      settled_at: ~U[2026-09-05 12:00:00Z],
+      cash_tendered: Decimal.new("100"),
+      change_due: Decimal.new("0"),
+      items: [],
+      payment_splits: [
+        %Espreso.Orders.PaymentSplit{paid_via: "cash", amount: Decimal.new("100")},
+        %Espreso.Orders.PaymentSplit{paid_via: "gcash", amount: Decimal.new("65")}
+      ]
+    }
+
+    receipt = Receipt.build(order)
+
+    assert receipt =~ "Cash"
+    assert receipt =~ "P100.00"
+    assert receipt =~ "GCash"
+    assert receipt =~ "P65.00"
+    assert receipt =~ "Tendered"
+  end
+
   test "kitchen ticket is compact with items and notes" do
     order = %Order{
       number: "CS-KIT001",

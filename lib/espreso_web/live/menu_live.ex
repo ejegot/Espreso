@@ -887,7 +887,7 @@ defmodule EspresoWeb.MenuLive do
               >
                 <div class="menu-signature-card-media" aria-hidden="true">
                   <img
-                    src={Menu.product_image(signature_category, signature_product.name)}
+                    src={Menu.product_image(signature_category, signature_product)}
                     alt=""
                     class="menu-signature-card-photo"
                     loading="lazy"
@@ -950,7 +950,7 @@ defmodule EspresoWeb.MenuLive do
                     <article class="brune-menu-item-card">
                       <div class="brune-menu-item-thumb">
                         <img
-                          src={Menu.product_image(category.name, product.name)}
+                          src={Menu.product_image(category.name, product)}
                           alt={product.name}
                           class="brune-menu-item-photo"
                           loading="lazy"
@@ -1046,7 +1046,7 @@ defmodule EspresoWeb.MenuLive do
             </div>
 
             <img
-              src={Menu.product_image(@detail.category_name, @detail.product.name)}
+              src={Menu.product_image(@detail.category_name, @detail.product)}
               alt={@detail.product.name}
               class="menu-buy-photo"
             />
@@ -1938,7 +1938,7 @@ defmodule EspresoWeb.MenuLive do
     |> Enum.map(fn category ->
       filtered_groups =
         Enum.map(category.groups, fn group ->
-          filtered = Enum.filter(group.products, &sweets_product?/1)
+          filtered = Enum.filter(group.products, &Menu.sweets_product?/1)
           %{group | products: filtered}
         end)
         |> Enum.reject(fn group -> group.products == [] end)
@@ -1953,9 +1953,6 @@ defmodule EspresoWeb.MenuLive do
   end
 
   defp matcha_product?(_), do: false
-
-  defp sweets_product?(%{name: name}), do: Menu.sweets_product_name?(name)
-  defp sweets_product?(_), do: false
 
   defp visit_hours_lines do
     CoffeeSpot.public_hours_lines()
@@ -2084,7 +2081,7 @@ defmodule EspresoWeb.MenuLive do
         price,
         qty,
         category_name,
-        Menu.product_image(category_name, product.name)
+        Menu.product_image(category_name, product)
       )
 
     socket
@@ -2700,7 +2697,7 @@ defmodule EspresoWeb.MenuLive do
 
       image =
         case normalize_restored_image(Map.get(line, "image") || Map.get(line, :image)) do
-          nil -> Menu.product_image(category.name, product.name)
+          nil -> Menu.product_image(category.name, product)
           path -> path
         end
 
@@ -2938,8 +2935,8 @@ defmodule EspresoWeb.MenuLive do
 
   defp craving_thumb(category) do
     case craving_sample_product(category) do
-      %{name: product_name} -> Menu.product_image(category.name, product_name)
-      _ -> Menu.product_image(category.name, category.name)
+      nil -> Menu.product_image(category.name, category.name)
+      product -> Menu.product_image(category.name, product)
     end
   end
 

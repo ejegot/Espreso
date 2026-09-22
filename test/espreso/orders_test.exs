@@ -2306,6 +2306,105 @@ defmodule Espreso.OrdersTest do
     |> Repo.update!()
   end
 
+  test "create_order stores cash plus wallet splits and keeps paid_via cash" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("165")}]
+
+    assert {:ok, order} =
+             Orders.create_order(lines, %{
+               customer_name: "Split",
+               fulfillment: :pickup,
+               payment_method: :counter,
+               payment_status: :paid,
+               paid_via: "cash",
+               cash_tendered: Decimal.new("100"),
+               splits: [
+                 %{paid_via: "cash", amount: Decimal.new("100")},
+                 %{paid_via: "gcash", amount: Decimal.new("65")}
+               ]
+             })
+
+    assert order.paid_via == "cash"
+    assert Orders.split_payments?(order)
+    assert Orders.split_payment_label(order) == "Cash + GCash"
+    assert Orders.payment_label(order) == "Split · Cash + GCash"
+
+    amounts =
+      order.payment_splits
+      |> Enum.map(&{&1.paid_via, Decimal.to_string(&1.amount, :normal)})
+      |> Enum.sort()
+
+    assert amounts == [{"cash", "100.00"}, {"gcash", "65.00"}]
+    assert Decimal.equal?(order.cash_tendered, Decimal.new("100"))
+    assert Decimal.equal?(order.change_due, Decimal.new("0"))
+  end
+
+  test "create_order rejects split amounts that do not equal the total" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("165")}]
+
+    assert {:error, :invalid_payment_split} =
+             Orders.create_order(lines, %{
+               customer_name: "Split",
+               fulfillment: :pickup,
+               payment_method: :counter,
+               payment_status: :paid,
+               paid_via: "cash",
+               splits: [
+                 %{paid_via: "cash", amount: Decimal.new("50")},
+                 %{paid_via: "gcash", amount: Decimal.new("50")}
+               ]
+             })
+  end
+
+  test "mark_paid stores a cash plus Maya split" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("165")}]
+
+    assert {:ok, order} =
+             Orders.create_order(lines, %{
+               customer_name: "Later",
+               fulfillment: :pickup,
+               payment_method: :counter
+             })
+
+    assert {:ok, paid} =
+             Orders.mark_paid(order,
+               paid_via: "cash",
+               cash_tendered: Decimal.new("80"),
+               splits: [
+                 %{paid_via: "cash", amount: "80"},
+                 %{paid_via: "maya", amount: "85"}
+               ]
+             )
+
+    paid = Orders.get_order(paid.id)
+    assert paid.paid_via == "cash"
+    assert Orders.split_payment_label(paid) == "Cash + Maya"
+
+    breakdown = Orders.todays_paid_breakdown()
+    assert breakdown.count == 1
+    assert Decimal.equal?(breakdown.total, Decimal.new("165"))
+    assert Decimal.equal?(breakdown.by_via["cash"].total, Decimal.new("80"))
+    assert Decimal.equal?(breakdown.by_via["maya"].total, Decimal.new("85"))
+    assert breakdown.by_via["gcash"].count == 0
+    assert breakdown.by_via["cash"].count == 1
+    assert breakdown.by_via["maya"].count == 1
+  end
+
+  test "online orders cannot be split" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("165")}]
+
+    assert {:error, :split_counter_only} =
+             Orders.create_order(lines, %{
+               customer_name: "QR",
+               fulfillment: :pickup,
+               payment_method: :online,
+               payment_status: :awaiting_payment,
+               splits: [
+                 %{paid_via: "cash", amount: Decimal.new("80")},
+                 %{paid_via: "gcash", amount: Decimal.new("85")}
+               ]
+             })
+  end
+
   defp insert_category!(name) do
     %Category{} |> Category.changeset(%{name: name}) |> Repo.insert!()
   end

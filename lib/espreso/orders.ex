@@ -10,7 +10,7 @@ defmodule Espreso.Orders do
   alias Espreso.BusinessSettings
   alias Espreso.CustomerPush
   alias Espreso.Loyalty
-  alias Espreso.Orders.{Order, OrderItem, PaymentReconciliation}
+  alias Espreso.Orders.{Order, OrderItem, PaymentReconciliation, PaymentSplit}
   alias Espreso.Menu
   alias Espreso.Menu.Product
   alias Espreso.Menu.ProductPrice
@@ -129,8 +129,15 @@ defmodule Espreso.Orders do
         Decimal.add(acc, Decimal.mult(line.price, line.quantity))
       end)
 
-    with {:ok, settlement_attrs} <-
-           build_settlement_attrs(payment_status, paid_via, total, attrs,
+    with {:ok, splits} <-
+           prepare_payment_splits(attrs, total, payment_method, payment_status),
+         paid_via <- primary_paid_via(paid_via, splits),
+         {:ok, settlement_attrs} <-
+           build_settlement_attrs(
+             payment_status,
+             paid_via,
+             cash_due_total(total, splits),
+             attrs,
              default_source: if(source == "pos", do: "pos", else: "manual")
            ) do
       customer_id = Map.get(attrs, :customer_id) || Map.get(attrs, "customer_id")
@@ -203,10 +210,13 @@ defmodule Espreso.Orders do
 
         {:ok, items}
       end)
+      |> Ecto.Multi.run(:payment_splits, fn repo, %{order: order} ->
+        insert_payment_splits(repo, order.id, splits)
+      end)
       |> Repo.transaction()
       |> case do
-        {:ok, %{order: order, items: items}} ->
-          order = %{order | items: items}
+        {:ok, %{order: order, items: items, payment_splits: payment_splits}} ->
+          order = %{order | items: items, payment_splits: payment_splits}
 
           _ =
             if payment_status == "paid" and not skip_earn? do
@@ -291,14 +301,14 @@ defmodule Espreso.Orders do
   def get_order_by_number!(number) when is_binary(number) do
     Order
     |> where([o], o.number == ^number)
-    |> preload(:items)
+    |> preload([:items, :payment_splits])
     |> Repo.one!()
   end
 
   def get_order_by_number(number) when is_binary(number) do
     Order
     |> where([o], o.number == ^number)
-    |> preload(:items)
+    |> preload([:items, :payment_splits])
     |> Repo.one()
   end
 
@@ -324,7 +334,7 @@ defmodule Espreso.Orders do
       Order
       |> where([o], o.number in ^cleaned)
       |> order_by([o], desc: o.inserted_at)
-      |> preload(:items)
+      |> preload([:items, :payment_splits])
       |> Repo.all()
     end
   end
@@ -365,7 +375,7 @@ defmodule Espreso.Orders do
       |> apply_transaction_cursor(cursor)
       |> order_by([o], desc: o.settled_at, desc: o.id)
       |> limit(^(limit + 1))
-      |> preload([:items, :settled_by_user])
+      |> preload([:items, :settled_by_user, :payment_splits])
 
     rows = Repo.all(query)
     has_next_page? = length(rows) > limit
@@ -422,32 +432,20 @@ defmodule Espreso.Orders do
   def transaction_summary(filters \\ %{}) when is_map(filters) do
     {query, normalized} = transaction_query(filters)
 
-    rows =
+    orders =
       query
-      |> group_by([o], o.paid_via)
-      |> select([o], {o.paid_via, count(o.id), sum(o.total)})
+      |> preload(:payment_splits)
       |> Repo.all()
 
     empty = %{total: Decimal.new("0"), count: 0}
-    by_via = Map.new(@paid_vias, &{&1, empty})
-
-    by_via =
-      Enum.reduce(rows, by_via, fn {via, count, total}, acc ->
-        key = if via in @paid_vias, do: via, else: "counter"
-        current = Map.fetch!(acc, key)
-
-        Map.put(acc, key, %{
-          count: current.count + count,
-          total: Decimal.add(current.total, decimalize(total))
-        })
-      end)
+    by_via = paid_via_breakdown(orders, empty)
 
     %{
       filters: normalized,
-      count: Enum.reduce(by_via, 0, fn {_via, row}, acc -> acc + row.count end),
+      count: length(orders),
       total:
-        Enum.reduce(by_via, Decimal.new("0"), fn {_via, row}, acc ->
-          Decimal.add(acc, row.total)
+        Enum.reduce(orders, Decimal.new("0"), fn order, acc ->
+          Decimal.add(acc, decimalize(order.total))
         end),
       by_via: by_via
     }
@@ -459,7 +457,7 @@ defmodule Espreso.Orders do
   def get_transaction(id) when is_integer(id) do
     Order
     |> where([o], o.id == ^id and o.payment_status == "paid" and not is_nil(o.settled_at))
-    |> preload([:items, :settled_by_user])
+    |> preload([:items, :settled_by_user, :payment_splits])
     |> Repo.one()
   end
 
@@ -521,7 +519,7 @@ defmodule Espreso.Orders do
             o.payment_status == "paid" and not is_nil(o.settled_at) and
               o.settled_at >= ^from_start and o.settled_at < ^to_end,
           order_by: [asc: o.settled_at, asc: o.id],
-          preload: [:items, :settled_by_user]
+          preload: [:items, :settled_by_user, :payment_splits]
         )
 
       count = Repo.aggregate(query, :count, :id)
@@ -665,6 +663,17 @@ defmodule Espreso.Orders do
 
   defp filter_transaction_value(query, _field, "all"), do: query
 
+  defp filter_transaction_value(query, :paid_via, value) do
+    split_ids = from(s in PaymentSplit, where: s.paid_via == ^value, select: s.order_id)
+    any_split_ids = from(s in PaymentSplit, select: s.order_id)
+
+    from(o in query,
+      where:
+        o.id in subquery(split_ids) or
+          (o.paid_via == ^value and o.id not in subquery(any_split_ids))
+    )
+  end
+
   defp filter_transaction_value(query, field_name, value),
     do: where(query, [o], field(o, ^field_name) == ^value)
 
@@ -672,7 +681,7 @@ defmodule Espreso.Orders do
     Order
     |> where([o], o.status in ^["received", "preparing"])
     |> order_by([o], asc: o.inserted_at, asc: o.id)
-    |> preload(:items)
+    |> preload([:items, :payment_splits])
     |> Repo.all()
   end
 
@@ -689,7 +698,7 @@ defmodule Espreso.Orders do
         _ -> list_active_orders()
       end
 
-    Repo.preload(orders, :items)
+    Repo.preload(orders, [:items, :payment_splits])
   end
 
   @doc """
@@ -708,7 +717,7 @@ defmodule Espreso.Orders do
   def get_order(id) when is_integer(id) do
     case Repo.get(Order, id) do
       nil -> nil
-      %Order{} = order -> Repo.preload(order, :items)
+      %Order{} = order -> Repo.preload(order, [:items, :payment_splits])
     end
   end
 
@@ -747,7 +756,7 @@ defmodule Espreso.Orders do
     |> where([o], o.status == "ready")
     |> order_by([o], desc: o.updated_at, desc: o.id)
     |> limit(^limit)
-    |> preload(:items)
+    |> preload([:items, :payment_splits])
     |> Repo.all()
   end
 
@@ -845,7 +854,7 @@ defmodule Espreso.Orders do
     |> where([o], o.customer_id == ^customer_id)
     |> order_by([o], desc: o.inserted_at, desc: o.id)
     |> limit(^limit)
-    |> preload(:items)
+    |> preload([:items, :payment_splits])
     |> Repo.all()
   end
 
@@ -861,43 +870,22 @@ defmodule Espreso.Orders do
   def todays_paid_breakdown do
     today_start = shop_day_start_utc()
 
-    rows =
+    orders =
       from(o in Order,
         where: o.payment_status == "paid" and o.settled_at >= ^today_start,
-        group_by: o.paid_via,
-        select: {o.paid_via, count(o.id), sum(o.total)}
+        preload: :payment_splits
       )
       |> Repo.all()
 
     empty = %{total: Decimal.new("0"), count: 0}
-
-    by_via =
-      Map.new(@paid_vias, fn via -> {via, empty} end)
-
-    by_via =
-      Enum.reduce(rows, by_via, fn {via, count, total}, acc ->
-        key = if via in @paid_vias, do: via, else: "counter"
-        current = Map.fetch!(acc, key)
-
-        Map.put(acc, key, %{
-          count: current.count + count,
-          total: Decimal.add(current.total, decimalize(total))
-        })
-      end)
-
-    total =
-      by_via
-      |> Map.values()
-      |> Enum.reduce(Decimal.new("0"), fn %{total: t}, acc -> Decimal.add(acc, t) end)
-
-    count =
-      by_via
-      |> Map.values()
-      |> Enum.reduce(0, fn %{count: c}, acc -> acc + c end)
+    by_via = paid_via_breakdown(orders, empty)
 
     %{
-      total: total,
-      count: count,
+      total:
+        Enum.reduce(orders, Decimal.new("0"), fn order, acc ->
+          Decimal.add(acc, decimalize(order.total))
+        end),
+      count: length(orders),
       by_via: by_via,
       shop_date: shop_date_today()
     }
@@ -1366,16 +1354,15 @@ defmodule Espreso.Orders do
   def status_label("cancelled"), do: "Cancelled"
   def status_label(other), do: other
 
-  def payment_label(%Order{payment_method: "counter", payment_status: "unpaid"}),
-    do: "Pay at counter"
-
-  def payment_label(%Order{payment_method: "counter", payment_status: "paid", paid_via: paid_via})
-      when paid_via in ["gcash", "maya"] do
-    "Paid via #{wallet_brand_label(paid_via)}"
+  def payment_label(%Order{payment_status: "paid"} = order) do
+    case split_payment_label(order) do
+      nil -> payment_label_paid(order)
+      label -> "Split · #{label}"
+    end
   end
 
-  def payment_label(%Order{payment_method: "counter", payment_status: "paid"}),
-    do: "Paid at counter"
+  def payment_label(%Order{payment_method: "counter", payment_status: "unpaid"}),
+    do: "Pay at counter"
 
   def payment_label(%Order{
         payment_method: "online",
@@ -1389,18 +1376,26 @@ defmodule Espreso.Orders do
   def payment_label(%Order{payment_method: "online", payment_status: "awaiting_payment"}),
     do: "Awaiting QR payment"
 
-  def payment_label(%Order{payment_method: "online", payment_status: "paid", paid_via: paid_via})
-      when paid_via in ["gcash", "maya"] do
-    "Paid via #{wallet_brand_label(paid_via)}"
-  end
-
-  def payment_label(%Order{payment_method: "online", payment_status: "paid"}),
-    do: "Paid online"
-
   def payment_label(%Order{payment_method: "online", payment_status: "unpaid"}),
     do: "Awaiting online payment"
 
   def payment_label(_), do: "Payment"
+
+  defp payment_label_paid(%Order{payment_method: "counter", paid_via: paid_via})
+       when paid_via in ["gcash", "maya"] do
+    "Paid via #{wallet_brand_label(paid_via)}"
+  end
+
+  defp payment_label_paid(%Order{payment_method: "counter"}), do: "Paid at counter"
+
+  defp payment_label_paid(%Order{payment_method: "online", paid_via: paid_via})
+       when paid_via in ["gcash", "maya"] do
+    "Paid via #{wallet_brand_label(paid_via)}"
+  end
+
+  defp payment_label_paid(%Order{payment_method: "online"}), do: "Paid online"
+
+  defp payment_label_paid(_), do: "Paid"
 
   def wallet_brand_label("gcash"), do: "GCash"
   def wallet_brand_label("maya"), do: "Maya"
@@ -1412,6 +1407,45 @@ defmodule Espreso.Orders do
   def paid_via_label("counter"), do: "Counter"
   def paid_via_label("paymongo"), do: "PayMongo"
   def paid_via_label(_), do: "Other"
+
+  @doc """
+  Compact split summary (`"Cash + GCash"`), or `nil` when the order is a
+  single tender.
+  """
+  def split_payment_label(%Order{payment_splits: splits}) when is_list(splits) and splits != [] do
+    splits
+    |> Enum.sort_by(&split_sort_key/1)
+    |> Enum.map(&paid_via_label(&1.paid_via))
+    |> Enum.join(" + ")
+  end
+
+  def split_payment_label(_), do: nil
+
+  def split_payments?(%Order{payment_splits: splits}) when is_list(splits) and splits != [],
+    do: true
+
+  def split_payments?(_), do: false
+
+  @doc """
+  Validates a cash + GCash/Maya split that sums to `total`.
+
+  Returns `{:ok, splits}` where each split is `%{paid_via: ..., amount: Decimal}`.
+  """
+  def prepare_payment_splits(source, total, payment_method, payment_status) do
+    case settlement_value(source, :splits) do
+      empty when empty in [nil, []] ->
+        {:ok, []}
+
+      _raw when payment_method != "counter" ->
+        {:error, :split_counter_only}
+
+      _raw when payment_status != "paid" ->
+        {:error, :split_requires_paid}
+
+      raw ->
+        validate_split_pair(raw, total)
+    end
+  end
 
   def paid_via_rows(%{by_via: by_via}) when is_map(by_via) do
     Enum.map(~w(cash gcash maya counter paymongo), fn via ->
@@ -1629,6 +1663,120 @@ defmodule Espreso.Orders do
 
   defp normalize_money(_), do: {:error, :invalid_cash_tendered}
 
+  defp primary_paid_via(_paid_via, [_ | _] = _splits), do: "cash"
+  defp primary_paid_via(paid_via, _), do: paid_via
+
+  defp cash_due_total(_total, splits) when is_list(splits) and splits != [] do
+    splits
+    |> Enum.find(fn split -> split.paid_via == "cash" end)
+    |> case do
+      %{amount: amount} -> amount
+      _ -> Decimal.new("0")
+    end
+  end
+
+  defp cash_due_total(total, _), do: total
+
+  defp validate_split_pair(raw, total) when is_list(raw) do
+    with {:ok, entries} <- map_split_entries(raw),
+         2 <- length(entries),
+         vias <- entries |> Enum.map(& &1.paid_via) |> Enum.sort(),
+         true <- split_pair?(vias),
+         true <- Enum.all?(entries, &(Decimal.compare(&1.amount, 0) == :gt)),
+         true <- Decimal.equal?(split_sum(entries), Decimal.round(decimalize(total), 2)) do
+      {:ok, Enum.sort_by(entries, &split_sort_key/1)}
+    else
+      _ -> {:error, :invalid_payment_split}
+    end
+  end
+
+  defp validate_split_pair(_, _), do: {:error, :invalid_payment_split}
+
+  defp map_split_entries(raw) do
+    Enum.reduce_while(raw, {:ok, []}, fn entry, {:ok, acc} ->
+      case normalize_split_entry(entry) do
+        {:ok, split} -> {:cont, {:ok, acc ++ [split]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp normalize_split_entry(entry) when is_map(entry) do
+    via = settlement_value(entry, :paid_via)
+    amount = settlement_value(entry, :amount)
+
+    with {:ok, via} <- normalize_split_via(via),
+         {:ok, amount} <- normalize_money(amount),
+         :gt <- Decimal.compare(amount, Decimal.new("0")) do
+      {:ok, %{paid_via: via, amount: amount}}
+    else
+      _ -> {:error, :invalid_payment_split}
+    end
+  end
+
+  defp normalize_split_entry(_), do: {:error, :invalid_payment_split}
+
+  defp normalize_split_via(value) when value in ["cash", "gcash", "maya"], do: {:ok, value}
+
+  defp normalize_split_via(value) when is_atom(value),
+    do: value |> Atom.to_string() |> normalize_split_via()
+
+  defp normalize_split_via(_), do: {:error, :invalid_payment_split}
+
+  defp split_pair?(["cash", "gcash"]), do: true
+  defp split_pair?(["cash", "maya"]), do: true
+  defp split_pair?(_), do: false
+
+  defp split_sum(entries) do
+    Enum.reduce(entries, Decimal.new("0"), fn %{amount: amount}, acc ->
+      Decimal.add(acc, amount)
+    end)
+  end
+
+  defp split_sort_key(%{paid_via: "cash"}), do: 0
+  defp split_sort_key(%PaymentSplit{paid_via: "cash"}), do: 0
+  defp split_sort_key(_), do: 1
+
+  defp insert_payment_splits(_repo, _order_id, []), do: {:ok, []}
+
+  defp insert_payment_splits(repo, order_id, splits) do
+    inserted =
+      Enum.map(splits, fn split ->
+        %PaymentSplit{}
+        |> PaymentSplit.changeset(%{
+          order_id: order_id,
+          paid_via: split.paid_via,
+          amount: split.amount
+        })
+        |> repo.insert!()
+      end)
+
+    {:ok, inserted}
+  end
+
+  defp paid_via_breakdown(orders, empty) do
+    by_via = Map.new(@paid_vias, fn via -> {via, empty} end)
+
+    Enum.reduce(orders, by_via, fn order, acc ->
+      Enum.reduce(payment_parts(order), acc, fn {via, amount}, acc ->
+        key = if via in @paid_vias, do: via, else: "counter"
+        current = Map.fetch!(acc, key)
+
+        Map.put(acc, key, %{
+          count: current.count + 1,
+          total: Decimal.add(current.total, decimalize(amount))
+        })
+      end)
+    end)
+  end
+
+  defp payment_parts(%Order{payment_splits: splits})
+       when is_list(splits) and splits != [] do
+    Enum.map(splits, &{&1.paid_via, &1.amount})
+  end
+
+  defp payment_parts(%Order{} = order), do: [{order.paid_via || "counter", order.total}]
+
   defp default_settlement_source(:paymongo), do: "paymongo"
   defp default_settlement_source(_), do: "manual"
 
@@ -1685,7 +1833,13 @@ defmodule Espreso.Orders do
   end
 
   defp apply_paid(%Order{} = order, paid_via, settlement_context, opts) do
-    with {:ok, paid_via} <- normalize_paid_via_value(paid_via),
+    with {:ok, splits} <-
+           prepare_payment_splits(opts, order.total, order.payment_method, "paid"),
+         {:ok, paid_via} <-
+           if(splits == [],
+             do: normalize_paid_via_value(paid_via),
+             else: {:ok, "cash"}
+           ),
          :ok <-
            validate_payment_settlement(
              order.payment_method,
@@ -1694,10 +1848,14 @@ defmodule Espreso.Orders do
              settlement_context
            ),
          {:ok, settlement_attrs} <-
-           build_settlement_attrs("paid", paid_via, order.total, opts,
+           build_settlement_attrs(
+             "paid",
+             paid_via,
+             cash_due_total(order.total, splits),
+             opts,
              default_source: default_settlement_source(settlement_context)
            ) do
-      do_apply_paid(order, paid_via, settlement_context, settlement_attrs)
+      do_apply_paid(order, paid_via, settlement_context, Map.put(settlement_attrs, :splits, splits))
     end
   end
 
@@ -1716,6 +1874,7 @@ defmodule Espreso.Orders do
     settlement_source = Map.fetch!(settlement_attrs, :settlement_source)
     cash_tendered = Map.get(settlement_attrs, :cash_tendered)
     change_due = Map.get(settlement_attrs, :change_due)
+    splits = Map.get(settlement_attrs, :splits) || []
 
     # Confirm payment advances New → Preparing so staff skip an extra tap.
     # Do not regress preparing / ready / completed.
@@ -1733,28 +1892,44 @@ defmodule Espreso.Orders do
         where(payment_query, [o], o.payment_intent == ^order.payment_intent)
       end
 
-    {count, _} =
-      payment_query
-      |> update([o],
-        set: [
-          payment_status: "paid",
-          paid_via: ^paid_via,
-          settled_at: ^settled_at,
-          settled_by_user_id: ^settled_by_user_id,
-          settlement_source: ^settlement_source,
-          cash_tendered: ^cash_tendered,
-          change_due: ^change_due,
-          settlement_time_estimated: false,
-          status: fragment("CASE WHEN status = 'received' THEN 'preparing' ELSE status END"),
-          updated_at: ^now
-        ]
-      )
-      |> Repo.update_all([])
+    now_ts = now
 
-    case count do
-      1 ->
+    result =
+      Ecto.Multi.new()
+      |> Ecto.Multi.run(:claim, fn repo, _changes ->
+        {count, _} =
+          payment_query
+          |> update([o],
+            set: [
+              payment_status: "paid",
+              paid_via: ^paid_via,
+              settled_at: ^settled_at,
+              settled_by_user_id: ^settled_by_user_id,
+              settlement_source: ^settlement_source,
+              cash_tendered: ^cash_tendered,
+              change_due: ^change_due,
+              settlement_time_estimated: false,
+              status: fragment("CASE WHEN status = 'received' THEN 'preparing' ELSE status END"),
+              updated_at: ^now_ts
+            ]
+          )
+          |> repo.update_all([])
+
+        case count do
+          1 -> {:ok, :transitioned}
+          0 -> {:error, :no_claim}
+          _ -> {:error, :unexpected_update_count}
+        end
+      end)
+      |> Ecto.Multi.run(:payment_splits, fn repo, _changes ->
+        insert_payment_splits(repo, order_id, splits)
+      end)
+      |> Repo.transaction()
+
+    case result do
+      {:ok, _} ->
         previous_status = order.status
-        order = Repo.get!(Order, order_id)
+        order = get_order(order_id)
         _ = attempt_loyalty_earn(order)
 
         case broadcast({:ok, order}) do
@@ -1763,7 +1938,7 @@ defmodule Espreso.Orders do
             {:ok, :transitioned, broadcasted}
         end
 
-      0 ->
+      {:error, :claim, :no_claim, _} ->
         case Repo.get(Order, order_id) do
           nil ->
             {:error, :not_found}
@@ -1788,8 +1963,11 @@ defmodule Espreso.Orders do
             end
         end
 
-      _ ->
+      {:error, :claim, :unexpected_update_count, _} ->
         {:error, :unexpected_update_count}
+
+      {:error, _step, reason, _} ->
+        {:error, reason}
     end
   end
 

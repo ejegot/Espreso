@@ -111,14 +111,34 @@ defmodule Espreso.Printer.Receipt do
   end
 
   defp payment_lines(order, paid_via, opts) do
-    case cash_change_lines(order, opts) do
-      [] ->
-        [EscPos.columns(Orders.paid_via_label(paid_via), money(order.total))]
+    split_lines = split_payment_lines(order)
 
-      tender_lines ->
+    tender_lines = cash_change_lines(order, opts)
+
+    cond do
+      split_lines != [] ->
+        split_lines ++ tender_lines
+
+      tender_lines != [] ->
         tender_lines
+
+      true ->
+        [EscPos.columns(Orders.paid_via_label(paid_via), money(order.total))]
     end
   end
+
+  defp split_payment_lines(%{payment_splits: splits}) when is_list(splits) and splits != [] do
+    splits
+    |> Enum.sort_by(fn
+      %{paid_via: "cash"} -> 0
+      _ -> 1
+    end)
+    |> Enum.map(fn split ->
+      EscPos.columns(Orders.paid_via_label(split.paid_via), money(split.amount))
+    end)
+  end
+
+  defp split_payment_lines(_), do: []
 
   defp cash_change_lines(order, opts) do
     tendered = Keyword.get(opts, :cash_tendered) || order.cash_tendered

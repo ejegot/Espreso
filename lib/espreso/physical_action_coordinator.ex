@@ -66,7 +66,7 @@ defmodule Espreso.PhysicalActionCoordinator do
     staff_name = Keyword.get(opts, :staff_name)
 
     settlement_opts =
-      Keyword.take(opts, [:settled_by_user_id, :settlement_source, :cash_tendered])
+      Keyword.take(opts, [:settled_by_user_id, :settlement_source, :cash_tendered, :splits])
 
     GenServer.call(
       server,

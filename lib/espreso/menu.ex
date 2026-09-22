@@ -8,9 +8,11 @@ defmodule Espreso.Menu do
   alias Espreso.Accounts.Authorization
   alias Espreso.Accounts.User
   alias Espreso.Repo
-  alias Espreso.Menu.{Category, Product}
+  alias Espreso.Menu.{Category, Product, ProductPhoto, ProductPrice}
 
   @category_order ~w(HOT COLD FRAPPE SODA FOOD)
+  @photo_max_bytes 3_000_000
+  @photo_types ~w(image/jpeg image/png image/webp)
 
   @product_images %{
     {"HOT", "Espresso"} => "/images/coffeespot/gen-hot-espresso.png",
@@ -294,6 +296,12 @@ defmodule Espreso.Menu do
 
   def sweets_product_name?(_), do: false
 
+  def sweets_product?(%{menu_group: group}) when group in @sweets_subcategory_names, do: true
+
+  def sweets_product?(%{name: name}), do: sweets_product_name?(name)
+
+  def sweets_product?(_), do: false
+
   @signature_product_name "Signature Tablea"
 
   @doc "Canonical name for the CoffeeSpot signature cacao drink."
@@ -374,8 +382,235 @@ defmodule Espreso.Menu do
     update_availability_as(actor, product.id, available)
   end
 
+  def category_names, do: @category_order
+
+  def food_group_names, do: Enum.map(@food_subcategories, &elem(&1, 0))
+
   @doc """
-  Absolute public URL for the CoffeeSpot QR menu landing page (`/menu`).
+  Creates a catalog product with prices when the actor has `:edit_menu`.
+
+  New items are available immediately on the QR menu and POS.
+  """
+  def create_product_as(%User{} = actor, attrs) when is_map(attrs) do
+    with :ok <- Authorization.authorize(actor, :edit_menu),
+         {:ok, category} <- fetch_category(attrs),
+         {:ok, name} <- fetch_name(attrs),
+         {:ok, menu_group} <- fetch_menu_group(category, attrs),
+         {:ok, prices} <- fetch_prices(category, attrs) do
+      insert_product_with_prices(category, name, menu_group, prices)
+    end
+  end
+
+  @doc """
+  Attaches a custom photo to a product. QR menu and POS use it immediately.
+  """
+  def put_product_photo_as(%User{} = actor, product_id, binary, content_type)
+      when is_integer(product_id) and is_binary(binary) do
+    with :ok <- Authorization.authorize(actor, :edit_menu),
+         %Product{} = product <- Repo.get(Product, product_id),
+         {:ok, type} <- normalize_photo_type(content_type),
+         :ok <- validate_photo_bytes(binary) do
+      upsert_product_photo(product, binary, type)
+    else
+      nil -> {:error, :not_found}
+      {:error, :unauthorized} = err -> err
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def get_product_photo(product_id) when is_integer(product_id) do
+    case Repo.get(Product, product_id) do
+      %Product{has_custom_photo: true} ->
+        Repo.get_by(ProductPhoto, product_id: product_id)
+
+      _ ->
+        nil
+    end
+  end
+
+  def photo_max_bytes, do: @photo_max_bytes
+
+  defp normalize_photo_type(type) when type in @photo_types, do: {:ok, type}
+  defp normalize_photo_type("image/jpg"), do: {:ok, "image/jpeg"}
+  defp normalize_photo_type(_), do: {:error, :invalid_photo}
+
+  defp validate_photo_bytes(binary) do
+    size = byte_size(binary)
+
+    cond do
+      size < 32 -> {:error, :invalid_photo}
+      size > @photo_max_bytes -> {:error, :photo_too_large}
+      true -> :ok
+    end
+  end
+
+  defp upsert_product_photo(product, binary, content_type) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    Repo.transaction(fn ->
+      photo =
+        case Repo.get_by(ProductPhoto, product_id: product.id) do
+          nil -> %ProductPhoto{product_id: product.id}
+          existing -> existing
+        end
+
+      {:ok, _photo} =
+        photo
+        |> ProductPhoto.changeset(%{content_type: content_type, data: binary})
+        |> Repo.insert_or_update()
+
+      {:ok, updated} =
+        product
+        |> Product.changeset(%{has_custom_photo: true, photo_updated_at: now})
+        |> Repo.update()
+
+      updated
+    end)
+    |> case do
+      {:ok, product} -> {:ok, product}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp fetch_category(attrs) do
+    name = attrs |> attr(:category) |> to_string() |> String.trim()
+
+    cond do
+      name not in @category_order ->
+        {:error, :invalid_category}
+
+      true ->
+        case Repo.get_by(Category, name: name) do
+          %Category{} = category -> {:ok, category}
+          nil -> {:error, :unknown_category}
+        end
+    end
+  end
+
+  defp fetch_name(attrs) do
+    name = attrs |> attr(:name) |> to_string() |> String.trim()
+
+    if name == "" or String.length(name) > 80 do
+      {:error, :invalid_name}
+    else
+      {:ok, name}
+    end
+  end
+
+  defp fetch_menu_group(%{name: "FOOD"}, attrs) do
+    group = attrs |> attr(:menu_group) |> to_string() |> String.trim()
+
+    if group in food_group_names() do
+      {:ok, group}
+    else
+      {:error, :invalid_menu_group}
+    end
+  end
+
+  defp fetch_menu_group(_category, _attrs), do: {:ok, nil}
+
+  defp fetch_prices(%{name: "HOT"}, attrs) do
+    case attr(attrs, :hot_price_mode) |> to_string() do
+      "single" -> sized_prices([{nil, attr(attrs, :price)}])
+      _ -> sized_prices([{"8oz", attr(attrs, :price_8oz)}, {"12oz", attr(attrs, :price_12oz)}])
+    end
+  end
+
+  defp fetch_prices(%{name: category}, attrs) when category in ["COLD", "FRAPPE", "SODA"] do
+    sized_prices([{"16oz", attr(attrs, :price)}])
+  end
+
+  defp fetch_prices(%{name: "FOOD"}, attrs) do
+    sized_prices([{nil, attr(attrs, :price)}])
+  end
+
+  defp fetch_prices(_category, _attrs), do: {:error, :invalid_category}
+
+  defp sized_prices(pairs) do
+    parsed =
+      Enum.reduce_while(pairs, [], fn {size, raw}, acc ->
+        case parse_price(raw) do
+          {:ok, price} -> {:cont, acc ++ [{size, price}]}
+          :error -> {:halt, :error}
+        end
+      end)
+
+    case parsed do
+      :error -> {:error, :invalid_price}
+      prices -> {:ok, prices}
+    end
+  end
+
+  defp parse_price(value) do
+    text = value |> to_string() |> String.trim() |> String.replace(",", "")
+
+    case Decimal.parse(text) do
+      {decimal, ""} ->
+        if Decimal.compare(decimal, 0) == :gt do
+          {:ok, Decimal.round(decimal, 2)}
+        else
+          :error
+        end
+
+      _ ->
+        :error
+    end
+  end
+
+  defp attr(attrs, key) do
+    Map.get(attrs, key) || Map.get(attrs, Atom.to_string(key))
+  end
+
+  defp insert_product_with_prices(category, name, menu_group, prices) do
+    changeset =
+      %Product{}
+      |> Product.changeset(%{
+        name: name,
+        category_id: category.id,
+        available: true,
+        menu_group: menu_group
+      })
+
+    Repo.transaction(fn ->
+      case Repo.insert(changeset) do
+        {:ok, product} ->
+          Enum.each(prices, fn {size, price} ->
+            {:ok, _} =
+              %ProductPrice{}
+              |> ProductPrice.changeset(%{
+                product_id: product.id,
+                size: size,
+                price: price
+              })
+              |> Repo.insert()
+          end)
+
+          Repo.preload(product, [:category, :product_prices])
+
+        {:error, %Ecto.Changeset{} = failed} ->
+          Repo.rollback(name_error(failed))
+      end
+    end)
+    |> case do
+      {:ok, product} -> {:ok, product}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp name_error(%Ecto.Changeset{} = changeset) do
+    if Keyword.has_key?(changeset.errors, :name) and
+         unique_name_error?(changeset.errors[:name]) do
+      :name_taken
+    else
+      :invalid_name
+    end
+  end
+
+  defp unique_name_error?({_msg, opts}), do: opts[:constraint] == :unique
+  defp unique_name_error?(_), do: false
+
+  @doc """
+  Absolute public URL for a CoffeeSpot QR menu landing page (`/menu`).
 
   Configured as `:public_menu_url` (env `PUBLIC_MENU_URL`).
   Development falls back to `http://localhost:4000/menu`.
@@ -494,18 +729,28 @@ defmodule Espreso.Menu do
   end
 
   defp food_groups(products) do
-    products_by_name = Map.new(products, &{&1.name, &1})
+    grouped = Enum.group_by(products, &food_group_name/1)
+    known = Enum.map(@food_subcategories, &elem(&1, 0))
 
-    @food_subcategories
-    |> Enum.map(fn {group_name, product_names} ->
-      grouped_products =
-        product_names
-        |> Enum.map(&Map.get(products_by_name, &1))
-        |> Enum.reject(&is_nil/1)
+    extras =
+      grouped
+      |> Map.keys()
+      |> Enum.reject(&(&1 in known or is_nil(&1)))
+      |> Enum.sort()
 
-      %{name: group_name, products: grouped_products}
+    (known ++ extras)
+    |> Enum.map(fn group ->
+      %{name: group, products: Map.get(grouped, group, [])}
     end)
-    |> Enum.reject(fn group -> group.products == [] end)
+    |> Enum.reject(&(&1.products == []))
+  end
+
+  defp food_group_name(%{menu_group: group}) when is_binary(group) and group != "", do: group
+
+  defp food_group_name(%{name: name}) do
+    Enum.find_value(@food_subcategories, fn {group, names} ->
+      if name in names, do: group
+    end) || "Other"
   end
 
   defp category_position(%{name: name}) do
@@ -520,9 +765,14 @@ defmodule Espreso.Menu do
   @pos_thumb_vsn "pos1"
 
   @doc """
-  Public image path for a menu item. Named CoffeeSpot photos first,
-  then a stable category fallback so every card has a photo.
+  Public image path for a menu item. Custom tablet photo first, then named
+  CoffeeSpot photos, then a stable category fallback so every card has a photo.
   """
+  def product_image(category_name, %{name: name} = product)
+      when is_binary(category_name) and is_binary(name) do
+    custom_photo_url(product) || product_image(category_name, name)
+  end
+
   def product_image(category_name, product_name)
       when is_binary(category_name) and is_binary(product_name) do
     Map.get(@product_images, {category_name, product_name}) ||
@@ -530,8 +780,9 @@ defmodule Espreso.Menu do
   end
 
   @doc "Image path plus whether it should render as a packshot (contain)."
-  def product_image_meta(category_name, product_name) do
-    src = product_image(category_name, product_name)
+  def product_image_meta(category_name, product)
+      when is_binary(category_name) and (is_map(product) or is_binary(product)) do
+    src = product_image(category_name, product)
     %{src: src, packshot?: packshot_image?(src)}
   end
 
@@ -539,8 +790,17 @@ defmodule Espreso.Menu do
   POS tablet image meta: lightweight WebP thumb under `/images/coffeespot/pos-thumbs/`
   with `?vsn=` for long-lived HTTP cache. Falls back to the full image if missing.
 
+  Custom photos skip thumbs and use `/media/products/:id`.
   Customer menu and API must keep using `product_image/2` / `product_image_meta/2`.
   """
+  def pos_product_image_meta(category_name, %{name: name} = product)
+      when is_binary(category_name) and is_binary(name) do
+    case custom_photo_url(product) do
+      nil -> pos_product_image_meta(category_name, name)
+      url -> %{src: url, packshot?: false}
+    end
+  end
+
   def pos_product_image_meta(category_name, product_name)
       when is_binary(category_name) and is_binary(product_name) do
     full = product_image(category_name, product_name)
@@ -554,6 +814,15 @@ defmodule Espreso.Menu do
         %{src: full, packshot?: packshot?}
     end
   end
+
+  defp custom_photo_url(%{id: id, has_custom_photo: true} = product) when is_integer(id) do
+    "/media/products/#{id}?v=#{photo_cache_v(Map.get(product, :photo_updated_at), id)}"
+  end
+
+  defp custom_photo_url(_), do: nil
+
+  defp photo_cache_v(%DateTime{} = at, _id), do: DateTime.to_unix(at)
+  defp photo_cache_v(_, id), do: id
 
   @doc "True when the image is a transparent packshot PNG (prefer contain in UI)."
   def packshot_image?(path) when is_binary(path) do

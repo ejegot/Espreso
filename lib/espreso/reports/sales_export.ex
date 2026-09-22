@@ -86,7 +86,7 @@ defmodule Espreso.Reports.SalesExport do
           source_label(order.source),
           payment_method_label(order.payment_method),
           payment_intent_label(order.payment_intent),
-          Orders.paid_via_label(order.paid_via),
+          Orders.split_payment_label(order) || Orders.paid_via_label(order.paid_via),
           settlement_source_label(order.settlement_source),
           money(order.total),
           loyalty_free_money(order.loyalty_free_amount_centavos),
@@ -105,7 +105,7 @@ defmodule Espreso.Reports.SalesExport do
       orders
       |> Enum.flat_map(fn %Order{} = order ->
         settler = settled_by_name(order)
-        paid_via = Orders.paid_via_label(order.paid_via)
+        paid_via = Orders.split_payment_label(order) || Orders.paid_via_label(order.paid_via)
         shop_date = shop_date_string(order.settled_at)
 
         (order.items || [])

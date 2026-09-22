@@ -67,7 +67,7 @@ defmodule EspresoWeb.Api.JSON do
               name: product.name,
               description: product.description,
               available: product.available,
-              image_path: Menu.product_image(category.name, product.name),
+              image_path: Menu.product_image(category.name, product),
               prices:
                 Enum.map(product.product_prices, fn price ->
                   %{
