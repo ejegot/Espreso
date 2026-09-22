@@ -6,6 +6,7 @@ defmodule EspresoWeb.StaffPosLive do
   alias Espreso.Menu
   alias Espreso.Orders
   alias Espreso.Printer
+  alias Espreso.Shifts
   alias EspresoWeb.PrinterClientBridge
   alias Phoenix.LiveView.JS
 
@@ -79,6 +80,7 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:pubsub_reload_timer, nil)
      |> assign(:pubsub_reload_token, nil)
      |> assign(:orders_new_count, Orders.new_lane_count())
+     |> assign_shop_day()
      |> reset_pos_product_stream(), layout: false}
   end
 
@@ -1015,6 +1017,7 @@ defmodule EspresoWeb.StaffPosLive do
       orders_badge_count={@orders_new_count}
     >
       <div class="staff-pos-page staff-pos-shell-root staff-pos-page--cafe">
+        <.shop_day_sales_banner status={@shop_day_status} id="staff-pos-shop-day" />
         <main class="staff-pos-main">
           <p :if={@error} class="staff-pos-flash" id="pos-error">{@error}</p>
 
@@ -1638,13 +1641,13 @@ defmodule EspresoWeb.StaffPosLive do
                       type="submit"
                       class={[
                         "staff-pos-place",
-                        (@cart == [] or @placing_order? or
+                        (@shop_day_status != :open or @cart == [] or @placing_order? or
                            loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)) &&
                           "is-disabled"
                       ]}
                       id="pos-place-order"
                       disabled={
-                        @cart == [] or @placing_order? or
+                        @shop_day_status != :open or @cart == [] or @placing_order? or
                           loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)
                       }
                     >
@@ -2074,11 +2077,7 @@ defmodule EspresoWeb.StaffPosLive do
           </div>
         </div>
 
-        <form
-          id="pos-split-form"
-          phx-change="set_cash_tendered"
-          phx-submit="confirm_split"
-        >
+        <form id="pos-split-form" phx-change="set_cash_tendered" phx-submit="confirm_split">
           <label class="staff-pos-cash-field" for="pos-split-tendered">
             <span>Cash received</span>
             <span class="staff-pos-cash-input-wrap">
@@ -2454,6 +2453,7 @@ defmodule EspresoWeb.StaffPosLive do
         complete_redeem(socket, customer, quote, paid_via, [], tendered, change)
     end
   end
+
   defp complete_redeem(socket, customer, quote, paid_via, splits, tendered, change) do
     paid? = socket.assigns.payment_choice == :paid
     paid_via = if paid_via == "split", do: "cash", else: paid_via
@@ -2616,106 +2616,118 @@ defmodule EspresoWeb.StaffPosLive do
             socket = assign(socket, :placing_order?, true)
 
             case Orders.create_order(lines, attrs) do
-          {:ok, order} ->
-            {permit, settle_result} =
-              if paid? do
-                PrinterClientBridge.settle_physical_for_paid_order(
-                  order,
-                  order.paid_via || paid_via || "cash",
-                  staff_name: socket.assigns.current_user.name
-                )
-              else
-                {nil, :disabled}
-              end
+              {:ok, order} ->
+                {permit, settle_result} =
+                  if paid? do
+                    PrinterClientBridge.settle_physical_for_paid_order(
+                      order,
+                      order.paid_via || paid_via || "cash",
+                      staff_name: socket.assigns.current_user.name
+                    )
+                  else
+                    {nil, :disabled}
+                  end
 
-            socket =
-              socket
-              |> apply_pos_physical_result(
-                order,
-                order.paid_via || paid_via,
-                settle_result,
-                permit
-              )
+                socket =
+                  socket
+                  |> apply_pos_physical_result(
+                    order,
+                    order.paid_via || paid_via,
+                    settle_result,
+                    permit
+                  )
 
-            note = socket.assigns.print_note
-            failed? = socket.assigns.print_failed?
-            note_error? = socket.assigns.print_note_error?
+                note = socket.assigns.print_note
+                failed? = socket.assigns.print_failed?
+                note_error? = socket.assigns.print_note_error?
 
-            cash_change = if(change, do: %{tendered: tendered, change: change})
+                cash_change = if(change, do: %{tendered: tendered, change: change})
 
-            {:noreply,
-             socket
-             |> clear_cart_undo()
-             |> assign(:cart, [])
-             |> assign(:card_sizes, %{})
-             |> assign(:added_product_id, nil)
-             |> assign(:error, nil)
-             |> assign(:submission_error, nil)
-             |> assign(:payment_choice, :paid)
-             |> assign(:paid_via, "cash")
-             |> assign(:split_cash, "")
-             |> assign(:split_wallet, "gcash")
-             |> close_split_modal()
-             |> assign(:customer_name, "Walk-in")
-             |> clear_loyalty_identity()
-             |> assign(:variant_editor_key, nil)
-             |> assign(:cash_tender_open?, false)
-             |> assign(:cash_tendered, "")
-             |> assign(:cash_tender_error, nil)
-             |> assign(:cash_tender_token, nil)
-             |> assign(:cash_tender_purpose, :order)
-             |> assign(:cash_tender_total, nil)
-             |> assign(:fulfillment, :pickup)
-             |> assign(:table_number, "")
-             |> assign(:placing_order?, false)
-             |> assign(:notes, "")
-             |> assign(:notes_open?, false)
-             |> assign(:categories, Menu.list_menu())
-             |> reset_pos_product_stream()
-             |> assign(:last_cash_change, cash_change)
-             |> assign(:print_note, note)
-             |> assign(:print_failed?, failed?)
-             |> assign(:print_note_error?, note_error?)
-             |> assign(:last_order, order)
-             |> remember_review_order(order)
-             |> assign(:ticket_loyalty_note, loyalty_place_note(order))
-             |> clear_place_flash()}
+                {:noreply,
+                 socket
+                 |> clear_cart_undo()
+                 |> assign(:cart, [])
+                 |> assign(:card_sizes, %{})
+                 |> assign(:added_product_id, nil)
+                 |> assign(:error, nil)
+                 |> assign(:submission_error, nil)
+                 |> assign(:payment_choice, :paid)
+                 |> assign(:paid_via, "cash")
+                 |> assign(:split_cash, "")
+                 |> assign(:split_wallet, "gcash")
+                 |> close_split_modal()
+                 |> assign(:customer_name, "Walk-in")
+                 |> clear_loyalty_identity()
+                 |> assign(:variant_editor_key, nil)
+                 |> assign(:cash_tender_open?, false)
+                 |> assign(:cash_tendered, "")
+                 |> assign(:cash_tender_error, nil)
+                 |> assign(:cash_tender_token, nil)
+                 |> assign(:cash_tender_purpose, :order)
+                 |> assign(:cash_tender_total, nil)
+                 |> assign(:fulfillment, :pickup)
+                 |> assign(:table_number, "")
+                 |> assign(:placing_order?, false)
+                 |> assign(:notes, "")
+                 |> assign(:notes_open?, false)
+                 |> assign(:categories, Menu.list_menu())
+                 |> reset_pos_product_stream()
+                 |> assign(:last_cash_change, cash_change)
+                 |> assign(:print_note, note)
+                 |> assign(:print_failed?, failed?)
+                 |> assign(:print_note_error?, note_error?)
+                 |> assign(:last_order, order)
+                 |> remember_review_order(order)
+                 |> assign(:ticket_loyalty_note, loyalty_place_note(order))
+                 |> clear_place_flash()}
 
-          {:error, :empty_cart} ->
-            {:noreply,
-             socket
-             |> assign(:placing_order?, false)
-             |> assign(:submission_error, "Add at least one item before placing an order.")}
+              {:error, :empty_cart} ->
+                {:noreply,
+                 socket
+                 |> assign(:placing_order?, false)
+                 |> assign(:submission_error, "Add at least one item before placing an order.")}
 
-          {:error, {:unavailable, names}} ->
-            {:noreply,
-             socket
-             |> assign(:placing_order?, false)
-             |> assign(:submission_error, unavailable_error(names))}
+              {:error, :shop_not_open} ->
+                {:noreply,
+                 socket
+                 |> assign(:placing_order?, false)
+                 |> assign(:submission_error, Shifts.selling_blocked_message(:shop_not_open))}
 
-          {:error, {:price_changed, _names}} ->
-            {:noreply,
-             socket
-             |> assign(:placing_order?, false)
-             |> assign(:categories, Menu.list_menu())
-             |> reset_pos_product_stream()
-             |> assign(:submission_error, "Price changed — please review your ticket.")}
+              {:error, :shop_day_closed} ->
+                {:noreply,
+                 socket
+                 |> assign(:placing_order?, false)
+                 |> assign(:submission_error, Shifts.selling_blocked_message(:shop_day_closed))}
 
-          {:error, :invalid_payment_split} ->
-            {:noreply,
-             socket
-             |> assign(:placing_order?, false)
-             |> assign(
-               :submission_error,
-               "Split amounts must be cash plus GCash or Maya, and equal the total."
-             )}
+              {:error, {:unavailable, names}} ->
+                {:noreply,
+                 socket
+                 |> assign(:placing_order?, false)
+                 |> assign(:submission_error, unavailable_error(names))}
 
-          {:error, _changeset} ->
-            {:noreply,
-             socket
-             |> assign(:placing_order?, false)
-             |> assign(:submission_error, "Could not place order. Check items and try again.")}
-        end
+              {:error, {:price_changed, _names}} ->
+                {:noreply,
+                 socket
+                 |> assign(:placing_order?, false)
+                 |> assign(:categories, Menu.list_menu())
+                 |> reset_pos_product_stream()
+                 |> assign(:submission_error, "Price changed — please review your ticket.")}
+
+              {:error, :invalid_payment_split} ->
+                {:noreply,
+                 socket
+                 |> assign(:placing_order?, false)
+                 |> assign(
+                   :submission_error,
+                   "Split amounts must be cash plus GCash or Maya, and equal the total."
+                 )}
+
+              {:error, _changeset} ->
+                {:noreply,
+                 socket
+                 |> assign(:placing_order?, false)
+                 |> assign(:submission_error, "Could not place order. Check items and try again.")}
+            end
         end
     end
   end
@@ -2724,6 +2736,10 @@ defmodule EspresoWeb.StaffPosLive do
     cond do
       socket.assigns.placing_order? ->
         :ignore
+
+      Map.get(socket.assigns, :shop_day_status, :open) != :open ->
+        {:error,
+         Shifts.selling_blocked_message(shop_day_error(Map.get(socket.assigns, :shop_day_status, :open)))}
 
       socket.assigns.cart == [] and
           (not is_nil(socket.assigns.place_flash) or not is_nil(socket.assigns.last_order)) ->
@@ -3626,7 +3642,11 @@ defmodule EspresoWeb.StaffPosLive do
 
             :invalid ->
               {:noreply,
-               assign(socket, :split_error, "Enter a valid cash amount with up to 2 decimal places.")}
+               assign(
+                 socket,
+                 :split_error,
+                 "Enter a valid cash amount with up to 2 decimal places."
+               )}
           end
 
         {:error, message} ->
@@ -3697,7 +3717,8 @@ defmodule EspresoWeb.StaffPosLive do
             {:ok, splits}
 
           {:error, _} ->
-            {:error, "Enter a cash amount less than the total. The rest is #{wallet_label(wallet)}."}
+            {:error,
+             "Enter a cash amount less than the total. The rest is #{wallet_label(wallet)}."}
         end
 
       :error ->
@@ -4016,4 +4037,11 @@ defmodule EspresoWeb.StaffPosLive do
   end
 
   defp order_note(_), do: nil
+
+  defp assign_shop_day(socket) do
+    assign(socket, :shop_day_status, Shifts.shop_day_status())
+  end
+
+  defp shop_day_error(:closed), do: :shop_day_closed
+  defp shop_day_error(_), do: :shop_not_open
 end

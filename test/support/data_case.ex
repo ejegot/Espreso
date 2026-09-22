@@ -29,6 +29,7 @@ defmodule Espreso.DataCase do
 
   setup tags do
     Espreso.DataCase.setup_sandbox(tags)
+    unless tags[:without_shop_open], do: ensure_shop_day_open!()
     :ok
   end
 
@@ -38,6 +39,28 @@ defmodule Espreso.DataCase do
   def setup_sandbox(tags) do
     pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Espreso.Repo, shared: not tags[:async])
     on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+  end
+
+  @doc """
+  Opens today's shop day so order/POS tests match production selling gates.
+  """
+  def ensure_shop_day_open! do
+    alias Espreso.Accounts
+    alias Espreso.Shifts
+
+    if is_nil(Shifts.get_todays_open()) do
+      {:ok, user} =
+        Accounts.register_user(%{
+          name: "Shop Open",
+          email: "shop-open-#{System.unique_integer([:positive])}@test.local",
+          password: "password123",
+          role: "manager"
+        })
+
+      {:ok, _} = Shifts.record_open(user, %{opening_cash: "0"})
+    end
+
+    :ok
   end
 
   @doc """

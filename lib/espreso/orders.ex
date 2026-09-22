@@ -7,11 +7,14 @@ defmodule Espreso.Orders do
   require Logger
 
   alias Espreso.Repo
+  alias Espreso.Accounts.Authorization
+  alias Espreso.Accounts.User
   alias Espreso.BusinessSettings
   alias Espreso.CustomerPush
   alias Espreso.Loyalty
   alias Espreso.Orders.{Order, OrderItem, PaymentReconciliation, PaymentSplit}
   alias Espreso.Menu
+  alias Espreso.Shifts
   alias Espreso.Menu.Product
   alias Espreso.Menu.ProductPrice
   alias Espreso.StaffShifts.StaffShift
@@ -49,12 +52,14 @@ defmodule Espreso.Orders do
   referenced product is unavailable (application-level check).
   """
   def create_order(lines, attrs) when is_list(lines) and lines != [] do
-    case Menu.unavailable_for_order_lines(lines) do
-      [] ->
-        do_create_order(lines, attrs)
+    with :ok <- Shifts.assert_selling_allowed() do
+      case Menu.unavailable_for_order_lines(lines) do
+        [] ->
+          do_create_order(lines, attrs)
 
-      names ->
-        {:error, {:unavailable, names}}
+        names ->
+          {:error, {:unavailable, names}}
+      end
     end
   end
 
@@ -1068,6 +1073,9 @@ defmodule Espreso.Orders do
           current.payment_status == "paid" ->
             {:error, :paid}
 
+          current.payment_status == "refunded" ->
+            {:error, :already_refunded}
+
           current.status not in ["received", "preparing"] ->
             {:error, :invalid_status}
 
@@ -1076,6 +1084,85 @@ defmodule Espreso.Orders do
 
           true ->
             atomically_cancel_order(id, :without_session)
+        end
+    end
+  end
+
+  def cancel_order(%Order{} = order), do: cancel_order(%Order{id: order.id})
+
+  @doc """
+  Refunds a paid order before the shop day is sealed.
+
+  Manager/owner only. Sets `payment_status` to `refunded` and `status` to
+  `cancelled` so the ticket leaves the kitchen board and drops out of paid
+  sales / drawer expected. Does not reverse PayMongo or loyalty points.
+  """
+  def refund_paid_order(%Order{id: id}, %User{} = user, reason) when is_integer(id) do
+    if Authorization.can?(user, :reports) do
+      do_refund_paid_order(id, user, reason)
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  def refund_paid_order(%Order{} = order, user, reason),
+    do: refund_paid_order(%Order{id: order.id}, user, reason)
+
+  defp do_refund_paid_order(id, user, reason) do
+    reason =
+      reason
+      |> to_string()
+      |> String.trim()
+
+    cond do
+      reason == "" or String.length(reason) < 2 or String.length(reason) > 500 ->
+        {:error, :refund_reason_required}
+
+      true ->
+        with :ok <- Shifts.assert_selling_allowed() do
+          atomically_refund_paid_order(id, user.id, reason)
+        end
+    end
+  end
+
+  defp atomically_refund_paid_order(order_id, user_id, reason) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    {count, _} =
+      from(o in Order,
+        where: o.id == ^order_id and o.payment_status == "paid"
+      )
+      |> update([o],
+        set: [
+          payment_status: "refunded",
+          status: "cancelled",
+          refunded_at: ^now,
+          refunded_by_user_id: ^user_id,
+          refund_reason: ^reason,
+          updated_at: ^now
+        ]
+      )
+      |> Repo.update_all([])
+
+    case count do
+      1 ->
+        order =
+          Order
+          |> Repo.get!(order_id)
+          |> Repo.preload([:items, :payment_splits, :refunded_by_user])
+
+        broadcast({:ok, order})
+
+      0 ->
+        case Repo.get(Order, order_id) do
+          nil ->
+            {:error, :not_found}
+
+          %Order{payment_status: "refunded"} ->
+            {:error, :already_refunded}
+
+          _ ->
+            {:error, :not_paid}
         end
     end
   end
@@ -1353,6 +1440,8 @@ defmodule Espreso.Orders do
   def status_label("completed"), do: "Picked up"
   def status_label("cancelled"), do: "Cancelled"
   def status_label(other), do: other
+
+  def payment_label(%Order{payment_status: "refunded"}), do: "Refunded"
 
   def payment_label(%Order{payment_status: "paid"} = order) do
     case split_payment_label(order) do
@@ -1833,7 +1922,8 @@ defmodule Espreso.Orders do
   end
 
   defp apply_paid(%Order{} = order, paid_via, settlement_context, opts) do
-    with {:ok, splits} <-
+    with :ok <- Shifts.assert_selling_allowed(),
+         {:ok, splits} <-
            prepare_payment_splits(opts, order.total, order.payment_method, "paid"),
          {:ok, paid_via} <-
            if(splits == [],
@@ -1855,7 +1945,12 @@ defmodule Espreso.Orders do
              opts,
              default_source: default_settlement_source(settlement_context)
            ) do
-      do_apply_paid(order, paid_via, settlement_context, Map.put(settlement_attrs, :splits, splits))
+      do_apply_paid(
+        order,
+        paid_via,
+        settlement_context,
+        Map.put(settlement_attrs, :splits, splits)
+      )
     end
   end
 

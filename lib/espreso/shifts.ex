@@ -122,6 +122,39 @@ defmodule Espreso.Shifts do
   def can_access_open?(user), do: can_access_close?(user)
 
   @doc """
+  Manila shop-day sales gate: `:open`, `:not_open`, or `:closed`.
+  """
+  def shop_day_status do
+    shop_date = Orders.shop_date_today()
+
+    cond do
+      not is_nil(get_close_for_date(shop_date)) -> :closed
+      is_nil(get_open_for_date(shop_date)) -> :not_open
+      true -> :open
+    end
+  end
+
+  @doc """
+  New sales and cash drawer movements are allowed only while the shop day
+  is opened and not yet sealed.
+  """
+  def assert_selling_allowed do
+    case shop_day_status() do
+      :open -> :ok
+      :not_open -> {:error, :shop_not_open}
+      :closed -> {:error, :shop_day_closed}
+    end
+  end
+
+  def selling_blocked_message(:shop_not_open),
+    do: "Record opening cash before selling. Open shop once at the start of the day."
+
+  def selling_blocked_message(:shop_day_closed),
+    do: "Shop day is closed. No new sales until tomorrow."
+
+  def selling_blocked_message(_), do: "Selling is not available right now."
+
+  @doc """
   Today's shop-day opening cash, if recorded.
   """
   def get_todays_open do

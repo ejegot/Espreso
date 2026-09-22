@@ -8,6 +8,7 @@ defmodule EspresoWeb.MenuLive do
   alias Espreso.Orders
   alias Espreso.BusinessSettings
   alias Espreso.PayMongo
+  alias Espreso.Shifts
 
   @impl true
   def mount(_params, _session, socket) do
@@ -49,6 +50,7 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:payment_method, :counter)
      |> assign(:payment_touched?, false)
      |> assign(:placing_order?, false)
+     |> assign(:shop_day_status, Shifts.shop_day_status())
      |> assign(:my_orders, [])
      |> assign(:my_orders_open?, false)
      |> assign(:my_orders_tab, :orders)
@@ -329,6 +331,9 @@ defmodule EspresoWeb.MenuLive do
 
       socket.assigns.placing_order? ->
         {:noreply, socket}
+
+      socket.assigns.shop_day_status != :open ->
+        {:noreply, order_failure(socket, shop_day_menu_message(socket.assigns.shop_day_status))}
 
       errors != %{} ->
         {:noreply, assign(socket, :checkout_errors, errors)}
@@ -1501,6 +1506,15 @@ defmodule EspresoWeb.MenuLive do
           class="menu-basket-submit menu-basket-submit--floating"
         >
           <p
+            :if={@shop_day_status != :open}
+            id="menu-shop-day-block"
+            class="menu-checkout-summary"
+            role="status"
+          >
+            {shop_day_menu_message(@shop_day_status)}
+          </p>
+
+          <p
             :if={checkout_summary_error(@checkout_errors)}
             id="menu-checkout-summary"
             class="menu-checkout-summary"
@@ -1520,7 +1534,7 @@ defmodule EspresoWeb.MenuLive do
                 type="button"
                 class="menu-basket-checkout"
                 phx-click="place_order"
-                disabled={@placing_order?}
+                disabled={@placing_order? or @shop_day_status != :open}
                 data-dismiss-keyboard
               >
                 {checkout_button_label(@payment_method, @placing_order?, @payments_mode)}
@@ -3274,8 +3288,8 @@ defmodule EspresoWeb.MenuLive do
          |> assign(:placing_order?, false)
          |> assign(:checkout_errors, checkout_errors_from_changeset(changeset))}
 
-      {:error, _} ->
-        {:noreply, order_failure(socket, "Could not place order — try again")}
+      {:error, reason} ->
+        {:noreply, order_failure(socket, order_create_failure_message(reason))}
     end
   end
 
@@ -3301,8 +3315,8 @@ defmodule EspresoWeb.MenuLive do
          |> assign(:placing_order?, false)
          |> assign(:checkout_errors, checkout_errors_from_changeset(changeset))}
 
-      {:error, _} ->
-        {:noreply, order_failure(socket, "Could not place order — try again")}
+      {:error, reason} ->
+        {:noreply, order_failure(socket, order_create_failure_message(reason))}
     end
   end
 
@@ -3328,8 +3342,8 @@ defmodule EspresoWeb.MenuLive do
          |> assign(:placing_order?, false)
          |> assign(:checkout_errors, checkout_errors_from_changeset(changeset))}
 
-      {:error, _} ->
-        {:noreply, order_failure(socket, "Could not place order — try again")}
+      {:error, reason} ->
+        {:noreply, order_failure(socket, order_create_failure_message(reason))}
     end
   end
 
@@ -3512,4 +3526,14 @@ defmodule EspresoWeb.MenuLive do
     do: "You'll pay with Maya on the next screen."
 
   defp payment_checkout_note(_, _), do: "Pay at the counter when your order is ready."
+
+  defp shop_day_menu_message(:closed),
+    do: "The shop is closed for today. Please order tomorrow."
+
+  defp shop_day_menu_message(_),
+    do: "The shop is not open yet. Please order when the cafe opens."
+
+  defp order_create_failure_message(:shop_not_open), do: shop_day_menu_message(:not_open)
+  defp order_create_failure_message(:shop_day_closed), do: shop_day_menu_message(:closed)
+  defp order_create_failure_message(_), do: "Could not place order — try again"
 end

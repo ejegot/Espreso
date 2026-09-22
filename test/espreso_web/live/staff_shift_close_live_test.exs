@@ -51,7 +51,7 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     assert has_element?(view, "#staff-shift-close-cash", "₱75")
     assert has_element?(view, "#staff-shift-close-counted-field", "Counted drawer cash")
     assert has_element?(view, "#staff-shift-close-drawer", "Expected drawer")
-    assert has_element?(view, "#staff-shift-close-opening-gap")
+    refute has_element?(view, "#staff-shift-close-opening-gap")
     assert has_element?(view, "#staff-shift-close-counted-hint", "Required")
     assert has_element?(view, "#staff-shift-close-breakdown", "GCash")
     assert has_element?(view, "#staff-shift-close-breakdown", "₱140")
@@ -130,16 +130,14 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
                "notes" => "End of day"
              })
 
-    {:ok, late} =
-      Orders.create_order(
-        [%{name: "Americano", size: nil, quantity: 1, price: Decimal.new("95")}],
-        %{customer_name: "Late", fulfillment: :pickup, payment_method: :counter}
-      )
-
-    {:ok, _} = Orders.mark_paid(late, paid_via: "cash")
+    assert {:error, :shop_day_closed} =
+             Orders.create_order(
+               [%{name: "Americano", size: nil, quantity: 1, price: Decimal.new("95")}],
+               %{customer_name: "Late", fulfillment: :pickup, payment_method: :counter}
+             )
 
     live_total = Orders.todays_paid_breakdown().total
-    assert Decimal.equal?(live_total, Decimal.new("235"))
+    assert Decimal.equal?(live_total, Decimal.new("140"))
 
     {:ok, view, _html} = live(conn, ~p"/staff/close")
 
@@ -156,7 +154,6 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     assert has_element?(view, "#staff-shift-close-sealed-breakdown", "₱140")
     assert has_element?(view, "#staff-shift-close-sealed-cash", "₱0")
     assert has_element?(view, "#staff-shift-close-sealed-counted", "₱140")
-    refute has_element?(view, "#staff-shift-close-sealed-system", "₱235")
     refute has_element?(view, "#staff-shift-close-form")
   end
 

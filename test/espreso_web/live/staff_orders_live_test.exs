@@ -103,12 +103,49 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert has_element?(view, "#ticket-new-paid-via-gcash-#{order.id}", "GCash")
     assert has_element?(view, "#ticket-new-paid-via-maya-#{order.id}", "Maya")
     assert has_element?(view, "#ticket-new-paid-via-split-#{order.id}", "Split")
-    assert has_element?(view, "#order-more-#{order.id} #cancel-order-#{order.id}", "Cancel")
+    refute has_element?(view, "#order-more-#{order.id} #refund-order-#{order.id}")
     refute has_element?(view, "#ticket-new-mark-paid-#{order.id}")
     refute has_element?(view, "#order-prepare-#{order.id}")
     refute has_element?(view, "#order-ready-#{order.id}")
     refute has_element?(view, "#order-card-new-#{order.id} .staff-badge--received")
     refute has_element?(view, "#orders-new-workload")
+  end
+
+  test "manager can refund a paid ticket from Orders", %{conn: conn} do
+    {:ok, manager} =
+      Accounts.register_user(%{
+        name: "Refund Mgr",
+        email: "refund-orders-#{System.unique_integer([:positive])}@test.local",
+        password: "password123",
+        role: "manager"
+      })
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{customer_name: "Walk-in", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, paid} = Orders.mark_paid(order, paid_via: "cash")
+
+    manager_conn =
+      conn
+      |> Phoenix.ConnTest.init_test_session(%{})
+      |> Plug.Conn.put_session(:user_id, manager.id)
+
+    {:ok, view, _html} = live(manager_conn, ~p"/orders")
+
+    assert has_element?(view, "#refund-order-#{paid.id}", "Refund")
+    view |> element("#refund-order-#{paid.id}") |> render_click()
+    assert has_element?(view, "#staff-order-refund-dialog", paid.number)
+
+    view
+    |> form("#staff-order-refund-form", %{reason: "Wrong drink"})
+    |> render_submit()
+
+    assert has_element?(view, "#orders-flash", "refunded")
+    refute has_element?(view, "#order-card-new-#{paid.id}")
+    assert Repo.reload!(paid).payment_status == "refunded"
   end
 
   test "Orders ticket shows Hot and Iced for the same drink name", %{conn: conn} do
@@ -407,7 +444,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     refute has_element?(view, "#orders-cash-tender-modal")
     assert has_element?(view, "#split-pay-modal")
-    assert has_element?(view, "#orders-split-cash") 
+    assert has_element?(view, "#orders-split-cash")
     assert live_assigns(view).split_cash == "30"
     assert live_assigns(view).split_wallet == "maya"
 

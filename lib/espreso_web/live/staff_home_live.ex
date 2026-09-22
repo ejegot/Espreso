@@ -3,6 +3,7 @@ defmodule EspresoWeb.StaffHomeLive do
 
   alias Espreso.Accounts.Authorization
   alias Espreso.Accounts.User
+  alias Espreso.CashOuts
   alias Espreso.Menu
   alias Espreso.Orders
   alias Espreso.Printer
@@ -144,9 +145,9 @@ defmodule EspresoWeb.StaffHomeLive do
         </header>
 
         <section :if={@shop_open_prompt?} class="staff-home-shop-open" id="staff-home-shop-open">
-          <p class="staff-home-shop-open-title">Opening cash not recorded</p>
+          <p class="staff-home-shop-open-title">Opening cash required</p>
           <p class="staff-home-shop-open-body">
-            Opening shift: count the drawer once. Mid and close shifts skip this.
+            Count the drawer once before selling. POS and orders stay locked until this is recorded.
           </p>
           <.link
             navigate={~p"/staff/open"}
@@ -156,6 +157,13 @@ defmodule EspresoWeb.StaffHomeLive do
             Enter opening cash
           </.link>
         </section>
+
+        <.shop_day_sales_banner
+          :if={!@shop_open_prompt?}
+          status={@shop_day_status}
+          id="staff-home-shop-closed"
+          show_open_link={false}
+        />
 
         <div class={["staff-home-desk-stage", @today_visible? && "staff-home-desk-stage--split"]}>
           <section
@@ -191,6 +199,45 @@ defmodule EspresoWeb.StaffHomeLive do
                 <span class="staff-paid-breakdown-count">{row.count}</span>
               </li>
             </ul>
+
+            <div :if={@drawer_summary} class="staff-home-drawer" id="staff-home-drawer">
+              <p class="staff-home-today-eyebrow">
+                {if(@drawer_summary.sealed?, do: "Drawer · sealed", else: "Drawer")}
+              </p>
+              <ul class="staff-home-drawer-list">
+                <li>
+                  <span>Opening</span>
+                  <strong>{Menu.format_price(@drawer_summary.opening)}</strong>
+                </li>
+                <li>
+                  <span>Cash sales</span>
+                  <strong>{Menu.format_price(@drawer_summary.cash_sales)}</strong>
+                </li>
+                <li>
+                  <span>Cash outs</span>
+                  <strong>{Menu.format_price(@drawer_summary.cash_outs)}</strong>
+                </li>
+                <li>
+                  <span>Expected</span>
+                  <strong>{Menu.format_price(@drawer_summary.expected)}</strong>
+                </li>
+                <li :if={@drawer_summary.sealed?}>
+                  <span>Counted</span>
+                  <strong>{Menu.format_price(@drawer_summary.counted)}</strong>
+                </li>
+                <li :if={@drawer_summary.sealed?} id="staff-home-drawer-variance">
+                  <span>Variance</span>
+                  <strong>{variance_line(@drawer_summary.variance)}</strong>
+                </li>
+              </ul>
+              <.link
+                navigate={~p"/staff/close"}
+                class="staff-home-drawer-link"
+                id="staff-home-drawer-close"
+              >
+                {if(@drawer_summary.sealed?, do: "View close", else: "Close shift")}
+              </.link>
+            </div>
           </section>
 
           <section class="staff-home-primary" aria-label="Primary action">
@@ -337,6 +384,8 @@ defmodule EspresoWeb.StaffHomeLive do
     |> assign(:shift_close, shift_close)
     |> assign(:shop_open, shop_open)
     |> assign(:shop_open_prompt?, shop_open_prompt?)
+    |> assign(:shop_day_status, Shifts.shop_day_status())
+    |> assign(:drawer_summary, drawer_summary(money?, shop_open, close, breakdown))
     |> assign(:today_visible?, money?)
     |> assign(:printer_on_home?, money? and Printer.enabled?())
     |> assign(:greeting, staff_greeting(user))
@@ -431,6 +480,58 @@ defmodule EspresoWeb.StaffHomeLive do
 
   defp manager_or_owner?(%User{role: role}), do: role in ["manager", "owner"]
   defp manager_or_owner?(_), do: false
+
+  defp drawer_summary(false, _, _, _), do: nil
+  defp drawer_summary(true, nil, nil, _), do: nil
+
+  defp drawer_summary(true, shop_open, close, breakdown) do
+    opening =
+      cond do
+        close && close.opening_cash -> close.opening_cash
+        shop_open && shop_open.opening_cash -> shop_open.opening_cash
+        true -> Decimal.new("0")
+      end
+
+    cash_outs = CashOuts.total_for_shop_date(Orders.shop_date_today())
+
+    cash_sales =
+      if close do
+        Shifts.cash_sales_total(close)
+      else
+        Shifts.cash_sales_total(breakdown)
+      end
+
+    expected =
+      if close && close.expected_cash do
+        close.expected_cash
+      else
+        Shifts.expected_drawer_cash(opening, cash_sales, cash_outs)
+      end
+
+    %{
+      sealed?: not is_nil(close),
+      opening: opening,
+      cash_sales: cash_sales,
+      cash_outs: cash_outs,
+      expected: expected,
+      counted: close && close.counted_cash,
+      variance: close && close.variance
+    }
+  end
+
+  defp variance_line(nil), do: "—"
+
+  defp variance_line(%Decimal{} = variance) do
+    abs = Decimal.abs(variance)
+
+    case Decimal.compare(variance, 0) do
+      :eq -> "Even"
+      :gt -> "Over #{Menu.format_price(abs)}"
+      :lt -> "Short #{Menu.format_price(abs)}"
+    end
+  end
+
+  defp variance_line(_), do: "—"
 
   defp orders_body(overview) do
     "#{overview.received_count} new · #{overview.preparing_count} preparing · #{overview.unpaid_active_count} unpaid"

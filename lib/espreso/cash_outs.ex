@@ -32,11 +32,11 @@ defmodule Espreso.CashOuts do
   Records a Cash Out for the actor.
 
   Baristas must have an open StaffShift. Manager/owner may record without one.
-  Blocked when today's shop day is already sealed by ShiftClose.
+  Blocked until opening cash is recorded, and after the shop day is sealed.
   """
   def create_cash_out(%User{} = actor, attrs) when is_map(attrs) do
     with :ok <- authorize_create(actor),
-         :ok <- ensure_shop_day_open(Orders.shop_date_today()),
+         :ok <- Shifts.assert_selling_allowed(),
          {:ok, staff_shift_id} <- resolve_staff_shift_id(actor) do
       recorded_at = utc_now()
       shop_date = Orders.shop_date_today()

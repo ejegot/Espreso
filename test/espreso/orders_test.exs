@@ -2405,6 +2405,47 @@ defmodule Espreso.OrdersTest do
              })
   end
 
+  test "manager can refund a paid order and it drops out of paid totals" do
+    {:ok, manager} =
+      Accounts.register_user(%{
+        name: "Refund Mgr",
+        email: "refund-mgr-#{System.unique_integer([:positive])}@test.local",
+        password: "password123",
+        role: "manager"
+      })
+
+    {:ok, barista} =
+      Accounts.register_user(%{
+        name: "Refund Bar",
+        email: "refund-bar-#{System.unique_integer([:positive])}@test.local",
+        password: "password123",
+        role: "barista"
+      })
+
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    assert {:ok, order} =
+             Orders.create_order(lines, %{
+               customer_name: "Walk-in",
+               fulfillment: :pickup,
+               payment_method: :counter
+             })
+
+    assert {:ok, paid} = Orders.mark_paid(order, paid_via: "cash")
+    assert Decimal.equal?(Orders.todays_paid_breakdown().total, Decimal.new("75"))
+
+    assert {:error, :unauthorized} = Orders.refund_paid_order(paid, barista, "Wrong drink")
+    assert {:error, :refund_reason_required} = Orders.refund_paid_order(paid, manager, " ")
+
+    assert {:ok, refunded} = Orders.refund_paid_order(paid, manager, "Wrong drink")
+    assert refunded.payment_status == "refunded"
+    assert refunded.status == "cancelled"
+    assert refunded.refund_reason == "Wrong drink"
+    assert refunded.refunded_by_user_id == manager.id
+    assert Decimal.equal?(Orders.todays_paid_breakdown().total, Decimal.new("0"))
+    assert {:error, :already_refunded} = Orders.refund_paid_order(refunded, manager, "Again")
+  end
+
   defp insert_category!(name) do
     %Category{} |> Category.changeset(%{name: name}) |> Repo.insert!()
   end

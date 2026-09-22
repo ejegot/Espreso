@@ -61,6 +61,18 @@ defmodule EspresoWeb.Api.V1.FallbackController do
     |> json(%{error: "empty_cart"})
   end
 
+  def call(conn, {:error, :shop_not_open}) do
+    conn
+    |> put_status(:unprocessable_entity)
+    |> json(%{error: "shop_not_open"})
+  end
+
+  def call(conn, {:error, :shop_day_closed}) do
+    conn
+    |> put_status(:unprocessable_entity)
+    |> json(%{error: "shop_day_closed"})
+  end
+
   def call(conn, {:error, %Ecto.Changeset{} = changeset}) do
     conn
     |> put_status(:unprocessable_entity)

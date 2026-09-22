@@ -361,4 +361,41 @@ defmodule EspresoWeb.StaffComponents do
 
   defp nav_badge_count(count) when count > 9, do: "9+"
   defp nav_badge_count(count), do: Integer.to_string(count)
+
+  attr :status, :atom, required: true
+  attr :id, :string, required: true
+  attr :show_open_link, :boolean, default: true
+
+  def shop_day_sales_banner(%{status: :open} = assigns) do
+    ~H""
+  end
+
+  def shop_day_sales_banner(assigns) do
+    {title, body, link?} =
+      case assigns.status do
+        :closed ->
+          {"Shop day is closed",
+           "No new sales until tomorrow. Mid-shift Time In/Out does not reopen the kaha.", false}
+
+        _ ->
+          {"Opening cash required",
+           "Count the drawer once before selling. Mid and close shifts skip this.", true}
+      end
+
+    assigns =
+      assigns
+      |> assign(:title, title)
+      |> assign(:body, body)
+      |> assign(:link?, link? and assigns.show_open_link)
+
+    ~H"""
+    <section class="staff-home-shop-open" id={@id}>
+      <p class="staff-home-shop-open-title">{@title}</p>
+      <p class="staff-home-shop-open-body">{@body}</p>
+      <.link :if={@link?} navigate={~p"/staff/open"} class="staff-home-shop-open-action">
+        Enter opening cash
+      </.link>
+    </section>
+    """
+  end
 end

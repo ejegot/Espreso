@@ -8,7 +8,7 @@ defmodule Espreso.Orders.Order do
 
   @statuses ~w(received preparing ready completed cancelled)
   @payment_methods ~w(counter online)
-  @payment_statuses ~w(unpaid awaiting_payment paid)
+  @payment_statuses ~w(unpaid awaiting_payment paid refunded)
   @paid_vias ~w(cash gcash maya counter paymongo)
   @payment_intents ~w(cash gcash maya)
   @fulfillments ~w(dine_in pickup)
@@ -36,11 +36,14 @@ defmodule Espreso.Orders.Order do
     field :settlement_time_estimated, :boolean, default: false
 
     field :loyalty_free_amount_centavos, :integer, default: 0
+    field :refunded_at, :utc_datetime
+    field :refund_reason, :string
 
     has_many :items, OrderItem
     has_many :payment_splits, PaymentSplit
     has_many :push_subscriptions, Espreso.CustomerPush.Subscription
     belongs_to :settled_by_user, User
+    belongs_to :refunded_by_user, User
     belongs_to :customer, Customer
 
     timestamps(type: :utc_datetime)
@@ -78,7 +81,10 @@ defmodule Espreso.Orders.Order do
       :change_due,
       :settlement_time_estimated,
       :customer_id,
-      :loyalty_free_amount_centavos
+      :loyalty_free_amount_centavos,
+      :refunded_at,
+      :refunded_by_user_id,
+      :refund_reason
     ])
     |> validate_required([
       :customer_name,
@@ -107,6 +113,8 @@ defmodule Espreso.Orders.Order do
     |> unique_constraint(:number)
     |> foreign_key_constraint(:settled_by_user_id)
     |> foreign_key_constraint(:customer_id)
+    |> foreign_key_constraint(:refunded_by_user_id)
+    |> validate_length(:refund_reason, max: 500)
     |> check_constraint(:loyalty_free_amount_centavos,
       name: :orders_loyalty_free_amount_nonnegative
     )
@@ -134,6 +142,28 @@ defmodule Espreso.Orders.Order do
   """
   def complete_changeset(order) do
     status_changeset(order, "completed")
+  end
+
+  def refund_changeset(order, attrs) do
+    order
+    |> cast(attrs, [
+      :payment_status,
+      :status,
+      :refunded_at,
+      :refunded_by_user_id,
+      :refund_reason
+    ])
+    |> validate_required([
+      :payment_status,
+      :status,
+      :refunded_at,
+      :refunded_by_user_id,
+      :refund_reason
+    ])
+    |> validate_inclusion(:payment_status, ["refunded"])
+    |> validate_inclusion(:status, ["cancelled"])
+    |> validate_length(:refund_reason, min: 2, max: 500)
+    |> foreign_key_constraint(:refunded_by_user_id)
   end
 
   def payment_changeset(order, attrs) do

@@ -1,10 +1,12 @@
 defmodule EspresoWeb.StaffOrdersLive do
   use EspresoWeb, :live_view
 
+  alias Espreso.Accounts.Authorization
   alias Espreso.BusinessSettings
   alias Espreso.Orders
   alias Espreso.PhysicalActionCoordinator
   alias Espreso.Printer
+  alias Espreso.Shifts
   alias Espreso.Repo
   alias EspresoWeb.PrinterClientBridge
   alias EspresoWeb.StaffNotifications
@@ -41,10 +43,15 @@ defmodule EspresoWeb.StaffOrdersLive do
      |> assign(:split_cash, "")
      |> assign(:split_wallet, "gcash")
      |> assign(:split_error, nil)
+     |> assign(:refunding_order, nil)
+     |> assign(:refund_reason, "")
+     |> assign(:refund_error, nil)
+     |> assign(:can_refund?, Authorization.can?(socket.assigns.current_user, :reports))
      |> assign(:alert_banner, nil)
      |> assign(:pubsub_reload_timer, nil)
      |> assign(:pubsub_reload_token, nil)
      |> assign(:pending_order_ids, MapSet.new())
+     |> assign(:shop_day_status, Shifts.shop_day_status())
      |> load_orders(), layout: false}
   end
 
@@ -250,6 +257,7 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   def handle_event("set_split_cash", params, socket) do
     amount = Map.get(params, "split_cash") || Map.get(params, "value") || ""
+
     {:noreply,
      socket
      |> assign(:split_cash, String.trim(to_string(amount)))
@@ -425,6 +433,12 @@ defmodule EspresoWeb.StaffOrdersLive do
          |> assign(:flash_note, mark_paid_flash(paid, paid.paid_via || paid_via, :disabled))
          |> load_orders()}
 
+      {:error, :shop_not_open} ->
+        {:noreply, assign(socket, :flash_note, Shifts.selling_blocked_message(:shop_not_open))}
+
+      {:error, :shop_day_closed} ->
+        {:noreply, assign(socket, :flash_note, Shifts.selling_blocked_message(:shop_day_closed))}
+
       {:error, :cancelled} ->
         {:noreply, assign(socket, :flash_note, "Cancelled orders cannot be marked paid.")}
 
@@ -522,6 +536,40 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   def handle_event("retry_mark_paid", _params, socket) do
     {:noreply, assign(socket, :flash_note, "Could not mark order paid.")}
+  end
+
+  def handle_event("open_refund", %{"id" => id}, socket) do
+    if socket.assigns.can_refund? do
+      with {order_id, ""} <- Integer.parse(id),
+           %Espreso.Orders.Order{} = order <- Repo.get(Espreso.Orders.Order, order_id),
+           true <- order.payment_status == "paid" do
+        {:noreply,
+         socket
+         |> assign(:refunding_order, order)
+         |> assign(:refund_reason, "")
+         |> assign(:refund_error, nil)}
+      else
+        _ -> {:noreply, assign(socket, :flash_note, "Could not refund that order.")}
+      end
+    else
+      {:noreply, assign(socket, :flash_note, "You don’t have access to refund orders.")}
+    end
+  end
+
+  def handle_event("cancel_refund", _params, socket) do
+    {:noreply, clear_refunding(socket)}
+  end
+
+  def handle_event("set_refund_reason", %{"reason" => reason}, socket) do
+    {:noreply, assign(socket, :refund_reason, reason)}
+  end
+
+  def handle_event("confirm_refund", %{"reason" => reason}, socket) do
+    confirm_refund(socket, reason)
+  end
+
+  def handle_event("confirm_refund", _params, socket) do
+    confirm_refund(socket, socket.assigns.refund_reason)
   end
 
   def handle_event("cancel_order", %{"id" => id}, socket) do
@@ -689,6 +737,7 @@ defmodule EspresoWeb.StaffOrdersLive do
       <div class="staff-orders-page staff-orders-shell-root">
         <main class="staff-orders-main">
           <p :if={@flash_note} class="staff-admin-note" id="orders-flash">{@flash_note}</p>
+          <.shop_day_sales_banner status={@shop_day_status} id="staff-orders-shop-day" />
 
           <nav class="staff-orders-lane-jumps" aria-label="Jump to order lane">
             <a href="#orders-new" class="staff-orders-lane-jump staff-orders-lane-jump--new">
@@ -763,6 +812,7 @@ defmodule EspresoWeb.StaffOrdersLive do
                     drawer_permit={Map.get(@drawer_permits, order.id)}
                     mark_paid_permit={Map.get(@mark_paid_permits, order.id)}
                     mark_paid_recovery={Map.get(@mark_paid_recoveries, order.id)}
+                    can_refund?={@can_refund?}
                   />
                 </div>
               </section>
@@ -789,6 +839,7 @@ defmodule EspresoWeb.StaffOrdersLive do
                     drawer_permit={Map.get(@drawer_permits, order.id)}
                     mark_paid_permit={Map.get(@mark_paid_permits, order.id)}
                     mark_paid_recovery={Map.get(@mark_paid_recoveries, order.id)}
+                    can_refund?={@can_refund?}
                   />
                 </div>
               </section>
@@ -812,6 +863,7 @@ defmodule EspresoWeb.StaffOrdersLive do
                     drawer_permit={Map.get(@drawer_permits, order.id)}
                     mark_paid_permit={Map.get(@mark_paid_permits, order.id)}
                     mark_paid_recovery={Map.get(@mark_paid_recoveries, order.id)}
+                    can_refund?={@can_refund?}
                   />
                 </div>
               </section>
@@ -968,6 +1020,7 @@ defmodule EspresoWeb.StaffOrdersLive do
         {order_cash_tender_modal(assigns)}
         {split_pay_modal(assigns)}
         {mark_paid_modal(assigns)}
+        {refund_modal(assigns)}
       </div>
     </.staff_shell>
     """
@@ -981,6 +1034,7 @@ defmodule EspresoWeb.StaffOrdersLive do
   attr :drawer_permit, :string, default: nil
   attr :mark_paid_permit, :string, default: nil
   attr :mark_paid_recovery, :map, default: nil
+  attr :can_refund?, :boolean, default: false
 
   defp kds_ticket(assigns) do
     source = source_badge(assigns.order)
@@ -1147,12 +1201,22 @@ defmodule EspresoWeb.StaffOrdersLive do
           </div>
 
           <details
-            :if={ticket_overflow_actions?(@order)}
+            :if={ticket_overflow_actions?(@order, @can_refund?)}
             class="staff-order-more"
             id={"order-more-#{@order.id}"}
           >
             <summary class="staff-order-more-summary" aria-label="More actions">⋯</summary>
             <div class="staff-order-more-panel">
+              <button
+                :if={show_refund_action?(@order, @can_refund?)}
+                type="button"
+                class="staff-action staff-action-cancel"
+                id={"refund-order-#{@order.id}"}
+                phx-value-id={@order.id}
+                phx-click="open_refund"
+              >
+                Refund
+              </button>
               <button
                 :if={show_cancel_action?(@order)}
                 type="button"
@@ -1272,7 +1336,13 @@ defmodule EspresoWeb.StaffOrdersLive do
       needs_payment_actions?(order)
   end
 
-  defp ticket_overflow_actions?(order) do
+  defp show_refund_action?(order, true) do
+    order.payment_status == "paid" and order.status in ["received", "preparing", "ready"]
+  end
+
+  defp show_refund_action?(_order, _), do: false
+
+  defp ticket_overflow_actions?(order, can_refund?) do
     abandon? = show_abandon_payment?(order)
 
     kitchen? =
@@ -1280,7 +1350,8 @@ defmodule EspresoWeb.StaffOrdersLive do
 
     paid_print? = order.payment_status == "paid" and Printer.enabled?()
 
-    show_cancel_action?(order) or abandon? or kitchen? or paid_print?
+    show_cancel_action?(order) or show_refund_action?(order, can_refund?) or abandon? or kitchen? or
+      paid_print?
   end
 
   defp checkout_session_attached?(%{paymongo_checkout_session_id: session_id})
@@ -1727,6 +1798,56 @@ defmodule EspresoWeb.StaffOrdersLive do
     end
   end
 
+  defp refund_modal(%{refunding_order: nil}), do: nil
+
+  defp refund_modal(assigns) do
+    ~H"""
+    <.modal id="staff-order-refund" show on_cancel={JS.push("cancel_refund")}>
+      <div class="staff-confirm-dialog" id="staff-order-refund-dialog">
+        <p class="staff-confirm-dialog-title">Refund {@refunding_order.number}?</p>
+        <p class="staff-confirm-dialog-copy">
+          This removes the sale from today’s drawer expected. Give the cash or wallet refund at the counter.
+          PayMongo is not reversed automatically.
+        </p>
+        <form id="staff-order-refund-form" phx-submit="confirm_refund" phx-change="set_refund_reason">
+          <label class="staff-shift-close-field">
+            <span>Reason</span>
+            <input
+              type="text"
+              name="reason"
+              value={@refund_reason}
+              maxlength="500"
+              placeholder="Wrong drink, customer request…"
+              class="staff-shift-close-input"
+              id="staff-order-refund-reason"
+            />
+          </label>
+          <p :if={@refund_error} class="staff-shift-close-error" id="staff-order-refund-error">
+            {@refund_error}
+          </p>
+          <div class="staff-confirm-dialog-actions">
+            <button
+              type="submit"
+              class="staff-action staff-action-cancel"
+              id="staff-order-refund-confirm"
+            >
+              Refund
+            </button>
+            <button
+              type="button"
+              class="staff-shell-tool"
+              id="staff-order-refund-cancel"
+              phx-click="cancel_refund"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </.modal>
+    """
+  end
+
   defp mark_paid_modal(%{mark_paid_order: nil}), do: nil
 
   defp mark_paid_modal(assigns) do
@@ -2041,7 +2162,11 @@ defmodule EspresoWeb.StaffOrdersLive do
 
   defp pending_wallet_label(_), do: "GCash"
 
-  defp split_payment_action?(%{payment_method: "counter", payment_intent: nil, payment_status: status})
+  defp split_payment_action?(%{
+         payment_method: "counter",
+         payment_intent: nil,
+         payment_status: status
+       })
        when status in ["unpaid", "awaiting_payment"],
        do: true
 
@@ -2477,6 +2602,7 @@ defmodule EspresoWeb.StaffOrdersLive do
       PhysicalActionCoordinator.permits(:mark_paid, mark_paid_order_ids)
 
     socket
+    |> assign(:shop_day_status, Shifts.shop_day_status())
     |> assign(:active_orders, active_orders)
     |> assign(:ready_orders, ready_orders)
     |> assign(:reprint_permits, reprint_permits)
@@ -2485,6 +2611,70 @@ defmodule EspresoWeb.StaffOrdersLive do
     |> assign(:mark_paid_permits, mark_paid_permits)
     |> assign(:unpaid_orders, unpaid_orders)
     |> assign(:paymongo_reconciliations, Orders.list_open_paymongo_reconciliations())
+  end
+
+  defp confirm_refund(socket, reason) do
+    order = socket.assigns.refunding_order
+
+    if is_nil(order) do
+      {:noreply, socket}
+    else
+      case Orders.refund_paid_order(order, socket.assigns.current_user, reason) do
+        {:ok, refunded} ->
+          {:noreply,
+           socket
+           |> clear_refunding()
+           |> assign(:flash_note, "#{refunded.number} refunded.")
+           |> load_orders()}
+
+        {:error, :unauthorized} ->
+          {:noreply,
+           socket
+           |> clear_refunding()
+           |> assign(:flash_note, "You don’t have access to refund orders.")}
+
+        {:error, :refund_reason_required} ->
+          {:noreply,
+           socket
+           |> assign(:refund_reason, reason)
+           |> assign(:refund_error, "Enter a short reason for the refund.")}
+
+        {:error, :shop_not_open} ->
+          {:noreply,
+           socket
+           |> clear_refunding()
+           |> assign(:flash_note, Shifts.selling_blocked_message(:shop_not_open))}
+
+        {:error, :shop_day_closed} ->
+          {:noreply,
+           socket
+           |> clear_refunding()
+           |> assign(:flash_note, "Cannot refund after Close shift.")}
+
+        {:error, :already_refunded} ->
+          {:noreply,
+           socket
+           |> clear_refunding()
+           |> assign(:flash_note, "That order is already refunded.")
+           |> load_orders()}
+
+        {:error, :not_paid} ->
+          {:noreply,
+           socket
+           |> clear_refunding()
+           |> assign(:flash_note, "Only paid orders can be refunded.")}
+
+        {:error, _} ->
+          {:noreply, assign(socket, :refund_error, "Could not refund that order.")}
+      end
+    end
+  end
+
+  defp clear_refunding(socket) do
+    socket
+    |> assign(:refunding_order, nil)
+    |> assign(:refund_reason, "")
+    |> assign(:refund_error, nil)
   end
 
   defp update_mark_paid_recovery(socket, order_id, paid_via, physical_result) do

@@ -173,6 +173,7 @@ defmodule Espreso.ShiftsTest do
     assert is_nil(Shifts.get_todays_close())
   end
 
+  @tag :without_shop_open
   test "record_open is once per shop day and snapshots into close" do
     manager = manager!()
     barista = barista!()
@@ -202,6 +203,30 @@ defmodule Espreso.ShiftsTest do
     assert Decimal.equal?(close.expected_cash, Decimal.new("600"))
     assert Decimal.equal?(close.variance, Decimal.new("-10"))
     assert {:error, :already_closed} = Shifts.record_open(manager, %{opening_cash: "1"})
+  end
+
+  @tag :without_shop_open
+  test "selling is blocked until opening cash and after close" do
+    manager = manager!()
+    lines = lines("75")
+    attrs = %{customer_name: "Walk-in", fulfillment: :pickup, payment_method: :counter}
+
+    assert Shifts.shop_day_status() == :not_open
+    assert {:error, :shop_not_open} = Orders.create_order(lines, attrs)
+
+    assert {:ok, _} = Shifts.record_open(manager, %{opening_cash: "200"})
+    assert Shifts.shop_day_status() == :open
+
+    assert {:ok, order} = Orders.create_order(lines, attrs)
+    assert {:ok, unpaid} = Orders.create_order(lines, attrs)
+    assert {:ok, _} = Orders.mark_paid(order, paid_via: "cash")
+
+    assert {:ok, _} = Shifts.record_close(manager, %{counted_cash: "275"})
+    assert Shifts.shop_day_status() == :closed
+    assert {:error, :shop_day_closed} = Orders.create_order(lines, attrs)
+    assert {:error, :shop_day_closed} = Orders.mark_paid(unpaid, paid_via: "cash")
+    assert {:ok, paid} = Orders.mark_paid(order, paid_via: "cash")
+    assert paid.id == order.id
   end
 
   test "failed already_closed does not close barista StaffShift" do

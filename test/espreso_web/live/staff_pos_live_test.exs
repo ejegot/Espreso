@@ -1227,7 +1227,13 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-order-review-items", "Espresso")
     assert has_element?(view, "#pos-order-review-items", "Americano")
     assert has_element?(view, "#pos-order-review-items", "12oz")
-    assert has_element?(view, "#pos-order-review-items .staff-pos-order-review-temp.is-hot", "Hot")
+
+    assert has_element?(
+             view,
+             "#pos-order-review-items .staff-pos-order-review-temp.is-hot",
+             "Hot"
+           )
+
     assert has_element?(view, "#pos-order-review-total", "₱270")
 
     view |> element(".staff-pos-order-review-backdrop") |> render_click()
@@ -1263,8 +1269,18 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert categories == ["COLD", "HOT"]
 
     view |> element("#pos-confirmation-view-order") |> render_click()
-    assert has_element?(view, "#pos-order-review-items .staff-pos-order-review-temp.is-hot", "Hot")
-    assert has_element?(view, "#pos-order-review-items .staff-pos-order-review-temp.is-iced", "Iced")
+
+    assert has_element?(
+             view,
+             "#pos-order-review-items .staff-pos-order-review-temp.is-hot",
+             "Hot"
+           )
+
+    assert has_element?(
+             view,
+             "#pos-order-review-items .staff-pos-order-review-temp.is-iced",
+             "Iced"
+           )
   end
 
   test "product taps do not clear a saved ticket until staff clears it", %{
@@ -2783,5 +2799,13 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     view |> element("#pos-search-clear") |> render_click()
     assert has_element?(view, "#pos-product-#{espresso.id}")
+  end
+
+  @tag :without_shop_open
+  test "POS is locked until opening cash", %{conn: conn, barista: barista} do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    assert has_element?(view, "#staff-pos-shop-day", "Opening cash required")
+    assert has_element?(view, "#pos-place-order[disabled]")
   end
 end

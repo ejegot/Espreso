@@ -9,6 +9,7 @@ defmodule EspresoWeb.StaffCashOutLive do
   alias Espreso.CashOuts.CashOut
   alias Espreso.Menu
   alias Espreso.Orders
+  alias Espreso.Shifts
   alias Espreso.StaffShifts
 
   @impl true
@@ -56,6 +57,12 @@ defmodule EspresoWeb.StaffCashOutLive do
            socket
            |> assign_cash_out_state()
            |> assign(:form_error, "You need an open staff shift to record a Cash Out.")}
+
+        {:error, :shop_not_open} ->
+          {:noreply,
+           socket
+           |> assign_cash_out_state()
+           |> assign(:form_error, Shifts.selling_blocked_message(:shop_not_open))}
 
         {:error, :shop_day_closed} ->
           {:noreply,
@@ -472,6 +479,9 @@ defmodule EspresoWeb.StaffCashOutLive do
         shop_day_closed? ->
           {true,
            "This shop day is already closed. Cash Out transactions can no longer be changed."}
+
+        Shifts.shop_day_status() == :not_open ->
+          {true, Shifts.selling_blocked_message(:shop_not_open)}
 
         barista?(user) and is_nil(StaffShifts.get_open_shift(user)) ->
           {true, "You need an open staff shift to record a Cash Out."}
