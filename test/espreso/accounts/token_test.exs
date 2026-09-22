@@ -28,7 +28,10 @@ defmodule Espreso.Accounts.TokenTest do
       })
 
     {:ok, tokens} = Token.issue_token_pair(user)
-    assert {:ok, %{access_token: access, user: refreshed}} = Token.refresh_access(tokens.refresh_token)
+
+    assert {:ok, %{access_token: access, user: refreshed}} =
+             Token.refresh_access(tokens.refresh_token)
+
     assert refreshed.id == user.id
     assert {:ok, _} = Token.verify_access(access)
   end

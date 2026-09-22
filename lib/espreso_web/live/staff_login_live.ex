@@ -438,10 +438,7 @@ defmodule EspresoWeb.StaffLoginLive do
 
         <aside class="staff-auth-visual" aria-hidden="true">
           <picture class="staff-auth-visual-picture">
-            <source
-              srcset={~p"/images/elilai-kafe/login-brand-panel.webp"}
-              type="image/webp"
-            />
+            <source srcset={~p"/images/elilai-kafe/login-brand-panel.webp"} type="image/webp" />
             <img
               src={~p"/images/elilai-kafe/login-brand-panel.jpg"}
               alt=""

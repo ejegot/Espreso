@@ -69,7 +69,10 @@ defmodule Espreso.CoffeeSpotTest do
 
     assert CoffeeSpot.business_name() == defaults.business_name
     assert CoffeeSpot.address() == defaults.address
-    assert CoffeeSpot.address_short() == "84 Lilac St., Concepcion Dos, Marikina City, Philippines"
+
+    assert CoffeeSpot.address_short() ==
+             "84 Lilac St., Concepcion Dos, Marikina City, Philippines"
+
     assert CoffeeSpot.phone_display() == defaults.phone
     assert CoffeeSpot.email() == defaults.email
     assert CoffeeSpot.hours_lines() == defaults.hours_lines
@@ -113,6 +116,7 @@ defmodule Espreso.CoffeeSpotTest do
       )
 
     assert String.starts_with?(url, "https://wa.me/639111111111?text=")
+
     assert CoffeeSpot.order_message(
              [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
              %{}

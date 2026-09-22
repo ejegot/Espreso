@@ -253,7 +253,13 @@ defmodule Espreso.PayMongo do
     end
   end
 
-  defp record_cancelled_payment_reconciliation(payload, session, session_id, order, amount_centavos) do
+  defp record_cancelled_payment_reconciliation(
+         payload,
+         session,
+         session_id,
+         order,
+         amount_centavos
+       ) do
     {payment_id, currency} = extract_paid_payment_audit(session)
     event_id = get_in(payload, ["data", "id"])
 

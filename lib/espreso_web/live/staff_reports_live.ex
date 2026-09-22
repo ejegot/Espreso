@@ -1,6 +1,6 @@
 defmodule EspresoWeb.StaffReportsLive do
   @moduledoc """
-  Owner/Manager Sales Report — date range picker and Excel export.
+  Owner/Manager reports — date range picker for sales, day close, and attendance exports.
   """
   use EspresoWeb, :live_view
 
@@ -16,7 +16,7 @@ defmodule EspresoWeb.StaffReportsLive do
 
       {:ok,
        socket
-       |> assign(:page_title, "Sales Report")
+       |> assign(:page_title, "Reports")
        |> assign(:from_date, today)
        |> assign(:to_date, today)
        |> assign(:form_error, nil), layout: false}
@@ -39,18 +39,18 @@ defmodule EspresoWeb.StaffReportsLive do
      |> assign(:form_error, error)}
   end
 
-  def handle_event("export", %{"report" => params}, socket) do
-    case parse_and_validate(params) do
+  def handle_event("export", params, socket) do
+    report = Map.get(params, "report") || %{}
+    kind = Map.get(params, "kind") || "sales"
+
+    case parse_and_validate(report) do
       {from_date, to_date, nil} when not is_nil(from_date) and not is_nil(to_date) ->
         {:noreply,
          socket
          |> assign(:from_date, from_date)
          |> assign(:to_date, to_date)
          |> assign(:form_error, nil)
-         |> redirect(
-           to:
-             ~p"/staff/reports/export?from=#{Date.to_iso8601(from_date)}&to=#{Date.to_iso8601(to_date)}"
-         )}
+         |> redirect(to: export_path(kind, from_date, to_date))}
 
       {from_date, to_date, error} ->
         {:noreply,
@@ -64,25 +64,20 @@ defmodule EspresoWeb.StaffReportsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.staff_shell
-      current={:reports}
-      current_user={@current_user}
-      page_title="Sales Report"
-      chrome={:bar}
-    >
+    <.staff_shell current={:reports} current_user={@current_user} page_title="Reports" chrome={:bar}>
       <main class="staff-reports" id="staff-reports">
         <header class="staff-reports-head">
           <div>
             <p class="staff-reports-eyebrow">Reports</p>
-            <h2>Sales Report</h2>
+            <h2>Reports</h2>
             <p>
-              Export paid sales for a Manila shop-date range as an Excel file
-              (Sales + Items sheets). Maximum {Orders.max_sales_export_shop_days()} days.
+              Export paid sales, day close, and staff attendance for a Manila shop-date
+              range. Maximum {Orders.max_sales_export_shop_days()} days. Owner and manager only.
             </p>
           </div>
         </header>
 
-        <section class="staff-reports-card" aria-label="Export sales">
+        <section class="staff-reports-card" aria-label="Export reports">
           <form id="staff-reports-export-form" phx-change="validate" phx-submit="export">
             <div class="staff-reports-fields">
               <label class="staff-reports-field">
@@ -106,14 +101,48 @@ defmodule EspresoWeb.StaffReportsLive do
                   required
                 />
               </label>
+            </div>
 
+            <div class="staff-reports-actions">
               <button
                 type="submit"
+                name="kind"
+                value="sales"
                 id="staff-reports-export"
                 class="staff-reports-export-btn"
                 disabled={not is_nil(@form_error)}
               >
-                Export Excel
+                Sales Excel
+              </button>
+              <button
+                type="submit"
+                name="kind"
+                value="close_xlsx"
+                id="staff-reports-close-xlsx"
+                class="staff-reports-export-btn staff-reports-export-btn--secondary"
+                disabled={not is_nil(@form_error)}
+              >
+                Close Excel
+              </button>
+              <button
+                type="submit"
+                name="kind"
+                value="close_pdf"
+                id="staff-reports-close-pdf"
+                class="staff-reports-export-btn staff-reports-export-btn--secondary"
+                disabled={not is_nil(@form_error)}
+              >
+                Close PDF
+              </button>
+              <button
+                type="submit"
+                name="kind"
+                value="attendance"
+                id="staff-reports-attendance-xlsx"
+                class="staff-reports-export-btn staff-reports-export-btn--secondary"
+                disabled={not is_nil(@form_error)}
+              >
+                Attendance Excel
               </button>
             </div>
 
@@ -151,6 +180,22 @@ defmodule EspresoWeb.StaffReportsLive do
   end
 
   defp parse_and_validate(_), do: {nil, nil, "Enter a valid Date From and Date To."}
+
+  defp export_path("close_xlsx", from_date, to_date),
+    do:
+      ~p"/staff/reports/export/close.xlsx?from=#{Date.to_iso8601(from_date)}&to=#{Date.to_iso8601(to_date)}"
+
+  defp export_path("close_pdf", from_date, to_date),
+    do:
+      ~p"/staff/reports/export/close.pdf?from=#{Date.to_iso8601(from_date)}&to=#{Date.to_iso8601(to_date)}"
+
+  defp export_path("attendance", from_date, to_date),
+    do:
+      ~p"/staff/reports/export/attendance.xlsx?from=#{Date.to_iso8601(from_date)}&to=#{Date.to_iso8601(to_date)}"
+
+  defp export_path(_kind, from_date, to_date),
+    do:
+      ~p"/staff/reports/export?from=#{Date.to_iso8601(from_date)}&to=#{Date.to_iso8601(to_date)}"
 
   defp parse_date(nil), do: {:error, :invalid_date}
   defp parse_date(""), do: {:error, :invalid_date}

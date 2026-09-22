@@ -2739,7 +2739,9 @@ defmodule EspresoWeb.StaffPosLive do
 
       Map.get(socket.assigns, :shop_day_status, :open) != :open ->
         {:error,
-         Shifts.selling_blocked_message(shop_day_error(Map.get(socket.assigns, :shop_day_status, :open)))}
+         Shifts.selling_blocked_message(
+           shop_day_error(Map.get(socket.assigns, :shop_day_status, :open))
+         )}
 
       socket.assigns.cart == [] and
           (not is_nil(socket.assigns.place_flash) or not is_nil(socket.assigns.last_order)) ->

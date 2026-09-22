@@ -18,7 +18,8 @@ defmodule EspresoWeb do
   """
 
   def static_paths,
-    do: ~w(assets fonts images favicon.ico robots.txt sw.js elilai-kafe.webmanifest coffeespot.webmanifest)
+    do:
+      ~w(assets fonts images favicon.ico robots.txt sw.js elilai-kafe.webmanifest coffeespot.webmanifest)
 
   def router do
     quote do

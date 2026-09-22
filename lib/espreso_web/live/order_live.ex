@@ -410,12 +410,7 @@ defmodule EspresoWeb.OrderLive do
         iPhone: Share → Add to Home Screen, then open the icon.
       </p>
       <div class="order-push-prompt-actions">
-        <button
-          type="button"
-          id="order-push-allow"
-          class="order-push-allow"
-          data-order-push-allow
-        >
+        <button type="button" id="order-push-allow" class="order-push-allow" data-order-push-allow>
           Notify me
         </button>
         <button

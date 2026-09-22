@@ -27,9 +27,9 @@ defmodule EspresoWeb.OrderChannelTest do
       )
 
     assert_receive %Phoenix.Socket.Message{
-                     event: "order_created",
-                     payload: %{order: %{id: order_id}}
-                   }
+      event: "order_created",
+      payload: %{order: %{id: order_id}}
+    }
 
     assert order_id == order.id
   end

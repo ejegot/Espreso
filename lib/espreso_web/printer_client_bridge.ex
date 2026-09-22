@@ -70,13 +70,15 @@ defmodule EspresoWeb.PrinterClientBridge do
     end
   end
 
-  def confirm_params(%{
-        "order_id" => order_id,
-        "action" => action,
-        "permit" => permit,
-        "request_id" => request_id,
-        "ok" => ok
-      } = params) do
+  def confirm_params(
+        %{
+          "order_id" => order_id,
+          "action" => action,
+          "permit" => permit,
+          "request_id" => request_id,
+          "ok" => ok
+        } = params
+      ) do
     case parse_action(action) do
       {:ok, action_atom} ->
         client_result =

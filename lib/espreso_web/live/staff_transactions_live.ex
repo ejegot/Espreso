@@ -130,7 +130,12 @@ defmodule EspresoWeb.StaffTransactionsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.staff_shell current={:transactions} current_user={@current_user} page_title="Transactions" chrome={:bar}>
+    <.staff_shell
+      current={:transactions}
+      current_user={@current_user}
+      page_title="Transactions"
+      chrome={:bar}
+    >
       <main class="staff-transactions" id="staff-transactions">
         <header class="staff-transactions-head">
           <div>
@@ -313,11 +318,7 @@ defmodule EspresoWeb.StaffTransactionsLive do
                 <p>Receipt</p>
                 <h3 id="transaction-detail-title">{@selected_transaction.number}</h3>
               </div>
-              <button
-                type="button"
-                phx-click="close_transaction"
-                aria-label="Close receipt"
-              >
+              <button type="button" phx-click="close_transaction" aria-label="Close receipt">
                 <.icon name="hero-x-mark" />
               </button>
             </header>
@@ -332,7 +333,7 @@ defmodule EspresoWeb.StaffTransactionsLive do
                     "staff-transaction-payment--#{@selected_transaction.paid_via || "other"}"
                   ]}>
                     {Orders.split_payment_label(@selected_transaction) ||
-                       Orders.paid_via_label(@selected_transaction.paid_via)}
+                      Orders.paid_via_label(@selected_transaction.paid_via)}
                   </dd>
                 </div>
                 <div>

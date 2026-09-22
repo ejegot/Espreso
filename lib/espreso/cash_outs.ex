@@ -76,6 +76,17 @@ defmodule Espreso.CashOuts do
     |> Repo.all()
   end
 
+  @doc """
+  Cash Outs (recorded and voided) whose `shop_date` falls in the inclusive range.
+  """
+  def list_cash_outs_for_shop_dates(%Date{} = from_date, %Date{} = to_date) do
+    CashOut
+    |> where([c], c.shop_date >= ^from_date and c.shop_date <= ^to_date)
+    |> order_by([c], asc: c.shop_date, desc: c.recorded_at, desc: c.id)
+    |> preload([:created_by_user])
+    |> Repo.all()
+  end
+
   @cash_out_history_page_size 25
 
   @doc """

@@ -82,6 +82,7 @@ defmodule EspresoWeb.StaffAttendanceLiveTest do
     assert has_element?(manager_view, "#staff-attendance-eyebrow", "Today · #{today_label}")
     assert has_element?(manager_view, "#staff-attendance-date[value=#{Date.to_iso8601(today)}]")
     assert has_element?(manager_view, "#staff-attendance-next[disabled]")
+    assert has_element?(manager_view, "#staff-attendance-export", "Export Excel")
     refute has_element?(manager_view, "#staff-attendance-today")
 
     {:ok, owner_view, _html} = live(log_in(conn, owner), ~p"/staff/attendance")

@@ -11,7 +11,12 @@ defmodule Espreso.Repo.Migrations.UpdateCoffeespotHours do
   def up do
     repo().update_all(
       "business_settings",
-      [set: [hours_lines: @hours_lines, updated_at: DateTime.utc_now() |> DateTime.truncate(:second)]],
+      [
+        set: [
+          hours_lines: @hours_lines,
+          updated_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        ]
+      ],
       []
     )
   end

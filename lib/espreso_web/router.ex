@@ -132,6 +132,9 @@ defmodule EspresoWeb.Router do
     end
 
     get "/staff/reports/export", SalesExportController, :download
+    get "/staff/reports/export/close.xlsx", CloseExportController, :xlsx
+    get "/staff/reports/export/close.pdf", CloseExportController, :pdf
+    get "/staff/reports/export/attendance.xlsx", AttendanceExportController, :download
 
     live_session :staff,
       on_mount: [{EspresoWeb.StaffAuth, :ensure_staff}] do

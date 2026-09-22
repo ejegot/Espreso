@@ -882,6 +882,30 @@ defmodule Espreso.Orders do
       )
       |> Repo.all()
 
+    breakdown_from_paid_orders(orders, shop_date_today())
+  end
+
+  @doc """
+  Paid sales broken down by `paid_via` for one Asia/Manila shop date.
+
+  Half-open UTC bounds via `shop_day_bounds_utc/1` on `settled_at`.
+  """
+  def paid_breakdown_for_shop_date(%Date{} = shop_date) do
+    {day_start, day_end} = shop_day_bounds_utc(shop_date)
+
+    orders =
+      from(o in Order,
+        where:
+          o.payment_status == "paid" and not is_nil(o.settled_at) and
+            o.settled_at >= ^day_start and o.settled_at < ^day_end,
+        preload: :payment_splits
+      )
+      |> Repo.all()
+
+    breakdown_from_paid_orders(orders, shop_date)
+  end
+
+  defp breakdown_from_paid_orders(orders, shop_date) do
     empty = %{total: Decimal.new("0"), count: 0}
     by_via = paid_via_breakdown(orders, empty)
 
@@ -892,7 +916,7 @@ defmodule Espreso.Orders do
         end),
       count: length(orders),
       by_via: by_via,
-      shop_date: shop_date_today()
+      shop_date: shop_date
     }
   end
 

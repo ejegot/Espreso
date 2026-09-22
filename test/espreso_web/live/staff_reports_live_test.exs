@@ -48,11 +48,14 @@ defmodule EspresoWeb.StaffReportsLiveTest do
     assert has_element?(owner_view, "#staff-reports")
     assert has_element?(owner_view, "#staff-reports-from")
     assert has_element?(owner_view, "#staff-reports-to")
-    assert has_element?(owner_view, "#staff-reports-export", "Export Excel")
+    assert has_element?(owner_view, "#staff-reports-export", "Sales Excel")
+    assert has_element?(owner_view, "#staff-reports-close-xlsx", "Close Excel")
+    assert has_element?(owner_view, "#staff-reports-close-pdf", "Close PDF")
+    assert has_element?(owner_view, "#staff-reports-attendance-xlsx", "Attendance Excel")
     assert has_element?(owner_view, "#staff-nav-reports")
 
     {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/staff/reports")
-    assert has_element?(manager_view, "#staff-reports-export", "Export Excel")
+    assert has_element?(manager_view, "#staff-reports-export", "Sales Excel")
 
     assert {:error, {:redirect, %{to: "/staff"}}} =
              live(log_in(conn, barista), ~p"/staff/reports")
@@ -132,6 +135,84 @@ defmodule EspresoWeb.StaffReportsLiveTest do
 
     assert redirected_to(conn) == ~p"/staff/reports"
     assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "31 days"
+  end
+
+  test "owner can download close xlsx and pdf; barista cannot", %{
+    conn: conn,
+    owner: owner,
+    barista: barista
+  } do
+    conn = log_in(conn, owner)
+
+    xlsx =
+      get(conn, ~p"/staff/reports/export/close.xlsx", %{
+        "from" => "2026-09-10",
+        "to" => "2026-09-10"
+      })
+
+    assert xlsx.status == 200
+    assert String.starts_with?(xlsx.resp_body, "PK")
+
+    disposition =
+      xlsx
+      |> get_resp_header("content-disposition")
+      |> List.first()
+
+    assert disposition =~ "elilai-close-2026-09-10-2026-09-10.xlsx"
+
+    pdf =
+      get(conn, ~p"/staff/reports/export/close.pdf", %{
+        "from" => "2026-09-10",
+        "to" => "2026-09-10"
+      })
+
+    assert pdf.status == 200
+    assert String.starts_with?(pdf.resp_body, "%PDF")
+
+    pdf_disposition =
+      pdf
+      |> get_resp_header("content-disposition")
+      |> List.first()
+
+    assert pdf_disposition =~ "elilai-close-2026-09-10-2026-09-10.pdf"
+
+    barista_conn =
+      log_in(conn, barista)
+      |> get(~p"/staff/reports/export/close.xlsx", %{
+        "from" => "2026-09-10",
+        "to" => "2026-09-10"
+      })
+
+    assert redirected_to(barista_conn) == ~p"/staff"
+  end
+
+  test "owner can download attendance xlsx", %{conn: conn, owner: owner, barista: barista} do
+    conn = log_in(conn, owner)
+
+    conn =
+      get(conn, ~p"/staff/reports/export/attendance.xlsx", %{
+        "from" => "2026-09-10",
+        "to" => "2026-09-10"
+      })
+
+    assert conn.status == 200
+    assert String.starts_with?(conn.resp_body, "PK")
+
+    disposition =
+      conn
+      |> get_resp_header("content-disposition")
+      |> List.first()
+
+    assert disposition =~ "elilai-attendance-2026-09-10-2026-09-10.xlsx"
+
+    barista_conn =
+      log_in(build_conn(), barista)
+      |> get(~p"/staff/reports/export/attendance.xlsx", %{
+        "from" => "2026-09-10",
+        "to" => "2026-09-10"
+      })
+
+    assert redirected_to(barista_conn) == ~p"/staff"
   end
 
   defp log_in(conn, user) do

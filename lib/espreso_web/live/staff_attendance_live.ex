@@ -54,7 +54,12 @@ defmodule EspresoWeb.StaffAttendanceLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.staff_shell current={:attendance} current_user={@current_user} page_title="Staff attendance" chrome={:bar}>
+    <.staff_shell
+      current={:attendance}
+      current_user={@current_user}
+      page_title="Staff attendance"
+      chrome={:bar}
+    >
       <main class="staff-attendance" id="staff-attendance">
         <header class="staff-attendance-head">
           <div>
@@ -73,6 +78,15 @@ defmodule EspresoWeb.StaffAttendanceLive do
                 Staff shifts and paid POS sales for this shop day
               <% end %>
             </p>
+            <.link
+              href={
+                ~p"/staff/reports/export/attendance.xlsx?from=#{Date.to_iso8601(@selected_date)}&to=#{Date.to_iso8601(@selected_date)}"
+              }
+              class="staff-attendance-export"
+              id="staff-attendance-export"
+            >
+              Export Excel
+            </.link>
           </div>
 
           <form

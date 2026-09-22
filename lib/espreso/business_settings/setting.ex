@@ -40,7 +40,11 @@ defmodule Espreso.BusinessSettings.Setting do
 
   def changeset(setting, attrs) do
     setting
-    |> cast(attrs, @required_fields ++ [:hours_lines, :hours_text, :payments_mode, :gcash_qrph_path, :maya_qrph_path])
+    |> cast(
+      attrs,
+      @required_fields ++
+        [:hours_lines, :hours_text, :payments_mode, :gcash_qrph_path, :maya_qrph_path]
+    )
     |> update_change(:payments_mode, &trim/1)
     |> update_change(:gcash_qrph_path, &blank_to_nil/1)
     |> update_change(:maya_qrph_path, &blank_to_nil/1)

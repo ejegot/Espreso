@@ -190,7 +190,11 @@ defmodule EspresoWeb.StaffHomeLive do
               <strong class="dashboard-kpi-value">{Menu.format_price(cash_today(@breakdown))}</strong>
               <span class="dashboard-kpi-hint">Of paid mix</span>
             </article>
-            <article class="dashboard-kpi-card" id="dashboard-panel-reports">
+            <.link
+              navigate={~p"/staff/reports"}
+              class="dashboard-kpi-card"
+              id="dashboard-panel-reports"
+            >
               <span class="staff-home-card-title">Reports</span>
               <strong class="dashboard-kpi-value">
                 {Menu.format_price(@reports_overview.period_paid_total)}
@@ -198,7 +202,7 @@ defmodule EspresoWeb.StaffHomeLive do
               <span class="staff-home-card-body dashboard-kpi-hint">
                 {reports_body(@reports_overview)}
               </span>
-            </article>
+            </.link>
           <% else %>
             <article class="dashboard-kpi-card" id="staff-home-kpi-active">
               <span class="staff-home-card-title">Active</span>

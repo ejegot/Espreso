@@ -60,10 +60,10 @@ defmodule EspresoWeb.HomeLiveTest do
     {:ok, view, _html} = live(conn, ~p"/menu")
 
     assert has_element?(view, "#menu-landing.menu-qr-landing--signature")
+
     assert has_element?(
              view,
              ~s(.menu-qr-landing-photo--signature[src="/images/coffeespot/signature-pure-tableya-portrait.jpg"])
            )
   end
 end
-

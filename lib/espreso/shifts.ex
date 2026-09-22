@@ -39,6 +39,28 @@ defmodule Espreso.Shifts do
   end
 
   @doc """
+  Sealed close snapshots whose `shop_date` falls in the inclusive range.
+  """
+  def list_closes_for_shop_dates(%Date{} = from_date, %Date{} = to_date) do
+    ShiftClose
+    |> where([s], s.shop_date >= ^from_date and s.shop_date <= ^to_date)
+    |> order_by([s], asc: s.shop_date)
+    |> preload(:closed_by_user)
+    |> Repo.all()
+  end
+
+  @doc """
+  Opening-cash rows whose `shop_date` falls in the inclusive range.
+  """
+  def list_opens_for_shop_dates(%Date{} = from_date, %Date{} = to_date) do
+    ShopDayOpen
+    |> where([o], o.shop_date >= ^from_date and o.shop_date <= ^to_date)
+    |> order_by([o], asc: o.shop_date)
+    |> preload(:opened_by_user)
+    |> Repo.all()
+  end
+
+  @doc """
   Read-only Close Shift history, newest Manila `shop_date` first.
 
   Because `shop_date` is unique, keyset pagination uses that date alone:

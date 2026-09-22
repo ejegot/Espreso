@@ -118,6 +118,7 @@ defmodule EspresoWeb.StaffAuthTest do
            |> :binary.match("id=\"staff-nav-menu-open\"")
            |> elem(0) <
              html |> :binary.match("id=\"staff-nav-logo\"") |> elem(0)
+
     assert has_element?(owner_view, "#staff-nav-orders", "Orders")
     assert has_element?(owner_view, "#staff-nav-pos", "POS")
     assert has_element?(owner_view, "#staff-nav-home.is-active", "Home")
@@ -308,8 +309,18 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(owner_view, "#dashboard-panel-popular-products .dashboard-popular-list")
     assert has_element?(owner_view, "#dashboard-panel-popular-products td", "Americano")
     assert has_element?(owner_view, "#dashboard-panel-popular-products td", "Espresso")
-    assert has_element?(owner_view, "#dashboard-panel-popular-products .dashboard-popular-qty", "3")
-    assert has_element?(owner_view, "#dashboard-panel-popular-products .dashboard-popular-qty", "1")
+
+    assert has_element?(
+             owner_view,
+             "#dashboard-panel-popular-products .dashboard-popular-qty",
+             "3"
+           )
+
+    assert has_element?(
+             owner_view,
+             "#dashboard-panel-popular-products .dashboard-popular-qty",
+             "1"
+           )
 
     {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/staff")
     refute has_element?(manager_view, "#dashboard-panel-popular-products")

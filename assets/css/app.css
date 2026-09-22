@@ -4184,6 +4184,11 @@ body:has(.menu-page-locked) {
   box-shadow: 0 6px 16px color-mix(in srgb, var(--dash-forest) 6%, transparent);
 }
 
+a.dashboard-kpi-card {
+  color: inherit;
+  text-decoration: none;
+}
+
 .dashboard-kpi-card.is-hero {
   border-color: color-mix(in srgb, var(--dash-forest) 22%, transparent);
   background: linear-gradient(
@@ -24078,6 +24083,12 @@ a.brune-contact-value:focus-visible {
   gap: 0.85rem;
 }
 
+.staff-reports-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
 @media (min-width: 520px) {
   .staff-reports-fields {
     grid-template-columns: 1fr 1fr;
@@ -24086,13 +24097,17 @@ a.brune-contact-value:focus-visible {
 
 @media (min-width: 720px) {
   .staff-reports-fields {
-    grid-template-columns: 1fr 1fr auto;
+    grid-template-columns: 1fr 1fr;
     align-items: end;
+  }
+
+  .staff-reports-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .staff-reports-export-btn {
     width: auto;
-    min-width: 10.5rem;
+    min-width: 0;
   }
 }
 
@@ -24164,6 +24179,27 @@ a.brune-contact-value:focus-visible {
 .staff-reports-export-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.staff-reports-export-btn--secondary {
+  border: 1px solid color-mix(in srgb, var(--rpt-forest) 22%, transparent);
+  background: #fff;
+  color: var(--rpt-forest);
+}
+
+.staff-attendance-export {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.4rem;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--rpt-forest, #394331) 22%, transparent);
+  border-radius: 0.7rem;
+  background: #fff;
+  color: var(--rpt-forest, #394331);
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .staff-attendance-head {
