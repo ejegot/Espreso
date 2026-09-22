@@ -22841,18 +22841,11 @@ a.brune-contact-value:focus-visible {
   min-height: 0;
 }
 
-.staff-transactions-list,
-.staff-transaction-detail {
+.staff-transactions-list {
   overflow: hidden;
   border: 1px solid var(--txn-line);
   border-radius: 0.85rem;
   background: #fff;
-}
-
-.staff-transactions-list {
-  max-height: min(70dvh, 42rem);
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
 
 .staff-transactions-list-head,
@@ -23013,18 +23006,16 @@ a.brune-contact-value:focus-visible {
   outline: none;
 }
 
-.staff-transaction-detail {
+.staff-transaction-detail,
+.staff-transaction-modal--receipt {
   display: flex;
   flex-direction: column;
   gap: 0;
   padding: 0.8rem;
-  max-height: min(78dvh, 48rem);
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
 
-.staff-transaction-detail > header {
+.staff-transaction-detail > header,
+.staff-transaction-modal--receipt > header {
   display: flex;
   justify-content: space-between;
   gap: 0.75rem;
@@ -23033,11 +23024,14 @@ a.brune-contact-value:focus-visible {
 }
 
 .staff-transaction-detail header p,
-.staff-transaction-detail header h3 {
+.staff-transaction-detail header h3,
+.staff-transaction-modal--receipt header p,
+.staff-transaction-modal--receipt header h3 {
   margin: 0;
 }
 
-.staff-transaction-detail header p {
+.staff-transaction-detail header p,
+.staff-transaction-modal--receipt header p {
   color: var(--txn-muted);
   font-size: 0.68rem;
   font-weight: 800;
@@ -23045,12 +23039,14 @@ a.brune-contact-value:focus-visible {
   letter-spacing: 0.06em;
 }
 
-.staff-transaction-detail header h3 {
+.staff-transaction-detail header h3,
+.staff-transaction-modal--receipt header h3 {
   font-size: 1.15rem;
   color: var(--txn-forest);
 }
 
-.staff-transaction-detail header button {
+.staff-transaction-detail header button,
+.staff-transaction-modal--receipt header button {
   width: 2.4rem;
   height: 2.4rem;
   border: 0;
@@ -23060,7 +23056,8 @@ a.brune-contact-value:focus-visible {
   cursor: pointer;
 }
 
-.staff-transaction-detail header svg {
+.staff-transaction-detail header svg,
+.staff-transaction-modal--receipt header svg {
   width: 1.1rem;
 }
 
@@ -23222,6 +23219,10 @@ a.brune-contact-value:focus-visible {
   padding-bottom: max(1rem, env(safe-area-inset-bottom));
 }
 
+#transaction-reprint-modal.staff-transaction-modal-layer {
+  z-index: 95;
+}
+
 .staff-transaction-modal-scrim {
   position: absolute;
   inset: 0;
@@ -23243,29 +23244,34 @@ a.brune-contact-value:focus-visible {
   box-shadow: 0 18px 48px color-mix(in srgb, var(--txn-forest) 18%, transparent);
 }
 
-.staff-transaction-modal h3,
-.staff-transaction-modal > p {
+.staff-transaction-modal--receipt {
+  width: min(100%, 28rem);
+  max-height: min(90dvh, 44rem);
+}
+
+.staff-transaction-modal:not(.staff-transaction-modal--receipt) h3,
+.staff-transaction-modal:not(.staff-transaction-modal--receipt) > p {
   margin: 0;
 }
 
-.staff-transaction-modal h3 {
+.staff-transaction-modal:not(.staff-transaction-modal--receipt) h3 {
   margin-top: 0.2rem;
   color: var(--txn-forest);
 }
 
-.staff-transaction-modal > p:not(.staff-transactions-eyebrow) {
+.staff-transaction-modal:not(.staff-transaction-modal--receipt) > p:not(.staff-transactions-eyebrow) {
   margin-top: 0.4rem;
   color: var(--txn-muted);
 }
 
-.staff-transaction-modal > div {
+.staff-transaction-modal:not(.staff-transaction-modal--receipt) > div {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.55rem;
   margin-top: 0.9rem;
 }
 
-.staff-transaction-modal > div button {
+.staff-transaction-modal:not(.staff-transaction-modal--receipt) > div button {
   min-height: 2.75rem;
   border: 1px solid var(--txn-line);
   border-radius: 0.65rem;
@@ -23275,7 +23281,7 @@ a.brune-contact-value:focus-visible {
   cursor: pointer;
 }
 
-.staff-transaction-modal > div button:last-child {
+.staff-transaction-modal:not(.staff-transaction-modal--receipt) > div button:last-child {
   border-color: var(--txn-forest);
   background: var(--txn-forest);
   color: #fff;
@@ -23292,34 +23298,6 @@ a.brune-contact-value:focus-visible {
 
   .staff-transactions-search {
     grid-column: auto;
-  }
-
-  .staff-transactions-workspace.has-detail {
-    grid-template-columns: minmax(0, 1fr) minmax(17.5rem, 0.4fr);
-    align-items: stretch;
-    min-height: min(70dvh, 40rem);
-  }
-
-  .staff-transactions-list {
-    max-height: min(70dvh, 40rem);
-  }
-
-  .staff-transaction-detail {
-    position: sticky;
-    top: 0.75rem;
-    max-height: min(70dvh, 40rem);
-  }
-}
-
-@media (min-width: 960px) {
-  .staff-transactions-workspace.has-detail {
-    grid-template-columns: minmax(0, 1fr) minmax(19rem, 0.36fr);
-    min-height: min(74dvh, 44rem);
-  }
-
-  .staff-transactions-list,
-  .staff-transaction-detail {
-    max-height: min(74dvh, 44rem);
   }
 }
 
@@ -23345,15 +23323,6 @@ a.brune-contact-value:focus-visible {
   .staff-transactions-filters input,
   .staff-transactions-filters select {
     min-height: 2.35rem;
-  }
-
-  .staff-transactions-workspace.has-detail {
-    min-height: calc(100dvh - 12rem);
-  }
-
-  .staff-transactions-list,
-  .staff-transaction-detail {
-    max-height: calc(100dvh - 12rem);
   }
 
   .staff-transaction-modal-layer {
@@ -23398,10 +23367,6 @@ a.brune-contact-value:focus-visible {
     grid-column: 2;
     grid-row: 2;
     text-align: right;
-  }
-
-  .staff-transactions-list {
-    max-height: none;
   }
 }
 

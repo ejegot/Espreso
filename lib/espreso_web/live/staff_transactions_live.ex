@@ -235,7 +235,7 @@ defmodule EspresoWeb.StaffTransactionsLive do
           {@action_note}
         </p>
 
-        <div class={["staff-transactions-workspace", @selected_transaction && "has-detail"]}>
+        <div class="staff-transactions-workspace">
           <section class="staff-transactions-list" id="transactions-list" aria-label="Paid receipts">
             <div class="staff-transactions-list-head" aria-hidden="true">
               <span>Total</span>
@@ -287,17 +287,36 @@ defmodule EspresoWeb.StaffTransactionsLive do
               Load more
             </button>
           </section>
+        </div>
 
-          <aside :if={@selected_transaction} class="staff-transaction-detail" id="transaction-detail">
+        <div
+          :if={@selected_transaction}
+          class="staff-transaction-modal-layer"
+          id="transaction-detail"
+          phx-window-keydown="close_transaction"
+          phx-key="escape"
+        >
+          <button
+            type="button"
+            class="staff-transaction-modal-scrim"
+            phx-click="close_transaction"
+            aria-label="Close receipt"
+          />
+          <section
+            class="staff-transaction-modal staff-transaction-modal--receipt"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="transaction-detail-title"
+          >
             <header>
               <div>
                 <p>Receipt</p>
-                <h3>{@selected_transaction.number}</h3>
+                <h3 id="transaction-detail-title">{@selected_transaction.number}</h3>
               </div>
               <button
                 type="button"
                 phx-click="close_transaction"
-                aria-label="Close transaction details"
+                aria-label="Close receipt"
               >
                 <.icon name="hero-x-mark" />
               </button>
@@ -389,6 +408,7 @@ defmodule EspresoWeb.StaffTransactionsLive do
                 {if @printer_enabled?, do: "Reprint receipt", else: "Printer disabled"}
               </button>
               <.link
+                :if={@selected_transaction.status in ~w(received preparing ready)}
                 navigate={~p"/orders"}
                 class="staff-transaction-orders-link"
                 id="transaction-view-orders"
@@ -396,7 +416,7 @@ defmodule EspresoWeb.StaffTransactionsLive do
                 View on Orders
               </.link>
             </div>
-          </aside>
+          </section>
         </div>
 
         <div

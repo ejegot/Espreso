@@ -57,7 +57,11 @@ defmodule EspresoWeb.StaffTransactionsLiveTest do
     assert has_element?(view, "#transaction-detail", "₱100")
     assert has_element?(view, "#transaction-detail", "Change")
     assert has_element?(view, "#transaction-detail", "₱25")
+    assert has_element?(view, "#transaction-detail.staff-transaction-modal-layer")
     assert has_element?(view, "#transaction-view-orders", "View on Orders")
+
+    view |> element("#transaction-detail .staff-transaction-modal-scrim") |> render_click()
+    refute has_element?(view, "#transaction-detail")
 
     view
     |> form("#transactions-filters", %{"filters" => %{"payment" => "gcash"}})
@@ -224,6 +228,49 @@ defmodule EspresoWeb.StaffTransactionsLiveTest do
       assert has_element?(view, "#transactions-list", "Wallet Only")
       refute has_element?(view, "#transactions-load-more")
     end)
+  end
+
+  test "in-progress paid tickets show View on Orders in the receipt modal", %{
+    conn: conn,
+    barista: barista
+  } do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Latte", size: nil, quantity: 1, price: Decimal.new("120")}],
+        %{
+          customer_name: "Kitchen Ticket",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_status: :paid,
+          paid_via: "cash",
+          settlement_source: "staff_orders",
+          settled_by_user_id: barista.id
+        }
+      )
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/transactions")
+    view |> element("#transaction-#{order.id}") |> render_click()
+
+    assert has_element?(view, "#transaction-detail.staff-transaction-modal-layer")
+    assert has_element?(view, "#transaction-view-orders", "View on Orders")
+  end
+
+  test "completed POS receipts hide View on Orders", %{
+    conn: conn,
+    barista: barista
+  } do
+    order = paid_order!("Picked Up", barista)
+
+    {:ok, order} =
+      order
+      |> Ecto.Changeset.change(status: "completed")
+      |> Espreso.Repo.update()
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/transactions")
+    view |> element("#transaction-#{order.id}") |> render_click()
+
+    assert has_element?(view, "#transaction-detail")
+    refute has_element?(view, "#transaction-view-orders")
   end
 
   test "pubsub reload resets transactions to the first page", %{
