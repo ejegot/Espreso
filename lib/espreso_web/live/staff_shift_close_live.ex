@@ -1,7 +1,6 @@
 defmodule EspresoWeb.StaffShiftCloseLive do
   use EspresoWeb, :live_view
 
-  alias Espreso.Accounts.Authorization
   alias Espreso.Accounts.User
   alias Espreso.CashOuts
   alias Espreso.Menu
@@ -394,13 +393,6 @@ defmodule EspresoWeb.StaffShiftCloseLive do
                 Log out
               </.link>
               <.link navigate={~p"/staff"} class="staff-shell-tool">Back to Home</.link>
-              <.link
-                :if={Authorization.can?(@current_user, :dashboard) and not barista?(@current_user)}
-                navigate={~p"/dashboard"}
-                class="staff-shell-tool staff-shell-tool--quiet"
-              >
-                Back to Dashboard
-              </.link>
               <.link navigate={~p"/transactions"} class="staff-shell-tool staff-shell-tool--quiet">
                 View Transactions
               </.link>

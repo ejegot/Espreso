@@ -1004,6 +1004,44 @@ defmodule Espreso.Orders do
     end)
   end
 
+  @doc """
+  Non-cancelled ticket counts per Asia/Manila shop day for the last `days` days.
+  Used by the staff Home volume chart (no sales amounts).
+  """
+  def order_volume_chart(days \\ 7) when is_integer(days) and days > 0 do
+    today = shop_date_today()
+    today_start = shop_day_start_utc()
+    period_start = DateTime.add(today_start, -(days - 1), :day)
+
+    rows =
+      from(o in Order,
+        where: o.status != "cancelled" and o.inserted_at >= ^period_start,
+        select: o.inserted_at
+      )
+      |> Repo.all()
+
+    grouped =
+      Enum.reduce(rows, %{}, fn inserted_at, acc ->
+        date = shop_date_from_utc(inserted_at)
+        Map.update(acc, date, 1, &(&1 + 1))
+      end)
+
+    dates = for offset <- 0..(days - 1), do: Date.add(today, offset - (days - 1))
+    max_count = dates |> Enum.map(&Map.get(grouped, &1, 0)) |> Enum.max(fn -> 0 end)
+
+    Enum.map(dates, fn date ->
+      count = Map.get(grouped, date, 0)
+
+      %{
+        date: date,
+        label: Calendar.strftime(date, "%a"),
+        day_label: Calendar.strftime(date, "%A"),
+        count: count,
+        pct: chart_bar_pct(count, max_count)
+      }
+    end)
+  end
+
   defp shop_date_from_utc(%DateTime{} = datetime) do
     datetime
     |> DateTime.add(@shop_utc_offset_seconds, :second)
@@ -1033,6 +1071,14 @@ defmodule Espreso.Orders do
         |> Decimal.round(0)
         |> Decimal.to_integer()
         |> max(8)
+    end
+  end
+
+  defp chart_bar_pct(count, max_count) when is_integer(count) and is_integer(max_count) do
+    cond do
+      max_count <= 0 -> 0
+      count <= 0 -> 0
+      true -> max(round(count / max_count * 100), 8)
     end
   end
 

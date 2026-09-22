@@ -92,7 +92,7 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     assert has_element?(view, "#staff-shift-close-sealed-variance", "Over ₱5")
     assert has_element?(view, "#staff-shift-close-sealed-notes", "Balanced")
     assert has_element?(view, "#staff-shift-close-done a[href='/staff']", "Back to Home")
-    assert has_element?(view, "#staff-shift-close-done a[href='/dashboard']", "Back to Dashboard")
+    refute has_element?(view, "#staff-shift-close-done a[href='/dashboard']")
 
     assert has_element?(
              view,

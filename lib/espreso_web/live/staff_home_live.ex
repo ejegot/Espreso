@@ -131,17 +131,23 @@ defmodule EspresoWeb.StaffHomeLive do
   def render(assigns) do
     ~H"""
     <.staff_shell current={:home} current_user={@current_user} page_title="Home" chrome={:bar}>
-      <main
-        class={[
-          "staff-home-main staff-home-hub staff-home-desk",
-          @today_visible? && "staff-home-desk--money",
-          not @today_visible? && "staff-home-desk--counter"
-        ]}
-        id="staff-home-desk"
-      >
-        <header class="staff-home-identity" id="staff-home-identity">
-          <p class="staff-home-greeting" id="staff-home-greeting">{@greeting}</p>
-          <p class="staff-home-identity-role">{User.role_label(@current_user.role)}</p>
+      <main class="staff-home-main dashboard-page dashboard-page--sales" id="staff-home-desk">
+        <header class="dashboard-head" id="staff-home-identity">
+          <div class="dashboard-head-copy">
+            <p class="dashboard-kicker">{User.role_label(@current_user.role)}</p>
+            <h1 class="dashboard-heading">Home</h1>
+            <p class="staff-home-lede dashboard-lede" id="staff-home-greeting">{@greeting}</p>
+          </div>
+          <div class="dashboard-head-pills">
+            <span class="dashboard-date-pill">
+              <span class="dashboard-pill-label">Shop day</span>
+              <strong>{Calendar.strftime(@shop_date, "%a %b %d")}</strong>
+            </span>
+            <span class="dashboard-date-pill">
+              <span class="dashboard-pill-label">Status</span>
+              <strong>{shop_day_status_label(@shop_day_status)}</strong>
+            </span>
+          </div>
         </header>
 
         <section :if={@shop_open_prompt?} class="staff-home-shop-open" id="staff-home-shop-open">
@@ -165,94 +171,207 @@ defmodule EspresoWeb.StaffHomeLive do
           show_open_link={false}
         />
 
-        <div class={["staff-home-desk-stage", @today_visible? && "staff-home-desk-stage--split"]}>
-          <section
-            :if={@today_visible?}
-            class="staff-home-today"
-            id="staff-home-today"
-            aria-label="Today"
-          >
-            <div class="staff-home-today-head">
-              <p class="staff-home-today-eyebrow">Today</p>
-              <p :if={@shift_close} class="staff-home-today-closed" id="staff-home-shift-closed">
-                Closed · {Shifts.format_closed_at(@shift_close.closed_at)}
-                <span :if={@shift_close.closed_by_user}>
-                  by {@shift_close.closed_by_user.name}
-                </span>
-              </p>
-            </div>
-
-            <div class="staff-home-today-row">
-              <p class="staff-home-today-total">
+        <section class="dashboard-kpi-grid" id="staff-home-kpis" aria-label="Key numbers">
+          <%= if @money? do %>
+            <article class="dashboard-kpi-card" id="dashboard-panel-sales">
+              <span class="staff-home-card-title">Paid today</span>
+              <strong class="dashboard-kpi-value">
                 {Menu.format_price(@sales.todays_paid_total)}
-                <span>paid</span>
-              </p>
-              <p class="staff-home-today-meta">
-                {@sales.todays_paid_count} paid · {@overview.active_count} active · {@overview.unpaid_active_count} unpaid
-              </p>
-            </div>
+              </strong>
+              <span class="staff-home-card-body dashboard-kpi-hint">{sales_body(@sales)}</span>
+            </article>
+            <article class="dashboard-kpi-card" id="dashboard-kpi-tickets">
+              <span class="staff-home-card-title">Paid tickets</span>
+              <strong class="dashboard-kpi-value">{@sales.todays_paid_count}</strong>
+              <span class="dashboard-kpi-hint">Settled this shop day</span>
+            </article>
+            <article class="dashboard-kpi-card" id="dashboard-kpi-cash">
+              <span class="staff-home-card-title">Cash</span>
+              <strong class="dashboard-kpi-value">{Menu.format_price(cash_today(@breakdown))}</strong>
+              <span class="dashboard-kpi-hint">Of paid mix</span>
+            </article>
+            <article class="dashboard-kpi-card" id="dashboard-panel-reports">
+              <span class="staff-home-card-title">Reports</span>
+              <strong class="dashboard-kpi-value">
+                {Menu.format_price(@reports_overview.period_paid_total)}
+              </strong>
+              <span class="staff-home-card-body dashboard-kpi-hint">
+                {reports_body(@reports_overview)}
+              </span>
+            </article>
+          <% else %>
+            <article class="dashboard-kpi-card" id="staff-home-kpi-active">
+              <span class="staff-home-card-title">Active</span>
+              <strong class="dashboard-kpi-value">{@overview.active_count}</strong>
+              <span class="dashboard-kpi-hint">Received + preparing</span>
+            </article>
+            <article class="dashboard-kpi-card" id="staff-home-kpi-unpaid">
+              <span class="staff-home-card-title">Unpaid</span>
+              <strong class="dashboard-kpi-value">{@overview.unpaid_active_count}</strong>
+              <span class="dashboard-kpi-hint">Still open on the board</span>
+            </article>
+            <article class="dashboard-kpi-card" id="staff-home-kpi-preparing">
+              <span class="staff-home-card-title">Preparing</span>
+              <strong class="dashboard-kpi-value">{@overview.preparing_count}</strong>
+              <span class="dashboard-kpi-hint">In progress</span>
+            </article>
+            <article class="dashboard-kpi-card" id="staff-home-kpi-tickets">
+              <span class="staff-home-card-title">Tickets</span>
+              <strong class="dashboard-kpi-value">{@overview.todays_count}</strong>
+              <span class="dashboard-kpi-hint">Placed this shop day</span>
+            </article>
+          <% end %>
+        </section>
 
-            <ul :if={@breakdown} class="staff-paid-breakdown" id="staff-home-paid-breakdown">
-              <li :for={row <- @via_rows} class="staff-paid-breakdown-row">
-                <span class="staff-paid-breakdown-label">{row.label}</span>
-                <span class="staff-paid-breakdown-total">{Menu.format_price(row.total)}</span>
-                <span class="staff-paid-breakdown-count">{row.count}</span>
-              </li>
-            </ul>
+        <section class="dashboard-launch" aria-label="Primary action">
+          <.link
+            :for={item <- @primary}
+            navigate={item.path}
+            class={["dashboard-launch-btn", item[:class]]}
+            id={"staff-home-#{item.id}"}
+          >
+            <span class="dashboard-launch-title">{item.title}</span>
+            <span class="dashboard-launch-body">{item.body}</span>
+          </.link>
+        </section>
 
-            <div :if={@drawer_summary} class="staff-home-drawer" id="staff-home-drawer">
-              <p class="staff-home-today-eyebrow">
-                {if(@drawer_summary.sealed?, do: "Drawer · sealed", else: "Drawer")}
-              </p>
-              <ul class="staff-home-drawer-list">
-                <li>
-                  <span>Opening</span>
-                  <strong>{Menu.format_price(@drawer_summary.opening)}</strong>
-                </li>
-                <li>
-                  <span>Cash sales</span>
-                  <strong>{Menu.format_price(@drawer_summary.cash_sales)}</strong>
-                </li>
-                <li>
-                  <span>Cash outs</span>
-                  <strong>{Menu.format_price(@drawer_summary.cash_outs)}</strong>
-                </li>
-                <li>
-                  <span>Expected</span>
-                  <strong>{Menu.format_price(@drawer_summary.expected)}</strong>
-                </li>
-                <li :if={@drawer_summary.sealed?}>
-                  <span>Counted</span>
-                  <strong>{Menu.format_price(@drawer_summary.counted)}</strong>
-                </li>
-                <li :if={@drawer_summary.sealed?} id="staff-home-drawer-variance">
-                  <span>Variance</span>
-                  <strong>{variance_line(@drawer_summary.variance)}</strong>
+        <div class={["dashboard-split", not @money? && "is-single"]}>
+          <section
+            class="staff-home-card dashboard-chart-panel"
+            id="staff-home-chart"
+            aria-labelledby="staff-home-chart-heading"
+          >
+            <header class="dashboard-panel-header">
+              <span class="staff-home-card-title" id="staff-home-chart-heading">
+                {if(@money?, do: "Paid sales", else: "Tickets")}
+              </span>
+              <p class="dashboard-chart-legend">Last 7 days</p>
+            </header>
+            <svg
+              class="dashboard-sparkline"
+              viewBox="0 0 100 40"
+              preserveAspectRatio="none"
+              role="img"
+              aria-label="Last 7 shop days"
+            >
+              <polyline
+                class="dashboard-sparkline-fill"
+                fill="color-mix(in srgb, #394331 14%, transparent)"
+                stroke="none"
+                points={"0,40 #{sparkline_points(@chart)} 100,40"}
+              />
+              <polyline
+                class="dashboard-sparkline-line"
+                fill="none"
+                stroke="#394331"
+                stroke-width="1.8"
+                stroke-linejoin="round"
+                stroke-linecap="round"
+                points={sparkline_points(@chart)}
+              />
+            </svg>
+            <ol class="dashboard-sparkline-axis">
+              <li :for={point <- @chart}>{point.label}</li>
+            </ol>
+          </section>
+
+          <section
+            :if={@money?}
+            id="staff-home-paid-breakdown"
+            class="staff-home-card dashboard-donut-panel"
+            aria-label="Payment methods"
+          >
+            <span class="staff-home-card-title">Payment methods</span>
+            <div class="dashboard-donut-row">
+              <div class="dashboard-donut" style={donut_style(@via_rows)} aria-hidden="true"></div>
+              <ul class="staff-paid-breakdown">
+                <li :for={row <- @via_rows} class="staff-paid-breakdown-row">
+                  <span class="staff-paid-breakdown-label">{row.label}</span>
+                  <span class="staff-paid-breakdown-total">{Menu.format_price(row.total)}</span>
+                  <span class="staff-paid-breakdown-count">{row.count}</span>
                 </li>
               </ul>
-              <.link
-                navigate={~p"/staff/close"}
-                class="staff-home-drawer-link"
-                id="staff-home-drawer-close"
-              >
-                {if(@drawer_summary.sealed?, do: "View close", else: "Close shift")}
-              </.link>
             </div>
           </section>
+        </div>
 
-          <section class="staff-home-primary" aria-label="Primary action">
+        <section :if={@money?} class="staff-home-today" id="staff-home-today" aria-label="Today">
+          <p :if={@shift_close} class="staff-home-today-closed" id="staff-home-shift-closed">
+            Closed · {Shifts.format_closed_at(@shift_close.closed_at)}
+            <span :if={@shift_close.closed_by_user}>
+              by {@shift_close.closed_by_user.name}
+            </span>
+          </p>
+
+          <div :if={@drawer_summary} class="staff-home-drawer" id="staff-home-drawer">
+            <p class="staff-home-today-eyebrow">
+              {if(@drawer_summary.sealed?, do: "Drawer · sealed", else: "Drawer")}
+            </p>
+            <ul class="staff-home-drawer-list">
+              <li>
+                <span>Opening</span>
+                <strong>{Menu.format_price(@drawer_summary.opening)}</strong>
+              </li>
+              <li>
+                <span>Cash sales</span>
+                <strong>{Menu.format_price(@drawer_summary.cash_sales)}</strong>
+              </li>
+              <li>
+                <span>Cash outs</span>
+                <strong>{Menu.format_price(@drawer_summary.cash_outs)}</strong>
+              </li>
+              <li>
+                <span>Expected</span>
+                <strong>{Menu.format_price(@drawer_summary.expected)}</strong>
+              </li>
+              <li :if={@drawer_summary.sealed?}>
+                <span>Counted</span>
+                <strong>{Menu.format_price(@drawer_summary.counted)}</strong>
+              </li>
+              <li :if={@drawer_summary.sealed?} id="staff-home-drawer-variance">
+                <span>Variance</span>
+                <strong>{variance_line(@drawer_summary.variance)}</strong>
+              </li>
+            </ul>
             <.link
-              :for={item <- @primary}
-              navigate={item.path}
-              class={["staff-home-pos-cta", item[:class]]}
-              id={"staff-home-#{item.id}"}
+              navigate={~p"/staff/close"}
+              class="staff-home-drawer-link"
+              id="staff-home-drawer-close"
             >
-              <span class="staff-home-pos-cta-kicker">{item.eyebrow}</span>
-              <span class="staff-home-pos-cta-title">{item.title}</span>
-              <span class="staff-home-pos-cta-body">{item.body}</span>
-              <span class="staff-home-pos-cta-action">{item.cta}</span>
+              {if(@drawer_summary.sealed?, do: "View close", else: "Close shift")}
             </.link>
-          </section>
+          </div>
+        </section>
+
+        <div
+          :if={@current_user.role == "owner"}
+          class="staff-home-grid dashboard-panels"
+          id="dashboard-panels"
+        >
+          <div
+            class="staff-home-card dashboard-card-metric-panel dashboard-card-secondary"
+            id="dashboard-panel-popular-products"
+          >
+            <span class="staff-home-card-eyebrow">Menu</span>
+            <span class="staff-home-card-title">Popular Products</span>
+            <p :if={@popular_products == []} class="staff-home-card-body">
+              No paid product sales today.
+            </p>
+            <table :if={@popular_products != []} class="dashboard-popular-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Qty</th>
+                </tr>
+              </thead>
+              <tbody class="dashboard-popular-list">
+                <tr :for={item <- @popular_products}>
+                  <td class="dashboard-popular-name">{item.name}</td>
+                  <td class="dashboard-popular-qty">{item.quantity}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <section class="staff-home-desk-tools" aria-label="Now">
@@ -376,8 +495,12 @@ defmodule EspresoWeb.StaffHomeLive do
     shop_open_prompt? =
       Shifts.can_access_open?(user) and is_nil(shop_open) and is_nil(close)
 
+    chart = if money?, do: Orders.paid_sales_chart(), else: Orders.order_volume_chart()
+    popular = if user.role == "owner", do: Orders.popular_products(), else: []
+
     socket
     |> assign(:overview, overview)
+    |> assign(:money?, money?)
     |> assign(:sales, sales)
     |> assign(:breakdown, breakdown)
     |> assign(:via_rows, if(breakdown, do: Orders.paid_via_rows(breakdown), else: []))
@@ -385,11 +508,15 @@ defmodule EspresoWeb.StaffHomeLive do
     |> assign(:shop_open, shop_open)
     |> assign(:shop_open_prompt?, shop_open_prompt?)
     |> assign(:shop_day_status, Shifts.shop_day_status())
+    |> assign(:shop_date, Orders.shop_date_today())
     |> assign(:drawer_summary, drawer_summary(money?, shop_open, close, breakdown))
     |> assign(:today_visible?, money?)
+    |> assign(:chart, chart)
+    |> assign(:reports_overview, if(money?, do: Orders.reports_overview(), else: nil))
+    |> assign(:popular_products, popular)
     |> assign(:printer_on_home?, money? and Printer.enabled?())
     |> assign(:greeting, staff_greeting(user))
-    |> assign(:primary, primary_tiles(user))
+    |> assign(:primary, primary_tiles(user, overview))
     |> then(fn socket ->
       tools = desk_tools(user, overview)
       {shift_tools, launch_tools} = Enum.split_with(tools, &(&1.id == "my-shifts"))
@@ -429,7 +556,7 @@ defmodule EspresoWeb.StaffHomeLive do
     end
   end
 
-  defp primary_tiles(%User{} = user) do
+  defp primary_tiles(%User{} = user, overview) do
     [
       %{
         id: "pos",
@@ -440,23 +567,25 @@ defmodule EspresoWeb.StaffHomeLive do
         cta: "Open POS →",
         class: "staff-home-pos-cta--primary",
         show?: Authorization.can?(user, :orders)
+      },
+      %{
+        id: "orders",
+        eyebrow: "Board",
+        title: "Orders",
+        body: orders_body(overview),
+        path: ~p"/orders",
+        cta: "Open Orders →",
+        class: "staff-home-pos-cta--secondary",
+        show?: Authorization.can?(user, :orders)
       }
     ]
     |> Enum.filter(& &1.show?)
   end
 
-  defp desk_tools(%User{} = user, overview) do
+  defp desk_tools(%User{} = user, _overview) do
     unpaid_count = Orders.count_todays_unpaid()
 
     [
-      %{
-        id: "orders",
-        title: "Orders",
-        body: orders_body(overview),
-        path: ~p"/orders",
-        count: overview.received_count,
-        show?: Authorization.can?(user, :orders)
-      },
       %{
         id: "unpaid",
         title: "Unpaid",
@@ -480,6 +609,71 @@ defmodule EspresoWeb.StaffHomeLive do
 
   defp manager_or_owner?(%User{role: role}), do: role in ["manager", "owner"]
   defp manager_or_owner?(_), do: false
+
+  defp sparkline_points(chart) when is_list(chart) do
+    n = max(length(chart) - 1, 1)
+
+    chart
+    |> Enum.with_index()
+    |> Enum.map_join(" ", fn {point, index} ->
+      x = index / n * 100
+      y = 36 - Map.get(point, :pct, 0) / 100 * 32
+      "#{Float.round(x / 1, 2)},#{Float.round(y / 1, 2)}"
+    end)
+  end
+
+  defp sparkline_points(_), do: "0,36 100,36"
+
+  @donut_colors ["#394331", "#f85020", "#c4a574", "#6b7f5a", "#8b6914"]
+
+  defp donut_style(rows) when is_list(rows) do
+    total =
+      Enum.reduce(rows, Decimal.new("0"), fn row, acc ->
+        Decimal.add(acc, row.total || Decimal.new("0"))
+      end)
+
+    if Decimal.compare(total, 0) != :gt do
+      "background: color-mix(in srgb, var(--dash-forest, #394331) 12%, #fff)"
+    else
+      {stops, _} =
+        rows
+        |> Enum.with_index()
+        |> Enum.reduce({[], 0.0}, fn {row, index}, {acc, start} ->
+          pct =
+            row.total
+            |> Decimal.div(total)
+            |> Decimal.mult(Decimal.new(100))
+            |> Decimal.to_float()
+
+          color = Enum.at(@donut_colors, rem(index, length(@donut_colors)))
+          stop = start + pct
+          {acc ++ ["#{color} #{start}% #{stop}%"], stop}
+        end)
+
+      "background: conic-gradient(#{Enum.join(stops, ", ")})"
+    end
+  end
+
+  defp donut_style(_), do: "background: #fff"
+
+  defp shop_day_status_label(:open), do: "Open"
+  defp shop_day_status_label(:closed), do: "Closed"
+  defp shop_day_status_label(_), do: "Not open"
+
+  defp sales_body(%{todays_paid_total: total, todays_paid_count: count}) do
+    "#{Menu.format_price(total)} today · #{count} paid orders"
+  end
+
+  defp reports_body(%{period_paid_count: 0}), do: "No paid sales in the last 7 days."
+
+  defp reports_body(%{period_paid_total: total, period_paid_count: count, period_days: days}) do
+    "#{Menu.format_price(total)} last #{days} days · #{count} paid orders"
+  end
+
+  defp cash_today(%{by_via: by_via}) when is_map(by_via),
+    do: Shifts.cash_sales_total(%{by_via: by_via})
+
+  defp cash_today(_), do: Decimal.new("0")
 
   defp drawer_summary(false, _, _, _), do: nil
   defp drawer_summary(true, nil, nil, _), do: nil

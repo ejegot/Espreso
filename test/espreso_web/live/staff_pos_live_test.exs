@@ -67,8 +67,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute has_element?(view, "#staff-pos-rail.staff-pos-rail--icons")
     assert has_element?(view, "#staff-nav-pos.is-active")
     assert has_element?(view, "#staff-pos-rail #staff-nav-menu-open")
-    assert has_element?(view, "#staff-pos-rail #staff-nav-home")
-    assert has_element?(view, "#staff-pos-rail #staff-nav-orders")
+    assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-home")
+    assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-orders")
     assert has_element?(view, "#staff-nav-drawer-panel")
     assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-logout", "Log out")
     refute has_element?(view, "#staff-nav-more")
@@ -514,7 +514,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
   test "manager and owner can open POS", %{conn: conn, manager: manager, owner: owner} do
     {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/pos")
     assert has_element?(manager_view, "#pos-place-order")
-    assert has_element?(manager_view, "#staff-nav-drawer-panel #staff-nav-dashboard", "Dashboard")
+    assert has_element?(manager_view, "#staff-nav-drawer-panel #staff-nav-reports", "Reports")
 
     assert has_element?(
              manager_view,
@@ -522,7 +522,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
              "Availability"
            )
 
-    assert has_element?(manager_view, "#staff-nav-drawer-panel #staff-nav-dashboard", "Dashboard")
+    assert has_element?(manager_view, "#staff-nav-drawer-panel #staff-nav-reports", "Reports")
     refute has_element?(manager_view, "#staff-nav-staff")
     refute has_element?(manager_view, "#staff-nav-settings")
 

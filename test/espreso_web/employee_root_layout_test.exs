@@ -64,7 +64,6 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
       ~p"/orders",
       ~p"/pos",
       ~p"/transactions",
-      ~p"/dashboard",
       ~p"/staff/close",
       ~p"/admin/availability",
       ~p"/admin/users",

@@ -10,6 +10,7 @@ defmodule EspresoWeb.StaffNavDrawerComponent do
   alias Espreso.Accounts.User
 
   @groups [
+    {:counter, "Counter"},
     {:service, "Service"},
     {:shift, "Shift"},
     {:manage, "Manage"}
@@ -24,6 +25,7 @@ defmodule EspresoWeb.StaffNavDrawerComponent do
      |> assign(assigns)
      |> assign(:role_title, role_title)
      |> assign(:groups, grouped_items(assigns.items))
+     |> assign_new(:orders_badge_count, fn -> 0 end)
      |> assign_new(:open?, fn -> false end)}
   end
 
@@ -111,10 +113,18 @@ defmodule EspresoWeb.StaffNavDrawerComponent do
                 @current == item.key && "is-active"
               ]}
               id={"staff-nav-#{item.key}"}
+              aria-label={nav_item_aria(item, @orders_badge_count)}
               aria-current={if(@current == item.key, do: "page", else: nil)}
             >
               <.icon name={item.icon} class="staff-nav-drawer-link-icon" />
               <span>{item.label}</span>
+              <span
+                :if={item.key == :orders and @orders_badge_count > 0}
+                class="staff-nav-drawer-badge"
+                id="staff-nav-orders-badge"
+              >
+                {nav_badge_count(@orders_badge_count)}
+              </span>
             </.link>
           </section>
         </div>
@@ -144,4 +154,13 @@ defmodule EspresoWeb.StaffNavDrawerComponent do
       %{key: key, title: title, items: grouped}
     end
   end
+
+  defp nav_item_aria(%{key: :orders, label: label}, count) when is_integer(count) and count > 0 do
+    "#{label}, #{count} new"
+  end
+
+  defp nav_item_aria(%{label: label}, _count), do: label
+
+  defp nav_badge_count(count) when count > 9, do: "9+"
+  defp nav_badge_count(count), do: Integer.to_string(count)
 end
