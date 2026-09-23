@@ -6429,8 +6429,8 @@ a.staff-home-card:focus-visible {
   align-items: center;
   gap: 0.4rem;
   width: 100%;
-  min-height: 3.25rem;
-  padding: 0.35rem 0.65rem;
+  min-height: 3.55rem;
+  padding: 0.28rem 0.65rem;
   border-right: none;
   border-bottom: 1px solid rgba(56, 32, 16, 0.1);
 }
@@ -6439,13 +6439,19 @@ a.staff-home-card:focus-visible {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  background: none;
+  box-shadow: none;
   text-decoration: none;
   color: inherit;
 }
 
 .staff-pos-rail--bar .staff-pos-rail-logo {
-  width: 2.45rem;
-  height: 2.45rem;
+  width: 2.85rem;
+  height: 2.85rem;
+  filter: drop-shadow(0 1px 1px rgba(56, 32, 16, 0.2));
 }
 
 .staff-pos-rail--bar .staff-pos-rail-nav {
@@ -6465,7 +6471,9 @@ a.staff-home-card:focus-visible {
   min-width: 3rem;
   min-height: 3rem;
   padding: 0;
-  border-radius: 0.85rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 .staff-pos-rail--bar .staff-pos-rail-link.is-active::before {
@@ -6501,7 +6509,17 @@ a.staff-home-card:focus-visible {
   min-height: 3rem;
   margin: 0;
   padding: 0;
+  border: none;
   border-top: none;
+  background: transparent;
+  color: #382010;
+}
+
+.staff-pos-rail--bar .staff-nav-menu-open--bar.is-active,
+.staff-pos-rail--bar .staff-pos-rail-link.is-active {
+  border: none;
+  background: transparent;
+  color: #1a0e08;
 }
 
 .staff-pos-rail--bar .staff-pos-rail-end {
@@ -6512,6 +6530,47 @@ a.staff-home-card:focus-visible {
   gap: 0.35rem;
   min-width: 0;
   margin-left: auto;
+}
+
+.staff-pos-rail-hop {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 3rem;
+  min-width: 3rem;
+  height: 3rem;
+  min-height: 3rem;
+  background: transparent;
+  color: #382010;
+  text-decoration: none;
+}
+
+.staff-pos-rail-hop:hover,
+.staff-pos-rail-hop:focus-visible {
+  background: transparent;
+  color: #1a0e08;
+  outline: none;
+}
+
+.staff-pos-rail-hop-badge {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.15rem;
+  display: inline-flex;
+  min-width: 1.05rem;
+  height: 1.05rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.22rem;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: var(--cs-orange, #c45c26);
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .staff-pos-rail--bar .staff-pos-rail-tools {
@@ -6678,7 +6737,17 @@ a.staff-home-card:focus-visible {
   height: 3rem;
   min-width: 3rem;
   min-height: 3rem;
-  border-radius: 0.85rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.staff-app.staff-app--bar .staff-pos-rail--bar .staff-notif-bell:hover,
+.staff-app.staff-app--bar .staff-pos-rail--bar .staff-notif-bell:focus-visible {
+  border: none;
+  background: transparent;
+  color: #1a0e08;
 }
 
 .staff-pos-rail--bar .staff-notif-bell-icon svg {
@@ -10233,6 +10302,12 @@ a.staff-home-card:focus-visible {
   flex: 1 1 16rem;
 }
 
+.staff-availability-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
 .staff-availability-add {
   min-height: 2.45rem;
   padding: 0.4rem 0.9rem;
@@ -10244,6 +10319,17 @@ a.staff-home-card:focus-visible {
   font-size: 0.82rem;
   font-weight: 800;
   cursor: pointer;
+}
+
+.staff-availability-add--ghost {
+  background: color-mix(in srgb, var(--elilai-cream, #f4efe3) 82%, #fff);
+  color: var(--elilai-forest, #394331);
+}
+
+.staff-availability-empty {
+  margin: 0 0 0.75rem;
+  color: color-mix(in srgb, var(--elilai-forest, #394331) 62%, #f4efe3);
+  font-size: 0.85rem;
 }
 
 .staff-availability-actions {
@@ -12202,6 +12288,29 @@ body:has(.staff-nav-drawer.is-open) {
   display: none;
 }
 
+.staff-orders-board-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.35rem;
+}
+
+.staff-orders-board-tools .staff-orders-header-tool,
+.staff-orders-board-tools .staff-orders-reconciliation-toggle {
+  position: relative;
+  min-height: 2.25rem;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--cs-line);
+  border-radius: 0.5rem;
+  background: var(--cs-surface, #fff);
+  color: inherit;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
 .staff-orders-page .staff-orders-alert {
   flex: 0 0 auto;
   display: flex;
@@ -13535,11 +13644,19 @@ body:has(.staff-nav-drawer.is-open) {
   height: 3rem;
   min-width: 3rem;
   min-height: 3rem;
+  border: none;
+  background: transparent;
 }
 
 .staff-app:has(.staff-orders-shell-root) .staff-notif:has(.staff-notif-badge) .staff-notif-bell {
   border-color: color-mix(in srgb, var(--cs-orange) 24%, transparent);
   color: var(--cs-brown);
+}
+
+.staff-app.staff-app--bar .staff-pos-rail--bar .staff-notif-bell,
+.staff-app.staff-app--bar .staff-pos-rail--bar .staff-notif:has(.staff-notif-badge) .staff-notif-bell {
+  border: none;
+  background: transparent;
 }
 
 @media (max-width: 760px) {

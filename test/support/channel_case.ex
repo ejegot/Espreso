@@ -11,6 +11,7 @@ defmodule EspresoWeb.ChannelCase do
 
   setup tags do
     Espreso.DataCase.setup_sandbox(tags)
+    unless tags[:without_shop_open], do: Espreso.DataCase.ensure_shop_day_open!()
     :ok
   end
 end

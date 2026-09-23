@@ -1,6 +1,8 @@
 defmodule EspresoWeb.StaffOwnerSetupLiveTest do
   use EspresoWeb.ConnCase
 
+  @moduletag :without_shop_open
+
   import Phoenix.LiveViewTest
 
   alias Espreso.Accounts

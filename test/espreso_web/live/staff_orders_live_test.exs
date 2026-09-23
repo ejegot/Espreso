@@ -27,7 +27,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     %{conn: conn, barista: barista}
   end
 
-  test "Orders header is a compact icon bar with board tools", %{
+  test "Orders header hops to POS; unpaid stays on the board", %{
     conn: conn
   } do
     {:ok, view, _html} = live(conn, ~p"/orders")
@@ -43,13 +43,16 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert has_element?(view, "#staff-nav-home")
     assert has_element?(view, "#staff-nav-pos")
     assert has_element?(view, "#staff-pos-rail #staff-nav-menu-open")
+    refute has_element?(view, "#staff-nav-menu-open.is-active")
     refute has_element?(view, ".staff-nav-menu-open-text")
 
-    assert has_element?(view, "#orders-new-header-link[href='#orders-new']", "New")
-    assert has_element?(view, "#unpaid-drawer-toggle", "Unpaid")
-    assert has_element?(view, "#staff-notif-toggle svg")
-    assert has_element?(view, "#orders-refresh .staff-orders-refresh-icon")
-    refute has_element?(view, "#orders-new-header-count")
+    assert has_element?(view, "#staff-rail-hop-pos[href='/pos']")
+    refute has_element?(view, "#staff-rail-hop-orders")
+    refute has_element?(view, "#staff-pos-rail #staff-notifications")
+    refute has_element?(view, "#staff-notif-toggle")
+    refute has_element?(view, "#orders-new-header-link")
+    refute has_element?(view, "#orders-refresh")
+    assert has_element?(view, "#orders-board-tools #unpaid-drawer-toggle", "Unpaid")
     refute has_element?(view, "#orders-unpaid-header-count")
 
     {:ok, _order} =
@@ -60,7 +63,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     _ = :sys.get_state(view.pid)
 
-    assert has_element?(view, "#orders-new-header-count.staff-orders-tool-badge", "1")
+    assert has_element?(view, "#orders-new .staff-orders-count", "1")
     assert has_element?(view, "#orders-unpaid-header-count.staff-orders-tool-badge", "1")
   end
 
@@ -1052,26 +1055,6 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     assert has_element?(view, "#{detail_id(order.id, "ready")} .staff-order-items", "Espresso")
   end
 
-  test "manual Refresh still reloads the board", %{conn: conn} do
-    {:ok, order} =
-      Orders.create_order(
-        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
-        %{
-          customer_name: "Refresh Keep",
-          fulfillment: :pickup,
-          payment_method: :counter
-        }
-      )
-
-    {:ok, view, _html} = live(conn, ~p"/orders")
-    assert has_element?(view, ".staff-order-number", order.number)
-
-    view |> element("button#orders-refresh") |> render_click()
-
-    assert has_element?(view, ".staff-order-number", order.number)
-    assert has_element?(view, ".staff-order-name", "Refresh Keep")
-  end
-
   test "Unpaid Orders section lists today's unpaid and Mark paid removes it", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/orders")
     assert has_element?(view, "#unpaid-orders-empty", "No unpaid orders today.")
@@ -1762,8 +1745,8 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     order
   end
 
-  test "notification bell shows new order and mark all read", %{conn: conn} do
-    {:ok, view, _html} = live(conn, ~p"/orders")
+  test "Home notification bell shows new order and mark all read", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/staff")
 
     assert has_element?(view, "#staff-notif-toggle")
     refute has_element?(view, "#staff-notif-badge")
@@ -1779,19 +1762,35 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
       )
 
     _ = :sys.get_state(view.pid)
-    html = render(view)
 
-    assert html =~ "New order"
-    assert html =~ order.number
     assert has_element?(view, "#staff-notif-badge")
-    assert has_element?(view, "#orders-alert-banner", order.number)
 
     view |> element("#staff-notif-toggle") |> render_click()
     assert has_element?(view, "#staff-notif-panel")
     assert has_element?(view, "#staff-notif-list", "New order")
+    assert render(view) =~ order.number
 
     view |> element("#staff-notif-mark-all") |> render_click()
     refute has_element?(view, "#staff-notif-badge")
+  end
+
+  test "new order alert still shows on Orders without a header bell", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/orders")
+    refute has_element?(view, "#staff-notif-toggle")
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Alert Test",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    _ = :sys.get_state(view.pid)
+
+    assert has_element?(view, "#orders-alert-banner", order.number)
 
     view |> element("#orders-alert-dismiss") |> render_click()
     refute has_element?(view, "#orders-alert-banner")
@@ -1820,8 +1819,6 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
           %{customer_name: "Burst Three", fulfillment: :pickup, payment_method: :counter}
         )
 
-      # Notifications / alerts are immediate; board reload waits for debounce quiet period.
-      assert has_element?(view, "#staff-notif-badge")
       assert has_element?(view, "#orders-alert-banner", third.number)
       refute has_element?(view, "#order-card-new-#{first.id}")
       refute has_element?(view, "#order-card-new-#{second.id}")
@@ -1832,7 +1829,7 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
       assert has_element?(view, "#order-card-new-#{first.id}")
       assert has_element?(view, "#order-card-new-#{second.id}")
       assert has_element?(view, "#order-card-new-#{third.id}")
-      assert has_element?(view, "#orders-new-header-count", "3")
+      assert has_element?(view, "#orders-new .staff-orders-count", "3")
     end)
   end
 

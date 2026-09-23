@@ -94,10 +94,6 @@ defmodule EspresoWeb.StaffOrdersLive do
   end
 
   @impl true
-  def handle_event("refresh", _params, socket) do
-    {:noreply, load_orders(socket)}
-  end
-
   def handle_event("dismiss_alert", _params, socket) do
     {:noreply, assign(socket, :alert_banner, nil)}
   end
@@ -674,66 +670,6 @@ defmodule EspresoWeb.StaffOrdersLive do
 
     ~H"""
     <.staff_shell current={:orders} current_user={@current_user} page_title="Orders" chrome={:bar}>
-      <:tools>
-        <a
-          href="#orders-new"
-          class="staff-shell-tool staff-orders-header-tool staff-orders-header-tool--new"
-          id="orders-new-header-link"
-          aria-label={"New orders: #{length(@received_orders)}"}
-        >
-          <span>New</span>
-          <span
-            :if={@received_orders != []}
-            class="staff-orders-tool-badge staff-orders-tool-badge--new"
-            id="orders-new-header-count"
-          >
-            {length(@received_orders)}
-          </span>
-        </a>
-        <button
-          type="button"
-          class="staff-shell-tool staff-orders-header-tool staff-orders-unpaid-toggle"
-          id="unpaid-drawer-toggle"
-          phx-click="toggle_unpaid_drawer"
-          aria-expanded={to_string(@unpaid_drawer_open)}
-          aria-controls="unpaid-orders"
-          aria-label={"Unpaid orders: #{length(@unpaid_orders)}"}
-        >
-          <span>Unpaid</span>
-          <span
-            :if={@unpaid_orders != []}
-            class="staff-orders-tool-badge staff-orders-tool-badge--unpaid"
-            id="orders-unpaid-header-count"
-          >
-            {length(@unpaid_orders)}
-          </span>
-        </button>
-        <button
-          :if={@paymongo_reconciliations != []}
-          type="button"
-          class="staff-shell-tool staff-orders-reconciliation-toggle"
-          id="reconciliation-drawer-toggle"
-          phx-click="toggle_reconciliation_drawer"
-          aria-expanded={to_string(@reconciliation_drawer_open)}
-          aria-controls="paymongo-reconciliations"
-        >
-          Reconciliation
-          <span class="staff-orders-reconciliation-toggle-count">
-            {length(@paymongo_reconciliations)}
-          </span>
-        </button>
-        <button
-          type="button"
-          class="staff-shell-tool staff-shell-tool--quiet staff-orders-header-icon staff-orders-refresh"
-          id="orders-refresh"
-          phx-click="refresh"
-          title="Refresh board"
-          aria-label="Refresh board"
-        >
-          <.icon name="hero-arrow-path" class="staff-orders-refresh-icon" />
-        </button>
-      </:tools>
-
       <div class="staff-orders-page staff-orders-shell-root">
         <main class="staff-orders-main">
           <p :if={@flash_note} class="staff-admin-note" id="orders-flash">{@flash_note}</p>
@@ -750,6 +686,41 @@ defmodule EspresoWeb.StaffOrdersLive do
               Ready <span>{length(@ready_orders)}</span>
             </a>
           </nav>
+
+          <div class="staff-orders-board-tools" id="orders-board-tools">
+            <button
+              type="button"
+              class="staff-shell-tool staff-orders-header-tool staff-orders-unpaid-toggle"
+              id="unpaid-drawer-toggle"
+              phx-click="toggle_unpaid_drawer"
+              aria-expanded={to_string(@unpaid_drawer_open)}
+              aria-controls="unpaid-orders"
+              aria-label={"Unpaid orders: #{length(@unpaid_orders)}"}
+            >
+              <span>Unpaid</span>
+              <span
+                :if={@unpaid_orders != []}
+                class="staff-orders-tool-badge staff-orders-tool-badge--unpaid"
+                id="orders-unpaid-header-count"
+              >
+                {length(@unpaid_orders)}
+              </span>
+            </button>
+            <button
+              :if={@paymongo_reconciliations != []}
+              type="button"
+              class="staff-shell-tool staff-orders-reconciliation-toggle"
+              id="reconciliation-drawer-toggle"
+              phx-click="toggle_reconciliation_drawer"
+              aria-expanded={to_string(@reconciliation_drawer_open)}
+              aria-controls="paymongo-reconciliations"
+            >
+              Reconciliation
+              <span class="staff-orders-reconciliation-toggle-count">
+                {length(@paymongo_reconciliations)}
+              </span>
+            </button>
+          </div>
 
           <div :if={@alert_banner} class="staff-orders-alert" id="orders-alert-banner" role="status">
             <div class="staff-orders-alert-copy">

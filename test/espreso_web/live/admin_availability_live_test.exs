@@ -193,6 +193,44 @@ defmodule EspresoWeb.AdminAvailabilityLiveTest do
     assert Menu.product_image("HOT", product) =~ "/media/products/#{product.id}"
   end
 
+  test "owner can add a category then an item in it", %{conn: conn, owner: owner} do
+    {:ok, view, _html} = live(log_in(conn, owner), ~p"/admin/availability")
+
+    assert has_element?(view, "#availability-add-category", "Add category")
+    view |> element("#availability-add-category") |> render_click()
+    assert has_element?(view, "#availability-add-category-form")
+
+    view
+    |> form("#availability-add-category-form", category: %{name: "Pastry"})
+    |> render_submit()
+
+    assert has_element?(view, "#availability-flash", "Pastry added")
+    refute has_element?(view, "#availability-add-category-form")
+    assert has_element?(view, "#availability-category-Pastry")
+    assert has_element?(view, ".staff-availability-empty", "No items yet")
+
+    view |> element("#availability-add-item") |> render_click()
+
+    view
+    |> form("#availability-add-form", item: %{category: "Pastry"})
+    |> render_change()
+
+    view
+    |> form("#availability-add-form",
+      item: %{
+        category: "Pastry",
+        name: "Croissant",
+        price: "95"
+      }
+    )
+    |> render_submit()
+
+    assert has_element?(view, "#availability-flash", "Croissant added to the menu.")
+    assert has_element?(view, ".staff-availability-name", "Croissant")
+    pastry = Menu.list_menu() |> Enum.find(&(&1.name == "Pastry"))
+    assert Enum.any?(pastry.products, &(&1.name == "Croissant"))
+  end
+
   defp log_in(conn, user) do
     conn
     |> Phoenix.ConnTest.init_test_session(%{})

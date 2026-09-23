@@ -1,6 +1,8 @@
 defmodule Espreso.AccountsBootstrapConcurrencyTest do
   use Espreso.DataCase, async: false
 
+  @moduletag :without_shop_open
+
   alias Espreso.Accounts
 
   test "concurrent initial owner setup creates exactly one owner" do

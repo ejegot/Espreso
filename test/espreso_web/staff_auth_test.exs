@@ -112,6 +112,7 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(owner_view, "#staff-pos-rail.staff-pos-rail--bar")
     refute has_element?(owner_view, "#staff-shell")
     assert has_element?(owner_view, "#staff-pos-rail #staff-notifications")
+    refute has_element?(owner_view, "#staff-nav-menu-open.is-active")
     html = render(owner_view)
 
     assert html
@@ -607,7 +608,7 @@ defmodule EspresoWeb.StaffAuthTest do
     {:ok, admin, _html} = live(conn, ~p"/admin/users")
     assert has_element?(admin, ".staff-shell-title", "Staff")
     assert has_element?(admin, "#staff-nav-staff.is-active", "Staff")
-    assert has_element?(admin, "#staff-nav-menu-open.is-active")
+    refute has_element?(admin, "#staff-nav-menu-open.is-active")
   end
 
   test "staff cannot open admin users", %{conn: conn, barista: barista} do

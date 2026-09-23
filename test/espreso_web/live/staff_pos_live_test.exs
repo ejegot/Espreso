@@ -67,6 +67,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute has_element?(view, "#staff-pos-rail.staff-pos-rail--icons")
     assert has_element?(view, "#staff-nav-pos.is-active")
     assert has_element?(view, "#staff-pos-rail #staff-nav-menu-open")
+    refute has_element?(view, "#staff-nav-menu-open.is-active")
     assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-home")
     assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-orders")
     assert has_element?(view, "#staff-nav-drawer-panel")
@@ -76,7 +77,10 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute has_element?(view, "#staff-pos-rail-footer")
     refute has_element?(view, ".staff-pos-rail-avatar")
     refute has_element?(view, "#staff-pos-rail #staff-notifications")
+    assert has_element?(view, "#staff-rail-hop-orders[href='/orders']")
+    refute has_element?(view, "#staff-rail-hop-pos")
     refute has_element?(view, "#staff-nav-orders-badge")
+    refute has_element?(view, "#staff-rail-hop-orders-badge")
     refute has_element?(view, "#staff-nav-dashboard")
     refute render(view) =~ "Coming soon"
   end
@@ -87,6 +91,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
   } do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
     refute has_element?(view, "#staff-nav-orders-badge")
+    refute has_element?(view, "#staff-rail-hop-orders-badge")
 
     {:ok, order} =
       Orders.create_order(
@@ -101,7 +106,9 @@ defmodule EspresoWeb.StaffPosLiveTest do
     html = render(view)
     assert html =~ ~s(id="staff-nav-orders-badge")
     assert has_element?(view, "#staff-nav-orders-badge", "1")
+    assert has_element?(view, "#staff-rail-hop-orders-badge", "1")
     assert has_element?(view, ~s(#staff-nav-orders[aria-label="Orders, 1 new"]))
+    assert has_element?(view, ~s(#staff-rail-hop-orders[aria-label="Orders, 1 new"]))
     assert Repo.get!(Order, order.id).status == "received"
   end
 

@@ -383,6 +383,7 @@ Hooks.StaffNavDrawer = {
     document.querySelectorAll("[data-staff-nav-menu-open]").forEach((btn) => {
       btn.setAttribute("aria-expanded", open ? "true" : "false")
       btn.setAttribute("aria-label", open ? "Close navigation menu" : "Open navigation menu")
+      btn.classList.toggle("is-active", open)
     })
 
     if (open) {

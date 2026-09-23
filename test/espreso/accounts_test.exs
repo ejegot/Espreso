@@ -1,6 +1,8 @@
 defmodule Espreso.AccountsTest do
   use Espreso.DataCase, async: true
 
+  @moduletag :without_shop_open
+
   alias Espreso.Accounts
   alias Espreso.Accounts.Authorization
   alias Espreso.Accounts.User

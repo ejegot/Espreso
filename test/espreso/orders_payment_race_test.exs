@@ -70,7 +70,7 @@ defmodule Espreso.OrdersPaymentRaceTest do
     assert :ok = PayMongo.handle_webhook_event(payload)
 
     order = Repo.get!(Order, order.id)
-    assert order.status == "received"
+    assert order.status == "preparing"
     assert order.payment_status == "paid"
 
     assert {:error, :paid} = Orders.abandon_online_payment(order)

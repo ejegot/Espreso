@@ -12,13 +12,15 @@ defmodule EspresoWeb.AdminAvailabilityLive do
      |> assign(:categories, Menu.list_products_for_availability())
      |> assign(:flash_note, nil)
      |> assign(:adding?, false)
+     |> assign(:adding_category?, false)
      |> assign(:photo_product, nil)
      |> allow_upload(:photo,
        accept: ~w(.jpg .jpeg .png .webp),
        max_entries: 1,
        max_file_size: Menu.photo_max_bytes()
      )
-     |> assign_add_form(), layout: false}
+     |> assign_add_form()
+     |> assign_category_form(), layout: false}
   end
 
   @impl true
@@ -65,6 +67,7 @@ defmodule EspresoWeb.AdminAvailabilityLive do
        socket
        |> cancel_photo_uploads()
        |> assign(:adding?, true)
+       |> assign(:adding_category?, false)
        |> assign(:photo_product, nil)
        |> assign(:flash_note, nil)
        |> assign_add_form()}
@@ -75,6 +78,25 @@ defmodule EspresoWeb.AdminAvailabilityLive do
 
   def handle_event("close_add", _params, socket) do
     {:noreply, socket |> cancel_photo_uploads() |> assign(:adding?, false)}
+  end
+
+  def handle_event("open_add_category", _params, socket) do
+    if Authorization.can?(socket.assigns.current_user, :edit_menu) do
+      {:noreply,
+       socket
+       |> cancel_photo_uploads()
+       |> assign(:adding?, false)
+       |> assign(:adding_category?, true)
+       |> assign(:photo_product, nil)
+       |> assign(:flash_note, nil)
+       |> assign_category_form()}
+    else
+      {:noreply, assign(socket, :flash_note, "You don’t have permission to add a category.")}
+    end
+  end
+
+  def handle_event("close_add_category", _params, socket) do
+    {:noreply, assign(socket, :adding_category?, false)}
   end
 
   def handle_event("open_photo", %{"id" => id}, socket) do
@@ -92,6 +114,7 @@ defmodule EspresoWeb.AdminAvailabilityLive do
          socket
          |> cancel_photo_uploads()
          |> assign(:adding?, false)
+         |> assign(:adding_category?, false)
          |> assign(:photo_product, product)
          |> assign(:flash_note, nil)}
     end
@@ -104,6 +127,11 @@ defmodule EspresoWeb.AdminAvailabilityLive do
   def handle_event("validate_item", params, socket) do
     item = Map.get(params, "item", socket.assigns.add_form.params)
     {:noreply, assign(socket, :add_form, to_form(item, as: :item))}
+  end
+
+  def handle_event("validate_category", params, socket) do
+    category = Map.get(params, "category", socket.assigns.category_form.params)
+    {:noreply, assign(socket, :category_form, to_form(category, as: :category))}
   end
 
   def handle_event("validate_photo", _params, socket), do: {:noreply, socket}
@@ -125,6 +153,25 @@ defmodule EspresoWeb.AdminAvailabilityLive do
          socket
          |> assign(:add_form, to_form(params, as: :item))
          |> assign(:flash_note, add_error_message(reason))}
+    end
+  end
+
+  def handle_event("save_category", %{"category" => params}, socket) do
+    case Menu.create_category_as(socket.assigns.current_user, params) do
+      {:ok, category} ->
+        {:noreply,
+         socket
+         |> assign(:adding_category?, false)
+         |> assign_category_form()
+         |> assign_add_form()
+         |> assign(:categories, Menu.list_products_for_availability())
+         |> assign(:flash_note, "#{category.name} added. You can add items to it now.")}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:category_form, to_form(params, as: :category))
+         |> assign(:flash_note, category_error_message(reason))}
     end
   end
 
@@ -163,15 +210,27 @@ defmodule EspresoWeb.AdminAvailabilityLive do
               Mark items unavailable when sold out (86). Add a photo from this tablet for QR and POS.
             </p>
           </div>
-          <button
+          <div
             :if={Authorization.can?(@current_user, :edit_menu)}
-            type="button"
-            id="availability-add-item"
-            class="staff-availability-add"
-            phx-click="open_add"
+            class="staff-availability-head-actions"
           >
-            Add item
-          </button>
+            <button
+              type="button"
+              id="availability-add-category"
+              class="staff-availability-add staff-availability-add--ghost"
+              phx-click="open_add_category"
+            >
+              Add category
+            </button>
+            <button
+              type="button"
+              id="availability-add-item"
+              class="staff-availability-add"
+              phx-click="open_add"
+            >
+              Add item
+            </button>
+          </div>
         </header>
 
         <section
@@ -180,6 +239,9 @@ defmodule EspresoWeb.AdminAvailabilityLive do
           id={"availability-category-#{category.name}"}
         >
           <h2>{category.name}</h2>
+          <p :if={category.products == []} class="staff-availability-empty">
+            No items yet. Add item to put drinks or food here.
+          </p>
 
           <div class="staff-availability-grid">
             <article
@@ -316,6 +378,54 @@ defmodule EspresoWeb.AdminAvailabilityLive do
       </.modal>
 
       <.modal
+        :if={@adding_category?}
+        id="availability-add-category-modal"
+        show
+        click_away={false}
+        autofocus={false}
+        on_cancel={JS.push("close_add_category")}
+      >
+        <section
+          class="staff-availability-add-dialog"
+          id="availability-add-category-dialog"
+          aria-label="Add category"
+        >
+          <h3 class="staff-confirm-dialog-title">Add category</h3>
+          <p class="staff-confirm-dialog-copy">
+            New categories show on this board right away. POS and QR show them after the first item.
+          </p>
+          <.form
+            for={@category_form}
+            id="availability-add-category-form"
+            phx-change="validate_category"
+            phx-submit="save_category"
+            class="staff-team-form"
+          >
+            <.input field={@category_form[:name]} type="text" label="Name" required />
+
+            <div class="staff-confirm-dialog-actions">
+              <button
+                type="submit"
+                class="staff-team-btn staff-team-btn--primary"
+                id="availability-add-category-save"
+                phx-disable-with="Saving…"
+              >
+                Save category
+              </button>
+              <button
+                type="button"
+                class="staff-team-btn"
+                id="availability-add-category-cancel"
+                phx-click="close_add_category"
+              >
+                Cancel
+              </button>
+            </div>
+          </.form>
+        </section>
+      </.modal>
+
+      <.modal
         :if={@photo_product}
         id="availability-photo-modal"
         show
@@ -385,9 +495,13 @@ defmodule EspresoWeb.AdminAvailabilityLive do
     assign(socket, :add_form, to_form(blank_add_params(), as: :item))
   end
 
+  defp assign_category_form(socket) do
+    assign(socket, :category_form, to_form(%{"name" => ""}, as: :category))
+  end
+
   defp blank_add_params do
     %{
-      "category" => "HOT",
+      "category" => List.first(Menu.category_names()) || "HOT",
       "name" => "",
       "hot_price_mode" => "sizes",
       "price" => "",
@@ -415,12 +529,7 @@ defmodule EspresoWeb.AdminAvailabilityLive do
     add_value(form, :category) == "HOT" and add_value(form, :hot_price_mode) != "single"
   end
 
-  defp show_single_price?(form) do
-    category = add_value(form, :category)
-
-    category in ["COLD", "FRAPPE", "SODA", "FOOD"] or
-      (category == "HOT" and add_value(form, :hot_price_mode) == "single")
-  end
+  defp show_single_price?(form), do: not show_hot_sizes?(form)
 
   defp price_label(form) do
     case add_value(form, :category) do
@@ -484,8 +593,15 @@ defmodule EspresoWeb.AdminAvailabilityLive do
   defp add_error_message(:invalid_name), do: "Enter a name."
   defp add_error_message(:invalid_price), do: "Enter a price greater than 0."
   defp add_error_message(:invalid_menu_group), do: "Choose a food group."
-  defp add_error_message(:unknown_category), do: "That category is missing. Seed the menu first."
+  defp add_error_message(:unknown_category), do: "That category is missing. Add it first."
   defp add_error_message(:invalid_photo), do: "Use a JPEG, PNG, or WebP photo."
   defp add_error_message(:photo_too_large), do: "Photo is too large (max 3 MB)."
   defp add_error_message(_), do: "Could not add the item."
+
+  defp category_error_message(:unauthorized),
+    do: "You don’t have permission to add a category."
+
+  defp category_error_message(:name_taken), do: "That category is already on the menu."
+  defp category_error_message(:invalid_name), do: "Enter a category name (letters or numbers)."
+  defp category_error_message(_), do: "Could not add the category."
 end

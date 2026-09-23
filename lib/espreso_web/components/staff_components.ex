@@ -35,7 +35,6 @@ defmodule EspresoWeb.StaffComponents do
     assigns =
       assigns
       |> assign(:drawer_nav, items)
-      |> assign(:drawer_active?, assigns.current != :home)
       |> assign(:orders_badge_count, orders_badge_count)
 
     ~H"""
@@ -64,8 +63,7 @@ defmodule EspresoWeb.StaffComponents do
             class={[
               "staff-pos-rail-link staff-nav-menu-open",
               @chrome == :rail && "staff-nav-menu-open--rail",
-              @chrome == :bar && "staff-nav-menu-open--bar",
-              @drawer_active? && "is-active"
+              @chrome == :bar && "staff-nav-menu-open--bar"
             ]}
             phx-click="toggle"
             phx-target="#staff-nav-drawer"
@@ -84,10 +82,43 @@ defmodule EspresoWeb.StaffComponents do
               {render_slot(@tools)}
             </div>
             <.live_component
-              :if={@current != :pos}
+              :if={@current not in [:pos, :orders]}
               module={EspresoWeb.StaffNotificationsComponent}
               id="staff-notifications"
             />
+            <.link
+              :if={@current == :orders}
+              navigate={~p"/pos"}
+              class="staff-pos-rail-hop"
+              id="staff-rail-hop-pos"
+              title="POS"
+              aria-label="POS"
+            >
+              <.icon name="hero-shopping-bag" class="staff-pos-rail-icon" />
+              <span class="sr-only">POS</span>
+            </.link>
+            <.link
+              :if={@current == :pos}
+              navigate={~p"/orders"}
+              class="staff-pos-rail-hop"
+              id="staff-rail-hop-orders"
+              title="Orders"
+              aria-label={
+                if @orders_badge_count > 0,
+                  do: "Orders, #{@orders_badge_count} new",
+                  else: "Orders"
+              }
+            >
+              <.icon name="hero-clipboard-document-list" class="staff-pos-rail-icon" />
+              <span
+                :if={@orders_badge_count > 0}
+                class="staff-pos-rail-hop-badge"
+                id="staff-rail-hop-orders-badge"
+              >
+                {hop_badge_count(@orders_badge_count)}
+              </span>
+              <span class="sr-only">Orders</span>
+            </.link>
             <.link
               navigate={~p"/staff"}
               class="staff-pos-rail-brand"
@@ -169,10 +200,7 @@ defmodule EspresoWeb.StaffComponents do
             <button
               type="button"
               id="staff-nav-menu-open"
-              class={[
-                "staff-nav-menu-open staff-nav-menu-open--top",
-                @drawer_active? && "is-active"
-              ]}
+              class="staff-nav-menu-open staff-nav-menu-open--top"
               phx-click="toggle"
               phx-target="#staff-nav-drawer"
               data-staff-nav-menu-open
@@ -320,6 +348,9 @@ defmodule EspresoWeb.StaffComponents do
     ]
     |> Enum.filter(& &1.show?)
   end
+
+  defp hop_badge_count(count) when count > 9, do: "9+"
+  defp hop_badge_count(count), do: Integer.to_string(count)
 
   attr :status, :atom, required: true
   attr :id, :string, required: true

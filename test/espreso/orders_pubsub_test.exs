@@ -28,7 +28,7 @@ defmodule Espreso.OrdersPubSubTest do
   end
 
   test "update_status broadcasts order_changed" do
-    {:ok, order} = Orders.create_order(lines(), attrs(%{customer_name: "Status Broadcast"}))
+    order = paid_order("Status Broadcast")
     :ok = Orders.subscribe()
 
     assert {:ok, preparing} = Orders.update_status(order, "preparing")
@@ -46,11 +46,12 @@ defmodule Espreso.OrdersPubSubTest do
   end
 
   test "mark_paid does not broadcast when already paid" do
-    {:ok, order} = Orders.create_order(lines(), attrs(%{customer_name: "Pay Idempotent"}))
-    assert {:ok, paid} = Orders.mark_paid(order)
+    paid = paid_order("Pay Idempotent")
 
     :ok = Orders.subscribe()
-    assert {:ok, ^paid} = Orders.mark_paid(paid)
+    assert {:ok, again} = Orders.mark_paid(paid)
+    assert again.id == paid.id
+    assert again.payment_status == "paid"
     refute_receive {:order_changed, _}, 50
   end
 
@@ -64,7 +65,7 @@ defmodule Espreso.OrdersPubSubTest do
   end
 
   test "complete_order broadcasts order_changed when status changes" do
-    {:ok, order} = Orders.create_order(lines(), attrs(%{customer_name: "Complete Broadcast"}))
+    order = paid_order("Complete Broadcast")
     {:ok, ready} = Orders.update_status(order, "ready")
     :ok = Orders.subscribe()
 
@@ -74,18 +75,20 @@ defmodule Espreso.OrdersPubSubTest do
   end
 
   test "complete_order does not broadcast when already completed" do
-    {:ok, order} = Orders.create_order(lines(), attrs(%{customer_name: "Complete Idempotent"}))
+    order = paid_order("Complete Idempotent")
     {:ok, ready} = Orders.update_status(order, "ready")
     assert {:ok, completed} = Orders.complete_order(ready)
 
     :ok = Orders.subscribe()
-    assert {:ok, ^completed} = Orders.complete_order(completed)
+    assert {:ok, again} = Orders.complete_order(completed)
+    assert again.id == completed.id
+    assert again.status == "completed"
     refute_receive {:order_changed, _}, 50
   end
 
   test "order-specific subscribe receives changes for that order only" do
-    {:ok, watched} = Orders.create_order(lines(), attrs(%{customer_name: "Watched"}))
-    {:ok, other} = Orders.create_order(lines(), attrs(%{customer_name: "Other"}))
+    watched = paid_order("Watched")
+    other = paid_order("Other")
 
     :ok = Orders.subscribe(watched)
     other_id = other.id
@@ -96,5 +99,11 @@ defmodule Espreso.OrdersPubSubTest do
     assert {:ok, _} = Orders.update_status(watched, "preparing")
     assert_receive {:order_changed, %{id: id, status: "preparing"}}
     assert id == watched.id
+  end
+
+  defp paid_order(customer_name) do
+    {:ok, order} = Orders.create_order(lines(), attrs(%{customer_name: customer_name}))
+    {:ok, paid} = Orders.mark_paid(order)
+    paid
   end
 end

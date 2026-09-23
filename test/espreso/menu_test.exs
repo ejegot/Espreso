@@ -118,6 +118,19 @@ defmodule Espreso.MenuTest do
       assert Enum.any?(hot_board.products, &(&1.name == "Secret Blend" and &1.available == false))
     end
 
+    test "includes empty categories so staff can add the first item" do
+      insert_category!("HOT")
+      pastry = insert_category!("Pastry")
+
+      names =
+        Menu.list_products_for_availability()
+        |> Enum.map(& &1.name)
+
+      assert names == ["HOT", "Pastry"]
+      board = Menu.list_products_for_availability() |> Enum.find(&(&1.id == pastry.id))
+      assert board.products == []
+    end
+
     test "manager and owner can toggle availability; barista is denied" do
       hot = insert_category!("HOT")
       product = insert_product!(hot, "Espresso", true, [{nil, "75"}])
@@ -229,6 +242,56 @@ defmodule Espreso.MenuTest do
       photo = Menu.get_product_photo(product.id)
       assert photo.data == png
       assert photo.content_type == "image/png"
+    end
+  end
+
+  describe "create_category_as/2" do
+    test "manager can add a category; barista cannot" do
+      manager = register!("Manager", "manager.addcat@test.local", "manager")
+      barista = register!("Staff", "staff.addcat@test.local", "barista")
+
+      assert {:error, :unauthorized} =
+               Menu.create_category_as(barista, %{"name" => "Pastry"})
+
+      assert {:ok, category} = Menu.create_category_as(manager, %{"name" => "Pastry"})
+      assert category.name == "Pastry"
+      assert "Pastry" in Menu.category_names()
+
+      board = Menu.list_products_for_availability() |> Enum.find(&(&1.name == "Pastry"))
+      assert board.products == []
+      refute Enum.any?(Menu.list_menu(), &(&1.name == "Pastry"))
+    end
+
+    test "owner can add an item to a new category with a single price" do
+      owner = register!("Owner", "owner.addcatitem@test.local", "owner")
+      hot = insert_category!("HOT")
+      insert_product!(hot, "Espresso", true, [{nil, "75"}])
+
+      assert {:ok, _} = Menu.create_category_as(owner, %{name: "Merch"})
+
+      assert {:ok, product} =
+               Menu.create_product_as(owner, %{
+                 "category" => "Merch",
+                 "name" => "Tote bag",
+                 "price" => "350"
+               })
+
+      assert product.available
+      assert is_nil(product.menu_group)
+      prices = Map.new(product.product_prices, &{&1.size, &1.price})
+      assert Decimal.equal?(prices[nil], Decimal.new("350"))
+
+      names = Menu.list_menu() |> Enum.map(& &1.name)
+      assert names == ["HOT", "Merch"]
+    end
+
+    test "rejects blank, duplicate, and invalid names" do
+      manager = register!("Manager", "manager.badcat@test.local", "manager")
+      insert_category!("HOT")
+
+      assert {:error, :invalid_name} = Menu.create_category_as(manager, %{"name" => "  "})
+      assert {:error, :invalid_name} = Menu.create_category_as(manager, %{"name" => "???"})
+      assert {:error, :name_taken} = Menu.create_category_as(manager, %{"name" => "hot"})
     end
   end
 

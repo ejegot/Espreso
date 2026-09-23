@@ -14,7 +14,12 @@ defmodule Espreso.Menu.Category do
   def changeset(category, attrs) do
     category
     |> cast(attrs, [:name])
+    |> update_change(:name, &trim_name/1)
     |> validate_required([:name])
+    |> validate_length(:name, min: 1, max: 30)
     |> unique_constraint(:name)
   end
+
+  defp trim_name(name) when is_binary(name), do: String.trim(name)
+  defp trim_name(name), do: name
 end

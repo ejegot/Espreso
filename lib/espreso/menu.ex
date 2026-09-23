@@ -357,7 +357,6 @@ defmodule Espreso.Menu do
 
       %{category | products: products}
     end)
-    |> Enum.reject(&(&1.products == []))
     |> Enum.sort_by(&category_position/1)
   end
 
@@ -382,9 +381,32 @@ defmodule Espreso.Menu do
     update_availability_as(actor, product.id, available)
   end
 
-  def category_names, do: @category_order
+  def category_names do
+    names =
+      Category
+      |> order_by([c], asc: c.id)
+      |> select([c], c.name)
+      |> Repo.all()
+
+    known = Enum.filter(@category_order, &(&1 in names))
+    extras = Enum.reject(names, &(&1 in @category_order))
+    known ++ extras
+  end
 
   def food_group_names, do: Enum.map(@food_subcategories, &elem(&1, 0))
+
+  @doc """
+  Creates a catalog category when the actor has `:edit_menu`.
+
+  Empty categories show on Availability so staff can add items. QR/POS
+  still hide a category until it has at least one available product.
+  """
+  def create_category_as(%User{} = actor, attrs) when is_map(attrs) do
+    with :ok <- Authorization.authorize(actor, :edit_menu),
+         {:ok, name} <- fetch_new_category_name(attrs) do
+      insert_category(name)
+    end
+  end
 
   @doc """
   Creates a catalog product with prices when the actor has `:edit_menu`.
@@ -476,7 +498,7 @@ defmodule Espreso.Menu do
     name = attrs |> attr(:category) |> to_string() |> String.trim()
 
     cond do
-      name not in @category_order ->
+      name == "" ->
         {:error, :invalid_category}
 
       true ->
@@ -484,6 +506,53 @@ defmodule Espreso.Menu do
           %Category{} = category -> {:ok, category}
           nil -> {:error, :unknown_category}
         end
+    end
+  end
+
+  defp fetch_new_category_name(attrs) do
+    name =
+      attrs
+      |> attr(:name)
+      |> to_string()
+      |> String.trim()
+      |> String.replace(~r/\s+/u, " ")
+
+    cond do
+      name == "" or String.length(name) > 30 ->
+        {:error, :invalid_name}
+
+      not Regex.match?(~r/^[\p{L}\p{N}][\p{L}\p{N} &'+\-]*$/u, name) ->
+        {:error, :invalid_name}
+
+      true ->
+        {:ok, name}
+    end
+  end
+
+  defp insert_category(name) do
+    if category_name_taken?(name) do
+      {:error, :name_taken}
+    else
+      %Category{}
+      |> Category.changeset(%{name: name})
+      |> Repo.insert()
+      |> case do
+        {:ok, category} -> {:ok, category}
+        {:error, %Ecto.Changeset{} = changeset} -> {:error, category_name_error(changeset)}
+      end
+    end
+  end
+
+  defp category_name_taken?(name) do
+    Repo.exists?(from c in Category, where: fragment("lower(?) = lower(?)", c.name, ^name))
+  end
+
+  defp category_name_error(%Ecto.Changeset{} = changeset) do
+    if Keyword.has_key?(changeset.errors, :name) and
+         unique_name_error?(changeset.errors[:name]) do
+      :name_taken
+    else
+      :invalid_name
     end
   end
 
@@ -524,7 +593,9 @@ defmodule Espreso.Menu do
     sized_prices([{nil, attr(attrs, :price)}])
   end
 
-  defp fetch_prices(_category, _attrs), do: {:error, :invalid_category}
+  defp fetch_prices(_category, attrs) do
+    sized_prices([{nil, attr(attrs, :price)}])
+  end
 
   defp sized_prices(pairs) do
     parsed =
@@ -753,8 +824,11 @@ defmodule Espreso.Menu do
     end) || "Other"
   end
 
-  defp category_position(%{name: name}) do
-    Enum.find_index(@category_order, &(&1 == name)) || length(@category_order)
+  defp category_position(%{name: name} = category) do
+    case Enum.find_index(@category_order, &(&1 == name)) do
+      nil -> {length(@category_order), Map.get(category, :id) || 0}
+      idx -> {idx, 0}
+    end
   end
 
   defp price_sort_key(%{size: nil}), do: {0, ""}

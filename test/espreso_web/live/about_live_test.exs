@@ -6,7 +6,7 @@ defmodule EspresoWeb.AboutLiveTest do
   test "GET /about loads About us page", %{conn: conn} do
     {:ok, view, html} = live(conn, ~p"/about")
 
-    assert has_element?(view, ".about-page")
+    assert has_element?(view, ".brune-about-hero")
     assert html =~ "CoffeeSpot"
     assert html =~ "About us"
   end
@@ -15,23 +15,23 @@ defmodule EspresoWeb.AboutLiveTest do
     {:ok, view, html} = live(conn, ~p"/about")
 
     assert html =~ "Italian-sourced beans"
-    assert html =~ "Online booking"
+    assert html =~ "Extended hours"
     assert html =~ "Dine-in"
     assert html =~ "Phillip Aseron"
     assert html =~ "Phem Baylen"
     assert html =~ "masarap ang coffee"
-    assert has_element?(view, "#about-intro-title")
+    assert has_element?(view, "#about-story-title")
     assert has_element?(view, "#about-services-title")
     assert has_element?(view, "#about-reviews-title")
     refute has_element?(view, "iframe.contact-map-frame")
   end
 
-  test "about page top nav includes Menu and Get in touch", %{conn: conn} do
+  test "about page top nav includes Menu and Contact", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/about")
 
-    assert has_element?(view, ".site-top a[href='/']", "Home")
-    assert has_element?(view, ".site-top a[href='/menu']", "Menu")
-    assert has_element?(view, ".site-top a.is-current[href='/about']", "About us")
-    assert has_element?(view, ".site-top a[href='/contact']", "Get in touch")
+    assert has_element?(view, ".brune-drawer-link[href='/']", "Home")
+    assert has_element?(view, ".brune-drawer-link[href='/menu']", "Menu")
+    assert has_element?(view, ".brune-drawer-link.is-current[href='/about']", "About")
+    assert has_element?(view, ".brune-drawer-link[href='/contact']", "Contact")
   end
 end
