@@ -153,7 +153,7 @@ defmodule EspresoWeb.OrderLive do
           phx-hook="OrderConfirm"
           data-order-number={@order.number}
         >
-          <p :if={not show_qrph_payment?(@order)} class="order-eyebrow">CoffeeSpot</p>
+          <p :if={not show_qrph_payment?(@order)} class="order-eyebrow"><.coffeespot_wordmark /></p>
           <%= if show_qrph_payment?(@order) do %>
             <%!-- Pay screen content is the QRPh section below (header is Pay with GCash / Maya). --%>
           <% else %>

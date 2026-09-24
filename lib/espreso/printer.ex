@@ -12,6 +12,7 @@ defmodule Espreso.Printer do
 
   require Logger
 
+  alias Espreso.Orders
   alias Espreso.Orders.Order
   alias Espreso.Printer.EscPos
   alias Espreso.Printer.Receipt
@@ -150,9 +151,7 @@ defmodule Espreso.Printer do
   def test_print_bytes do
     EscPos.join([
       EscPos.init(),
-      EscPos.align_center(),
-      EscPos.bold_on(),
-      EscPos.text_line("CoffeeSpot"),
+      Receipt.brand_header(),
       EscPos.bold_off(),
       EscPos.text_line("Espreso printer test"),
       EscPos.align_left(),
@@ -177,6 +176,7 @@ defmodule Espreso.Printer do
   end
 
   def dispatch_day_report(close, opts \\ []) do
+    opts = put_day_report_refunds(close, opts)
     dispatch_payload(Receipt.build_day_report(close, opts), "day report")
   end
 
@@ -199,6 +199,12 @@ defmodule Espreso.Printer do
     Receipt.build(order, opts)
     |> maybe_append_drawer(opts)
   end
+
+  defp put_day_report_refunds(%{shop_date: %Date{} = shop_date}, opts) do
+    Keyword.put_new_lazy(opts, :refunds, fn -> Orders.refund_total_for_shop_date(shop_date) end)
+  end
+
+  defp put_day_report_refunds(_close, opts), do: opts
 
   defp maybe_append_drawer(bytes, opts) do
     if Keyword.get(opts, :open_drawer, false) do

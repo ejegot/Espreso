@@ -106,7 +106,9 @@ defmodule EspresoWeb.PwaManifestTest do
           "/coffeespot.webmanifest",
           "/images/coffeespot/app-icon-192.png",
           "/images/coffeespot/app-icon-512.png",
-          "/images/coffeespot/apple-touch-icon.png"
+          "/images/coffeespot/apple-touch-icon.png",
+          "/images/coffeespot/wordmark.png",
+          "/images/coffeespot/favicon-32.png"
         ] do
       response = get(conn, path)
       assert response(response, 200)

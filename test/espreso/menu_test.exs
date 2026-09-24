@@ -315,12 +315,13 @@ defmodule Espreso.MenuTest do
   end
 
   describe "ESP-91 FOOD catalog" do
-    test "Sandwiches & Wraps subgroup includes all three new products with descriptions and prices" do
+    test "Sandwiches & Wraps subgroup includes sandwiches and Spam Burger" do
       food = insert_category!("FOOD")
 
       insert_product!(food, "Slow-Roasted Chicken Sourdough", true, [{nil, "249"}])
       insert_product!(food, "Golden Egg Royale", true, [{nil, "199"}])
       insert_product!(food, "Tuna Royale Baguette", true, [{nil, "249"}])
+      insert_product!(food, "Spam Burger", true, [{nil, "179"}])
 
       food_menu = Menu.list_menu() |> Enum.find(&(&1.name == "FOOD"))
       sandwiches = Enum.find(food_menu.groups, &(&1.name == "Sandwiches & Wraps"))
@@ -328,7 +329,8 @@ defmodule Espreso.MenuTest do
       assert Enum.map(sandwiches.products, & &1.name) == [
                "Slow-Roasted Chicken Sourdough",
                "Golden Egg Royale",
-               "Tuna Royale Baguette"
+               "Tuna Royale Baguette",
+               "Spam Burger"
              ]
 
       chicken = Enum.find(sandwiches.products, &(&1.name == "Slow-Roasted Chicken Sourdough"))
@@ -408,6 +410,57 @@ defmodule Espreso.MenuTest do
 
       assert Menu.product_image("FOOD", "Chocolate Almond Waffles") ==
                "/images/coffeespot/gen-food-choco-almond-waffles.png"
+
+      assert Menu.product_image("FOOD", "Waffles") ==
+               "/images/coffeespot/gen-food-waffles-plain.jpg"
+
+      assert Menu.product_image("FOOD", "Spam Burger") ==
+               "/images/coffeespot/gen-food-spam-burger.jpg"
+
+      assert Menu.product_image("FOOD", "Big Assorted Muffin") ==
+               "/images/coffeespot/gen-food-big-assorted-muffin.jpg"
+    end
+
+    test "Spam, Nugget, Chicken & Chips, and Waffles match shop copy and prices" do
+      food = insert_category!("FOOD")
+
+      insert_product!(food, "Spam", true, [{nil, "179"}])
+      insert_product!(food, "Nugget", true, [{nil, "179"}])
+      insert_product!(food, "Chicken & Chips", true, [{nil, "199"}])
+
+      insert_product!(food, "Waffles", true, [
+        {"Plain", "99"},
+        {"Strawberry", "129"},
+        {"Chocolate", "129"}
+      ])
+
+      food_menu = Menu.list_menu() |> Enum.find(&(&1.name == "FOOD"))
+      rice = Enum.find(food_menu.groups, &(&1.name == "Rice Meal"))
+      appetizers = Enum.find(food_menu.groups, &(&1.name == "Appetizers"))
+      cakes = Enum.find(food_menu.groups, &(&1.name == "Cakes / Breads"))
+
+      spam = Enum.find(rice.products, &(&1.name == "Spam"))
+      nugget = Enum.find(rice.products, &(&1.name == "Nugget"))
+      chips = Enum.find(appetizers.products, &(&1.name == "Chicken & Chips"))
+      waffles = Enum.find(cakes.products, &(&1.name == "Waffles"))
+
+      assert spam.description =~ "Two pieces of Spam"
+      assert spam.description =~ "plain rice"
+      assert nugget.description =~ "Four crispy chicken nuggets"
+      assert nugget.description =~ "rice"
+      assert [%{price: chicken_price}] = chips.product_prices
+      assert Decimal.equal?(chicken_price, Decimal.new("199"))
+
+      assert Enum.map(waffles.product_prices, &{&1.size, Decimal.to_string(&1.price)}) == [
+               {"Plain", "99"},
+               {"Chocolate", "129"},
+               {"Strawberry", "129"}
+             ]
+
+      assert waffles.description =~ "plain ₱99"
+      assert waffles.description =~ "chocolate or strawberry ₱129"
+      refute "Belgian Waffles" in Menu.sweets_product_names()
+      assert "Waffles" in Menu.sweets_product_names()
     end
   end
 
@@ -426,7 +479,10 @@ defmodule Espreso.MenuTest do
                "/images/coffeespot/gen-soda-tropical-passion.png"
 
       assert Menu.product_image("FOOD", "Nugget") ==
-               "/images/coffeespot/gen-food-nugget.png"
+               "/images/coffeespot/gen-food-nugget-rice.jpg"
+
+      assert Menu.product_image("FOOD", "Spam") ==
+               "/images/coffeespot/gen-food-spam-plain-rice.jpg"
 
       assert Menu.product_image("FOOD", "Beef Tapa") ==
                "/images/coffeespot/gen-food-beef-tapa.png"

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 148" role="img" aria-label="CoffeeSpot">
+  <path
+    d="M60 8C35.6 8 16 26.5 16 53c0 31.4 44 82.5 44 82.5V8z"
+    fill="#E06038"
+  />
+  <path
+    d="M60 8c24.4 0 44 18.5 44 45 0 31.4-44 82.5-44 82.5V8z"
+    fill="#B0A898"
+  />
+  <circle cx="60" cy="54" r="24" fill="#FAF7F4"/>
+  <g transform="translate(60 54) rotate(-28)">
+    <ellipse cx="0" cy="0" rx="12.2" ry="19.8" fill="#4E3326"/>
+    <path d="M-1.2 -16.2 C3.8 -6 3.8 6 -1.2 16.2" fill="none" stroke="#FAF7F4" stroke-width="2.35" stroke-linecap="round"/>
+  </g>
+</svg>

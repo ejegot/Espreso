@@ -34,7 +34,7 @@ defmodule EspresoWeb.HomeLive do
       <%!-- Hero --%>
       <section class="brune-hero" aria-label="CoffeeSpot">
         <div class="brune-hero-copy">
-          <h1 class="brune-hero-title">CoffeeSpot</h1>
+          <h1 class="brune-hero-title"><.coffeespot_wordmark class="coffeespot-wordmark--hero" /></h1>
           <p class="brune-hero-lede">{CoffeeSpot.tagline()}</p>
         </div>
 

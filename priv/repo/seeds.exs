@@ -94,6 +94,42 @@ seed_products = fn category, products ->
   end)
 end
 
+replace_product_prices = fn category, product_name, prices ->
+  case Repo.get_by(Product, name: product_name, category_id: category.id) do
+    nil ->
+      :ok
+
+    product ->
+      ProductPrice
+      |> where([pp], pp.product_id == ^product.id)
+      |> Repo.delete_all()
+
+      Enum.each(prices, fn {size, price} ->
+        %ProductPrice{}
+        |> ProductPrice.changeset(%{
+          product_id: product.id,
+          size: size,
+          price: Decimal.new(price)
+        })
+        |> Repo.insert!()
+      end)
+  end
+end
+
+set_food_group = fn product_name, group ->
+  food_category = find_or_create_category.("FOOD")
+
+  case Repo.get_by(Product, name: product_name, category_id: food_category.id) do
+    nil ->
+      :ok
+
+    product ->
+      product
+      |> Product.changeset(%{menu_group: group, description: nil})
+      |> Repo.update!()
+  end
+end
+
 retire_food_products = fn names ->
   food_category = find_or_create_category.("FOOD")
 
@@ -104,19 +140,28 @@ end
 
 rename_product = fn category_name, old_name, new_name ->
   category = find_or_create_category.(category_name)
+  old = Repo.get_by(Product, name: old_name, category_id: category.id)
+  existing = Repo.get_by(Product, name: new_name, category_id: category.id)
 
-  case Repo.get_by(Product, name: old_name, category_id: category.id) do
-    nil ->
+  cond do
+    is_nil(old) ->
       :ok
 
-    product ->
-      product
+    is_nil(existing) or existing.id == old.id ->
+      old
       |> Product.changeset(%{name: new_name})
+      |> Repo.update!()
+
+    true ->
+      old
+      |> Product.changeset(%{available: false})
       |> Repo.update!()
   end
 end
 
 rename_product.("SODA", "Green Apple Campaign", "Green Apple Campagna")
+rename_product.("FOOD", "Spam & Chips", "Spam Burger")
+rename_product.("FOOD", "Belgian Waffles", "Waffles")
 
 hot_category = find_or_create_category.("HOT")
 
@@ -205,12 +250,12 @@ food_products = [
   {"Fries w/ Nuggets", [{nil, "199"}]},
   {"Beef Nachos", [{nil, "249"}]},
   {"Quesadillas", [{nil, "249"}]},
-  {"Chicken & Chips", [{nil, "150"}]},
-  {"Spam & Chips", [{nil, "150"}]},
+  {"Chicken & Chips", [{nil, "199"}]},
   # Sandwiches & Wraps
   {"Slow-Roasted Chicken Sourdough", [{nil, "249"}]},
   {"Golden Egg Royale", [{nil, "199"}]},
   {"Tuna Royale Baguette", [{nil, "249"}]},
+  {"Spam Burger", [{nil, "179"}]},
   # Muffins
   {"Big Assorted Muffin", [{nil, "99"}]},
   # Cakes / Breads
@@ -219,18 +264,33 @@ food_products = [
   {"BNN Moist Slice", [{nil, "75"}]},
   {"Choco Moist Slice", [{nil, "75"}]},
   {"Carrot Moist Slice", [{nil, "75"}]},
-  {"Belgian Waffles", [{nil, "149"}]},
-  {"Chocolate Almond Waffles", [{nil, "149"}]}
+  {"Waffles", [{"Plain", "99"}, {"Chocolate", "129"}, {"Strawberry", "129"}]}
 ]
 
 seed_products.(food_category, food_products)
+
+replace_product_prices.(food_category, "Waffles", [
+  {"Plain", "99"},
+  {"Chocolate", "129"},
+  {"Strawberry", "129"}
+])
+
+set_food_group.("Spam Burger", "Sandwiches & Wraps")
+set_food_group.("Waffles", "Cakes / Breads")
+set_food_group.("Spam", "Rice Meal")
+set_food_group.("Nugget", "Rice Meal")
+set_food_group.("Chicken & Chips", "Appetizers")
+set_food_group.("Big Assorted Muffin", "Muffins")
 
 retire_food_products.([
   "BNN Cream Cheese",
   "BNN Choco Overload",
   "BNN Biscoff",
   "Choco Chips",
-  "Red Velvet"
+  "Red Velvet",
+  "Spam & Chips",
+  "Belgian Waffles",
+  "Chocolate Almond Waffles"
 ])
 
 # —— Staff accounts (Phase A) ——

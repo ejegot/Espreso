@@ -41,6 +41,23 @@
   text-decoration: none;
 }
 
+.coffeespot-wordmark {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+}
+
+.coffeespot-wordmark-img {
+  display: block;
+  width: auto;
+  height: 1.55rem;
+}
+
+.coffeespot-wordmark--hero .coffeespot-wordmark-img {
+  height: clamp(2.75rem, 11vw, 5.15rem);
+  margin-inline: auto;
+}
+
 .site-top-nav {
   display: flex;
   align-items: center;
@@ -2473,7 +2490,15 @@ body:has(.menu-page-locked) {
   box-shadow: 0 12px 36px rgba(17, 17, 18, 0.06);
 }
 
-.order-eyebrow,
+.order-eyebrow {
+  margin: 0 0 0.5rem;
+  line-height: 0;
+}
+
+.order-eyebrow .coffeespot-wordmark-img {
+  height: 1.15rem;
+}
+
 .order-status-message,
 .staff-orders-brand {
   margin: 0 0 0.35rem;
@@ -16235,13 +16260,11 @@ body:has(.home-page-landing) {
 
 .menu-qr-top-brand {
   margin: 0;
-  font-family: "Instrument Serif", Georgia, serif;
-  font-size: clamp(1.45rem, 6vw, 1.85rem);
-  font-weight: 400;
-  letter-spacing: -0.03em;
-  line-height: 1;
-  color: var(--qr-chrome-ink);
-  text-shadow: 0 1px 16px rgba(56, 32, 16, 0.45);
+  line-height: 0;
+}
+
+.menu-qr-top-brand .coffeespot-wordmark-img {
+  height: clamp(1.35rem, 5.2vw, 1.65rem);
 }
 
 .menu-qr-sticky {
@@ -16536,12 +16559,12 @@ body:has(.home-page-landing) {
 }
 
 .menu-my-orders-eyebrow {
-  margin: 0 0 0.2rem;
-  color: #b0a098;
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  margin: 0 0 0.35rem;
+  line-height: 0;
+}
+
+.menu-my-orders-eyebrow .coffeespot-wordmark-img {
+  height: 1.05rem;
 }
 
 .menu-my-orders-header h2 {
@@ -17525,12 +17548,16 @@ body:has(.home-page-landing) {
   min-height: 3.35rem;
   padding: calc(0.55rem + env(safe-area-inset-top)) 1.25rem 0.55rem;
   pointer-events: none;
-  background: transparent;
+  background: linear-gradient(180deg, rgba(20, 10, 6, 0.28) 0%, transparent 100%);
 }
 
 .menu-qr-landing-top-brand {
-  color: rgba(250, 247, 244, 0.82);
-  text-shadow: 0 1px 14px rgba(56, 32, 16, 0.55);
+  line-height: 0;
+}
+
+.menu-qr-landing-top-brand .coffeespot-wordmark-img {
+  height: clamp(1.35rem, 2.2vw, 1.7rem);
+  filter: drop-shadow(0 1px 10px rgba(20, 10, 6, 0.7));
 }
 
 .menu-qr-landing-carousel {
@@ -18140,12 +18167,11 @@ body:has(.home-page-landing) {
 
 .menu-qr-craving-brand {
   margin: 0.15rem 0 0;
-  font-family: "Instrument Serif", Georgia, serif;
-  font-size: clamp(1.7rem, 6.5vw, 2.05rem);
-  font-weight: 400;
-  letter-spacing: -0.03em;
-  line-height: 1;
-  color: #382010;
+  line-height: 0;
+}
+
+.menu-qr-craving-brand .coffeespot-wordmark-img {
+  height: clamp(1.55rem, 6vw, 1.95rem);
 }
 
 .menu-qr-craving-title {
@@ -18385,11 +18411,11 @@ body:has(.home-page-landing) {
 
 .menu-qr-visit-brand {
   margin: 0.15rem 0 0;
-  font-family: "Instrument Serif", Georgia, serif;
-  font-size: clamp(1.7rem, 6.5vw, 2.05rem);
-  font-weight: 400;
-  letter-spacing: -0.03em;
-  line-height: 1;
+  line-height: 0;
+}
+
+.menu-qr-visit-brand .coffeespot-wordmark-img {
+  height: clamp(1.55rem, 6vw, 1.95rem);
 }
 
 .menu-qr-visit-title {
@@ -19835,14 +19861,13 @@ html:not(.page-is-loading) .brune-top {
 
 .brune-top-brand {
   justify-self: center;
-  color: var(--brune-ink);
-  font-family: "Instrument Serif", Georgia, serif;
-  font-size: clamp(1.55rem, 2.2vw, 1.85rem);
-  font-weight: 400;
-  letter-spacing: -0.03em;
-  line-height: 1;
+  line-height: 0;
   text-decoration: none;
-  transition: color 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+  transition: opacity 0.3s ease;
+}
+
+.brune-top-brand .coffeespot-wordmark-img {
+  height: 1.7rem;
 }
 
 .brune-top-trailing {
@@ -19995,10 +20020,11 @@ html:not(.page-is-loading) .brune-top {
 
 .brune-drawer-brand {
   margin: 0;
-  color: var(--brune-ink);
-  font-family: "Instrument Serif", Georgia, serif;
-  font-size: 1.45rem;
-  letter-spacing: -0.03em;
+  line-height: 0;
+}
+
+.brune-drawer-brand .coffeespot-wordmark-img {
+  height: 1.45rem;
 }
 
 .brune-drawer-link {
@@ -20137,12 +20163,7 @@ html:not(.page-is-loading) .brune-top {
 
 .brune-hero-title {
   margin: 0;
-  color: var(--brune-ink);
-  font-family: "Instrument Serif", Georgia, serif;
-  font-size: clamp(3.5rem, 14vw, 6.5rem);
-  font-weight: 400;
-  letter-spacing: -0.04em;
-  line-height: 0.92;
+  line-height: 0;
 }
 
 .brune-hero-lede {
@@ -20819,11 +20840,12 @@ html:not(.page-is-loading) .brune-top {
 
 .menu-page-brune .brune-mega-footer--secondary .brune-mega-brand {
   margin: 0;
-  color: #382010;
-  font-family: "Instrument Serif", Georgia, serif;
-  font-size: 1.35rem;
-  font-weight: 400;
-  letter-spacing: -0.02em;
+  line-height: 0;
+}
+
+.menu-page-brune .brune-mega-footer--secondary .brune-mega-brand .coffeespot-wordmark-img {
+  height: 1.55rem;
+  margin-inline: auto;
 }
 
 .menu-page-brune .brune-mega-footer--secondary .menu-footer-owned-label {
@@ -23221,11 +23243,11 @@ html:not(.page-is-loading) .brune-top {
 
 .brune-contact-brand-name {
   margin: 0;
-  color: var(--brune-ink);
-  font-family: "Instrument Serif", Georgia, serif;
-  font-size: 1.15rem;
-  font-weight: 400;
-  letter-spacing: -0.02em;
+  line-height: 0;
+}
+
+.brune-contact-brand-name .coffeespot-wordmark-img {
+  height: 1.5rem;
 }
 
 .brune-contact-brand-title {

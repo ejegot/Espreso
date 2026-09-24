@@ -1106,7 +1106,7 @@ defmodule EspresoWeb.StaffPosLive do
                         "Added #{card.product.name}"
 
                       length(card.product.product_prices) > 1 ->
-                        "Choose size for #{card.product.name}"
+                        "Choose #{pos_option_word(card.product)} for #{card.product.name}"
 
                       true ->
                         "Add #{card.product.name}"
@@ -1729,7 +1729,7 @@ defmodule EspresoWeb.StaffPosLive do
       <div class="staff-pos-size-picker-panel staff-pos-modal-panel">
         <header class="staff-pos-size-picker-head">
           <div>
-            <p class="staff-pos-size-picker-eyebrow">Choose size</p>
+            <p class="staff-pos-size-picker-eyebrow">Choose {pos_option_word(@product)}</p>
             <h2 class="staff-pos-size-picker-title" id="pos-size-picker-title">{@product.name}</h2>
           </div>
           <button
@@ -3134,14 +3134,28 @@ defmodule EspresoWeb.StaffPosLive do
     Enum.sort_by(prices, &pos_size_sort_key/1)
   end
 
-  defp pos_size_sort_key(%{size: size}) when is_binary(size) do
+  defp pos_size_sort_key(%{price: price, size: size}) when is_binary(size) do
     case Regex.run(~r/\d+/, size) do
       [digits] -> {1, String.to_integer(digits), size}
-      _ -> {2, 0, size}
+      _ -> {2, Decimal.to_float(price), size}
     end
   end
 
+  defp pos_size_sort_key(%{price: price}), do: {0, Decimal.to_float(price), ""}
   defp pos_size_sort_key(_), do: {0, 0, ""}
+
+  defp pos_option_word(product) do
+    if flavor_option_prices?(product), do: "flavor", else: "size"
+  end
+
+  defp flavor_option_prices?(%{product_prices: prices}) when is_list(prices) do
+    Enum.any?(prices, fn
+      %{size: size} when is_binary(size) -> size in ~w(Plain Chocolate Strawberry)
+      _ -> false
+    end)
+  end
+
+  defp flavor_option_prices?(_), do: false
 
   defp selected_price_id(%{product_prices: [price]}, _card_sizes), do: price.id
 
@@ -3189,12 +3203,16 @@ defmodule EspresoWeb.StaffPosLive do
 
   defp price_label(%{product_prices: [price]}), do: Menu.format_price(price.price)
 
-  defp price_label(%{product_prices: prices}) do
-    prices
-    |> Enum.map(& &1.price)
-    |> Enum.min(Decimal)
-    |> Menu.format_price()
-    |> then(&"from #{&1}")
+  defp price_label(%{product_prices: prices}) when is_list(prices) do
+    amounts = Enum.map(prices, & &1.price)
+    lowest = Enum.min(amounts, Decimal)
+    formatted = Menu.format_price(lowest)
+
+    if Enum.all?(amounts, &Decimal.equal?(&1, lowest)) do
+      formatted
+    else
+      "from #{formatted}"
+    end
   end
 
   defp add_line(cart, product, price, category_name, quantity) do

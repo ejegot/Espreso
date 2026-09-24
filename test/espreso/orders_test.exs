@@ -2457,6 +2457,12 @@ defmodule Espreso.OrdersTest do
     assert refunded.refund_reason == "Wrong drink"
     assert refunded.refunded_by_user_id == manager.id
     assert Decimal.equal?(Orders.todays_paid_breakdown().total, Decimal.new("0"))
+
+    assert Decimal.equal?(
+             Orders.refund_total_for_shop_date(Orders.shop_date_today()),
+             Decimal.new("75")
+           )
+
     assert {:error, :already_refunded} = Orders.refund_paid_order(refunded, manager, "Again")
   end
 

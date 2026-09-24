@@ -97,11 +97,19 @@ defmodule Espreso.PrinterTest do
     assert receipt =~ "9/5/26 8:00 PM"
     assert receipt =~ "Employee: Jun"
     assert receipt =~ "84 Lilac St., Marikina City"
+    assert :binary.match(receipt, <<0x1D, 0x76, 0x30, 0x00>>) != :nomatch
     assert receipt =~ "CoffeeSpot_Guest"
     assert receipt =~ "SPOT3333"
     assert receipt =~ "2 Hours"
     refute receipt =~ "₱"
-    refute receipt =~ "?"
+
+    text_after_mark =
+      case :binary.split(receipt, "LILAC, MARIKINA") do
+        [_mark, rest] -> "LILAC, MARIKINA" <> rest
+        [whole] -> whole
+      end
+
+    refute text_after_mark =~ "?"
   end
 
   test "day report prints drawer expected counted and variance" do
@@ -120,15 +128,51 @@ defmodule Espreso.PrinterTest do
     report = Receipt.build_day_report(close, staff_name: "Ana")
 
     assert report =~ "DAY REPORT"
+    assert :binary.match(report, <<0x1D, 0x76, 0x30, 0x00>>) != :nomatch
+    assert report =~ "Elilai Kafe"
+    assert report =~ "CASH DRAWER"
     assert report =~ "Opening cash"
     assert report =~ "P500.00"
+    assert report =~ "Cash sales"
+    assert report =~ "P75.00"
+    refute report =~ "Cash outs"
     assert report =~ "Expected"
     assert report =~ "P575.00"
     assert report =~ "Counted"
     assert report =~ "P80.00"
     assert report =~ "Short"
+    assert report =~ "SALES"
+    assert report =~ "Paid"
+    refute report =~ "System paid"
+    refute report =~ "Refunds"
     assert report =~ "Closed by Ana"
     refute report =~ "₱"
+  end
+
+  test "day report prints cash outs and refunds when they are not zero" do
+    close = %Espreso.Shifts.ShiftClose{
+      shop_date: ~D[2026-09-22],
+      system_total: Decimal.new("215"),
+      system_count: 2,
+      counted_cash: Decimal.new("520"),
+      opening_cash: Decimal.new("500"),
+      expected_cash: Decimal.new("550"),
+      variance: Decimal.new("-30"),
+      closed_at: ~U[2026-09-22 10:00:00Z],
+      by_via: %{
+        "cash" => %{"total" => "100", "count" => 1},
+        "gcash" => %{"total" => "115", "count" => 1}
+      }
+    }
+
+    report = Receipt.build_day_report(close, staff_name: "Ana", refunds: Decimal.new("40"))
+
+    assert report =~ "Cash outs"
+    assert report =~ "P50.00"
+    assert report =~ "Refunds"
+    assert report =~ "P40.00"
+    assert report =~ "GCash"
+    assert report =~ "P115.00"
   end
 
   test "receipt prints cash and wallet split lines" do
@@ -173,6 +217,7 @@ defmodule Espreso.PrinterTest do
     ticket = Receipt.build_kitchen(order, staff_name: "Ana")
 
     assert ticket =~ "KITCHEN"
+    assert :binary.match(ticket, <<0x1D, 0x76, 0x30, 0x00>>) != :nomatch
     assert ticket =~ "CS-KIT001"
     assert ticket =~ "Dine-in"
     assert ticket =~ "2x Scarlet Berry 16oz Iced"
@@ -355,12 +400,20 @@ defmodule Espreso.PrinterTest do
     task =
       Task.async(fn ->
         {:ok, socket} = :gen_tcp.accept(listener, 1_500)
-        {:ok, bytes} = :gen_tcp.recv(socket, 0, 1_500)
+        bytes = recv_all(socket)
         :gen_tcp.close(socket)
         :gen_tcp.close(listener)
         bytes
       end)
 
     {port, task}
+  end
+
+  defp recv_all(socket, acc \\ <<>>) do
+    case :gen_tcp.recv(socket, 0, 400) do
+      {:ok, chunk} -> recv_all(socket, acc <> chunk)
+      {:error, :closed} -> acc
+      {:error, :timeout} -> acc
+    end
   end
 end

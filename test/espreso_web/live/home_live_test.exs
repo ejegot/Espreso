@@ -25,6 +25,7 @@ defmodule EspresoWeb.HomeLiveTest do
     {:ok, view, _html} = live(conn, ~p"/")
 
     assert has_element?(view, ".brune-top-brand", "CoffeeSpot")
+    assert has_element?(view, ".brune-top-brand img.coffeespot-wordmark-img")
     assert has_element?(view, ".brune-top-nav")
   end
 

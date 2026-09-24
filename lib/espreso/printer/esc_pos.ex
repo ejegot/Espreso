@@ -3,8 +3,15 @@ defmodule Espreso.Printer.EscPos do
 
   # HS-802UL 80mm ≈ 48 chars in Font A
   @width 48
+  @external_resource Path.expand("../../../priv/printer/coffeespot-wordmark.escpos", __DIR__)
+  @shop_mark File.read!(@external_resource)
 
   def width, do: @width
+
+  @doc """
+  1-bit GS v 0 raster of the CoffeeSpot pin + wordmark for 80mm ESC/POS.
+  """
+  def shop_mark, do: @shop_mark
 
   def init, do: <<0x1B, 0x40>>
   def cut, do: <<0x1D, 0x56, 0x00>>

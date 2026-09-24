@@ -905,6 +905,24 @@ defmodule Espreso.Orders do
     breakdown_from_paid_orders(orders, shop_date)
   end
 
+  @doc """
+  Sum of order totals refunded during one Asia/Manila shop date (`refunded_at`).
+  """
+  def refund_total_for_shop_date(%Date{} = shop_date) do
+    {day_start, day_end} = shop_day_bounds_utc(shop_date)
+
+    from(o in Order,
+      where:
+        o.payment_status == "refunded" and not is_nil(o.refunded_at) and
+          o.refunded_at >= ^day_start and o.refunded_at < ^day_end,
+      select: sum(o.total)
+    )
+    |> Repo.one()
+    |> decimalize()
+  end
+
+  def refund_total_for_shop_date(_), do: Decimal.new("0")
+
   defp breakdown_from_paid_orders(orders, shop_date) do
     empty = %{total: Decimal.new("0"), count: 0}
     by_via = paid_via_breakdown(orders, empty)

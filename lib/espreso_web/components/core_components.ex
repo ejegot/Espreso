@@ -627,6 +627,30 @@ defmodule EspresoWeb.CoreComponents do
   end
 
   @doc """
+  Official CoffeeSpot pin + wordmark lockup.
+  """
+  attr :variant, :string, default: "color", values: ~w(color on-dark)
+  attr :class, :any, default: nil
+
+  def coffeespot_wordmark(assigns) do
+    src =
+      if assigns.variant == "on-dark" do
+        "/images/coffeespot/wordmark-on-dark.png"
+      else
+        "/images/coffeespot/wordmark.png"
+      end
+
+    assigns = assign(assigns, :src, src)
+
+    ~H"""
+    <span class={["coffeespot-wordmark", @class]}>
+      <img src={@src} alt="" class="coffeespot-wordmark-img" />
+      <span class="sr-only">CoffeeSpot</span>
+    </span>
+    """
+  end
+
+  @doc """
   Minimal Brune-style top bar — logo left, menu link right.
   """
   attr :current, :string, default: "home", values: ~w(home menu about contact)
@@ -660,7 +684,7 @@ defmodule EspresoWeb.CoreComponents do
               </label>
               <nav class="brune-drawer-panel" aria-label="Main">
                 <div class="brune-drawer-panel-head">
-                  <p class="brune-drawer-brand">CoffeeSpot</p>
+                  <p class="brune-drawer-brand"><.coffeespot_wordmark /></p>
                   <label
                     for="brune-nav-drawer"
                     class="brune-icon-btn brune-drawer-close"
@@ -735,7 +759,9 @@ defmodule EspresoWeb.CoreComponents do
           <% end %>
         </div>
 
-        <.link navigate="/" class="brune-top-brand">CoffeeSpot</.link>
+        <.link navigate="/" class="brune-top-brand" aria-label="CoffeeSpot home">
+          <.coffeespot_wordmark />
+        </.link>
 
         <div class="brune-top-trailing">
           <.link navigate="/contact" class="brune-icon-btn" aria-label="Contact">
@@ -926,7 +952,9 @@ defmodule EspresoWeb.CoreComponents do
       @variant == "overlay" && "site-top-over",
       @show_basket? && "site-top-menu"
     ]}>
-      <.link navigate="/" class="site-top-brand">CoffeeSpot</.link>
+      <.link navigate="/" class="site-top-brand" aria-label="CoffeeSpot home">
+        <.coffeespot_wordmark />
+      </.link>
       <nav class="site-top-nav" aria-label="Primary">
         <.link navigate="/" class={["site-top-link", @current == "home" && "is-current"]}>
           Home

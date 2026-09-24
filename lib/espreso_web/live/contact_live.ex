@@ -29,7 +29,7 @@ defmodule EspresoWeb.ContactLive do
       <section class="brune-contact-main">
         <div class="brune-contact-left">
           <div class="brune-contact-brand">
-            <p class="brune-contact-brand-name">CoffeeSpot</p>
+            <p class="brune-contact-brand-name"><.coffeespot_wordmark /></p>
             <h1 class="brune-contact-brand-title">Contact</h1>
           </div>
 

@@ -486,7 +486,9 @@ defmodule EspresoWeb.MenuLive do
         class="menu-qr-landing menu-qr-landing--signature"
       >
         <header class="menu-qr-landing-top menu-qr-top" id="menu-landing-top">
-          <p class="menu-qr-landing-top-brand menu-qr-top-brand">CoffeeSpot</p>
+          <p class="menu-qr-landing-top-brand menu-qr-top-brand">
+            <.coffeespot_wordmark variant="on-dark" />
+          </p>
         </header>
 
         <div
@@ -613,7 +615,7 @@ defmodule EspresoWeb.MenuLive do
           <button type="button" class="menu-qr-craving-back" phx-click="back_to_landing">
             Back
           </button>
-          <p class="menu-qr-craving-brand">CoffeeSpot</p>
+          <p class="menu-qr-craving-brand"><.coffeespot_wordmark /></p>
           <h1 id="menu-craving-chooser-title" class="menu-qr-craving-title">
             What are you craving?
           </h1>
@@ -664,7 +666,7 @@ defmodule EspresoWeb.MenuLive do
             Back
           </button>
 
-          <p class="menu-qr-visit-brand">{CoffeeSpot.business_name()}</p>
+          <p class="menu-qr-visit-brand"><.coffeespot_wordmark /></p>
           <h1 class="menu-qr-visit-title">Visit CoffeeSpot</h1>
           <p class="menu-qr-visit-place">{CoffeeSpot.location()}</p>
 
@@ -750,7 +752,9 @@ defmodule EspresoWeb.MenuLive do
             >
               <.icon name="hero-arrow-left" class="menu-qr-chrome-icon" />
             </button>
-            <p class="menu-qr-chrome-brand menu-qr-top-brand">CoffeeSpot</p>
+            <p class="menu-qr-chrome-brand menu-qr-top-brand">
+              <.coffeespot_wordmark variant="on-dark" />
+            </p>
             <div class="menu-qr-chrome-trailing">
               <button
                 type="button"
@@ -1002,7 +1006,7 @@ defmodule EspresoWeb.MenuLive do
         </section>
 
         <footer class="brune-mega-footer brune-mega-footer--secondary" aria-label="CoffeeSpot footer">
-          <p class="brune-mega-brand">CoffeeSpot Marikina</p>
+          <p class="brune-mega-brand"><.coffeespot_wordmark /></p>
           <p class="menu-footer-owned-label">Owned and Operated by:</p>
           <p class="menu-footer-owned-name">Elilai Kafe</p>
 
@@ -1092,8 +1096,8 @@ defmodule EspresoWeb.MenuLive do
 
             <div class="menu-detail-options">
               <div :if={detail_multi_size?(@detail)} class="menu-detail-option">
-                <p class="menu-detail-label">Size</p>
-                <div class="menu-size-pills" role="group" aria-label="Size">
+                <p class="menu-detail-label">{detail_option_label(@detail)}</p>
+                <div class="menu-size-pills" role="group" aria-label={detail_option_label(@detail)}>
                   <button
                     :for={price <- @detail.product.product_prices}
                     type="button"
@@ -1574,7 +1578,7 @@ defmodule EspresoWeb.MenuLive do
         >
           <header class="menu-my-orders-header">
             <div>
-              <p class="menu-my-orders-eyebrow">CoffeeSpot</p>
+              <p class="menu-my-orders-eyebrow"><.coffeespot_wordmark /></p>
               <h2 id="menu-my-orders-title">
                 <%= if @my_orders_tab == :rewards do %>
                   ELIlai Rewards
@@ -2833,12 +2837,14 @@ defmodule EspresoWeb.MenuLive do
         Menu.format_price(price.price)
 
       [_ | _] = prices ->
-        lowest =
-          prices
-          |> Enum.map(& &1.price)
-          |> Enum.min(Decimal)
+        amounts = Enum.map(prices, & &1.price)
+        lowest = Enum.min(amounts, Decimal)
 
-        "from #{Menu.format_price(lowest)}"
+        if Enum.all?(amounts, &Decimal.equal?(&1, lowest)) do
+          Menu.format_price(lowest)
+        else
+          "from #{Menu.format_price(lowest)}"
+        end
 
       _ ->
         ""
@@ -2850,6 +2856,19 @@ defmodule EspresoWeb.MenuLive do
 
   defp detail_multi_size?(%{product: %{product_prices: prices}}) when length(prices) > 1, do: true
   defp detail_multi_size?(_detail), do: false
+
+  defp detail_option_label(detail) do
+    if detail_flavor_options?(detail), do: "Flavor", else: "Size"
+  end
+
+  defp detail_flavor_options?(%{product: %{product_prices: prices}}) when is_list(prices) do
+    Enum.any?(prices, fn
+      %{size: size} when is_binary(size) -> size in ~w(Plain Chocolate Strawberry)
+      _ -> false
+    end)
+  end
+
+  defp detail_flavor_options?(_), do: false
 
   defp detail_single_size_label(%{product: %{product_prices: [price | _]}}) do
     case size_label(price) do

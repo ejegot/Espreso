@@ -22,11 +22,7 @@ defmodule Espreso.Printer.Receipt do
     EscPos.join(
       [
         EscPos.init(),
-        EscPos.align_center(),
-        EscPos.bold_on(),
-        EscPos.size_double_height(),
-        EscPos.text_line(shop_name()),
-        EscPos.size_normal(),
+        brand_header(),
         EscPos.text_line("LILAC, MARIKINA"),
         EscPos.bold_off(),
         EscPos.text_line(conf.address),
@@ -86,7 +82,7 @@ defmodule Espreso.Printer.Receipt do
         EscPos.size_double_height(),
         EscPos.text_line("KITCHEN"),
         EscPos.size_normal(),
-        EscPos.text_line(shop_name()),
+        brand_header(),
         EscPos.bold_off(),
         EscPos.align_left(),
         EscPos.bold_on(),
@@ -123,32 +119,42 @@ defmodule Espreso.Printer.Receipt do
 
     variance = close.variance
     variance_label = variance_label(variance)
+    cash_sales = cash_sales_from_close(close)
+    cash_outs = cash_outs_from_close(close, opts)
+    refunds = refunds_from_opts(opts)
 
     EscPos.join(
       [
         EscPos.init(),
-        EscPos.align_center(),
-        EscPos.bold_on(),
-        EscPos.size_double_height(),
-        EscPos.text_line(shop_name()),
-        EscPos.size_normal(),
+        brand_header(),
         EscPos.text_line("DAY REPORT"),
         EscPos.bold_off(),
+        EscPos.text_line("Elilai Kafe"),
         EscPos.text_line(date_label),
         EscPos.feed(1),
         EscPos.align_left(),
         EscPos.separator(),
+        EscPos.align_center(),
+        EscPos.text_line("CASH DRAWER"),
+        EscPos.align_left(),
         EscPos.columns("Opening cash", money(close.opening_cash)),
-        EscPos.columns("Cash sales", money(cash_sales_from_close(close))),
-        EscPos.columns("Expected", money(close.expected_cash)),
-        EscPos.columns("Counted", money(close.counted_cash)),
-        EscPos.bold_on(),
-        EscPos.columns(variance_label, money(variance)),
-        EscPos.bold_off(),
-        EscPos.separator(),
-        EscPos.columns("System paid", money(close.system_total)),
-        EscPos.text_line("#{close.system_count || 0} orders")
+        EscPos.columns("Cash sales", money(cash_sales))
       ] ++
+        optional_money_line("Cash outs", cash_outs) ++
+        [
+          EscPos.columns("Expected", money(close.expected_cash)),
+          EscPos.columns("Counted", money(close.counted_cash)),
+          EscPos.bold_on(),
+          EscPos.columns(variance_label, money(variance)),
+          EscPos.bold_off(),
+          EscPos.separator(),
+          EscPos.align_center(),
+          EscPos.text_line("SALES"),
+          EscPos.align_left(),
+          EscPos.columns("Paid", money(close.system_total)),
+          EscPos.text_line("#{close.system_count || 0} orders")
+        ] ++
+        optional_money_line("Refunds", refunds) ++
         day_report_via_lines(close) ++
         [
           EscPos.separator(),
@@ -161,6 +167,28 @@ defmodule Espreso.Printer.Receipt do
   end
 
   defp cash_sales_from_close(close), do: Shifts.cash_sales_total(close)
+
+  defp cash_outs_from_close(close, opts) do
+    case Keyword.get(opts, :cash_outs) do
+      %Decimal{} = amount -> amount
+      _ -> Shifts.implied_cash_outs(close)
+    end
+  end
+
+  defp refunds_from_opts(opts) do
+    case Keyword.get(opts, :refunds) do
+      %Decimal{} = amount -> amount
+      _ -> Decimal.new("0")
+    end
+  end
+
+  defp optional_money_line(label, amount) do
+    if is_nil(amount) or decimal_zero?(amount) do
+      []
+    else
+      [EscPos.columns(label, money(amount))]
+    end
+  end
 
   defp variance_label(%Decimal{} = variance) do
     case Decimal.compare(variance, 0) do
@@ -292,6 +320,28 @@ defmodule Espreso.Printer.Receipt do
     case Application.get_env(:espreso, :receipt_shop_name) do
       name when is_binary(name) and name != "" -> name
       _ -> "CoffeeSpot"
+    end
+  end
+
+  @doc false
+  def brand_header do
+    mark = EscPos.shop_mark()
+
+    if mark == <<>> do
+      [
+        EscPos.align_center(),
+        EscPos.bold_on(),
+        EscPos.size_double_height(),
+        EscPos.text_line(shop_name()),
+        EscPos.size_normal()
+      ]
+    else
+      [
+        EscPos.align_center(),
+        mark,
+        EscPos.feed(1),
+        EscPos.bold_on()
+      ]
     end
   end
 

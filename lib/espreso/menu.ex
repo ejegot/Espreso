@@ -61,16 +61,17 @@ defmodule Espreso.Menu do
     {"FOOD", "Chicken Flakes"} => "/images/coffeespot/gen-food-chicken-flakes.png",
     {"FOOD", "Beef Tapa"} => "/images/coffeespot/gen-food-beef-tapa.png",
     {"FOOD", "Corned Beef"} => "/images/coffeespot/gen-food-corned-beef.png",
-    {"FOOD", "Spam"} => "/images/coffeespot/gen-food-spam.png",
+    {"FOOD", "Spam"} => "/images/coffeespot/gen-food-spam-plain-rice.jpg",
     {"FOOD", "Pork Liempo"} => "/images/coffeespot/gen-food-pork-liempo.png",
     {"FOOD", "Spam Musubi"} => "/images/coffeespot/gen-food-spam-musubi.png",
-    {"FOOD", "Nugget"} => "/images/coffeespot/gen-food-nugget.png",
+    {"FOOD", "Nugget"} => "/images/coffeespot/gen-food-nugget-rice.jpg",
     {"FOOD", "Solo Fries"} => "/images/coffeespot/gen-food-solo-fries.png",
     {"FOOD", "Fries w/ Nuggets"} => "/images/coffeespot/gen-food-fries-nuggets.png",
     {"FOOD", "Beef Nachos"} => "/images/coffeespot/gen-food-beef-nachos.png",
     {"FOOD", "Quesadillas"} => "/images/coffeespot/gen-food-quesadillas.png",
     {"FOOD", "Chicken & Chips"} => "/images/coffeespot/gen-food-chicken-chips.png",
     {"FOOD", "Spam & Chips"} => "/images/coffeespot/gen-food-spam-chips.png",
+    {"FOOD", "Spam Burger"} => "/images/coffeespot/gen-food-spam-burger.jpg",
     {"FOOD", "Slow-Roasted Chicken Sourdough"} =>
       "/images/coffeespot/food-slow-roasted-chicken-sourdough.png",
     {"FOOD", "Golden Egg Royale"} => "/images/coffeespot/food-golden-egg-royale.png",
@@ -79,6 +80,7 @@ defmodule Espreso.Menu do
     {"FOOD", "BNN Choco Overload"} => "/images/coffeespot/gen-food-bnn-choco-overload.png",
     {"FOOD", "BNN Biscoff"} => "/images/coffeespot/gen-food-bnn-biscoff.png",
     {"FOOD", "Choco Chips"} => "/images/coffeespot/gen-food-choco-chips-muffin.png",
+    {"FOOD", "Big Assorted Muffin"} => "/images/coffeespot/gen-food-big-assorted-muffin.jpg",
     {"FOOD", "Red Velvet"} => "/images/coffeespot/gen-food-red-velvet.png",
     {"FOOD", "Dark Choco Dream Cake"} => "/images/coffeespot/gen-food-dark-choco-cake.png",
     {"FOOD", "Choco Chip Cookies"} => "/images/coffeespot/gen-food-choco-chip-cookies.png",
@@ -86,7 +88,9 @@ defmodule Espreso.Menu do
     {"FOOD", "Choco Moist Slice"} => "/images/coffeespot/gen-food-choco-moist-slice.png",
     {"FOOD", "Carrot Moist Slice"} => "/images/coffeespot/gen-food-carrot-moist-slice.png",
     {"FOOD", "Belgian Waffles"} => "/images/coffeespot/gen-food-belgian-waffles.png",
-    {"FOOD", "Chocolate Almond Waffles"} => "/images/coffeespot/gen-food-choco-almond-waffles.png"
+    {"FOOD", "Chocolate Almond Waffles"} =>
+      "/images/coffeespot/gen-food-choco-almond-waffles.png",
+    {"FOOD", "Waffles"} => "/images/coffeespot/gen-food-waffles-plain.jpg"
   }
 
   @category_images %{
@@ -193,10 +197,10 @@ defmodule Espreso.Menu do
       "Sweet-cured beef strips with garlic rice and egg — a Filipino classic.",
     {"FOOD", "Corned Beef"} =>
       "Savory corned beef sautéed with onions, served with rice and egg.",
-    {"FOOD", "Spam"} => "Pan-fried Spam slices with garlic rice and a sunny-side-up egg.",
+    {"FOOD", "Spam"} => "Two pieces of Spam with one egg and plain rice.",
     {"FOOD", "Pork Liempo"} => "Juicy grilled pork belly with garlic rice and a fried egg.",
     {"FOOD", "Spam Musubi"} => "Spam on sushi rice wrapped in nori — a quick, savory bite.",
-    {"FOOD", "Nugget"} => "Golden crispy chicken nuggets served with your choice of dip.",
+    {"FOOD", "Nugget"} => "Four crispy chicken nuggets served with rice.",
     # FOOD — Appetizers
     {"FOOD", "Solo Fries"} => "A generous serving of crispy, golden french fries.",
     {"FOOD", "Fries w/ Nuggets"} =>
@@ -205,7 +209,8 @@ defmodule Espreso.Menu do
     {"FOOD", "Quesadillas"} =>
       "Grilled flour tortilla filled with melted cheese and savory filling.",
     {"FOOD", "Chicken & Chips"} => "Crispy chicken tenders served with a side of seasoned fries.",
-    {"FOOD", "Spam & Chips"} => "Pan-fried Spam slices paired with crispy seasoned fries.",
+    {"FOOD", "Spam & Chips"} => "Spam burger served with a side of chips.",
+    {"FOOD", "Spam Burger"} => "Spam burger served with a side of chips.",
     # FOOD — Sandwiches & Wraps
     {"FOOD", "Slow-Roasted Chicken Sourdough"} =>
       "Slow-marinated chicken, gently cooked to tender perfection, layered with melted cheese and roasted vegetables between golden, toasted sourdough.",
@@ -220,6 +225,8 @@ defmodule Espreso.Menu do
     {"FOOD", "BNN Biscoff"} => "Banana muffin with Biscoff spread and cookie crumble topping.",
     {"FOOD", "Choco Chips"} => "A classic chocolate chip muffin — soft, warm, and sweet.",
     {"FOOD", "Red Velvet"} => "Rich red velvet muffin with a hint of cocoa and cream cheese.",
+    {"FOOD", "Big Assorted Muffin"} =>
+      "A big assorted muffin — pick from the flavors in the case.",
     # FOOD — Cakes / Breads
     {"FOOD", "Dark Choco Dream Cake"} =>
       "Dense, fudgy dark chocolate cake — a chocoholic's dream.",
@@ -229,10 +236,10 @@ defmodule Espreso.Menu do
     {"FOOD", "Choco Moist Slice"} => "Rich chocolate banana bread — soft, moist, and indulgent.",
     {"FOOD", "Carrot Moist Slice"} =>
       "Spiced carrot bread with a moist crumb and subtle sweetness.",
-    {"FOOD", "Belgian Waffles"} =>
-      "Golden Belgian waffles with butter and maple syrup — warm and comforting.",
+    {"FOOD", "Belgian Waffles"} => "Golden waffle — plain ₱99, or chocolate or strawberry ₱129.",
     {"FOOD", "Chocolate Almond Waffles"} =>
-      "Crisp waffles drizzled with chocolate and topped with almond slivers."
+      "Golden waffle — plain ₱99, or chocolate or strawberry ₱129.",
+    {"FOOD", "Waffles"} => "Golden waffle — plain ₱99, or chocolate or strawberry ₱129."
   }
 
   @food_subcategories [
@@ -252,14 +259,14 @@ defmodule Espreso.Menu do
        "Fries w/ Nuggets",
        "Beef Nachos",
        "Quesadillas",
-       "Chicken & Chips",
-       "Spam & Chips"
+       "Chicken & Chips"
      ]},
     {"Sandwiches & Wraps",
      [
        "Slow-Roasted Chicken Sourdough",
        "Golden Egg Royale",
-       "Tuna Royale Baguette"
+       "Tuna Royale Baguette",
+       "Spam Burger"
      ]},
     {"Muffins",
      [
@@ -272,8 +279,7 @@ defmodule Espreso.Menu do
        "BNN Moist Slice",
        "Choco Moist Slice",
        "Carrot Moist Slice",
-       "Belgian Waffles",
-       "Chocolate Almond Waffles"
+       "Waffles"
      ]}
   ]
 
@@ -832,6 +838,12 @@ defmodule Espreso.Menu do
   end
 
   defp price_sort_key(%{size: nil}), do: {0, ""}
+
+  defp price_sort_key(%{price: price, size: size})
+       when size in ~w(Plain Chocolate Strawberry) do
+    {0, Decimal.to_float(price), size}
+  end
+
   defp price_sort_key(%{size: size}), do: {1, size}
 
   # Bump when regenerating priv/static/images/coffeespot/pos-thumbs/ so tablets

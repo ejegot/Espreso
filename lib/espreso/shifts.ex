@@ -287,6 +287,21 @@ defmodule Espreso.Shifts do
   def cash_sales_total(_), do: Decimal.new("0")
 
   @doc """
+  Cash taken out of the drawer implied by a sealed close snapshot.
+
+  `opening + cash sales - expected`. Zero when opening or expected is missing.
+  """
+  def implied_cash_outs(%{opening_cash: opening, expected_cash: expected} = close)
+      when not is_nil(opening) and not is_nil(expected) do
+    cash_sales_total(close)
+    |> Decimal.add(decimalize_money(opening))
+    |> Decimal.sub(decimalize_money(expected))
+    |> Decimal.round(2)
+  end
+
+  def implied_cash_outs(_), do: Decimal.new("0")
+
+  @doc """
   LiveView eligibility for an open (not yet sealed) shop day.
 
   - Manager/owner: always `:ok` when the day is open
