@@ -1319,70 +1319,72 @@ defmodule EspresoWeb.StaffPosLive do
                     </div>
 
                     <p class="staff-pos-section-label">Order type</p>
-                    <div
-                      class="staff-pos-fulfillment staff-pos-fulfillment--pills"
-                      id="pos-fulfillment"
-                      role="radiogroup"
-                      aria-label="Order type"
-                    >
-                      <button
-                        type="button"
-                        class={["staff-pos-fulfill-chip", @fulfillment == :dine_in && "is-active"]}
-                        id="pos-fulfillment-dine-in"
-                        phx-click="set_fulfillment"
-                        phx-value-fulfillment="dine_in"
-                        aria-pressed={to_string(@fulfillment == :dine_in)}
+                    <div class="staff-pos-ticket-controls">
+                      <div
+                        class="staff-pos-fulfillment staff-pos-fulfillment--pills"
+                        id="pos-fulfillment"
+                        role="radiogroup"
+                        aria-label="Order type"
                       >
-                        Dine In
-                      </button>
-                      <button
-                        type="button"
-                        class={["staff-pos-fulfill-chip", @fulfillment == :pickup && "is-active"]}
-                        id="pos-fulfillment-pickup"
-                        phx-click="set_fulfillment"
-                        phx-value-fulfillment="pickup"
-                        aria-pressed={to_string(@fulfillment == :pickup)}
-                      >
-                        Take Out
-                      </button>
-                    </div>
-
-                    <div class="staff-pos-ticket-identity">
-                      <label class="staff-pos-field staff-pos-field--name" for="pos-customer-name">
-                        <span class="staff-pos-field-label">Name</span>
-                        <input
-                          type="text"
-                          class="staff-pos-field-input"
-                          id="pos-customer-name"
-                          name="customer_name"
-                          value={@customer_name}
-                          phx-change="set_customer_name"
-                          phx-debounce="300"
-                          autocomplete="off"
-                          maxlength="60"
-                          placeholder="Walk-in"
-                        />
-                      </label>
-
-                      <div class="staff-pos-loyalty-entry-wrap" id="pos-loyalty">
                         <button
                           type="button"
-                          id="pos-loyalty-entry"
-                          class={[
-                            "staff-pos-loyalty-entry",
-                            @loyalty_customer && "is-linked",
-                            @loyalty_customer &&
-                              @loyalty_customer.points_balance >= Loyalty.redeem_cost() &&
-                              "is-ready",
-                            loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer) &&
-                              "is-attention"
-                          ]}
-                          phx-click="open_loyalty"
-                          aria-expanded={to_string(@loyalty_open?)}
-                          aria-controls="pos-loyalty-modal"
+                          class={["staff-pos-fulfill-chip", @fulfillment == :dine_in && "is-active"]}
+                          id="pos-fulfillment-dine-in"
+                          phx-click="set_fulfillment"
+                          phx-value-fulfillment="dine_in"
+                          aria-pressed={to_string(@fulfillment == :dine_in)}
                         >
-                          {loyalty_entry_label(@loyalty_customer, @loyalty_phone)}
+                          Dine In
                         </button>
+                        <button
+                          type="button"
+                          class={["staff-pos-fulfill-chip", @fulfillment == :pickup && "is-active"]}
+                          id="pos-fulfillment-pickup"
+                          phx-click="set_fulfillment"
+                          phx-value-fulfillment="pickup"
+                          aria-pressed={to_string(@fulfillment == :pickup)}
+                        >
+                          Take Out
+                        </button>
+                      </div>
+
+                      <div class="staff-pos-ticket-identity">
+                        <label class="staff-pos-field staff-pos-field--name" for="pos-customer-name">
+                          <span class="staff-pos-field-label">Name</span>
+                          <input
+                            type="text"
+                            class="staff-pos-field-input"
+                            id="pos-customer-name"
+                            name="customer_name"
+                            value={@customer_name}
+                            phx-change="set_customer_name"
+                            phx-debounce="300"
+                            autocomplete="off"
+                            maxlength="60"
+                            placeholder="Walk-in"
+                          />
+                        </label>
+
+                        <div class="staff-pos-loyalty-entry-wrap" id="pos-loyalty">
+                          <button
+                            type="button"
+                            id="pos-loyalty-entry"
+                            class={[
+                              "staff-pos-loyalty-entry",
+                              @loyalty_customer && "is-linked",
+                              @loyalty_customer &&
+                                @loyalty_customer.points_balance >= Loyalty.redeem_cost() &&
+                                "is-ready",
+                              loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer) &&
+                                "is-attention"
+                            ]}
+                            phx-click="open_loyalty"
+                            aria-expanded={to_string(@loyalty_open?)}
+                            aria-controls="pos-loyalty-modal"
+                          >
+                            {loyalty_entry_label(@loyalty_customer, @loyalty_phone)}
+                          </button>
+                        </div>
                       </div>
                     </div>
                     <p
@@ -1446,32 +1448,34 @@ defmodule EspresoWeb.StaffPosLive do
                         <div class="staff-pos-cart-main">
                           <div class="staff-pos-cart-copy">
                             <p class="staff-pos-cart-name">{line.name}</p>
-                            <%= if length(cart_variant_options(@categories, line)) > 1 do %>
-                              <button
-                                type="button"
-                                class="staff-pos-cart-variant-trigger"
-                                id={"pos-cart-variant-trigger-#{line.key}"}
-                                phx-click="toggle_cart_variant"
-                                phx-value-key={line.key}
-                                aria-expanded={to_string(@variant_editor_key == line.key)}
-                                aria-controls={"pos-cart-variant-chooser-#{line.key}"}
-                                aria-label={"Change #{line.name} size, currently #{size_label(line.size)}"}
+                            <div class="staff-pos-cart-meta">
+                              <%= if length(cart_variant_options(@categories, line)) > 1 do %>
+                                <button
+                                  type="button"
+                                  class="staff-pos-cart-variant-trigger"
+                                  id={"pos-cart-variant-trigger-#{line.key}"}
+                                  phx-click="toggle_cart_variant"
+                                  phx-value-key={line.key}
+                                  aria-expanded={to_string(@variant_editor_key == line.key)}
+                                  aria-controls={"pos-cart-variant-chooser-#{line.key}"}
+                                  aria-label={"Change #{line.name} size, currently #{size_label(line.size)}"}
+                                >
+                                  {size_label(line.size)} <span aria-hidden="true">▾</span>
+                                </button>
+                              <% else %>
+                                <p class="staff-pos-cart-size">{size_label(line.size)}</p>
+                              <% end %>
+                              <p
+                                :if={meta = Orders.temperature_meta(line[:category])}
+                                class={"staff-pos-cart-temp is-#{meta.tone}"}
                               >
-                                {size_label(line.size)} <span aria-hidden="true">▾</span>
-                              </button>
-                            <% else %>
-                              <p class="staff-pos-cart-size">{size_label(line.size)}</p>
-                            <% end %>
-                            <p
-                              :if={meta = Orders.temperature_meta(line[:category])}
-                              class={"staff-pos-cart-temp is-#{meta.tone}"}
-                            >
-                              {meta.label}
-                            </p>
-                            <p class="staff-pos-cart-amount">
-                              {Menu.format_price(Decimal.mult(line.price, line.quantity))}
-                            </p>
+                                {meta.label}
+                              </p>
+                            </div>
                           </div>
+                          <p class="staff-pos-cart-amount">
+                            {Menu.format_price(Decimal.mult(line.price, line.quantity))}
+                          </p>
                           <div class="staff-pos-cart-actions">
                             <div class="staff-pos-qty-controls">
                               <button
@@ -2005,6 +2009,7 @@ defmodule EspresoWeb.StaffPosLive do
         :confirm_enabled?,
         match?(%Decimal{}, cash_due) and wallet_ok? and cash_tender_valid?(tender_state)
       )
+      |> assign(:portion_ready?, match?(%Decimal{}, cash_due) and wallet_ok?)
       |> assign(:busy?, assigns.placing_order? or assigns.redeeming?)
 
     ~H"""
@@ -2019,8 +2024,32 @@ defmodule EspresoWeb.StaffPosLive do
         <header class="staff-pos-cash-modal-head">
           <p class="staff-pos-cash-modal-eyebrow">Split payment</p>
           <h2 id="pos-split-modal-title">Cash + {@wallet_label}</h2>
+          <div
+            class="staff-pos-cash-quick staff-pos-split-wallets"
+            role="group"
+            aria-label="Wallet for split"
+          >
+            <button
+              type="button"
+              class={[@split_wallet == "gcash" && "is-selected"]}
+              id="pos-split-wallet-gcash"
+              phx-click="set_split_wallet"
+              phx-value-wallet="gcash"
+            >
+              GCash
+            </button>
+            <button
+              type="button"
+              class={[@split_wallet == "maya" && "is-selected"]}
+              id="pos-split-wallet-maya"
+              phx-click="set_split_wallet"
+              phx-value-wallet="maya"
+            >
+              Maya
+            </button>
+          </div>
           <p id="pos-split-modal-description">
-            Enter the cash portion, confirm the wallet transfer, then enter cash received.
+            Enter cash first. {@wallet_label} covers the rest.
           </p>
         </header>
 
@@ -2030,28 +2059,7 @@ defmodule EspresoWeb.StaffPosLive do
         </div>
 
         <div class="staff-pos-split" id="pos-split-fields">
-          <div class="staff-pos-split-wallets" role="group" aria-label="Wallet for split">
-            <button
-              type="button"
-              class={["staff-pos-pay-chip", @split_wallet == "gcash" && "is-active"]}
-              id="pos-split-wallet-gcash"
-              phx-click="set_split_wallet"
-              phx-value-wallet="gcash"
-            >
-              GCash
-            </button>
-            <button
-              type="button"
-              class={["staff-pos-pay-chip", @split_wallet == "maya" && "is-active"]}
-              id="pos-split-wallet-maya"
-              phx-click="set_split_wallet"
-              phx-value-wallet="maya"
-            >
-              Maya
-            </button>
-          </div>
-
-          <label class="staff-pos-split-field" for="pos-split-cash">
+          <label class="staff-pos-cash-field" for="pos-split-cash">
             <span>Cash portion</span>
             <span class="staff-pos-cash-input-wrap">
               <span aria-hidden="true">₱</span>
@@ -2071,89 +2079,91 @@ defmodule EspresoWeb.StaffPosLive do
             </span>
           </label>
 
-          <div class="staff-pos-split-remainder" id="pos-split-wallet-amount">
+          <p :if={!@portion_ready?} class="staff-pos-split-cue" id="pos-split-portion-hint">
+            Enter an amount less than the total.
+          </p>
+
+          <div :if={@portion_ready?} class="staff-pos-cash-total" id="pos-split-wallet-amount">
             <span>{@wallet_label}</span>
             <strong>{Menu.format_price(@remainder)}</strong>
           </div>
         </div>
 
         <form id="pos-split-form" phx-change="set_cash_tendered" phx-submit="confirm_split">
-          <label class="staff-pos-cash-field" for="pos-split-tendered">
-            <span>Cash received</span>
-            <span class="staff-pos-cash-input-wrap">
-              <span aria-hidden="true">₱</span>
-              <input
-                type="text"
-                inputmode="decimal"
-                autocomplete="off"
-                id="pos-split-tendered"
-                name="cash_tendered"
-                value={@cash_tendered}
-                placeholder="0.00"
-                aria-describedby="pos-split-tender-feedback"
-              />
-            </span>
-          </label>
+          <%= if @portion_ready? do %>
+            <label class="staff-pos-cash-field" for="pos-split-tendered">
+              <span>Cash received</span>
+              <span class="staff-pos-cash-input-wrap">
+                <span aria-hidden="true">₱</span>
+                <input
+                  type="text"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  id="pos-split-tendered"
+                  name="cash_tendered"
+                  value={@cash_tendered}
+                  placeholder="0.00"
+                  aria-describedby="pos-split-tender-feedback"
+                />
+              </span>
+            </label>
 
-          <div class="staff-pos-cash-quick" id="pos-split-quick-tenders">
-            <button
-              type="button"
-              id="pos-split-cash-exact"
-              phx-click="cash_exact"
-              disabled={is_nil(@cash_due)}
-              aria-label="Set cash received to the cash portion"
-              data-dismiss-keyboard
-            >
-              Exact
-            </button>
-            <button
-              :for={amount <- @quick_tenders}
-              type="button"
-              id={"pos-split-preset-#{Decimal.to_integer(amount)}"}
-              phx-click="cash_chip"
-              phx-value-amount={Decimal.to_string(amount, :normal)}
-              aria-label={"Set cash received to #{Menu.format_price(amount)}"}
-              data-dismiss-keyboard
-            >
-              {Menu.format_price(amount)}
-            </button>
-          </div>
+            <div class="staff-pos-cash-quick" id="pos-split-quick-tenders">
+              <button
+                type="button"
+                id="pos-split-cash-exact"
+                phx-click="cash_exact"
+                aria-label="Set cash received to the cash portion"
+                data-dismiss-keyboard
+              >
+                Exact
+              </button>
+              <button
+                :for={amount <- @quick_tenders}
+                type="button"
+                id={"pos-split-preset-#{Decimal.to_integer(amount)}"}
+                phx-click="cash_chip"
+                phx-value-amount={Decimal.to_string(amount, :normal)}
+                aria-label={"Set cash received to #{Menu.format_price(amount)}"}
+                data-dismiss-keyboard
+              >
+                {Menu.format_price(amount)}
+              </button>
+            </div>
 
-          <div
-            class={[
-              "staff-pos-cash-feedback",
-              match?({:short, _, _}, @tender_state) && "is-short",
-              (@tender_state == :invalid or not is_nil(@split_error)) && "is-error"
-            ]}
-            id="pos-split-tender-feedback"
-            aria-live="polite"
-          >
-            <%= cond do %>
-              <% not match?(%Decimal{}, @cash_due) -> %>
-                <span>Enter a cash amount less than the total.</span>
-              <% Decimal.compare(@remainder, 0) != :gt -> %>
-                <span>Cash must be less than the total so {@wallet_label} covers the rest.</span>
-              <% true -> %>
-                <%= case @tender_state do %>
-                  <% {:exact, _tendered, change} -> %>
-                    <span>Exact cash</span>
-                    <strong>Change {Menu.format_price(change)}</strong>
-                  <% {:change, _tendered, change} -> %>
-                    <span>Change</span>
-                    <strong>{Menu.format_price(change)}</strong>
-                  <% {:short, _tendered, needed} -> %>
-                    <span>Still needed</span>
-                    <strong>{Menu.format_price(needed)}</strong>
-                  <% :invalid -> %>
-                    <span>Enter a valid amount with up to 2 decimal places.</span>
-                  <% :blank -> %>
-                    <span>Enter cash received or choose Exact.</span>
-                <% end %>
-            <% end %>
-            <span :if={@split_error} class="staff-pos-cash-feedback-error">
-              {@split_error}
-            </span>
-          </div>
+            <div
+              class={[
+                "staff-pos-cash-feedback",
+                match?({:short, _, _}, @tender_state) && "is-short",
+                (@tender_state == :invalid or not is_nil(@split_error)) && "is-error"
+              ]}
+              id="pos-split-tender-feedback"
+              aria-live="polite"
+            >
+              <%= case @tender_state do %>
+                <% {:exact, _tendered, change} -> %>
+                  <span>Exact cash</span>
+                  <strong>Change {Menu.format_price(change)}</strong>
+                <% {:change, _tendered, change} -> %>
+                  <span>Change</span>
+                  <strong>{Menu.format_price(change)}</strong>
+                <% {:short, _tendered, needed} -> %>
+                  <span>Still needed</span>
+                  <strong>{Menu.format_price(needed)}</strong>
+                <% :invalid -> %>
+                  <span>Enter a valid amount with up to 2 decimal places.</span>
+                <% :blank -> %>
+                  <span>Enter cash received or choose Exact.</span>
+              <% end %>
+              <span :if={@split_error} class="staff-pos-cash-feedback-error">
+                {@split_error}
+              </span>
+            </div>
+          <% else %>
+            <div class="staff-pos-cash-feedback" id="pos-split-tender-feedback" aria-live="polite">
+              <span>Enter the cash portion, then confirm cash received.</span>
+            </div>
+          <% end %>
 
           <div class="staff-pos-cash-modal-actions">
             <button
@@ -2163,7 +2173,7 @@ defmodule EspresoWeb.StaffPosLive do
               disabled={!@confirm_enabled? or @busy?}
               data-dismiss-keyboard
             >
-              Confirm Split
+              Confirm Payment
             </button>
             <button
               type="button"

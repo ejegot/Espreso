@@ -1921,7 +1921,11 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> element("#pos-pay-split") |> render_click()
     assert has_element?(view, "#pos-pay-split.is-active", "Split")
     assert has_element?(view, "#pos-split-modal")
+    assert has_element?(view, "#pos-split-modal-container")
     assert has_element?(view, "#pos-split-fields")
+    assert has_element?(view, "#pos-split-modal .staff-pos-cash-modal-head", "Cash + GCash")
+    assert has_element?(view, "#pos-split-total", "Total")
+    assert has_element?(view, "#pos-confirm-split", "Confirm Payment")
     assert has_element?(view, "#pos-place-order", "Enter Split")
     refute has_element?(view, "#pos-order-form #pos-split-cash")
 

@@ -4091,10 +4091,11 @@ body:has(.menu-page-locked) {
 }
 
 .dashboard-page.staff-home-main,
-.dashboard-page .staff-home-main {
-  width: min(calc(100% - 1.5rem), 56rem);
+.dashboard-page .staff-home-main,
+.staff-app .dashboard-page.staff-home-main {
+  width: min(calc(100% - clamp(1rem, 4vw, 2.5rem)), 72rem);
   margin-inline: auto;
-  padding-block: 0.75rem 1.25rem;
+  padding-block: clamp(0.55rem, 1.6vh, 1.05rem) clamp(1rem, 3vh, 2rem);
   --dash-forest: var(--elilai-forest, #394331);
   --dash-ivory: var(--elilai-ivory, #f4efe3);
   --dash-ink: var(--cs-brown, var(--dash-forest));
@@ -4176,8 +4177,8 @@ body:has(.menu-page-locked) {
   display: grid;
   align-content: start;
   gap: 0.15rem;
-  min-height: 0;
-  padding: 0.9rem 1rem;
+  min-height: 4.6rem;
+  padding: 0.85rem 0.95rem;
   border: 1px solid var(--dash-line);
   border-radius: 0.85rem;
   background: #fff;
@@ -4344,26 +4345,40 @@ a.dashboard-kpi-card {
 
 .dashboard-launch {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 0.55rem;
   margin-bottom: 0.9rem;
+}
+
+@media (min-width: 720px) {
+  .dashboard-launch {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  }
 }
 
 .dashboard-launch-btn {
   display: grid;
   gap: 0.12rem;
-  min-height: 3.4rem;
-  padding: 0.7rem 0.85rem;
+  align-content: center;
+  min-height: 3.5rem;
+  padding: 0.75rem 0.9rem;
   border: 1px solid var(--dash-line);
   border-radius: 0.75rem;
   background: #fff;
   color: var(--dash-forest);
   text-decoration: none;
+  touch-action: manipulation;
 }
 
 .dashboard-launch-btn.staff-home-pos-cta--primary {
-  border-color: color-mix(in srgb, var(--cs-orange, #f85020) 35%, var(--dash-line));
-  background: color-mix(in srgb, var(--cs-orange, #f85020) 8%, #fff);
+  min-height: 3.85rem;
+  border-color: var(--dash-forest);
+  background: var(--dash-forest);
+  color: #fff;
+}
+
+.dashboard-launch-btn.staff-home-pos-cta--primary .dashboard-launch-body {
+  color: color-mix(in srgb, #fff 78%, var(--dash-forest));
 }
 
 .dashboard-launch-title {
@@ -4398,8 +4413,14 @@ a.dashboard-kpi-card {
 .dashboard-sparkline {
   display: block;
   width: 100%;
-  height: 7.5rem;
+  height: clamp(5rem, 16vh, 8.5rem);
   overflow: visible;
+}
+
+@media (orientation: portrait) and (max-width: 899px) {
+  .dashboard-sparkline {
+    height: 5.25rem;
+  }
 }
 
 .dashboard-sparkline-line {
@@ -4809,6 +4830,19 @@ a.dashboard-kpi-card {
   text-transform: uppercase;
 }
 
+.staff-home-desk-tools {
+  display: grid;
+  gap: 0.55rem;
+  margin-bottom: 0.35rem;
+}
+
+@media (min-width: 720px) {
+  .staff-home-desk-tools {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+  }
+}
+
 .staff-home-secondary {
   display: grid;
   gap: 0.55rem;
@@ -4818,18 +4852,12 @@ a.dashboard-kpi-card {
 .staff-home-tertiary {
   display: grid;
   gap: 0.45rem;
-  margin-top: 0.55rem;
+  margin-top: 0;
 }
 
-@media (min-width: 640px) {
-  .staff-home-secondary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 900px) {
-  .staff-home-secondary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 719px) {
+  .staff-home-tertiary {
+    margin-top: 0;
   }
 }
 
@@ -4837,8 +4865,8 @@ a.dashboard-kpi-card {
   display: grid;
   gap: 0.12rem;
   align-content: start;
-  min-height: 3.15rem;
-  padding: 0.5rem 0.65rem;
+  min-height: 3.5rem;
+  padding: 0.7rem 0.85rem;
   border: 1px solid color-mix(in srgb, var(--elilai-forest, #394331) 12%, transparent);
   border-radius: 0.75rem;
   background: #fff;
@@ -4964,9 +4992,13 @@ a.dashboard-kpi-card {
   }
 
   .staff-home-tool-link {
-    min-height: 5.85rem;
-    padding: 0.95rem 1.05rem;
-    border-radius: 0.95rem;
+    min-height: 3.5rem;
+    padding: 0.75rem 0.9rem;
+    border-radius: 0.85rem;
+  }
+
+  .dashboard-page .staff-home-tool-link {
+    min-height: 3.5rem;
   }
 
   .staff-home-tool-label {
@@ -5727,11 +5759,6 @@ a.dashboard-kpi-card {
 }
 
 @media (min-width: 640px) {
-  .dashboard-page.staff-home-main,
-  .dashboard-page .staff-home-main {
-    width: min(calc(100% - 2rem), 64rem);
-  }
-
   .dashboard-page .staff-home-grid,
   .dashboard-page .dashboard-panels {
     grid-template-columns: 1fr 1fr;
@@ -5740,13 +5767,6 @@ a.dashboard-kpi-card {
   .dashboard-primary {
     grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
     align-items: stretch;
-  }
-}
-
-@media (min-width: 960px) {
-  .dashboard-page.staff-home-main,
-  .dashboard-page .staff-home-main {
-    width: min(calc(100% - 2rem), 72rem);
   }
 }
 
@@ -7164,21 +7184,14 @@ a.staff-home-card:focus-visible {
 /* Split earlier so tablet portrait + phone landscape keep ticket reachable */
 @media (min-width: 760px) {
   .staff-pos-page.staff-pos-page--cafe .staff-pos-layout.staff-pos-layout--cafe {
-    grid-template-columns: minmax(0, 1fr) minmax(22rem, 25.5rem);
+    grid-template-columns: minmax(0, 1fr) minmax(22rem, 24rem);
     gap: 0.55rem;
   }
 }
 
-@media (min-width: 900px) {
+@media (min-width: 1100px) {
   .staff-pos-page.staff-pos-page--cafe .staff-pos-layout.staff-pos-layout--cafe {
-    grid-template-columns: minmax(0, 1fr) minmax(24rem, 26.5rem);
-    gap: 0.6rem;
-  }
-}
-
-@media (min-width: 960px) {
-  .staff-pos-page.staff-pos-page--cafe .staff-pos-layout.staff-pos-layout--cafe {
-    grid-template-columns: minmax(0, 1fr) minmax(24.5rem, 27.5rem);
+    grid-template-columns: minmax(0, 1fr) minmax(23rem, 26rem);
     gap: 0.65rem;
   }
 }
@@ -7477,7 +7490,23 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-title-row {
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.35rem;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-head .staff-pos-section-label {
+  display: none;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  margin: 0 0 0.4rem;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-controls .staff-pos-fulfillment--pills,
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-controls .staff-pos-ticket-identity {
+  display: contents;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-title-actions {
@@ -7488,7 +7517,7 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-clear-ticket {
-  min-height: 2.25rem;
+  min-height: 2.75rem;
   padding: 0.25rem 0.5rem;
   border: 0;
   background: transparent;
@@ -7535,7 +7564,7 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-fulfill-chip {
-  min-height: 2.45rem;
+  min-height: 2.75rem;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--elilai-forest, #394331) 16%, transparent);
   background: #fff;
@@ -7579,7 +7608,7 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-identity .staff-pos-field-input {
-  min-height: 2.45rem;
+  min-height: 2.75rem;
   padding: 0.4rem 0.75rem;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--elilai-forest, #394331) 16%, transparent);
@@ -7598,7 +7627,7 @@ a.staff-home-card:focus-visible {
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-identity .staff-pos-loyalty-entry,
 .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-identity .staff-pos-loyalty-entry.is-linked {
-  min-height: 2.45rem;
+  min-height: 2.75rem;
   justify-content: center;
   text-align: center;
   padding: 0.4rem 0.5rem;
@@ -7618,10 +7647,10 @@ a.staff-home-card:focus-visible {
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-cart-line {
   display: grid;
-  grid-template-columns: 3.4rem minmax(0, 1fr);
-  gap: 0.75rem;
+  grid-template-columns: 2.75rem minmax(0, 1fr);
+  gap: 0.5rem 0.55rem;
   align-items: start;
-  padding: 0.85rem 0;
+  padding: 0.55rem 0;
   border: none;
   border-bottom: 1px solid rgba(56, 32, 16, 0.08);
   border-radius: 0;
@@ -7633,17 +7662,17 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-cart-thumb {
-  width: 3.4rem;
-  height: 3.4rem;
-  border-radius: 0.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.6rem;
   background: color-mix(in srgb, #faf7f4 80%, #fff);
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-cart-main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.55rem;
-  align-items: end;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-cart-copy {
@@ -7652,25 +7681,38 @@ a.staff-home-card:focus-visible {
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-cart-name {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   font-weight: 800;
   color: #382010;
+  line-height: 1.2;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.4rem;
+  margin-top: 0.08rem;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-cart-size {
-  margin: 0.15rem 0 0;
-  font-size: 0.75rem;
+  margin: 0;
+  font-size: 0.72rem;
   font-weight: 600;
   color: #b0a098;
 }
 
+.staff-pos-page.staff-pos-page--cafe .staff-pos-cart-temp {
+  margin: 0;
+}
+
 .staff-pos-page.staff-pos-page--cafe .staff-pos-cart-variant-trigger {
-  min-height: 2.125rem;
+  min-height: 2.5rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  margin: 0.15rem 0 0;
-  padding: 0.2rem 0.55rem;
+  gap: 0.2rem;
+  margin: 0;
+  padding: 0.15rem 0.6rem;
   border: 1px solid rgba(56, 32, 16, 0.14);
   border-radius: 999px;
   background: #fff;
@@ -7688,17 +7730,21 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-cart-amount {
-  margin: 0.35rem 0 0;
-  font-size: 0.92rem;
+  margin: 0;
+  font-size: 0.86rem;
   font-weight: 800;
   color: #382010;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-cart-actions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.35rem;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  grid-column: 1 / -1;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-cart-variant-chooser {
@@ -7706,19 +7752,19 @@ a.staff-home-card:focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
-  margin-top: 0.45rem;
-  padding-top: 0.45rem;
+  margin-top: 0.15rem;
+  padding-top: 0.4rem;
   border-top: 1px solid rgba(56, 32, 16, 0.08);
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-cart-variant-option {
-  min-height: 2.125rem;
-  padding: 0.25rem 0.65rem;
+  min-height: 2.75rem;
+  padding: 0.2rem 0.55rem;
   border: 1px solid rgba(56, 32, 16, 0.14);
   border-radius: 999px;
   background: #fff;
   color: #382010;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
   cursor: pointer;
   touch-action: manipulation;
@@ -7737,14 +7783,15 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-qty-btn {
-  width: 2.5rem;
-  height: 2.5rem;
-  min-width: 2.5rem;
-  min-height: 2.5rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
   border-radius: 999px;
   border: 1px solid rgba(56, 32, 16, 0.14);
   background: #fff;
   color: #382010;
+  font-size: 1.05rem;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-qty-btn--plus {
@@ -7753,11 +7800,16 @@ a.staff-home-card:focus-visible {
   color: #382010;
 }
 
+.staff-pos-page.staff-pos-page--cafe .staff-pos-qty {
+  min-width: 1.15rem;
+  font-size: 0.9rem;
+}
+
 .staff-pos-page.staff-pos-page--cafe .staff-pos-remove {
-  width: 2.5rem;
-  height: 2.5rem;
-  min-width: 2.5rem;
-  min-height: 2.5rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
   border-radius: 999px;
 }
 
@@ -7832,7 +7884,7 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket.is-empty .staff-pos-pay-chip {
-  min-height: 2.45rem;
+  min-height: 2.75rem;
   border-color: rgba(56, 32, 16, 0.08);
   color: #b0a098;
   font-weight: 700;
@@ -7847,7 +7899,7 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket.is-empty .staff-pos-place {
-  min-height: 2.95rem;
+  min-height: 3.1rem;
   opacity: 0.38;
   font-size: 0.95rem;
 }
@@ -7878,7 +7930,7 @@ a.staff-home-card:focus-visible {
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-pay-chip {
   box-sizing: border-box;
-  min-height: 3.35rem;
+  min-height: 2.75rem;
   width: 100%;
   min-width: 0;
   border-radius: 999px;
@@ -7908,42 +7960,20 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-split-modal .staff-pos-split {
-  margin: 0.35rem 0 0.75rem;
-}
-
-.staff-pos-page.staff-pos-page--cafe .staff-pos-split-hint {
   margin: 0;
-  color: color-mix(in srgb, #382010 72%, #b0a098);
-  font-size: 0.74rem;
-  font-weight: 650;
-  line-height: 1.35;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-split-wallets {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.4rem;
-}
-
-.staff-pos-page.staff-pos-page--cafe .staff-pos-split-field,
-.staff-pos-page.staff-pos-page--cafe .staff-pos-split-remainder {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  min-height: 2.75rem;
-  padding: 0.35rem 0.15rem;
-  font-size: 0.86rem;
-  font-weight: 700;
-}
-
-.staff-pos-page.staff-pos-page--cafe .staff-pos-split-field .staff-pos-cash-input-wrap {
-  flex: 0 1 8rem;
+  max-width: 12.5rem;
+  margin: 0.45rem 0 0;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-place {
   width: 100%;
-  min-height: 3.35rem;
+  min-height: 3.1rem;
   border-radius: 999px;
   text-transform: none;
   letter-spacing: 0;
@@ -8185,7 +8215,7 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-payment.staff-pos-tender--methods {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 @media (min-width: 900px) {
@@ -8194,7 +8224,7 @@ a.staff-home-card:focus-visible {
   }
 
   .staff-pos-page.staff-pos-page--cafe .staff-pos-payment.staff-pos-tender--methods {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -8224,15 +8254,15 @@ a.staff-home-card:focus-visible {
   padding: 1rem;
 }
 
-#cash-tender-modal {
+#cash-tender-modal, #pos-split-modal {
   z-index: 70;
 }
 
-#cash-tender-modal-bg {
+#cash-tender-modal-bg, #pos-split-modal-bg {
   background: rgba(24, 16, 12, 0.46);
 }
 
-#cash-tender-modal-container {
+#cash-tender-modal-container, #pos-split-modal-container {
   width: min(100%, 24rem);
   max-height: calc(100dvh - 2rem);
   margin-inline: auto;
@@ -8247,74 +8277,77 @@ a.staff-home-card:focus-visible {
 }
 
 @media (min-width: 760px) {
-  #cash-tender-modal .flex.min-h-full.items-center {
+  #cash-tender-modal .flex.min-h-full.items-center, #pos-split-modal .flex.min-h-full.items-center {
     align-items: flex-start;
     padding-block: 0.85rem 0.65rem;
   }
 
-  #cash-tender-modal-container {
+  #cash-tender-modal-container, #pos-split-modal-container {
     width: min(50rem, calc(100vw - 2.25rem));
     max-height: calc(100dvh - 3rem);
     padding: 1.45rem 1.55rem 1.35rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-modal {
+  #cash-tender-modal .staff-pos-cash-modal, #pos-split-modal .staff-pos-cash-modal {
     grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.35fr);
     grid-template-rows: auto 1fr;
     gap: 1.15rem 1.5rem;
     align-items: start;
   }
 
-  #cash-tender-modal .staff-pos-cash-modal-head {
+  #cash-tender-modal .staff-pos-cash-modal-head, #pos-split-modal .staff-pos-cash-modal-head {
     grid-row: 1;
     grid-column: 1;
     padding-right: 0;
   }
 
-  #cash-tender-modal .staff-pos-cash-modal-head h2 {
+  #cash-tender-modal .staff-pos-cash-modal-head h2, #pos-split-modal .staff-pos-cash-modal-head h2 {
     font-size: 1.55rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-total {
+  #cash-tender-modal .staff-pos-cash-modal > .staff-pos-cash-total,
+  #pos-split-modal .staff-pos-cash-modal > .staff-pos-cash-total {
     grid-row: 2;
     grid-column: 1;
     width: 100%;
     padding: 0.9rem 1rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-total strong {
+  #cash-tender-modal .staff-pos-cash-total strong, #pos-split-modal .staff-pos-cash-total strong {
     font-size: 1.7rem;
   }
 
-  #cash-tender-modal #pos-cash-tender-form {
+  #cash-tender-modal #pos-cash-tender-form, #pos-split-modal #pos-split-form {
     grid-row: 1 / span 2;
     grid-column: 2;
     align-content: start;
     gap: 0.7rem;
+    padding-top: 0.15rem;
+    padding-right: 1.65rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-input-wrap {
+  #cash-tender-modal .staff-pos-cash-input-wrap, #pos-split-modal .staff-pos-cash-input-wrap {
     min-height: 3.5rem;
     font-size: 1.35rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-input-wrap input {
+  #cash-tender-modal .staff-pos-cash-input-wrap input, #pos-split-modal .staff-pos-cash-input-wrap input {
     min-height: 3.3rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-quick button {
+  #cash-tender-modal .staff-pos-cash-quick button, #pos-split-modal .staff-pos-cash-quick button {
     min-height: 3.15rem;
     font-size: 0.95rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-modal-actions {
+  #cash-tender-modal .staff-pos-cash-modal-actions, #pos-split-modal .staff-pos-cash-modal-actions {
     position: static;
     grid-template-columns: minmax(0, 1fr) minmax(7.5rem, 0.45fr);
     margin: 0.15rem 0 0;
     padding: 0;
   }
 
-  #cash-tender-modal .staff-pos-cash-modal-actions .staff-pos-place {
+  #cash-tender-modal .staff-pos-cash-modal-actions .staff-pos-place, #pos-split-modal .staff-pos-cash-modal-actions .staff-pos-place {
     min-height: 3.25rem;
     font-size: 1.05rem;
   }
@@ -8375,6 +8408,7 @@ a.staff-home-card:focus-visible {
 }
 
 #pos-cash-tender-form,
+#pos-split-form,
 .staff-pos-cash-field {
   display: grid;
   gap: 0.45rem;
@@ -8438,7 +8472,8 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-cash-quick button:focus-visible,
-.staff-pos-cash-quick button:active {
+.staff-pos-cash-quick button:active,
+.staff-pos-split-wallets button.is-selected {
   border-color: var(--cs-orange);
   background: color-mix(in srgb, var(--cs-orange) 8%, #fff);
   color: var(--cs-orange);
@@ -8524,7 +8559,7 @@ a.staff-home-card:focus-visible {
 }
 
 @media (max-width: 480px) {
-  #cash-tender-modal-container {
+  #cash-tender-modal-container, #pos-split-modal-container {
     max-height: calc(100dvh - 1rem);
     padding: 0.9rem;
     padding-bottom: max(0.9rem, env(safe-area-inset-bottom));
@@ -8541,108 +8576,153 @@ a.staff-home-card:focus-visible {
 
 /* Short / landscape viewports — parity with Orders #orders-cash-tender-modal */
 @media (max-height: 560px) {
-  #cash-tender-modal .flex.min-h-full.items-center {
+  #cash-tender-modal .flex.min-h-full.items-center, #pos-split-modal .flex.min-h-full.items-center {
     align-items: flex-start;
     padding-block: 0.5rem;
   }
 
-  #cash-tender-modal-container {
+  #cash-tender-modal-container, #pos-split-modal-container {
     max-height: calc(100dvh - 1rem);
     padding: 0.75rem;
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
   }
 
-  #cash-tender-modal .staff-pos-cash-modal {
+  #cash-tender-modal .staff-pos-cash-modal, #pos-split-modal .staff-pos-cash-modal {
     gap: 0.55rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-modal-head h2 {
+  #cash-tender-modal .staff-pos-cash-modal-head h2, #pos-split-modal .staff-pos-cash-modal-head h2 {
     font-size: 1.15rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-total {
+  #cash-tender-modal .staff-pos-cash-modal > .staff-pos-cash-total,
+  #pos-split-modal .staff-pos-cash-modal > .staff-pos-cash-total {
     padding: 0.5rem 0.65rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-total strong {
+  #cash-tender-modal .staff-pos-cash-total strong, #pos-split-modal .staff-pos-cash-total strong {
     font-size: 1.15rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-input-wrap {
+  #cash-tender-modal .staff-pos-cash-input-wrap, #pos-split-modal .staff-pos-cash-input-wrap {
     min-height: 2.75rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-input-wrap input {
+  #cash-tender-modal .staff-pos-cash-input-wrap input, #pos-split-modal .staff-pos-cash-input-wrap input {
     min-height: 2.55rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-quick button {
+  #cash-tender-modal .staff-pos-cash-quick button, #pos-split-modal .staff-pos-cash-quick button {
     min-height: 2.45rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-feedback {
+  #cash-tender-modal .staff-pos-cash-feedback, #pos-split-modal .staff-pos-cash-feedback {
     min-height: 2.5rem;
     padding: 0.4rem 0.55rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-modal-actions {
+  #cash-tender-modal .staff-pos-cash-modal-actions, #pos-split-modal .staff-pos-cash-modal-actions {
     bottom: -0.75rem;
     padding-top: 0.35rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-modal-actions .staff-pos-place {
+  #cash-tender-modal .staff-pos-cash-modal-actions .staff-pos-place, #pos-split-modal .staff-pos-cash-modal-actions .staff-pos-place {
     min-height: 2.75rem;
   }
 }
 
 @media (min-width: 760px) and (max-height: 560px) {
-  #cash-tender-modal-container {
+  #cash-tender-modal-container, #pos-split-modal-container {
     width: min(52rem, calc(100vw - 1.5rem));
     max-height: calc(100dvh - 0.75rem);
     padding: 1.15rem 1.3rem;
     padding-bottom: max(1.15rem, env(safe-area-inset-bottom));
   }
 
-  #cash-tender-modal .staff-pos-cash-modal {
+  #cash-tender-modal .staff-pos-cash-modal, #pos-split-modal .staff-pos-cash-modal {
     gap: 0.85rem 1.2rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-modal-head h2 {
+  #cash-tender-modal .staff-pos-cash-modal-head h2, #pos-split-modal .staff-pos-cash-modal-head h2 {
     font-size: 1.4rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-total {
+  #cash-tender-modal .staff-pos-cash-modal > .staff-pos-cash-total,
+  #pos-split-modal .staff-pos-cash-modal > .staff-pos-cash-total {
     padding: 0.75rem 0.85rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-total strong {
+  #cash-tender-modal .staff-pos-cash-total strong, #pos-split-modal .staff-pos-cash-total strong {
     font-size: 1.5rem;
   }
 
-  #cash-tender-modal #pos-cash-tender-form {
+  #cash-tender-modal #pos-cash-tender-form, #pos-split-modal #pos-split-form {
     gap: 0.55rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-input-wrap {
+  #cash-tender-modal .staff-pos-cash-input-wrap, #pos-split-modal .staff-pos-cash-input-wrap {
     min-height: 3.25rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-input-wrap input {
+  #cash-tender-modal .staff-pos-cash-input-wrap input, #pos-split-modal .staff-pos-cash-input-wrap input {
     min-height: 3.05rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-quick button {
+  #cash-tender-modal .staff-pos-cash-quick button, #pos-split-modal .staff-pos-cash-quick button {
     min-height: 2.95rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-feedback {
+  #cash-tender-modal .staff-pos-cash-feedback, #pos-split-modal .staff-pos-cash-feedback {
     min-height: 2.75rem;
     padding: 0.45rem 0.6rem;
   }
 
-  #cash-tender-modal .staff-pos-cash-modal-actions .staff-pos-place {
+  #cash-tender-modal .staff-pos-cash-modal-actions .staff-pos-place, #pos-split-modal .staff-pos-cash-modal-actions .staff-pos-place {
     min-height: 3.1rem;
   }
+}
+
+
+@media (min-width: 760px) {
+  #pos-split-modal .staff-pos-cash-modal {
+    grid-template-rows: auto auto 1fr;
+  }
+
+  #pos-split-modal .staff-pos-split {
+    grid-row: 3;
+    grid-column: 1;
+    display: grid;
+    gap: 0.55rem;
+    margin: 0;
+    width: 100%;
+  }
+
+  #pos-split-modal #pos-split-form {
+    grid-row: 1 / span 3;
+  }
+
+  #pos-split-modal .staff-pos-split-wallets {
+    max-width: 12.5rem;
+    margin: 0.55rem 0 0;
+  }
+
+  #pos-split-modal .staff-pos-split-wallets button {
+    min-height: 2.45rem;
+    font-size: 0.82rem;
+  }
+}
+
+.staff-pos-split-cue {
+  margin: 0;
+  color: color-mix(in srgb, var(--cs-brown) 68%, var(--cs-beige));
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.staff-pos-split {
+  display: grid;
+  gap: 0.55rem;
 }
 
 .staff-pos-page .staff-pos-size-picker-head {
@@ -9523,6 +9603,11 @@ a.staff-home-card:focus-visible {
   cursor: pointer;
 }
 
+.staff-pos-page.staff-pos-page--cafe .staff-pos-notes-toggle {
+  min-height: 2.75rem;
+  font-size: 0.8rem;
+}
+
 .staff-pos-page .staff-pos-cash-chips {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -9932,6 +10017,7 @@ a.staff-home-card:focus-visible {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 @media (max-width: 759px) and (orientation: portrait) {
@@ -9968,7 +10054,7 @@ a.staff-home-card:focus-visible {
 
   .staff-pos-page.staff-pos-page--cafe .staff-pos-cart-variant-trigger,
   .staff-pos-page.staff-pos-page--cafe .staff-pos-cart-variant-option {
-    min-height: 2.5rem;
+    min-height: 2.75rem;
   }
 }
 
@@ -10033,8 +10119,8 @@ a.staff-home-card:focus-visible {
   }
 
   .staff-pos-page.staff-pos-page--cafe .staff-pos-fulfill-chip {
-    min-height: 2.25rem;
-    font-size: 0.8rem;
+    min-height: 2.75rem;
+    font-size: 0.82rem;
   }
 
   .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-footer {
@@ -10049,11 +10135,11 @@ a.staff-home-card:focus-visible {
   }
 
   .staff-pos-page.staff-pos-page--cafe .staff-pos-pay-chip {
-    min-height: 2.85rem;
+    min-height: 2.75rem;
   }
 
   .staff-pos-page.staff-pos-page--cafe .staff-pos-place {
-    min-height: 2.85rem;
+    min-height: 3.1rem;
   }
 
   .staff-pos-page.staff-pos-page--cafe .staff-pos-product-card-media {
@@ -12166,9 +12252,9 @@ body:has(.staff-nav-drawer.is-open) {
   }
 
   .staff-app .staff-home-tool-link {
-    min-height: 5.85rem;
-    padding: 0.95rem 1.05rem;
-    border-radius: 0.95rem;
+    min-height: 3.5rem;
+    padding: 0.75rem 0.9rem;
+    border-radius: 0.85rem;
   }
 
   .staff-app .staff-home-tertiary .staff-home-tool-link {

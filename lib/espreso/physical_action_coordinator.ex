@@ -485,7 +485,7 @@ defmodule Espreso.PhysicalActionCoordinator do
 
     case Orders.mark_paid_with_transition(%Order{id: order_id}, mark_paid_opts) do
       {:ok, :transitioned, order} ->
-        order = Repo.preload(order, :items)
+        order = preload_for_receipt(order)
 
         dispatch_mark_paid_receipt(
           state,
@@ -1015,7 +1015,7 @@ defmodule Espreso.PhysicalActionCoordinator do
       order.payment_status != "paid" -> {:error, :order_not_paid}
       order.status not in @receipt_reprint_statuses -> {:error, :order_not_eligible}
       not Printer.enabled?() -> {:error, :printer_disabled}
-      true -> {:ok, Repo.preload(order, :items)}
+      true -> {:ok, preload_for_receipt(order)}
     end
   end
 
@@ -1046,10 +1046,14 @@ defmodule Espreso.PhysicalActionCoordinator do
     end
   end
 
+  defp preload_for_receipt(%Order{} = order) do
+    Repo.preload(order, [:items, :payment_splits])
+  end
+
   defp paid_order_with_items(order_id) do
     case Repo.get(Order, order_id) do
       nil -> {:error, :order_not_found}
-      %Order{payment_status: "paid"} = order -> {:ok, Repo.preload(order, :items)}
+      %Order{payment_status: "paid"} = order -> {:ok, preload_for_receipt(order)}
       %Order{} -> {:error, :order_not_paid}
     end
   end

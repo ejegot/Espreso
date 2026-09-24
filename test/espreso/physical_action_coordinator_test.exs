@@ -927,6 +927,40 @@ defmodule Espreso.PhysicalActionCoordinatorTest do
     refute_receive {:unexpected_drawer, _}
   end
 
+  test "reprint receipt payload includes GCash and cash split lines" do
+    parent = self()
+
+    start_coordinator(fn order, _opts ->
+      send(parent, {:receipt_text, Espreso.Printer.Receipt.build(order)})
+      :dispatched
+    end)
+
+    order = paid_order!()
+
+    {:ok, _} =
+      Repo.insert(%Espreso.Orders.PaymentSplit{
+        order_id: order.id,
+        paid_via: "cash",
+        amount: Decimal.new("25")
+      })
+
+    {:ok, _} =
+      Repo.insert(%Espreso.Orders.PaymentSplit{
+        order_id: order.id,
+        paid_via: "gcash",
+        amount: Decimal.new("50")
+      })
+
+    permit = permit_for(order.id, :receipt_reprint)
+
+    assert {:dispatched, _next} = execute(order.id, :receipt_reprint, permit)
+    assert_receive {:receipt_text, receipt}
+    assert receipt =~ "Cash"
+    assert receipt =~ "GCash"
+    assert receipt =~ "P25.00"
+    assert receipt =~ "P50.00"
+  end
+
   test "settle_physical cash path mirrors mark paid client handoff without resettling" do
     start_coordinator_with(
       dispatch_receipt: fn _order, _opts -> {:client_dispatch, "R"} end,

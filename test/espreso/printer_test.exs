@@ -201,6 +201,20 @@ defmodule Espreso.PrinterTest do
     assert receipt =~ "Change"
   end
 
+  test "Maya receipt prints Maya once" do
+    order = %Order{
+      number: "CS-MAYA1",
+      paid_via: "maya",
+      total: Decimal.new("180"),
+      items: []
+    }
+
+    receipt = Receipt.build(order)
+    assert receipt =~ "Maya"
+    refute receipt =~ "GCash"
+    refute receipt =~ "Tendered"
+  end
+
   test "non-cash receipt prints the wallet once" do
     order = %Order{
       number: "CS-GCASH1",
