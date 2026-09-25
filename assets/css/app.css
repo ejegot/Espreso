@@ -4185,6 +4185,23 @@ body:has(.menu-page-locked) {
   text-transform: uppercase;
 }
 
+.dashboard-date-pill strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.dashboard-status-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: #3d6b45;
+}
+
+.dashboard-date-pill.is-live {
+  border-color: color-mix(in srgb, #3d6b45 28%, var(--dash-line));
+}
+
 .dashboard-kpi-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4199,15 +4216,16 @@ body:has(.menu-page-locked) {
 }
 
 .dashboard-kpi-card {
+  position: relative;
   display: grid;
   align-content: start;
   gap: 0.15rem;
   min-height: 4.6rem;
-  padding: 0.85rem 0.95rem;
+  padding: 0.85rem 2.85rem 0.85rem 0.95rem;
   border: 1px solid var(--dash-line);
   border-radius: 0.85rem;
   background: #fff;
-  box-shadow: 0 6px 16px color-mix(in srgb, var(--dash-forest) 6%, transparent);
+  box-shadow: none;
 }
 
 a.dashboard-kpi-card {
@@ -4225,16 +4243,47 @@ a.dashboard-kpi-card {
 }
 
 .dashboard-kpi-icon {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
   display: grid;
   width: 2rem;
   height: 2rem;
   place-items: center;
-  margin-bottom: 0.35rem;
+  margin: 0;
   border-radius: 0.55rem;
   background: color-mix(in srgb, var(--dash-forest) 10%, #fff);
-  color: var(--dash-forest);
-  font-size: 0.85rem;
-  font-weight: 800;
+  color: inherit;
+}
+
+.staff-home-card-glyph {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.dashboard-kpi-card--sage .dashboard-kpi-icon {
+  background: #e7eee4;
+  color: #394331;
+}
+
+.dashboard-kpi-card--clay .dashboard-kpi-icon {
+  background: #f3e4dc;
+  color: #8a4a32;
+}
+
+.dashboard-kpi-card--sand .dashboard-kpi-icon {
+  background: #f1ead7;
+  color: #8b6914;
+}
+
+.dashboard-kpi-card--leaf .dashboard-kpi-icon {
+  background: #deeadc;
+  color: #35503a;
+}
+
+.dashboard-kpi-card--moss .dashboard-kpi-icon {
+  background: #e4ebe0;
+  color: var(--dash-forest, #394331);
 }
 
 .dashboard-kpi-card .staff-home-card-title {
@@ -4243,7 +4292,7 @@ a.dashboard-kpi-card {
 
 .dashboard-kpi-value {
   margin: 0.15rem 0 0;
-  color: var(--dash-forest);
+  color: inherit;
   font-size: 1.45rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -4382,9 +4431,9 @@ a.dashboard-kpi-card {
 }
 
 .dashboard-launch-btn {
-  display: grid;
-  gap: 0.12rem;
-  align-content: center;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   min-height: 3.5rem;
   padding: 0.75rem 0.9rem;
   border: 1px solid var(--dash-line);
@@ -4395,10 +4444,33 @@ a.dashboard-kpi-card {
   touch-action: manipulation;
 }
 
+.dashboard-launch-mark {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--dash-forest) 12%, #fff);
+  color: var(--dash-forest);
+}
+
+.dashboard-launch-copy {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+  flex: 1;
+}
+
 .dashboard-launch-btn.staff-home-pos-cta--primary {
   min-height: 3.85rem;
   border-color: var(--dash-forest);
   background: var(--dash-forest);
+  color: #fff;
+}
+
+.dashboard-launch-btn.staff-home-pos-cta--primary .dashboard-launch-mark {
+  background: color-mix(in srgb, #000 16%, var(--dash-forest));
   color: #fff;
 }
 
@@ -4496,8 +4568,8 @@ a.dashboard-kpi-card {
 }
 
 .staff-home-pos-cta--secondary {
-  border-color: color-mix(in srgb, var(--dash-forest, #394331) 18%, transparent);
-  background: #fff;
+  border-color: color-mix(in srgb, #394331 16%, transparent);
+  background: #e4ebe0;
 }
 
 .dashboard-staff-note {
@@ -4887,11 +4959,12 @@ a.dashboard-kpi-card {
 }
 
 .staff-home-tool-link {
+  position: relative;
   display: grid;
   gap: 0.12rem;
   align-content: start;
   min-height: 3.5rem;
-  padding: 0.7rem 0.85rem;
+  padding: 0.7rem 2.85rem 0.7rem 0.85rem;
   border: 1px solid color-mix(in srgb, var(--elilai-forest, #394331) 12%, transparent);
   border-radius: 0.75rem;
   background: #fff;
@@ -4899,6 +4972,19 @@ a.dashboard-kpi-card {
   text-decoration: none;
   box-shadow: none;
   transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.staff-home-tool-icon {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, var(--elilai-forest, #394331) 10%, #fff);
+  color: inherit;
 }
 
 .staff-home-tool-link:hover,
@@ -4909,8 +4995,43 @@ a.dashboard-kpi-card {
 }
 
 .staff-home-tool-link--attention {
-  border-color: color-mix(in srgb, var(--cs-orange, #f85020) 30%, transparent);
-  background: color-mix(in srgb, var(--cs-orange, #f85020) 6%, #fff);
+  border-color: color-mix(in srgb, #8a4a32 22%, transparent);
+  background: #f3e4dc;
+  color: #6b3a2c;
+}
+
+.staff-home-tool-link--attention .staff-home-tool-icon {
+  background: #e8cfc4;
+}
+
+.staff-home-tool-link--attention:hover,
+.staff-home-tool-link--attention:focus-visible {
+  background: color-mix(in srgb, #8a4a32 12%, #f3e4dc);
+}
+
+.staff-home-tool-link--open {
+  border-color: color-mix(in srgb, #5a6b4f 18%, transparent);
+  background: #e4ebe0;
+  color: #394331;
+}
+
+.staff-home-tool-link--open .staff-home-tool-icon {
+  background: #d3ddd0;
+}
+
+.staff-home-tool-link--open:hover,
+.staff-home-tool-link--open:focus-visible {
+  background: color-mix(in srgb, #5a6b4f 10%, #e4ebe0);
+}
+
+.staff-home-tool-link--shifts {
+  border-color: color-mix(in srgb, #5c5340 16%, transparent);
+  background: #f1ead7;
+  color: #5c5340;
+}
+
+.staff-home-tool-link--shifts .staff-home-tool-icon {
+  background: #e4d7b8;
 }
 
 .staff-home-tool-link--close {
@@ -7941,9 +8062,9 @@ a.staff-home-card:focus-visible {
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-payment.staff-pos-tender--methods,
 .staff-pos-page.staff-pos-page--cafe .staff-pos-tender--methods {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.4rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   max-width: none;
   box-sizing: border-box;
@@ -7951,6 +8072,73 @@ a.staff-home-card:focus-visible {
   padding: 0;
   border: none;
   background: transparent;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-place-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3.1rem;
+  gap: 0.35rem;
+  align-items: stretch;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-place-menu {
+  display: grid;
+  place-items: center;
+  min-height: 3.1rem;
+  padding: 0;
+  border: 1px solid var(--cs-orange, #f85020);
+  border-radius: 999px;
+  background: var(--cs-orange, #f85020);
+  color: #fff;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-place-menu:disabled,
+.staff-pos-page.staff-pos-page--cafe .staff-pos-place-menu.is-disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-place-menu .staff-pos-pay-trigger-chevron {
+  border-color: currentColor;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-tender--methods.is-open .staff-pos-place-menu .staff-pos-pay-trigger-chevron {
+  transform: rotate(-135deg) translateY(-0.05rem);
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-pay-trigger-chevron {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-0.1rem);
+  opacity: 0.85;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-tender--methods.is-open .staff-pos-pay-trigger-chevron {
+  transform: rotate(-135deg) translateY(-0.05rem);
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-pay-menu {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 0.4rem);
+  z-index: 24;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+  padding: 0.4rem;
+  border: 1px solid color-mix(in srgb, var(--elilai-forest, #394331) 16%, transparent);
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 10px 28px color-mix(in srgb, #382010 14%, transparent);
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-pay-menu.is-open {
+  display: grid;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-pay-chip {
@@ -8236,20 +8424,20 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-page .staff-pos-payment.staff-pos-tender--methods {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-payment.staff-pos-tender--methods {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 @media (min-width: 900px) {
   .staff-pos-page .staff-pos-payment.staff-pos-tender--methods {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .staff-pos-page.staff-pos-page--cafe .staff-pos-payment.staff-pos-tender--methods {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

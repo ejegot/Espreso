@@ -434,7 +434,8 @@ defmodule EspresoWeb.StaffAuthTest do
     assert render(barista_view) =~ ~r/Good (morning|afternoon|evening), /
     assert has_element?(barista_view, "#staff-home-pos", "Open POS")
     assert has_element?(barista_view, "#staff-home-orders", "Orders")
-    assert has_element?(barista_view, "#staff-home-unpaid", "Unpaid")
+    assert has_element?(barista_view, "#staff-home-kpi-unpaid", "Unpaid")
+    assert has_element?(barista_view, "#staff-home-open-shop", "Open shop")
     assert has_element?(barista_view, "#staff-home-my-shifts", "My shifts")
     refute has_element?(barista_view, "#staff-home-dashboard")
     refute has_element?(barista_view, "#staff-home-today")
@@ -450,6 +451,8 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(manager_view, "#staff-home-today")
     assert has_element?(manager_view, "#staff-home-pos", "Open POS")
     assert has_element?(manager_view, "#staff-home-orders", "Orders")
+    assert has_element?(manager_view, "#staff-home-open-shop", "Open shop")
+    refute has_element?(manager_view, "#staff-home-my-shifts")
     refute has_element?(manager_view, "#staff-home-dashboard")
     refute has_element?(manager_view, "#staff-home-availability")
     refute has_element?(manager_view, "#staff-home-close")

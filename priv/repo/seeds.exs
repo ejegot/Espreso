@@ -260,7 +260,7 @@ food_products = [
   {"Big Assorted Muffin", [{nil, "99"}]},
   # Cakes / Breads
   {"Dark Choco Dream Cake", [{nil, "229"}]},
-  {"Choco Chip Cookies", [{nil, "65"}]},
+  {"Choco Chip Cookies", [{nil, "75"}]},
   {"BNN Moist Slice", [{nil, "75"}]},
   {"Choco Moist Slice", [{nil, "75"}]},
   {"Carrot Moist Slice", [{nil, "75"}]},

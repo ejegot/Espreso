@@ -1797,11 +1797,13 @@ defmodule EspresoWeb.StaffPosLiveTest do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
     assert has_element?(view, "#pos-pay-cash.is-active", "Cash")
-    assert has_element?(view, ".staff-pos-section-label", "Payment method")
+    assert has_element?(view, "#pos-payment-method-label", "Process Cash Order")
+    refute has_element?(view, ".staff-pos-section-label", "Payment method")
     assert has_element?(view, "#pos-place-order", "Process Cash Order")
     refute has_element?(view, "#pos-wallet-confirmation-cue")
     refute has_element?(view, "#pos-pay-later")
     assert has_element?(view, "#pos-pay-maya", "Maya")
+    refute has_element?(view, "#pos-payment-method-menu.is-open")
     refute has_element?(view, "#pos-cash-helper")
 
     view |> element("#pos-product-#{espresso.id}") |> render_click()
@@ -1823,6 +1825,25 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-place-order", "Process Cash Order")
   end
 
+  test "POS process chevron opens payment choices and updates the Process label", %{
+    conn: conn,
+    barista: barista
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    assert has_element?(view, "#pos-place-order", "Process Cash Order")
+    refute has_element?(view, "#pos-payment-method-menu.is-open")
+
+    view |> element("#pos-payment-method") |> render_click()
+    assert has_element?(view, "#pos-payment-method-menu.is-open")
+
+    view |> element("#pos-pay-maya") |> render_click()
+    assert has_element?(view, "#pos-payment-method-label", "Confirm Maya & Process")
+    assert has_element?(view, "#pos-pay-maya.is-active", "Maya")
+    refute has_element?(view, "#pos-payment-method-menu.is-open")
+    assert has_element?(view, "#pos-place-order", "Confirm Maya & Process")
+  end
+
   test "POS GCash acknowledgement remains a single paid-order submission", %{
     conn: conn,
     barista: barista,
@@ -1842,6 +1863,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> element("#pos-pay-gcash") |> render_click()
 
     assert has_element?(view, "#pos-pay-gcash.is-active", "GCash")
+    assert has_element?(view, "#pos-place-order", "Confirm GCash & Process")
+    refute has_element?(view, "#pos-payment-method-menu.is-open")
 
     assert has_element?(
              view,
@@ -1920,6 +1943,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> element("#pos-product-#{espresso.id}") |> render_click()
     view |> element("#pos-pay-split") |> render_click()
     assert has_element?(view, "#pos-pay-split.is-active", "Split")
+    assert has_element?(view, "#pos-place-order", "Enter Split")
     assert has_element?(view, "#pos-split-modal")
     assert has_element?(view, "#pos-split-modal-container")
     assert has_element?(view, "#pos-split-fields")
@@ -2543,7 +2567,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(home, "#staff-home-identity")
     assert has_element?(home, "#staff-home-orders", "Orders")
     assert has_element?(home, "#staff-home-pos", "Open POS")
-    assert has_element?(home, "#staff-home-unpaid", "Unpaid")
+    assert has_element?(home, "#staff-home-open-shop", "Open shop")
     assert has_element?(home, "#staff-notif-toggle")
     refute has_element?(home, "#staff-home-shop-status")
     refute has_element?(home, "#staff-home-today")

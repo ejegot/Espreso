@@ -143,9 +143,13 @@ defmodule EspresoWeb.StaffHomeLive do
               <span class="dashboard-pill-label">Shop day</span>
               <strong>{Calendar.strftime(@shop_date, "%a %b %d")}</strong>
             </span>
-            <span class="dashboard-date-pill">
+            <span class={["dashboard-date-pill", @shop_day_status == :open && "is-live"]}>
               <span class="dashboard-pill-label">Status</span>
-              <strong>{shop_day_status_label(@shop_day_status)}</strong>
+              <strong>
+                <span :if={@shop_day_status == :open} class="dashboard-status-dot" aria-hidden="true">
+                </span>
+                {shop_day_status_label(@shop_day_status)}
+              </strong>
             </span>
           </div>
         </header>
@@ -173,28 +177,40 @@ defmodule EspresoWeb.StaffHomeLive do
 
         <section class="dashboard-kpi-grid" id="staff-home-kpis" aria-label="Key numbers">
           <%= if @money? do %>
-            <article class="dashboard-kpi-card" id="dashboard-panel-sales">
+            <article class="dashboard-kpi-card dashboard-kpi-card--leaf" id="dashboard-panel-sales">
+              <span class="dashboard-kpi-icon" aria-hidden="true">
+                <.icon name="hero-banknotes" class="staff-home-card-glyph" />
+              </span>
               <span class="staff-home-card-title">Paid today</span>
               <strong class="dashboard-kpi-value">
                 {Menu.format_price(@sales.todays_paid_total)}
               </strong>
               <span class="staff-home-card-body dashboard-kpi-hint">{sales_body(@sales)}</span>
             </article>
-            <article class="dashboard-kpi-card" id="dashboard-kpi-tickets">
+            <article class="dashboard-kpi-card dashboard-kpi-card--sage" id="dashboard-kpi-tickets">
+              <span class="dashboard-kpi-icon" aria-hidden="true">
+                <.icon name="hero-check-circle" class="staff-home-card-glyph" />
+              </span>
               <span class="staff-home-card-title">Paid tickets</span>
               <strong class="dashboard-kpi-value">{@sales.todays_paid_count}</strong>
               <span class="dashboard-kpi-hint">Settled this shop day</span>
             </article>
-            <article class="dashboard-kpi-card" id="dashboard-kpi-cash">
+            <article class="dashboard-kpi-card dashboard-kpi-card--sand" id="dashboard-kpi-cash">
+              <span class="dashboard-kpi-icon" aria-hidden="true">
+                <.icon name="hero-banknotes" class="staff-home-card-glyph" />
+              </span>
               <span class="staff-home-card-title">Cash</span>
               <strong class="dashboard-kpi-value">{Menu.format_price(cash_today(@breakdown))}</strong>
               <span class="dashboard-kpi-hint">Of paid mix</span>
             </article>
             <.link
               navigate={~p"/staff/reports"}
-              class="dashboard-kpi-card"
+              class="dashboard-kpi-card dashboard-kpi-card--moss"
               id="dashboard-panel-reports"
             >
+              <span class="dashboard-kpi-icon" aria-hidden="true">
+                <.icon name="hero-chart-bar" class="staff-home-card-glyph" />
+              </span>
               <span class="staff-home-card-title">Reports</span>
               <strong class="dashboard-kpi-value">
                 {Menu.format_price(@reports_overview.period_paid_total)}
@@ -204,22 +220,34 @@ defmodule EspresoWeb.StaffHomeLive do
               </span>
             </.link>
           <% else %>
-            <article class="dashboard-kpi-card" id="staff-home-kpi-active">
+            <article class="dashboard-kpi-card dashboard-kpi-card--sage" id="staff-home-kpi-active">
+              <span class="dashboard-kpi-icon" aria-hidden="true">
+                <.icon name="hero-user-group" class="staff-home-card-glyph" />
+              </span>
               <span class="staff-home-card-title">Active</span>
               <strong class="dashboard-kpi-value">{@overview.active_count}</strong>
               <span class="dashboard-kpi-hint">Received + preparing</span>
             </article>
-            <article class="dashboard-kpi-card" id="staff-home-kpi-unpaid">
+            <article class="dashboard-kpi-card dashboard-kpi-card--clay" id="staff-home-kpi-unpaid">
+              <span class="dashboard-kpi-icon" aria-hidden="true">
+                <.icon name="hero-exclamation-triangle" class="staff-home-card-glyph" />
+              </span>
               <span class="staff-home-card-title">Unpaid</span>
               <strong class="dashboard-kpi-value">{@overview.unpaid_active_count}</strong>
               <span class="dashboard-kpi-hint">Still open on the board</span>
             </article>
-            <article class="dashboard-kpi-card" id="staff-home-kpi-preparing">
+            <article class="dashboard-kpi-card dashboard-kpi-card--sand" id="staff-home-kpi-preparing">
+              <span class="dashboard-kpi-icon" aria-hidden="true">
+                <.icon name="hero-clock" class="staff-home-card-glyph" />
+              </span>
               <span class="staff-home-card-title">Preparing</span>
               <strong class="dashboard-kpi-value">{@overview.preparing_count}</strong>
               <span class="dashboard-kpi-hint">In progress</span>
             </article>
-            <article class="dashboard-kpi-card" id="staff-home-kpi-tickets">
+            <article class="dashboard-kpi-card dashboard-kpi-card--leaf" id="staff-home-kpi-tickets">
+              <span class="dashboard-kpi-icon" aria-hidden="true">
+                <.icon name="hero-document-text" class="staff-home-card-glyph" />
+              </span>
               <span class="staff-home-card-title">Tickets</span>
               <strong class="dashboard-kpi-value">{@overview.todays_count}</strong>
               <span class="dashboard-kpi-hint">Placed this shop day</span>
@@ -234,8 +262,13 @@ defmodule EspresoWeb.StaffHomeLive do
             class={["dashboard-launch-btn", item[:class]]}
             id={"staff-home-#{item.id}"}
           >
-            <span class="dashboard-launch-title">{item.title}</span>
-            <span class="dashboard-launch-body">{item.body}</span>
+            <span :if={item[:icon]} class="dashboard-launch-mark" aria-hidden="true">
+              <.icon name={item.icon} class="staff-home-card-glyph" />
+            </span>
+            <span class="dashboard-launch-copy">
+              <span class="dashboard-launch-title">{item.title}</span>
+              <span class="dashboard-launch-body">{item.body}</span>
+            </span>
           </.link>
         </section>
 
@@ -386,6 +419,9 @@ defmodule EspresoWeb.StaffHomeLive do
               class={["staff-home-tool-link", item[:class]]}
               id={"staff-home-#{item.id}"}
             >
+              <span :if={item[:icon]} class="staff-home-tool-icon" aria-hidden="true">
+                <.icon name={item.icon} class="staff-home-card-glyph" />
+              </span>
               <span class="staff-home-tool-label">
                 {item.title}
                 <span
@@ -405,6 +441,9 @@ defmodule EspresoWeb.StaffHomeLive do
               class={["staff-home-tool-link", "staff-home-tool-link--quiet", item[:class]]}
               id={"staff-home-#{item.id}"}
             >
+              <span :if={item[:icon]} class="staff-home-tool-icon" aria-hidden="true">
+                <.icon name={item.icon} class="staff-home-card-glyph" />
+              </span>
               <span class="staff-home-tool-label">{item.title}</span>
               <span class="staff-home-tool-body">{item.body}</span>
             </.link>
@@ -570,6 +609,7 @@ defmodule EspresoWeb.StaffHomeLive do
         path: ~p"/pos",
         cta: "Open POS →",
         class: "staff-home-pos-cta--primary",
+        icon: "hero-plus",
         show?: Authorization.can?(user, :orders)
       },
       %{
@@ -580,6 +620,7 @@ defmodule EspresoWeb.StaffHomeLive do
         path: ~p"/orders",
         cta: "Open Orders →",
         class: "staff-home-pos-cta--secondary",
+        icon: "hero-clipboard-document-list",
         show?: Authorization.can?(user, :orders)
       }
     ]
@@ -587,17 +628,16 @@ defmodule EspresoWeb.StaffHomeLive do
   end
 
   defp desk_tools(%User{} = user, _overview) do
-    unpaid_count = Orders.count_todays_unpaid()
-
     [
       %{
-        id: "unpaid",
-        title: "Unpaid",
-        body: "Confirm counter & QR",
-        path: ~p"/orders?unpaid=1",
-        count: unpaid_count,
-        show?: Authorization.can?(user, :orders),
-        class: "staff-home-tool-link--attention"
+        id: "open-shop",
+        title: "Open shop",
+        body: "Count the drawer before selling",
+        path: ~p"/staff/open",
+        count: nil,
+        show?: Shifts.can_access_open?(user),
+        class: "staff-home-tool-link--open",
+        icon: "hero-lock-open"
       },
       %{
         id: "my-shifts",
@@ -605,7 +645,9 @@ defmodule EspresoWeb.StaffHomeLive do
         body: "Time In, Time Out & sales",
         path: ~p"/staff/shifts",
         count: nil,
-        show?: user.role == "barista"
+        show?: user.role == "barista",
+        class: "staff-home-tool-link--shifts",
+        icon: "hero-calendar-days"
       }
     ]
     |> Enum.filter(& &1.show?)

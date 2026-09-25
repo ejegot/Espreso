@@ -52,6 +52,7 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
     assert has_element?(manager_view, "#staff-home-drawer", "Expected")
     refute has_element?(manager_view, "#staff-home-drawer-variance")
     assert has_element?(manager_view, "#staff-home-drawer-close", "Close shift")
+    assert has_element?(manager_view, "#staff-home-open-shop", "Open shop")
     refute has_element?(manager_view, "#staff-home-shop-open")
     refute has_element?(manager_view, "#staff-home-close")
     refute has_element?(manager_view, "#staff-home-today-barista")
@@ -70,8 +71,10 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
     assert has_element?(barista_view, "#staff-home-kpi-active")
     assert has_element?(barista_view, "#staff-home-pos", "Open POS")
     assert has_element?(barista_view, "#staff-home-orders", "Orders")
-    assert has_element?(barista_view, "#staff-home-unpaid", "Unpaid")
+    assert has_element?(barista_view, "#staff-home-kpi-unpaid", "Unpaid")
+    assert has_element?(barista_view, "#staff-home-open-shop", "Open shop")
     assert has_element?(barista_view, "#staff-home-my-shifts", "My shifts")
+    refute has_element?(barista_view, "#staff-home-unpaid")
 
     assert {:ok, _} = Shifts.record_close(manager, %{counted_cash: "75"})
 
@@ -119,7 +122,7 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
     refute has_element?(view, "#dashboard-panel-transactions")
   end
 
-  test "unpaid badge shows today's unpaid count and updates after mark_paid", %{conn: conn} do
+  test "unpaid KPI shows today's unpaid count and updates after mark_paid", %{conn: conn} do
     {:ok, barista} =
       Accounts.register_user(%{
         name: "Home Unpaid Bar",
@@ -171,20 +174,19 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
 
     {:ok, view, _html} = live(staff_conn, ~p"/staff")
 
-    assert has_element?(view, "#staff-home-unpaid", "Unpaid")
-    assert has_element?(view, "#staff-home-unpaid .staff-home-inline-count", "1")
+    assert has_element?(view, "#staff-home-kpi-unpaid", "Unpaid")
+    assert has_element?(view, "#staff-home-kpi-unpaid .dashboard-kpi-value", "1")
+    refute has_element?(view, "#staff-home-unpaid")
 
     {:ok, _} = Orders.mark_paid(unpaid, paid_via: "cash")
 
     wait_for_home_reload(view)
 
-    html_after = render(view)
-    assert has_element?(view, "#staff-home-unpaid", "Unpaid")
-    refute has_element?(view, "#staff-home-unpaid .staff-home-inline-count")
-    refute html_after =~ "staff-home-inline-count"
+    assert has_element?(view, "#staff-home-kpi-unpaid", "Unpaid")
+    assert has_element?(view, "#staff-home-kpi-unpaid .dashboard-kpi-value", "0")
   end
 
-  test "unpaid badge stays empty when there are no unpaid orders", %{conn: conn} do
+  test "unpaid KPI is zero when there are no unpaid orders", %{conn: conn} do
     {:ok, barista} =
       Accounts.register_user(%{
         name: "Home Zero Bar",
@@ -200,8 +202,9 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
 
     {:ok, view, _html} = live(staff_conn, ~p"/staff")
 
-    assert has_element?(view, "#staff-home-unpaid", "Unpaid")
-    refute has_element?(view, "#staff-home-unpaid .staff-home-inline-count")
+    assert has_element?(view, "#staff-home-kpi-unpaid", "Unpaid")
+    assert has_element?(view, "#staff-home-kpi-unpaid .dashboard-kpi-value", "0")
+    refute has_element?(view, "#staff-home-unpaid")
   end
 
   defp wait_for_home_reload(view) do

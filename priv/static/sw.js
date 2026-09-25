@@ -1,4 +1,4 @@
-const STATIC_CACHE = "elilai-static-v2"
+const STATIC_CACHE = "elilai-static-v5"
 const STATIC_CACHE_PREFIX = "elilai-static-"
 const ALLOWED_PREFIXES = ["/assets/", "/fonts/"]
 const ALLOWED_EXACT_PATHS = [

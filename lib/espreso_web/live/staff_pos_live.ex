@@ -44,6 +44,7 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:table_number, "")
      |> assign(:payment_choice, :paid)
      |> assign(:paid_via, "cash")
+     |> assign(:payment_methods_open?, false)
      |> assign(:split_cash, "")
      |> assign(:split_wallet, "gcash")
      |> assign(:split_open?, false)
@@ -162,6 +163,8 @@ defmodule EspresoWeb.StaffPosLive do
              "set_notes",
              "set_fulfillment",
              "set_payment_method",
+             "toggle_payment_methods",
+             "close_payment_methods",
              "set_payment_choice",
              "set_paid_via",
              "open_order_review",
@@ -598,12 +601,21 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:table_number, "")}
   end
 
+  def handle_event("toggle_payment_methods", _params, socket) do
+    {:noreply, assign(socket, :payment_methods_open?, !socket.assigns.payment_methods_open?)}
+  end
+
+  def handle_event("close_payment_methods", _params, socket) do
+    {:noreply, assign(socket, :payment_methods_open?, false)}
+  end
+
   def handle_event("set_payment_method", %{"method" => paid_via}, socket)
       when paid_via in ["cash", "gcash", "maya", "split"] do
     {:noreply,
      socket
      |> assign(:payment_choice, :paid)
      |> assign(:paid_via, paid_via)
+     |> assign(:payment_methods_open?, false)
      |> assign(:cash_tendered, "")
      |> assign(:cash_tender_error, nil)
      |> then(fn socket ->
@@ -1545,76 +1557,96 @@ defmodule EspresoWeb.StaffPosLive do
                       </div>
                     </div>
 
-                    <p class="staff-pos-section-label">Payment method</p>
                     <div
-                      class="staff-pos-payment staff-pos-tender staff-pos-tender--methods"
+                      class={[
+                        "staff-pos-payment staff-pos-tender staff-pos-tender--methods",
+                        @payment_methods_open? && "is-open"
+                      ]}
                       id="pos-payment-methods"
-                      role="radiogroup"
-                      aria-label="Payment method"
+                      phx-click-away="close_payment_methods"
                     >
-                      <button
-                        type="button"
-                        class={[
-                          "staff-pos-pay-chip",
-                          @payment_choice == :paid and @paid_via == "cash" && "is-active"
-                        ]}
-                        id="pos-pay-cash"
-                        phx-click="set_payment_method"
-                        phx-value-method="cash"
-                        aria-pressed={to_string(@payment_choice == :paid and @paid_via == "cash")}
+                      <div
+                        class={["staff-pos-pay-menu", @payment_methods_open? && "is-open"]}
+                        id="pos-payment-method-menu"
+                        role="listbox"
+                        aria-label="Payment method"
+                        aria-hidden={to_string(!@payment_methods_open?)}
                       >
-                        Cash
-                      </button>
-                      <button
-                        type="button"
-                        class={[
-                          "staff-pos-pay-chip",
-                          @payment_choice == :paid and @paid_via == "gcash" && "is-active"
-                        ]}
-                        id="pos-pay-gcash"
-                        phx-click="set_payment_method"
-                        phx-value-method="gcash"
-                        aria-pressed={to_string(@payment_choice == :paid and @paid_via == "gcash")}
-                        aria-describedby={
-                          if @payment_choice == :paid and @paid_via == "gcash",
-                            do: "pos-wallet-confirmation-cue",
-                            else: nil
-                        }
-                      >
-                        GCash
-                      </button>
-                      <button
-                        type="button"
-                        class={[
-                          "staff-pos-pay-chip",
-                          @payment_choice == :paid and @paid_via == "maya" && "is-active"
-                        ]}
-                        id="pos-pay-maya"
-                        phx-click="set_payment_method"
-                        phx-value-method="maya"
-                        aria-pressed={to_string(@payment_choice == :paid and @paid_via == "maya")}
-                        aria-describedby={
-                          if @payment_choice == :paid and @paid_via == "maya",
-                            do: "pos-wallet-confirmation-cue",
-                            else: nil
-                        }
-                      >
-                        Maya
-                      </button>
-                      <button
-                        type="button"
-                        class={[
-                          "staff-pos-pay-chip",
-                          @payment_choice == :paid and @paid_via == "split" && "is-active"
-                        ]}
-                        id="pos-pay-split"
-                        phx-click="set_payment_method"
-                        phx-value-method="split"
-                        aria-pressed={to_string(@payment_choice == :paid and @paid_via == "split")}
-                      >
-                        Split
-                      </button>
-                    </div>
+                        <button
+                          type="button"
+                          class={[
+                            "staff-pos-pay-chip",
+                            @payment_choice == :paid and @paid_via == "cash" && "is-active"
+                          ]}
+                          id="pos-pay-cash"
+                          phx-click="set_payment_method"
+                          phx-value-method="cash"
+                          role="option"
+                          aria-selected={
+                            to_string(@payment_choice == :paid and @paid_via == "cash")
+                          }
+                        >
+                          Cash
+                        </button>
+                        <button
+                          type="button"
+                          class={[
+                            "staff-pos-pay-chip",
+                            @payment_choice == :paid and @paid_via == "gcash" && "is-active"
+                          ]}
+                          id="pos-pay-gcash"
+                          phx-click="set_payment_method"
+                          phx-value-method="gcash"
+                          role="option"
+                          aria-selected={
+                            to_string(@payment_choice == :paid and @paid_via == "gcash")
+                          }
+                          aria-describedby={
+                            if @payment_choice == :paid and @paid_via == "gcash",
+                              do: "pos-wallet-confirmation-cue",
+                              else: nil
+                          }
+                        >
+                          GCash
+                        </button>
+                        <button
+                          type="button"
+                          class={[
+                            "staff-pos-pay-chip",
+                            @payment_choice == :paid and @paid_via == "maya" && "is-active"
+                          ]}
+                          id="pos-pay-maya"
+                          phx-click="set_payment_method"
+                          phx-value-method="maya"
+                          role="option"
+                          aria-selected={
+                            to_string(@payment_choice == :paid and @paid_via == "maya")
+                          }
+                          aria-describedby={
+                            if @payment_choice == :paid and @paid_via == "maya",
+                              do: "pos-wallet-confirmation-cue",
+                              else: nil
+                          }
+                        >
+                          Maya
+                        </button>
+                        <button
+                          type="button"
+                          class={[
+                            "staff-pos-pay-chip",
+                            @payment_choice == :paid and @paid_via == "split" && "is-active"
+                          ]}
+                          id="pos-pay-split"
+                          phx-click="set_payment_method"
+                          phx-value-method="split"
+                          role="option"
+                          aria-selected={
+                            to_string(@payment_choice == :paid and @paid_via == "split")
+                          }
+                        >
+                          Split
+                        </button>
+                      </div>
 
                     <p
                       :if={split_summary(assigns)}
@@ -1641,22 +1673,43 @@ defmodule EspresoWeb.StaffPosLive do
                       {@submission_error}
                     </p>
 
-                    <button
-                      type="submit"
-                      class={[
-                        "staff-pos-place",
-                        (@shop_day_status != :open or @cart == [] or @placing_order? or
-                           loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)) &&
-                          "is-disabled"
-                      ]}
-                      id="pos-place-order"
-                      disabled={
-                        @shop_day_status != :open or @cart == [] or @placing_order? or
-                          loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)
-                      }
-                    >
-                      {place_order_label(@payment_choice, @paid_via)}
-                    </button>
+                    <div class="staff-pos-place-split">
+                      <button
+                        type="submit"
+                        class={[
+                          "staff-pos-place",
+                          (@shop_day_status != :open or @cart == [] or @placing_order? or
+                             loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)) &&
+                            "is-disabled"
+                        ]}
+                        id="pos-place-order"
+                        disabled={
+                          @shop_day_status != :open or @cart == [] or @placing_order? or
+                            loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)
+                        }
+                      >
+                        <span id="pos-payment-method-label">
+                          {place_order_label(@payment_choice, @paid_via)}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        class={[
+                          "staff-pos-place-menu",
+                          (@shop_day_status != :open or @placing_order?) && "is-disabled"
+                        ]}
+                        id="pos-payment-method"
+                        phx-click="toggle_payment_methods"
+                        disabled={@shop_day_status != :open or @placing_order?}
+                        aria-expanded={to_string(@payment_methods_open?)}
+                        aria-controls="pos-payment-method-menu"
+                        aria-haspopup="listbox"
+                        aria-label={"Change payment method, #{payment_method_label(@paid_via)} selected"}
+                      >
+                        <span class="staff-pos-pay-trigger-chevron" aria-hidden="true"></span>
+                      </button>
+                    </div>
+                    </div>
                   </div>
                 </form>
               <% end %>
@@ -2663,6 +2716,7 @@ defmodule EspresoWeb.StaffPosLive do
                  |> assign(:submission_error, nil)
                  |> assign(:payment_choice, :paid)
                  |> assign(:paid_via, "cash")
+                 |> assign(:payment_methods_open?, false)
                  |> assign(:split_cash, "")
                  |> assign(:split_wallet, "gcash")
                  |> close_split_modal()
@@ -2831,6 +2885,11 @@ defmodule EspresoWeb.StaffPosLive do
         "Add Loyalty"
     end
   end
+
+  defp payment_method_label("gcash"), do: "GCash"
+  defp payment_method_label("maya"), do: "Maya"
+  defp payment_method_label("split"), do: "Split"
+  defp payment_method_label(_), do: "Cash"
 
   defp place_order_label(:paid, "gcash"), do: "Confirm GCash & Process"
   defp place_order_label(:paid, "maya"), do: "Confirm Maya & Process"
@@ -3419,6 +3478,7 @@ defmodule EspresoWeb.StaffPosLive do
     |> assign(:submission_error, nil)
     |> assign(:payment_choice, :paid)
     |> assign(:paid_via, "cash")
+    |> assign(:payment_methods_open?, false)
     |> assign(:split_cash, "")
     |> assign(:split_wallet, "gcash")
     |> close_split_modal()
