@@ -672,8 +672,46 @@ defmodule EspresoWeb.StaffOrdersLive do
     <.staff_shell current={:orders} current_user={@current_user} page_title="Orders" chrome={:bar}>
       <div class="staff-orders-page staff-orders-shell-root">
         <main class="staff-orders-main">
-          <p :if={@flash_note} class="staff-admin-note" id="orders-flash">{@flash_note}</p>
-          <.shop_day_sales_banner status={@shop_day_status} id="staff-orders-shop-day" />
+          <div
+            :if={@flash_note || @shop_day_status != :open || @alert_banner}
+            class="staff-orders-toasts"
+            id="orders-toasts"
+          >
+            <p :if={@flash_note} class="staff-admin-note staff-orders-toast" id="orders-flash">
+              {@flash_note}
+            </p>
+            <.shop_day_sales_banner status={@shop_day_status} id="staff-orders-shop-day" />
+            <div
+              :if={@alert_banner}
+              class="staff-orders-alert staff-orders-toast"
+              id="orders-alert-banner"
+              role="status"
+            >
+              <div class="staff-orders-alert-copy">
+                <p class="staff-orders-alert-title">New order {@alert_banner.number}</p>
+                <p class="staff-orders-alert-body">
+                  {@alert_banner.name} · Jump to New lane
+                </p>
+              </div>
+              <div class="staff-orders-alert-actions">
+                <a
+                  href={"#order-card-new-#{@alert_banner.id}"}
+                  class="staff-orders-alert-jump"
+                  id="orders-alert-jump"
+                >
+                  View
+                </a>
+                <button
+                  type="button"
+                  class="staff-orders-alert-dismiss"
+                  id="orders-alert-dismiss"
+                  phx-click="dismiss_alert"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
 
           <nav class="staff-orders-lane-jumps" aria-label="Jump to order lane">
             <a href="#orders-new" class="staff-orders-lane-jump staff-orders-lane-jump--new">
@@ -720,32 +758,6 @@ defmodule EspresoWeb.StaffOrdersLive do
                 {length(@paymongo_reconciliations)}
               </span>
             </button>
-          </div>
-
-          <div :if={@alert_banner} class="staff-orders-alert" id="orders-alert-banner" role="status">
-            <div class="staff-orders-alert-copy">
-              <p class="staff-orders-alert-title">New order {@alert_banner.number}</p>
-              <p class="staff-orders-alert-body">
-                {@alert_banner.name} · Jump to New lane
-              </p>
-            </div>
-            <div class="staff-orders-alert-actions">
-              <a
-                href={"#order-card-new-#{@alert_banner.id}"}
-                class="staff-orders-alert-jump"
-                id="orders-alert-jump"
-              >
-                View
-              </a>
-              <button
-                type="button"
-                class="staff-orders-alert-dismiss"
-                id="orders-alert-dismiss"
-                phx-click="dismiss_alert"
-              >
-                Dismiss
-              </button>
-            </div>
           </div>
 
           <div class="staff-orders-board">
@@ -1045,8 +1057,8 @@ defmodule EspresoWeb.StaffOrdersLive do
       <div class="staff-order-ticket-body" id={"order-detail-#{@lane}-#{@order.id}"}>
         <div class="staff-order-ticket-head">
           <div class="staff-order-ticket-head-main">
-            <p class="staff-order-number">{@order.number}</p>
             <p :if={show_customer_name?(@order)} class="staff-order-name">{@order.customer_name}</p>
+            <p class="staff-order-number">{@order.number}</p>
           </div>
           <div class="staff-order-ticket-head-side">
             <span
@@ -1095,11 +1107,8 @@ defmodule EspresoWeb.StaffOrdersLive do
         <div class="staff-order-ticket-foot">
           <div class="staff-order-pay">
             <span class="staff-order-pay-amount">{Orders.format_total(@order)}</span>
-            <span class={"staff-order-pay-state staff-badge--pay-#{@order.payment_status}"}>
-              {payment_state_label(@order)}
-            </span>
-            <span :if={paid_via_badge(@order)} class="staff-order-pay-via">
-              {paid_via_badge(@order)}
+            <span class={"staff-order-pay-state staff-order-pay-badge staff-badge--pay-#{@order.payment_status}"}>
+              {payment_badge_text(@order)}
             </span>
           </div>
           <p class={order_age_class(@order.inserted_at, @age_now)}>
@@ -1151,13 +1160,13 @@ defmodule EspresoWeb.StaffOrdersLive do
             <button
               :if={@order.status == "preparing" and not Orders.unpaid?(@order)}
               type="button"
-              class="staff-action staff-action-primary"
+              class="staff-action staff-action-primary staff-action-mark-ready"
               id={"order-ready-#{@order.id}"}
               phx-click="set_status"
               phx-value-id={@order.id}
               phx-value-status="ready"
             >
-              Ready
+              Mark Ready ➔
             </button>
             <button
               :if={@order.status == "ready" and not Orders.unpaid?(@order)}
@@ -1167,7 +1176,7 @@ defmodule EspresoWeb.StaffOrdersLive do
               phx-click="complete_order"
               phx-value-id={@order.id}
             >
-              Picked up
+              Complete & Archive
             </button>
           </div>
 
@@ -2288,6 +2297,13 @@ defmodule EspresoWeb.StaffOrdersLive do
   defp payment_state_label(%{payment_status: "paid"}), do: "Paid"
   defp payment_state_label(%{payment_status: "awaiting_payment"}), do: "Waiting"
   defp payment_state_label(_), do: "Unpaid"
+
+  defp payment_badge_text(order) do
+    case paid_via_badge(order) do
+      nil -> payment_state_label(order)
+      via -> "#{payment_state_label(order)} · #{via}"
+    end
+  end
 
   defp paid_via_badge(%{payment_status: "paid"} = order) do
     Orders.split_payment_label(order) || paid_via_badge_single(order)

@@ -183,7 +183,7 @@ defmodule EspresoWeb.StaffHomeLive do
               </span>
               <span class="staff-home-card-title">Paid today</span>
               <strong class="dashboard-kpi-value">
-                {Menu.format_price(@sales.todays_paid_total)}
+                {peso(@sales.todays_paid_total)}
               </strong>
               <span class="staff-home-card-body dashboard-kpi-hint">{sales_body(@sales)}</span>
             </article>
@@ -200,7 +200,7 @@ defmodule EspresoWeb.StaffHomeLive do
                 <.icon name="hero-banknotes" class="staff-home-card-glyph" />
               </span>
               <span class="staff-home-card-title">Cash</span>
-              <strong class="dashboard-kpi-value">{Menu.format_price(cash_today(@breakdown))}</strong>
+              <strong class="dashboard-kpi-value">{peso(cash_today(@breakdown))}</strong>
               <span class="dashboard-kpi-hint">Of paid mix</span>
             </article>
             <.link
@@ -213,7 +213,7 @@ defmodule EspresoWeb.StaffHomeLive do
               </span>
               <span class="staff-home-card-title">Reports</span>
               <strong class="dashboard-kpi-value">
-                {Menu.format_price(@reports_overview.period_paid_total)}
+                {peso(@reports_overview.period_paid_total)}
               </strong>
               <span class="staff-home-card-body dashboard-kpi-hint">
                 {reports_body(@reports_overview)}
@@ -313,6 +313,72 @@ defmodule EspresoWeb.StaffHomeLive do
           </section>
 
           <section
+            :if={@money? and (@drawer_summary || @open_shop_tool || @shift_close)}
+            class="staff-home-card staff-home-drawer-panel"
+            id="staff-home-today"
+            aria-label="Drawer"
+          >
+            <p :if={@shift_close} class="staff-home-today-closed" id="staff-home-shift-closed">
+              Closed · {Shifts.format_closed_at(@shift_close.closed_at)}
+              <span :if={@shift_close.closed_by_user}>
+                by {@shift_close.closed_by_user.name}
+              </span>
+            </p>
+
+            <div :if={@drawer_summary} class="staff-home-drawer" id="staff-home-drawer">
+              <p class="staff-home-today-eyebrow">
+                {if(@drawer_summary.sealed?, do: "Drawer · sealed", else: "Drawer")}
+              </p>
+              <ul class="staff-home-drawer-list">
+                <li>
+                  <span>Opening</span>
+                  <strong>{peso(@drawer_summary.opening)}</strong>
+                </li>
+                <li>
+                  <span>Cash sales</span>
+                  <strong>{peso(@drawer_summary.cash_sales)}</strong>
+                </li>
+                <li>
+                  <span>Cash outs</span>
+                  <strong>{peso(@drawer_summary.cash_outs)}</strong>
+                </li>
+                <li>
+                  <span>Expected</span>
+                  <strong>{peso(@drawer_summary.expected)}</strong>
+                </li>
+                <li :if={@drawer_summary.sealed?}>
+                  <span>Counted</span>
+                  <strong>{peso(@drawer_summary.counted)}</strong>
+                </li>
+                <li :if={@drawer_summary.sealed?} id="staff-home-drawer-variance">
+                  <span>Variance</span>
+                  <strong>{variance_line(@drawer_summary.variance)}</strong>
+                </li>
+              </ul>
+              <.link
+                navigate={~p"/staff/close"}
+                class="staff-home-drawer-link"
+                id="staff-home-drawer-close"
+              >
+                {if(@drawer_summary.sealed?, do: "View close", else: "Close shift")}
+              </.link>
+            </div>
+
+            <.link
+              :if={@open_shop_tool}
+              navigate={@open_shop_tool.path}
+              class={["staff-home-tool-link", @open_shop_tool[:class]]}
+              id={"staff-home-#{@open_shop_tool.id}"}
+            >
+              <span :if={@open_shop_tool[:icon]} class="staff-home-tool-icon" aria-hidden="true">
+                <.icon name={@open_shop_tool.icon} class="staff-home-card-glyph" />
+              </span>
+              <span class="staff-home-tool-label">{@open_shop_tool.title}</span>
+              <span class="staff-home-tool-body">{@open_shop_tool.body}</span>
+            </.link>
+          </section>
+
+          <section
             :if={@money?}
             id="staff-home-paid-breakdown"
             class="staff-home-card dashboard-donut-panel"
@@ -324,61 +390,13 @@ defmodule EspresoWeb.StaffHomeLive do
               <ul class="staff-paid-breakdown">
                 <li :for={row <- @via_rows} class="staff-paid-breakdown-row">
                   <span class="staff-paid-breakdown-label">{row.label}</span>
-                  <span class="staff-paid-breakdown-total">{Menu.format_price(row.total)}</span>
+                  <span class="staff-paid-breakdown-total">{peso(row.total)}</span>
                   <span class="staff-paid-breakdown-count">{row.count}</span>
                 </li>
               </ul>
             </div>
           </section>
         </div>
-
-        <section :if={@money?} class="staff-home-today" id="staff-home-today" aria-label="Today">
-          <p :if={@shift_close} class="staff-home-today-closed" id="staff-home-shift-closed">
-            Closed · {Shifts.format_closed_at(@shift_close.closed_at)}
-            <span :if={@shift_close.closed_by_user}>
-              by {@shift_close.closed_by_user.name}
-            </span>
-          </p>
-
-          <div :if={@drawer_summary} class="staff-home-drawer" id="staff-home-drawer">
-            <p class="staff-home-today-eyebrow">
-              {if(@drawer_summary.sealed?, do: "Drawer · sealed", else: "Drawer")}
-            </p>
-            <ul class="staff-home-drawer-list">
-              <li>
-                <span>Opening</span>
-                <strong>{Menu.format_price(@drawer_summary.opening)}</strong>
-              </li>
-              <li>
-                <span>Cash sales</span>
-                <strong>{Menu.format_price(@drawer_summary.cash_sales)}</strong>
-              </li>
-              <li>
-                <span>Cash outs</span>
-                <strong>{Menu.format_price(@drawer_summary.cash_outs)}</strong>
-              </li>
-              <li>
-                <span>Expected</span>
-                <strong>{Menu.format_price(@drawer_summary.expected)}</strong>
-              </li>
-              <li :if={@drawer_summary.sealed?}>
-                <span>Counted</span>
-                <strong>{Menu.format_price(@drawer_summary.counted)}</strong>
-              </li>
-              <li :if={@drawer_summary.sealed?} id="staff-home-drawer-variance">
-                <span>Variance</span>
-                <strong>{variance_line(@drawer_summary.variance)}</strong>
-              </li>
-            </ul>
-            <.link
-              navigate={~p"/staff/close"}
-              class="staff-home-drawer-link"
-              id="staff-home-drawer-close"
-            >
-              {if(@drawer_summary.sealed?, do: "View close", else: "Close shift")}
-            </.link>
-          </div>
-        </section>
 
         <div
           :if={@current_user.role == "owner"}
@@ -411,7 +429,11 @@ defmodule EspresoWeb.StaffHomeLive do
           </div>
         </div>
 
-        <section class="staff-home-desk-tools" aria-label="Now">
+        <section
+          :if={@launch_tools != [] or @shift_tools != []}
+          class="staff-home-desk-tools"
+          aria-label="Now"
+        >
           <div class="staff-home-secondary">
             <.link
               :for={item <- @launch_tools}
@@ -562,10 +584,13 @@ defmodule EspresoWeb.StaffHomeLive do
     |> assign(:primary, primary_tiles(user, overview))
     |> then(fn socket ->
       tools = desk_tools(user, overview)
-      {shift_tools, launch_tools} = Enum.split_with(tools, &(&1.id == "my-shifts"))
+      {shift_tools, rest} = Enum.split_with(tools, &(&1.id == "my-shifts"))
+      {open_shop_tools, other_launch} = Enum.split_with(rest, &(&1.id == "open-shop"))
+      open_shop_tool = List.first(open_shop_tools)
 
       socket
-      |> assign(:launch_tools, launch_tools)
+      |> assign(:open_shop_tool, open_shop_tool)
+      |> assign(:launch_tools, if(money?, do: other_launch, else: rest))
       |> assign(:shift_tools, shift_tools)
     end)
   end
@@ -706,14 +731,20 @@ defmodule EspresoWeb.StaffHomeLive do
   defp shop_day_status_label(:closed), do: "Closed"
   defp shop_day_status_label(_), do: "Not open"
 
+  defp peso(amount) do
+    amount
+    |> Menu.format_price()
+    |> String.replace(~r/^P(?=[\d,])/, "₱")
+  end
+
   defp sales_body(%{todays_paid_total: total, todays_paid_count: count}) do
-    "#{Menu.format_price(total)} today · #{count} paid orders"
+    "#{peso(total)} today · #{count} paid orders"
   end
 
   defp reports_body(%{period_paid_count: 0}), do: "No paid sales in the last 7 days."
 
   defp reports_body(%{period_paid_total: total, period_paid_count: count, period_days: days}) do
-    "#{Menu.format_price(total)} last #{days} days · #{count} paid orders"
+    "#{peso(total)} last #{days} days · #{count} paid orders"
   end
 
   defp cash_today(%{by_via: by_via}) when is_map(by_via),
@@ -766,8 +797,8 @@ defmodule EspresoWeb.StaffHomeLive do
 
     case Decimal.compare(variance, 0) do
       :eq -> "Even"
-      :gt -> "Over #{Menu.format_price(abs)}"
-      :lt -> "Short #{Menu.format_price(abs)}"
+      :gt -> "Over #{peso(abs)}"
+      :lt -> "Short #{peso(abs)}"
     end
   end
 

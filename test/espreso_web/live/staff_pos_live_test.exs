@@ -61,6 +61,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
     assert has_element?(view, ".staff-shell-title", "POS")
     assert has_element?(view, "#pos-catalog")
+    assert has_element?(view, ".staff-pos-catalog-head-tools #pos-catalog-count", "items")
+    refute has_element?(view, "#pos-search #pos-catalog-count")
     assert has_element?(view, "#pos-ticket")
     assert has_element?(view, "#staff-pos-rail")
     assert has_element?(view, "#staff-pos-rail.staff-pos-rail--bar")
@@ -840,7 +842,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
            )
 
     assert has_element?(view, "#pos-product-#{americano.id}", "8oz · 12oz")
-    assert has_element?(view, "#pos-product-#{americano.id}", "from ₱110")
+    assert has_element?(view, "#pos-product-#{americano.id}", "₱110")
 
     view |> element("#pos-product-#{americano.id}") |> render_click()
 

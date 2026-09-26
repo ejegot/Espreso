@@ -53,6 +53,7 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
     refute has_element?(manager_view, "#staff-home-drawer-variance")
     assert has_element?(manager_view, "#staff-home-drawer-close", "Close shift")
     assert has_element?(manager_view, "#staff-home-open-shop", "Open shop")
+    assert has_element?(manager_view, "#staff-home-today #staff-home-open-shop")
     refute has_element?(manager_view, "#staff-home-shop-open")
     refute has_element?(manager_view, "#staff-home-close")
     refute has_element?(manager_view, "#staff-home-today-barista")

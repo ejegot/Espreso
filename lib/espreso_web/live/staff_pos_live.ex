@@ -1090,45 +1090,49 @@ defmodule EspresoWeb.StaffPosLive do
                   <h2 class="staff-pos-catalog-title" id="pos-catalog-title">
                     Categories
                   </h2>
-                  <form
-                    class="staff-pos-search"
-                    id="pos-search"
-                    phx-change="search"
-                    phx-submit="search"
-                  >
-                    <label class="staff-pos-search-label" for="pos-search-input">Search</label>
-                    <div class="staff-pos-search-row">
-                      <input
-                        type="search"
-                        class="staff-pos-search-input"
-                        id="pos-search-input"
-                        name="q"
-                        value={@search}
-                        placeholder="Search menu"
-                        autocomplete="off"
-                        phx-debounce="200"
-                      />
-                      <button
-                        :if={String.trim(@search) != ""}
-                        type="button"
-                        class="staff-pos-search-clear"
-                        id="pos-search-clear"
-                        phx-click="clear_search"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </form>
-                  <span class="staff-pos-catalog-count" id="pos-catalog-count">
-                    {length(
-                      visible_product_entries(
-                        @categories,
-                        @selected_category,
-                        @menu_filter,
-                        @search
-                      )
-                    )}
-                  </span>
+                  <div class="staff-pos-catalog-head-tools">
+                    <form
+                      class="staff-pos-search"
+                      id="pos-search"
+                      phx-change="search"
+                      phx-submit="search"
+                    >
+                      <label class="staff-pos-search-label" for="pos-search-input">Search</label>
+                      <div class="staff-pos-search-row">
+                        <input
+                          type="search"
+                          class="staff-pos-search-input"
+                          id="pos-search-input"
+                          name="q"
+                          value={@search}
+                          placeholder="Search menu"
+                          autocomplete="off"
+                          phx-debounce="200"
+                        />
+                        <button
+                          :if={String.trim(@search) != ""}
+                          type="button"
+                          class="staff-pos-search-clear"
+                          id="pos-search-clear"
+                          phx-click="clear_search"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </form>
+                    <span class="staff-pos-catalog-count" id="pos-catalog-count">
+                      {catalog_items_label(
+                        length(
+                          visible_product_entries(
+                            @categories,
+                            @selected_category,
+                            @menu_filter,
+                            @search
+                          )
+                        )
+                      )}
+                    </span>
+                  </div>
                 </header>
 
                 <nav class="staff-pos-categories staff-pos-categories--pills" aria-label="Categories">
@@ -1639,41 +1643,43 @@ defmodule EspresoWeb.StaffPosLive do
                               </p>
                             </div>
                           </div>
-                          <p class="staff-pos-cart-amount">
-                            {Menu.format_price(Decimal.mult(line.price, line.quantity))}
-                          </p>
-                          <div class="staff-pos-cart-actions">
-                            <div class="staff-pos-qty-controls">
+                          <div class="staff-pos-cart-pricing">
+                            <p class="staff-pos-cart-amount">
+                              {Menu.format_price(Decimal.mult(line.price, line.quantity))}
+                            </p>
+                            <div class="staff-pos-cart-actions">
+                              <div class="staff-pos-qty-controls">
+                                <button
+                                  type="button"
+                                  class="staff-pos-qty-btn"
+                                  phx-click="dec"
+                                  phx-value-key={line.key}
+                                  aria-label={"Decrease #{line.name}"}
+                                >
+                                  −
+                                </button>
+                                <span class="staff-pos-qty">{line.quantity}</span>
+                                <button
+                                  type="button"
+                                  class="staff-pos-qty-btn staff-pos-qty-btn--plus"
+                                  phx-click="inc"
+                                  phx-value-key={line.key}
+                                  aria-label={"Increase #{line.name}"}
+                                >
+                                  +
+                                </button>
+                              </div>
                               <button
                                 type="button"
-                                class="staff-pos-qty-btn"
-                                phx-click="dec"
+                                class="staff-pos-remove"
+                                phx-click="remove"
                                 phx-value-key={line.key}
-                                aria-label={"Decrease #{line.name}"}
+                                aria-label={"Remove #{line.name}"}
+                                title="Remove"
                               >
-                                −
-                              </button>
-                              <span class="staff-pos-qty">{line.quantity}</span>
-                              <button
-                                type="button"
-                                class="staff-pos-qty-btn staff-pos-qty-btn--plus"
-                                phx-click="inc"
-                                phx-value-key={line.key}
-                                aria-label={"Increase #{line.name}"}
-                              >
-                                +
+                                ×
                               </button>
                             </div>
-                            <button
-                              type="button"
-                              class="staff-pos-remove"
-                              phx-click="remove"
-                              phx-value-key={line.key}
-                              aria-label={"Remove #{line.name}"}
-                              title="Remove"
-                            >
-                              ×
-                            </button>
                           </div>
                           <div
                             :if={@variant_editor_key == line.key}
@@ -3454,18 +3460,14 @@ defmodule EspresoWeb.StaffPosLive do
     end
   end
 
+  defp catalog_items_label(1), do: "1 item"
+  defp catalog_items_label(count) when is_integer(count), do: "#{count} items"
+
   defp price_label(%{product_prices: [price]}), do: Menu.format_price(price.price)
 
   defp price_label(%{product_prices: prices}) when is_list(prices) do
     amounts = Enum.map(prices, & &1.price)
-    lowest = Enum.min(amounts, Decimal)
-    formatted = Menu.format_price(lowest)
-
-    if Enum.all?(amounts, &Decimal.equal?(&1, lowest)) do
-      formatted
-    else
-      "from #{formatted}"
-    end
+    Menu.format_price(Enum.min(amounts, Decimal))
   end
 
   defp add_line(cart, product, price, category_name, quantity) do
