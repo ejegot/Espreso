@@ -112,6 +112,39 @@ defmodule Espreso.PrinterTest do
     refute text_after_mark =~ "?"
   end
 
+  test "receipt prints subtotal and discount then due total" do
+    order = %Order{
+      number: "CS-DISC01",
+      customer_name: "Walk-in",
+      fulfillment: "pickup",
+      paid_via: "cash",
+      total: Decimal.new("60"),
+      discount_kind: "senior",
+      discount_label: "Senior 20%",
+      discount_amount: Decimal.new("15"),
+      inserted_at: ~N[2026-09-05 12:00:00],
+      settled_at: ~U[2026-09-05 12:00:00Z],
+      items: [
+        %OrderItem{
+          name: "Espresso",
+          size: nil,
+          quantity: 1,
+          unit_price: Decimal.new("75"),
+          line_total: Decimal.new("75")
+        }
+      ]
+    }
+
+    receipt = Receipt.build(order)
+
+    assert receipt =~ "SUBTOTAL"
+    assert receipt =~ "P75.00"
+    assert receipt =~ "DISCOUNT Senior 20%"
+    assert receipt =~ "-P15.00"
+    assert receipt =~ "TOTAL"
+    assert receipt =~ "P60.00"
+  end
+
   test "day report prints drawer expected counted and variance" do
     close = %Espreso.Shifts.ShiftClose{
       shop_date: ~D[2026-09-22],

@@ -12,7 +12,7 @@ defmodule Espreso.Orders do
   alias Espreso.BusinessSettings
   alias Espreso.CustomerPush
   alias Espreso.Loyalty
-  alias Espreso.Orders.{Order, OrderItem, PaymentReconciliation, PaymentSplit}
+  alias Espreso.Orders.{Discount, Order, OrderItem, PaymentReconciliation, PaymentSplit}
   alias Espreso.Menu
   alias Espreso.Shifts
   alias Espreso.Menu.Product
@@ -129,12 +129,15 @@ defmodule Espreso.Orders do
          payment_intent,
          source
        ) do
-    total =
+    subtotal =
       Enum.reduce(lines, Decimal.new(0), fn line, acc ->
         Decimal.add(acc, Decimal.mult(line.price, line.quantity))
       end)
 
-    with {:ok, splits} <-
+    with {:ok, discount} <- Discount.from_order_attrs(attrs, subtotal, source),
+         :ok <- reject_discount_loyalty_stack(discount, attrs),
+         total <- discount.due,
+         {:ok, splits} <-
            prepare_payment_splits(attrs, total, payment_method, payment_status),
          paid_via <- primary_paid_via(paid_via, splits),
          {:ok, settlement_attrs} <-
@@ -170,7 +173,10 @@ defmodule Espreso.Orders do
           status: initial_kitchen_status(payment_status, source),
           total: total,
           customer_id: customer_id,
-          loyalty_free_amount_centavos: loyalty_free
+          loyalty_free_amount_centavos: loyalty_free,
+          discount_kind: discount.kind,
+          discount_label: discount.label,
+          discount_amount: discount.amount
         }
         |> Map.merge(settlement_attrs)
 
@@ -242,6 +248,22 @@ defmodule Espreso.Orders do
         {:error, _step, reason, _} ->
           {:error, reason}
       end
+    end
+  end
+
+  defp reject_discount_loyalty_stack(discount, attrs) do
+    loyalty =
+      case Map.get(attrs, :loyalty_free_amount_centavos) ||
+             Map.get(attrs, "loyalty_free_amount_centavos") do
+        nil -> 0
+        n when is_integer(n) and n >= 0 -> n
+        other -> Loyalty.to_centavos(other)
+      end
+
+    if Discount.applied?(discount) and loyalty > 0 do
+      {:error, :discount_loyalty_conflict}
+    else
+      :ok
     end
   end
 

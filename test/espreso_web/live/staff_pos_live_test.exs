@@ -121,7 +121,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     conn = log_in(conn, barista)
     {:ok, view, _html} = live(conn, ~p"/pos")
-    assert has_element?(view, "#pos-loyalty-entry", "Add Loyalty")
+    assert has_element?(view, "#pos-loyalty-entry", "Loyalty")
     assert has_element?(view, ".staff-pos-ticket-identity #pos-customer-name")
     assert has_element?(view, ".staff-pos-ticket-identity #pos-loyalty-entry")
     refute has_element?(view, "#pos-loyalty-history")
@@ -152,7 +152,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     view |> element("#pos-loyalty-clear") |> render_click()
     refute has_element?(view, "#pos-loyalty-history")
-    assert has_element?(view, "#pos-loyalty-entry", "Add Loyalty")
+    assert has_element?(view, "#pos-loyalty-entry", "Loyalty")
   end
 
   test "phone entered without Find blocks place and shows Find hint", %{
@@ -201,7 +201,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
     view |> element("#pos-product-#{espresso.id}") |> render_click()
     refute has_element?(view, "#pos-loyalty-find-hint")
-    assert has_element?(view, "#pos-loyalty-entry", "Add Loyalty")
+    assert has_element?(view, "#pos-loyalty-entry", "Loyalty")
 
     submit_order(view)
 
@@ -234,7 +234,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert live_assigns(view).loyalty_phone == ""
 
     view |> element("#pos-new-order") |> render_click()
-    assert has_element?(view, "#pos-loyalty-entry", "Add Loyalty")
+    assert has_element?(view, "#pos-loyalty-entry", "Loyalty")
   end
 
   test "successful paid loyalty earn shows points feedback", %{
@@ -555,7 +555,14 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute has_element?(view, "#pos-category-ALL")
     refute render(view) =~ ">All</span>"
     refute has_element?(view, "#pos-notes-toggle")
+    refute has_element?(view, "#pos-discount-toggle")
+    assert has_element?(view, "#pos-loyalty-entry", "Loyalty")
     assert has_element?(view, "#pos-ticket.is-empty")
+
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    assert has_element?(view, "#pos-ticket-extras.is-armed")
+    assert has_element?(view, "#pos-notes-toggle", "Notes")
+    assert has_element?(view, "#pos-discount-toggle", "Discount")
   end
 
   test "POS catalog uses versioned WebP thumbnails with eager loading", %{
@@ -2094,6 +2101,9 @@ defmodule EspresoWeb.StaffPosLiveTest do
     |> element("#pos-notes")
     |> render_change(%{"notes" => "Less ice"})
 
+    assert has_element?(view, "#pos-notes-toggle", "Notes")
+    refute has_element?(view, "#pos-notes-toggle", "Less ice")
+
     submit_order(view)
 
     assert has_element?(view, "#pos-confirmation", "Maria")
@@ -2105,6 +2115,64 @@ defmodule EspresoWeb.StaffPosLiveTest do
     [order] = placed_orders()
     assert order.customer_name == "Maria"
     assert order.notes == "Less ice"
+  end
+
+  test "senior 20% lowers the due total and persists on the order", %{
+    conn: conn,
+    barista: barista,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    view |> element("#pos-product-#{espresso.id}") |> render_click()
+    assert has_element?(view, "#pos-total", "₱75")
+
+    view |> element("#pos-discount-toggle") |> render_click()
+    view |> element("#pos-discount-senior") |> render_click()
+
+    assert has_element?(view, "#pos-subtotal", "₱75")
+    assert has_element?(view, "#pos-discount-amount", "₱15")
+    assert has_element?(view, "#pos-total", "₱60")
+    refute has_element?(view, "#pos-discount-peso")
+
+    view |> form("#pos-order-form") |> render_submit()
+    assert has_element?(view, "#pos-cash-total", "₱60")
+    view |> element("#pos-cash-exact") |> render_click()
+    view |> form("#pos-cash-tender-form") |> render_submit()
+
+    [order] = placed_orders()
+    assert order.discount_kind == "senior"
+    assert Decimal.equal?(order.discount_amount, Decimal.new("15"))
+    assert Decimal.equal?(order.total, Decimal.new("60"))
+  end
+
+  test "barista cannot apply peso off; manager can", %{
+    conn: conn,
+    barista: barista,
+    manager: manager,
+    espresso: espresso
+  } do
+    {:ok, barista_view, _html} = live(log_in(conn, barista), ~p"/pos")
+    barista_view |> element("#pos-product-#{espresso.id}") |> render_click()
+    barista_view |> element("#pos-discount-toggle") |> render_click()
+    refute has_element?(barista_view, "#pos-discount-peso")
+
+    {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/pos")
+    manager_view |> element("#pos-product-#{espresso.id}") |> render_click()
+    manager_view |> element("#pos-discount-toggle") |> render_click()
+    manager_view |> element("#pos-discount-peso") |> render_click()
+
+    manager_view
+    |> element("#pos-discount-peso-amount")
+    |> render_change(%{"discount_peso" => "10"})
+
+    assert has_element?(manager_view, "#pos-total", "₱65")
+
+    submit_order(manager_view)
+
+    [order] = placed_orders()
+    assert order.discount_kind == "peso"
+    assert Decimal.equal?(order.discount_amount, Decimal.new("10"))
+    assert Decimal.equal?(order.total, Decimal.new("65"))
   end
 
   test "Process Order submits the latest customer name without waiting for debounce", %{

@@ -36,6 +36,9 @@ defmodule Espreso.Orders.Order do
     field :settlement_time_estimated, :boolean, default: false
 
     field :loyalty_free_amount_centavos, :integer, default: 0
+    field :discount_kind, :string, default: "none"
+    field :discount_label, :string
+    field :discount_amount, :decimal, default: Decimal.new("0")
     field :refunded_at, :utc_datetime
     field :refund_reason, :string
 
@@ -82,6 +85,9 @@ defmodule Espreso.Orders.Order do
       :settlement_time_estimated,
       :customer_id,
       :loyalty_free_amount_centavos,
+      :discount_kind,
+      :discount_label,
+      :discount_amount,
       :refunded_at,
       :refunded_by_user_id,
       :refund_reason
@@ -98,6 +104,8 @@ defmodule Espreso.Orders.Order do
     |> update_change(:customer_name, &String.trim/1)
     |> validate_length(:customer_name, min: 2, max: 60)
     |> validate_number(:loyalty_free_amount_centavos, greater_than_or_equal_to: 0)
+    |> validate_inclusion(:discount_kind, Espreso.Orders.Discount.kinds())
+    |> validate_number(:discount_amount, greater_than_or_equal_to: 0)
     |> validate_inclusion(:fulfillment, @fulfillments)
     |> validate_inclusion(:status, @statuses)
     |> validate_inclusion(:payment_method, @payment_methods)

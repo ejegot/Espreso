@@ -37,7 +37,7 @@ defmodule EspresoWeb.ServiceWorkerTest do
   test "service worker contract is limited to the static allowlist" do
     source = File.read!(@service_worker_path)
 
-    assert source =~ "const STATIC_CACHE = \"elilai-static-v2\""
+    assert source =~ "const STATIC_CACHE = \"elilai-static-v8\""
     assert source =~ "const ALLOWED_PREFIXES = [\"/assets/\", \"/fonts/\"]"
     assert source =~ "\"/images/elilai-kafe/elilai-kafe-logo.jpg\""
     assert source =~ "\"/images/elilai-kafe/app-icon-192.png\""

@@ -2,6 +2,7 @@ defmodule Espreso.Printer.Receipt do
   @moduledoc false
 
   alias Espreso.Orders
+  alias Espreso.Orders.Discount
   alias Espreso.Orders.Order
   alias Espreso.Printer.EscPos
   alias Espreso.Shifts
@@ -44,6 +45,7 @@ defmodule Espreso.Printer.Receipt do
         EscPos.separator()
       ] ++
         Enum.flat_map(items, &item_lines/1) ++
+        discount_lines(order) ++
         [
           EscPos.separator(),
           EscPos.bold_on(),
@@ -367,6 +369,22 @@ defmodule Espreso.Printer.Receipt do
   end
 
   defp timestamp_line(_), do: timestamp_line(%{inserted_at: NaiveDateTime.local_now()})
+
+  defp discount_lines(order) do
+    amount = order.discount_amount || Decimal.new("0")
+
+    if Discount.applied?(order) do
+      subtotal = Decimal.add(order.total || Decimal.new("0"), amount)
+
+      [
+        EscPos.separator(),
+        EscPos.columns("SUBTOTAL", money(subtotal)),
+        EscPos.columns("DISCOUNT #{Discount.receipt_label(order)}", "-#{money(amount)}")
+      ]
+    else
+      []
+    end
+  end
 
   defp format_shop_timestamp(%DateTime{} = at) do
     at

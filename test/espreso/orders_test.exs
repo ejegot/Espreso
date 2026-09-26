@@ -238,6 +238,57 @@ defmodule Espreso.OrdersTest do
     assert order.fulfillment == "pickup"
     assert order.payment_status == "unpaid"
     assert order.status == "received"
+    assert order.discount_kind == "none"
+    assert Decimal.equal?(order.discount_amount, Decimal.new("0"))
+  end
+
+  test "create_order POS senior discount stores due as total" do
+    lines = [insert_pos_line!("Espresso", nil, "75")]
+
+    assert {:ok, order} =
+             Orders.create_order(lines, %{
+               customer_name: "Walk-in",
+               fulfillment: :pickup,
+               payment_method: :counter,
+               source: :pos,
+               discount_kind: "senior"
+             })
+
+    assert order.discount_kind == "senior"
+    assert order.discount_label == "Senior 20%"
+    assert Decimal.equal?(order.discount_amount, Decimal.new("15"))
+    assert Decimal.equal?(order.total, Decimal.new("60"))
+    assert Decimal.equal?(hd(order.items).unit_price, Decimal.new("75"))
+  end
+
+  test "create_order customer source ignores POS discount attrs" do
+    lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
+
+    assert {:ok, order} =
+             Orders.create_order(lines, %{
+               customer_name: "Juan",
+               fulfillment: :pickup,
+               payment_method: :counter,
+               discount_kind: "senior"
+             })
+
+    assert order.source == "customer"
+    assert order.discount_kind == "none"
+    assert Decimal.equal?(order.total, Decimal.new("75"))
+  end
+
+  test "create_order rejects discount stacked with loyalty redeem" do
+    lines = [insert_pos_line!("Espresso", nil, "75")]
+
+    assert {:error, :discount_loyalty_conflict} =
+             Orders.create_order(lines, %{
+               customer_name: "Walk-in",
+               fulfillment: :pickup,
+               payment_method: :counter,
+               source: :pos,
+               discount_kind: "staff",
+               loyalty_free_amount_centavos: 7500
+             })
   end
 
   test "create_order allows dine-in without table" do
