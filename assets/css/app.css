@@ -25618,3 +25618,432 @@ a.brune-contact-value:focus-visible {
 .order-page .order-card--confirm .order-elilai-rewards {
   margin: 0.9rem 0 0.15rem;
 }
+
+/* Espreso product / waitlist — cream + forest, not CoffeeSpot guest chrome */
+.espreso-product-body {
+  margin: 0;
+  min-height: 100vh;
+  background: #f4f0e8;
+  color: #2e3529;
+}
+
+.espreso-product {
+  --product-cream: #f9f6f0;
+  --product-canvas: #f4f0e8;
+  --product-forest: #394331;
+  --product-ink: #2e3529;
+  --product-muted: #6f7468;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.espreso-product-panel {
+  box-sizing: border-box;
+}
+
+.espreso-product-panel--story {
+  display: flex;
+  flex-direction: column;
+  padding: 1.65rem 1.25rem 1.5rem;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 5%, transparent), transparent 42%),
+    repeating-linear-gradient(
+      to right,
+      color-mix(in srgb, #f4efe6 7%, transparent) 0 1px,
+      transparent 1px 72px
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      color-mix(in srgb, #f4efe6 7%, transparent) 0 1px,
+      transparent 1px 72px
+    ),
+    var(--product-forest);
+  color: #f4efe6;
+}
+
+.espreso-product-brand {
+  margin: 0 0 1.25rem;
+}
+
+.espreso-product-brand-lockup {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.espreso-product-logo {
+  display: block;
+  width: 5.35rem;
+  height: auto;
+  flex-shrink: 0;
+  object-fit: contain;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  filter: none;
+}
+
+.espreso-product-wordmark {
+  margin: 0;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  color: #f4efe6;
+}
+
+.espreso-product-brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.espreso-product-kicker-sub {
+  margin: 0;
+  padding: 0;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: color-mix(in srgb, #f4efe6 62%, #394331);
+}
+
+.espreso-product-headline {
+  margin: 0;
+  max-width: 16ch;
+  font-family: "Instrument Serif", serif;
+  font-size: clamp(2.15rem, 5vw, 3.15rem);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.espreso-product-lede {
+  margin: 0.75rem 0 1.15rem;
+  max-width: 32rem;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: color-mix(in srgb, #f4efe6 78%, #394331);
+}
+
+.espreso-product-features {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.55rem;
+}
+
+.espreso-product-feature {
+  display: grid;
+  grid-template-columns: 1.7rem 1fr;
+  gap: 0.65rem;
+  align-items: start;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid color-mix(in srgb, #f4efe6 13%, transparent);
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, #fff 7%, transparent);
+  animation: espreso-product-tile-in 0.5s ease both;
+  transition:
+    transform 0.22s ease,
+    background-color 0.22s ease,
+    border-color 0.22s ease;
+}
+
+.espreso-product-feature:hover {
+  transform: translateY(-3px);
+  background: color-mix(in srgb, #fff 12%, transparent);
+  border-color: color-mix(in srgb, #d8c4a0 38%, transparent);
+}
+
+.espreso-product-feature:hover .espreso-product-feature-icon {
+  color: #efe0c4;
+  transform: scale(1.08);
+}
+
+.espreso-product-feature-icon {
+  display: flex;
+  width: 1.7rem;
+  height: 1.7rem;
+  margin-top: 0.05rem;
+  color: #d8c4a0;
+  transition: transform 0.22s ease, color 0.22s ease;
+}
+
+.espreso-product-feature-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.espreso-product-feature-copy {
+  min-width: 0;
+}
+
+.espreso-product-feature-title {
+  margin: 0 0 0.12rem;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.espreso-product-feature-body {
+  margin: 0;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: color-mix(in srgb, #f4efe6 70%, #394331);
+}
+
+.espreso-product-soon {
+  margin-top: 0.7rem;
+  padding: 1.1rem 1rem;
+  border: 1px dashed color-mix(in srgb, #f4efe6 22%, transparent);
+  border-radius: 0.95rem;
+  text-align: center;
+}
+
+.espreso-product-soon-title {
+  margin: 0 0 0.25rem;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.espreso-product-soon-body {
+  margin: 0;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: color-mix(in srgb, #f4efe6 62%, #394331);
+}
+
+.espreso-product-price {
+  margin: 0.9rem 0 0;
+  width: fit-content;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid color-mix(in srgb, #f4efe6 18%, transparent);
+  border-radius: 999px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: color-mix(in srgb, #f4efe6 78%, #394331);
+}
+
+.espreso-product-panel--form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem 1.15rem 2.25rem;
+  background: var(--product-canvas);
+}
+
+.espreso-product-tabs {
+  display: flex;
+  width: 100%;
+  max-width: 28rem;
+  margin: 0 0 0.9rem;
+  padding: 0.22rem;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--product-ink) 6%, transparent);
+}
+
+.espreso-product-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.35rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  color: var(--product-muted);
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.espreso-product-tab.is-active {
+  background: var(--product-forest);
+  color: #f4efe6;
+}
+
+.espreso-product-card {
+  width: 100%;
+  max-width: 28rem;
+  padding: 1.25rem 1.15rem 1.3rem;
+  border-radius: 1.1rem;
+  background: #fff;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--product-ink) 8%, transparent);
+}
+
+.espreso-product-card-title {
+  margin: 0;
+  font-family: "Instrument Serif", serif;
+  font-size: 1.7rem;
+  font-weight: 400;
+  color: var(--product-ink);
+}
+
+.espreso-product-card-lede {
+  margin: 0.4rem 0 1rem;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--product-muted);
+}
+
+.espreso-product-form {
+  position: relative;
+  display: grid;
+  gap: 0.62rem;
+}
+
+.espreso-product-field {
+  display: grid;
+  gap: 0.3rem;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--product-ink);
+}
+
+.espreso-product-field em {
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--product-muted);
+}
+
+.espreso-product-field input,
+.espreso-product-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--product-ink) 10%, transparent);
+  border-radius: 0.7rem;
+  background: #ebe5db;
+  color: var(--product-ink);
+  font-family: "DM Sans", sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.espreso-product-field input:focus,
+.espreso-product-field textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--product-forest) 18%, transparent);
+}
+
+.espreso-product-error {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #8a3b32;
+}
+
+.espreso-product-honeypot {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.espreso-product-submit {
+  margin-top: 0.35rem;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border: 0;
+  border-radius: 0.8rem;
+  background: var(--product-forest);
+  color: #f4efe6;
+  font-family: "DM Sans", sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.espreso-product-submit:hover,
+.espreso-product-submit:focus-visible {
+  filter: brightness(1.08);
+}
+
+@keyframes espreso-product-tile-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .espreso-product-feature {
+    animation: none;
+    transition: none;
+  }
+
+  .espreso-product-feature:hover,
+  .espreso-product-feature:hover .espreso-product-feature-icon {
+    transform: none;
+  }
+}
+
+@media (min-width: 960px) {
+  .espreso-product {
+    grid-template-columns: minmax(0, 1.12fr) minmax(24rem, 0.88fr);
+    min-height: 100vh;
+  }
+
+  .espreso-product-panel--story {
+    padding: 2.1rem 2.1rem 1.6rem 2.4rem;
+  }
+
+  .espreso-product-headline {
+    max-width: none;
+  }
+
+  .espreso-product-features {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .espreso-product-soon {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 7.5rem;
+    margin-top: 0.85rem;
+  }
+
+  .espreso-product-panel--form {
+    justify-content: center;
+    padding: 2rem 2rem;
+  }
+}

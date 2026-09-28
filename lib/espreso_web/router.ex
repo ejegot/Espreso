@@ -17,6 +17,10 @@ defmodule EspresoWeb.Router do
     plug :put_root_layout, html: {EspresoWeb.Layouts, :employee_root}
   end
 
+  pipeline :product_root do
+    plug :put_root_layout, html: {EspresoWeb.Layouts, :product_root}
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
   end
@@ -84,6 +88,14 @@ defmodule EspresoWeb.Router do
     live "/about", AboutLive
     live "/contact", ContactLive
     get "/media/products/:id", ProductPhotoController, :show
+  end
+
+  scope "/", EspresoWeb do
+    pipe_through [:browser, :product_root]
+
+    live_session :product, layout: false do
+      live "/product", ProductLive
+    end
   end
 
   scope "/", EspresoWeb do
