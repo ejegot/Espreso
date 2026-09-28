@@ -1,6 +1,6 @@
 defmodule Espreso.BusinessSettings.Setting do
   @moduledoc """
-  Singleton shop contact / hours / social settings.
+  Per-branch shop contact / hours / social settings.
   """
 
   use Ecto.Schema
@@ -23,6 +23,9 @@ defmodule Espreso.BusinessSettings.Setting do
     field :singleton_key, :integer, default: 1
     field :hours_text, :string, virtual: true
 
+    belongs_to :tenant, Espreso.Tenancy.Tenant
+    belongs_to :branch, Espreso.Tenancy.Branch
+
     timestamps(type: :utc_datetime)
   end
 
@@ -43,7 +46,15 @@ defmodule Espreso.BusinessSettings.Setting do
     |> cast(
       attrs,
       @required_fields ++
-        [:hours_lines, :hours_text, :payments_mode, :gcash_qrph_path, :maya_qrph_path]
+        [
+          :hours_lines,
+          :hours_text,
+          :payments_mode,
+          :gcash_qrph_path,
+          :maya_qrph_path,
+          :tenant_id,
+          :branch_id
+        ]
     )
     |> update_change(:payments_mode, &trim/1)
     |> update_change(:gcash_qrph_path, &blank_to_nil/1)
@@ -66,7 +77,10 @@ defmodule Espreso.BusinessSettings.Setting do
     |> validate_url(:tiktok_url)
     |> validate_inclusion(:payments_mode, @payments_modes)
     |> validate_hours_lines()
-    |> unique_constraint(:singleton_key)
+    |> Espreso.Tenancy.put_ids()
+    |> unique_constraint(:branch_id)
+    |> foreign_key_constraint(:tenant_id)
+    |> foreign_key_constraint(:branch_id)
   end
 
   defp put_hours_lines_from_text(changeset) do

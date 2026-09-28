@@ -1,14 +1,13 @@
 defmodule Espreso.BusinessSettings do
   @moduledoc """
-  Owner-managed shop contact, hours, and social links (singleton).
+  Owner-managed shop contact, hours, and social links (one row per branch).
   """
-
-  import Ecto.Query
 
   alias Espreso.Accounts.Authorization
   alias Espreso.Accounts.User
   alias Espreso.BusinessSettings.Setting
   alias Espreso.Repo
+  alias Espreso.Tenancy
 
   @payments_modes ~w(paymongo qrph_manual counter_only)
 
@@ -33,28 +32,45 @@ defmodule Espreso.BusinessSettings do
   }
 
   @doc """
-  Returns the singleton settings row, creating defaults if missing.
+  Returns settings for Lilac (current live shop), creating defaults if missing.
   """
   def get do
-    case Repo.one(from s in Setting, limit: 1) do
+    get_for_branch(Tenancy.default_branch_id())
+  end
+
+  def get_for_branch(branch_id) when is_integer(branch_id) do
+    case Repo.get_by(Setting, branch_id: branch_id) do
       %Setting{} = setting -> setting
-      nil -> ensure_defaults!()
+      nil -> ensure_defaults_for_branch!(branch_id)
     end
   end
 
   @doc """
-  Idempotent insert of the default CoffeeSpot settings row.
+  Idempotent insert of the CoffeeSpot Lilac settings row.
   """
   def ensure_defaults! do
-    case Repo.one(from s in Setting, limit: 1) do
-      %Setting{} = setting ->
-        setting
+    get_for_branch(Tenancy.default_branch_id())
+  end
 
-      nil ->
-        %Setting{}
-        |> Setting.changeset(@defaults)
-        |> Repo.insert!()
-    end
+  defp ensure_defaults_for_branch!(branch_id) do
+    %{tenant: tenant, branch: branch} = Tenancy.ensure_coffeespot_lilac!()
+
+    {tenant_id, branch_id} =
+      if branch.id == branch_id do
+        {tenant.id, branch.id}
+      else
+        found = Repo.get!(Espreso.Tenancy.Branch, branch_id)
+        {found.tenant_id, found.id}
+      end
+
+    attrs =
+      @defaults
+      |> Map.put(:tenant_id, tenant_id)
+      |> Map.put(:branch_id, branch_id)
+
+    %Setting{}
+    |> Setting.changeset(attrs)
+    |> Repo.insert!()
   end
 
   def defaults, do: @defaults

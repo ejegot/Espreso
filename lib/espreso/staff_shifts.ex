@@ -226,7 +226,12 @@ defmodule Espreso.StaffShifts do
         end
 
         %StaffShift{}
-        |> StaffShift.open_changeset(%{user_id: user.id, started_at: now})
+        |> StaffShift.open_changeset(%{
+          user_id: user.id,
+          started_at: now,
+          tenant_id: user.tenant_id,
+          branch_id: user.branch_id
+        })
         |> Repo.insert()
         |> case do
           {:ok, shift} -> shift

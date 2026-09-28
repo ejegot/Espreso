@@ -1,0 +1,19 @@
+---
+description: Start work on a git branch without Linear tickets
+alwaysApply: true
+---
+
+# Git start — no Linear
+
+Do not wait for Linear, a Linear issue ID, or a paste from Linear. That workflow is retired.
+
+When the user asks to implement, fix, or ship code:
+
+1. If not already on a matching feature branch, create one from up-to-date `main`:
+   `git checkout main && git pull && git checkout -b ej/<short-kebab-slug>`
+2. Slug = the work in a few words. No ticket number required.
+   - Good: `ej/tenancy-lilac-backfill`, `ej/elilai-product-waitlist`
+   - Bad: `ej/esp-201-...` only because Linear used that — do not invent Linear IDs
+3. Then make the changes on that branch. Commit / PR / merge only when the user asks.
+
+Do not create GitHub Issues unless the user asks. A branch name is enough to start.

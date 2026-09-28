@@ -13,6 +13,9 @@ defmodule Espreso.Accounts.User do
     field :role, :string, default: "barista"
     field :active, :boolean, default: true
 
+    belongs_to :tenant, Espreso.Tenancy.Tenant
+    belongs_to :branch, Espreso.Tenancy.Branch
+
     timestamps(type: :utc_datetime)
   end
 
@@ -20,7 +23,7 @@ defmodule Espreso.Accounts.User do
 
   def registration_changeset(user, attrs, opts \\ []) do
     user
-    |> cast(attrs, [:name, :email, :password, :role, :active])
+    |> cast(attrs, [:name, :email, :password, :role, :active, :tenant_id, :branch_id])
     |> update_change(:email, &normalize_email/1)
     |> update_change(:name, &String.trim/1)
     |> validate_required([:name, :email, :role])
@@ -28,6 +31,9 @@ defmodule Espreso.Accounts.User do
     |> validate_format(:email, ~r/^[^\s]+@[^\s]+$/, message: "must be a valid email")
     |> validate_inclusion(:role, @roles)
     |> unique_constraint(:email)
+    |> Espreso.Tenancy.put_ids()
+    |> foreign_key_constraint(:tenant_id)
+    |> foreign_key_constraint(:branch_id)
     |> maybe_clear_blank_password()
     |> maybe_validate_password(opts)
     |> maybe_hash_password(opts)

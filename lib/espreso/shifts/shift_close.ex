@@ -17,6 +17,8 @@ defmodule Espreso.Shifts.ShiftClose do
     field :closed_at, :utc_datetime
 
     belongs_to :closed_by_user, User
+    belongs_to :tenant, Espreso.Tenancy.Tenant
+    belongs_to :branch, Espreso.Tenancy.Branch
 
     timestamps(type: :utc_datetime)
   end
@@ -34,7 +36,9 @@ defmodule Espreso.Shifts.ShiftClose do
       :variance,
       :notes,
       :closed_by_user_id,
-      :closed_at
+      :closed_at,
+      :tenant_id,
+      :branch_id
     ])
     |> validate_required([
       :shop_date,
@@ -46,8 +50,11 @@ defmodule Espreso.Shifts.ShiftClose do
     ])
     |> validate_number(:system_count, greater_than_or_equal_to: 0)
     |> validate_length(:notes, max: 500)
-    |> unique_constraint(:shop_date)
+    |> Espreso.Tenancy.put_ids()
+    |> unique_constraint(:shop_date, name: :shift_closes_branch_id_shop_date_index)
     |> foreign_key_constraint(:closed_by_user_id)
+    |> foreign_key_constraint(:tenant_id)
+    |> foreign_key_constraint(:branch_id)
     |> validate_number(:counted_cash, greater_than_or_equal_to: 0)
   end
 end

@@ -10,13 +10,15 @@ defmodule Espreso.CustomerPush.Subscription do
     field :auth, :string
 
     belongs_to :order, Order
+    belongs_to :tenant, Espreso.Tenancy.Tenant
+    belongs_to :branch, Espreso.Tenancy.Branch
 
     timestamps(type: :utc_datetime)
   end
 
   def changeset(subscription, attrs) do
     subscription
-    |> cast(attrs, [:order_id, :endpoint, :p256dh, :auth])
+    |> cast(attrs, [:order_id, :endpoint, :p256dh, :auth, :tenant_id, :branch_id])
     |> validate_required([:order_id, :endpoint, :p256dh, :auth])
     |> update_change(:endpoint, &String.trim/1)
     |> update_change(:p256dh, &String.trim/1)
@@ -26,6 +28,9 @@ defmodule Espreso.CustomerPush.Subscription do
     |> validate_length(:auth, min: 8, max: 64)
     |> validate_format(:endpoint, ~r/^https:\/\//i)
     |> unique_constraint([:order_id, :endpoint])
+    |> Espreso.Tenancy.put_ids()
     |> foreign_key_constraint(:order_id)
+    |> foreign_key_constraint(:tenant_id)
+    |> foreign_key_constraint(:branch_id)
   end
 end

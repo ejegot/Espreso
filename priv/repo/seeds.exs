@@ -16,7 +16,7 @@ alias Espreso.BusinessSettings
 alias Espreso.Repo
 alias Espreso.Menu.{Category, Product, ProductPrice}
 
-# —— Business settings (singleton) ——
+# —— Business settings (Lilac branch) ——
 settings = BusinessSettings.ensure_defaults!()
 IO.puts("Business settings ready: #{settings.business_name}")
 

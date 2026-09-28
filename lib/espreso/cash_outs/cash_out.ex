@@ -27,6 +27,8 @@ defmodule Espreso.CashOuts.CashOut do
     belongs_to :created_by_user, User, foreign_key: :created_by_user_id
     belongs_to :staff_shift, StaffShift
     belongs_to :voided_by_user, User, foreign_key: :voided_by_user_id
+    belongs_to :tenant, Espreso.Tenancy.Tenant
+    belongs_to :branch, Espreso.Tenancy.Branch
 
     timestamps(type: :utc_datetime)
   end
@@ -44,7 +46,9 @@ defmodule Espreso.CashOuts.CashOut do
       :shop_date,
       :status,
       :created_by_user_id,
-      :staff_shift_id
+      :staff_shift_id,
+      :tenant_id,
+      :branch_id
     ])
     |> validate_required([
       :amount,
@@ -58,8 +62,11 @@ defmodule Espreso.CashOuts.CashOut do
     |> validate_inclusion(:status, @statuses)
     |> validate_number(:amount, greater_than: 0)
     |> update_change(:note, &normalize_optional_text/1)
+    |> Espreso.Tenancy.put_ids()
     |> foreign_key_constraint(:created_by_user_id)
     |> foreign_key_constraint(:staff_shift_id)
+    |> foreign_key_constraint(:tenant_id)
+    |> foreign_key_constraint(:branch_id)
   end
 
   def void_changeset(cash_out, attrs) do
