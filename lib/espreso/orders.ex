@@ -18,6 +18,7 @@ defmodule Espreso.Orders do
   alias Espreso.Menu.Product
   alias Espreso.Menu.ProductPrice
   alias Espreso.StaffShifts.StaffShift
+  alias Espreso.Tenancy
 
   @unpaid_payment_statuses ~w(unpaid awaiting_payment)
   @paid_vias ~w(cash gcash maya counter paymongo)
@@ -326,14 +327,14 @@ defmodule Espreso.Orders do
   end
 
   def get_order_by_number!(number) when is_binary(number) do
-    Order
+    branch_scope(Order)
     |> where([o], o.number == ^number)
     |> preload([:items, :payment_splits])
     |> Repo.one!()
   end
 
   def get_order_by_number(number) when is_binary(number) do
-    Order
+    branch_scope(Order)
     |> where([o], o.number == ^number)
     |> preload([:items, :payment_splits])
     |> Repo.one()
@@ -358,7 +359,7 @@ defmodule Espreso.Orders do
     if cleaned == [] do
       []
     else
-      Order
+      branch_scope(Order)
       |> where([o], o.number in ^cleaned)
       |> order_by([o], desc: o.inserted_at)
       |> preload([:items, :payment_splits])
@@ -482,7 +483,7 @@ defmodule Espreso.Orders do
   Loads one paid receipt transaction with its items and settlement staff.
   """
   def get_transaction(id) when is_integer(id) do
-    Order
+    branch_scope(Order)
     |> where([o], o.id == ^id and o.payment_status == "paid" and not is_nil(o.settled_at))
     |> preload([:items, :settled_by_user, :payment_splits])
     |> Repo.one()
@@ -541,7 +542,7 @@ defmodule Espreso.Orders do
       {_, to_end} = shop_day_bounds_utc(to_date)
 
       query =
-        from(o in Order,
+        from(o in branch_scope(Order),
           where:
             o.payment_status == "paid" and not is_nil(o.settled_at) and
               o.settled_at >= ^from_start and o.settled_at < ^to_end,
@@ -573,7 +574,7 @@ defmodule Espreso.Orders do
   """
   def sales_summary_for_staff_shift(%StaffShift{} = shift) do
     query =
-      from(o in Order,
+      from(o in branch_scope(Order),
         where:
           o.payment_status == "paid" and o.source == "pos" and
             o.settled_by_user_id == ^shift.user_id and not is_nil(o.settled_at) and
@@ -605,7 +606,7 @@ defmodule Espreso.Orders do
     {day_start, day_end} = shop_day_bounds_utc(normalized.date)
 
     query =
-      from(o in Order,
+      from(o in branch_scope(Order),
         where:
           o.payment_status == "paid" and not is_nil(o.settled_at) and
             o.settled_at >= ^day_start and o.settled_at < ^day_end
@@ -705,7 +706,7 @@ defmodule Espreso.Orders do
     do: where(query, [o], field(o, ^field_name) == ^value)
 
   def list_active_orders do
-    Order
+    branch_scope(Order)
     |> where([o], o.status in ^["received", "preparing"])
     |> order_by([o], asc: o.inserted_at, asc: o.id)
     |> preload([:items, :payment_splits])
@@ -779,7 +780,7 @@ defmodule Espreso.Orders do
   defp cancel_order_for_api(%Order{} = order), do: cancel_order(order)
 
   def list_recent_ready(limit \\ 10) do
-    Order
+    branch_scope(Order)
     |> where([o], o.status == "ready")
     |> order_by([o], desc: o.updated_at, desc: o.id)
     |> limit(^limit)
@@ -822,7 +823,7 @@ defmodule Espreso.Orders do
   def list_todays_orders(limit \\ 5) when is_integer(limit) and limit > 0 do
     today_start = shop_day_start_utc()
 
-    Order
+    branch_scope(Order)
     |> where([o], o.inserted_at >= ^today_start and o.status != "cancelled")
     |> order_by([o], desc: o.inserted_at)
     |> limit(^limit)
@@ -854,7 +855,7 @@ defmodule Espreso.Orders do
   defp todays_unpaid_query do
     today_start = shop_day_start_utc()
 
-    from(o in Order,
+    from(o in branch_scope(Order),
       where:
         o.inserted_at >= ^today_start and o.payment_status in ^@unpaid_payment_statuses and
           o.status in ^["received", "preparing", "ready", "completed"]
@@ -877,7 +878,7 @@ defmodule Espreso.Orders do
         _ -> 25
       end
 
-    Order
+    branch_scope(Order)
     |> where([o], o.customer_id == ^customer_id)
     |> order_by([o], desc: o.inserted_at, desc: o.id)
     |> limit(^limit)
@@ -898,7 +899,7 @@ defmodule Espreso.Orders do
     today_start = shop_day_start_utc()
 
     orders =
-      from(o in Order,
+      from(o in branch_scope(Order),
         where: o.payment_status == "paid" and o.settled_at >= ^today_start,
         preload: :payment_splits
       )
@@ -916,7 +917,7 @@ defmodule Espreso.Orders do
     {day_start, day_end} = shop_day_bounds_utc(shop_date)
 
     orders =
-      from(o in Order,
+      from(o in branch_scope(Order),
         where:
           o.payment_status == "paid" and not is_nil(o.settled_at) and
             o.settled_at >= ^day_start and o.settled_at < ^day_end,
@@ -933,7 +934,7 @@ defmodule Espreso.Orders do
   def refund_total_for_shop_date(%Date{} = shop_date) do
     {day_start, day_end} = shop_day_bounds_utc(shop_date)
 
-    from(o in Order,
+    from(o in branch_scope(Order),
       where:
         o.payment_status == "refunded" and not is_nil(o.refunded_at) and
           o.refunded_at >= ^day_start and o.refunded_at < ^day_end,
@@ -1006,7 +1007,7 @@ defmodule Espreso.Orders do
     period_start = DateTime.add(today_start, -6, :day)
 
     paid_period =
-      Order
+      branch_scope(Order)
       |> where([o], o.payment_status == "paid" and o.settled_at >= ^period_start)
 
     total = Repo.aggregate(paid_period, :sum, :total) || Decimal.new("0")
@@ -1029,7 +1030,7 @@ defmodule Espreso.Orders do
     period_start = DateTime.add(today_start, -(days - 1), :day)
 
     rows =
-      from(o in Order,
+      from(o in branch_scope(Order),
         where:
           o.payment_status == "paid" and not is_nil(o.settled_at) and
             o.settled_at >= ^period_start,
@@ -1078,7 +1079,7 @@ defmodule Espreso.Orders do
     period_start = DateTime.add(today_start, -(days - 1), :day)
 
     rows =
-      from(o in Order,
+      from(o in branch_scope(Order),
         where: o.status != "cancelled" and o.inserted_at >= ^period_start,
         select: o.inserted_at
       )
@@ -1161,7 +1162,9 @@ defmodule Espreso.Orders do
 
     from(i in OrderItem,
       join: o in assoc(i, :order),
-      where: o.payment_status == "paid" and o.settled_at >= ^today_start,
+      where:
+        o.payment_status == "paid" and o.settled_at >= ^today_start and
+          o.branch_id == ^Tenancy.default_branch_id(),
       group_by: i.name,
       order_by: [desc: sum(i.quantity), asc: i.name],
       limit: ^limit,
@@ -1185,7 +1188,7 @@ defmodule Espreso.Orders do
   end
 
   defp count_orders(opts) do
-    Order
+    branch_scope(Order)
     |> then(fn query ->
       case Keyword.get(opts, :status) do
         statuses when is_list(statuses) -> where(query, [o], o.status in ^statuses)
@@ -1320,7 +1323,7 @@ defmodule Espreso.Orders do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     {count, _} =
-      from(o in Order,
+      from(o in branch_scope(Order),
         where: o.id == ^order_id and o.payment_status == "paid"
       )
       |> update([o],
@@ -2165,7 +2168,7 @@ defmodule Espreso.Orders do
     # Confirm payment advances New → Preparing so staff skip an extra tap.
     # Do not regress preparing / ready / completed.
     payment_query =
-      from(o in Order,
+      from(o in branch_scope(Order),
         where:
           o.id == ^order_id and o.status != "cancelled" and o.payment_status != "paid" and
             o.payment_method == ^order.payment_method
@@ -2411,4 +2414,6 @@ defmodule Espreso.Orders do
   end
 
   defp checkout_session_attached?(_order), do: false
+
+  defp branch_scope(query), do: Tenancy.scope_to_branch(query)
 end

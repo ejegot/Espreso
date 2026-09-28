@@ -11,6 +11,8 @@ defmodule Espreso.Menu.Product do
     field :photo_updated_at, :utc_datetime
 
     belongs_to :category, Espreso.Menu.Category
+    belongs_to :tenant, Espreso.Tenancy.Tenant
+    belongs_to :branch, Espreso.Tenancy.Branch
     has_many :product_prices, Espreso.Menu.ProductPrice
 
     timestamps(type: :utc_datetime)
@@ -26,7 +28,9 @@ defmodule Espreso.Menu.Product do
       :category_id,
       :menu_group,
       :has_custom_photo,
-      :photo_updated_at
+      :photo_updated_at,
+      :tenant_id,
+      :branch_id
     ])
     |> update_change(:name, &trim_name/1)
     |> update_change(:menu_group, &blank_to_nil/1)
@@ -34,6 +38,9 @@ defmodule Espreso.Menu.Product do
     |> validate_length(:name, min: 1, max: 80)
     |> unique_constraint(:name, name: :products_category_id_name_index)
     |> foreign_key_constraint(:category_id)
+    |> Espreso.Tenancy.put_ids()
+    |> foreign_key_constraint(:tenant_id)
+    |> foreign_key_constraint(:branch_id)
   end
 
   defp trim_name(name) when is_binary(name), do: String.trim(name)

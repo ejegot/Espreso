@@ -15,6 +15,7 @@ defmodule EspresoWeb.StaffAuth do
   alias Espreso.Accounts.Authorization
   alias Espreso.Accounts.User
   alias Espreso.StaffShifts
+  alias Espreso.Tenancy
 
   def log_in_user(conn, user, params \\ %{}) do
     case maybe_open_staff_shift(user) do
@@ -24,6 +25,8 @@ defmodule EspresoWeb.StaffAuth do
         conn
         |> renew_session()
         |> put_session(:user_id, user.id)
+        |> put_session(:tenant_id, user.tenant_id)
+        |> put_session(:branch_id, user.branch_id)
         |> delete_session(:user_return_to)
         |> redirect(to: params["redirect_to"] || user_return_to)
 
@@ -54,7 +57,10 @@ defmodule EspresoWeb.StaffAuth do
   def fetch_current_user(conn, _opts) do
     user_id = get_session(conn, :user_id)
     user = if user_id, do: Accounts.get_user(user_id)
-    assign(conn, :current_user, user)
+
+    conn
+    |> assign(:current_user, user)
+    |> assign_tenancy(user)
   end
 
   def redirect_if_staff_is_authenticated(conn, _opts) do
@@ -199,12 +205,38 @@ defmodule EspresoWeb.StaffAuth do
   end
 
   defp mount_current_user(socket, session) do
-    Phoenix.Component.assign_new(socket, :current_user, fn ->
-      case session do
-        %{"user_id" => user_id} -> Accounts.get_user(user_id)
-        _ -> nil
-      end
-    end)
+    socket =
+      Phoenix.Component.assign_new(socket, :current_user, fn ->
+        case session do
+          %{"user_id" => user_id} -> Accounts.get_user(user_id)
+          _ -> nil
+        end
+      end)
+
+    assign_tenancy(socket, socket.assigns.current_user)
+  end
+
+  defp assign_tenancy(conn_or_socket, %User{tenant_id: tenant_id, branch_id: branch_id})
+       when is_integer(tenant_id) and is_integer(branch_id) do
+    conn_or_socket
+    |> assign_tenancy_ids(tenant_id, branch_id)
+  end
+
+  defp assign_tenancy(conn_or_socket, _) do
+    ids = Tenancy.coffeespot_lilac_ids()
+    assign_tenancy_ids(conn_or_socket, ids.tenant_id, ids.branch_id)
+  end
+
+  defp assign_tenancy_ids(%Plug.Conn{} = conn, tenant_id, branch_id) do
+    conn
+    |> assign(:current_tenant_id, tenant_id)
+    |> assign(:current_branch_id, branch_id)
+  end
+
+  defp assign_tenancy_ids(%Phoenix.LiveView.Socket{} = socket, tenant_id, branch_id) do
+    socket
+    |> Phoenix.Component.assign(:current_tenant_id, tenant_id)
+    |> Phoenix.Component.assign(:current_branch_id, branch_id)
   end
 
   defp renew_session(conn) do

@@ -48,6 +48,8 @@ defmodule Espreso.Orders.Order do
     belongs_to :settled_by_user, User
     belongs_to :refunded_by_user, User
     belongs_to :customer, Customer
+    belongs_to :tenant, Espreso.Tenancy.Tenant
+    belongs_to :branch, Espreso.Tenancy.Branch
 
     timestamps(type: :utc_datetime)
   end
@@ -90,7 +92,9 @@ defmodule Espreso.Orders.Order do
       :discount_amount,
       :refunded_at,
       :refunded_by_user_id,
-      :refund_reason
+      :refund_reason,
+      :tenant_id,
+      :branch_id
     ])
     |> validate_required([
       :customer_name,
@@ -119,6 +123,9 @@ defmodule Espreso.Orders.Order do
     |> validate_number(:cash_tendered, greater_than_or_equal_to: 0)
     |> validate_number(:change_due, greater_than_or_equal_to: 0)
     |> unique_constraint(:number)
+    |> Espreso.Tenancy.put_ids()
+    |> foreign_key_constraint(:tenant_id)
+    |> foreign_key_constraint(:branch_id)
     |> foreign_key_constraint(:settled_by_user_id)
     |> foreign_key_constraint(:customer_id)
     |> foreign_key_constraint(:refunded_by_user_id)

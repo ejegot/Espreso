@@ -18,6 +18,8 @@ defmodule Espreso.StaffShifts.StaffShift do
     field :end_reason, :string
 
     belongs_to :user, User
+    belongs_to :tenant, Espreso.Tenancy.Tenant
+    belongs_to :branch, Espreso.Tenancy.Branch
 
     timestamps(type: :utc_datetime)
   end
@@ -29,9 +31,12 @@ defmodule Espreso.StaffShifts.StaffShift do
   """
   def open_changeset(shift, attrs) do
     shift
-    |> cast(attrs, [:user_id, :started_at])
+    |> cast(attrs, [:user_id, :started_at, :tenant_id, :branch_id])
     |> validate_required([:user_id, :started_at])
+    |> Espreso.Tenancy.put_ids()
     |> foreign_key_constraint(:user_id)
+    |> foreign_key_constraint(:tenant_id)
+    |> foreign_key_constraint(:branch_id)
     |> unique_constraint(:user_id, name: :staff_shifts_one_open_per_user)
   end
 

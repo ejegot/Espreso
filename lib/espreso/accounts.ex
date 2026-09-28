@@ -8,6 +8,7 @@ defmodule Espreso.Accounts do
   alias Espreso.Repo
   alias Espreso.Accounts.Authorization
   alias Espreso.Accounts.User
+  alias Espreso.Tenancy
 
   def get_user(id) when is_integer(id), do: Repo.get(User, id)
   def get_user!(id), do: Repo.get!(User, id)
@@ -19,6 +20,7 @@ defmodule Espreso.Accounts do
 
   def list_users do
     User
+    |> Tenancy.scope_to_branch()
     |> order_by([u], asc: u.name)
     |> Repo.all()
   end

@@ -21,6 +21,7 @@ defmodule Espreso.Shifts do
   alias Espreso.Shifts.ShiftClose
   alias Espreso.StaffShifts
   alias Espreso.StaffShifts.StaffShift
+  alias Espreso.Tenancy
 
   @close_history_page_size 25
 
@@ -33,6 +34,7 @@ defmodule Espreso.Shifts do
 
   def get_close_for_date(%Date{} = shop_date) do
     ShiftClose
+    |> Tenancy.scope_to_branch()
     |> where([s], s.shop_date == ^shop_date)
     |> preload(:closed_by_user)
     |> Repo.one()
@@ -43,6 +45,7 @@ defmodule Espreso.Shifts do
   """
   def list_closes_for_shop_dates(%Date{} = from_date, %Date{} = to_date) do
     ShiftClose
+    |> Tenancy.scope_to_branch()
     |> where([s], s.shop_date >= ^from_date and s.shop_date <= ^to_date)
     |> order_by([s], asc: s.shop_date)
     |> preload(:closed_by_user)
@@ -54,6 +57,7 @@ defmodule Espreso.Shifts do
   """
   def list_opens_for_shop_dates(%Date{} = from_date, %Date{} = to_date) do
     ShopDayOpen
+    |> Tenancy.scope_to_branch()
     |> where([o], o.shop_date >= ^from_date and o.shop_date <= ^to_date)
     |> order_by([o], asc: o.shop_date)
     |> preload(:opened_by_user)
@@ -86,6 +90,7 @@ defmodule Espreso.Shifts do
 
     query =
       ShiftClose
+      |> Tenancy.scope_to_branch()
       |> apply_close_history_cursor(cursor)
       |> order_by([s], desc: s.shop_date)
       |> limit(^(limit + 1))
@@ -185,6 +190,7 @@ defmodule Espreso.Shifts do
 
   def get_open_for_date(%Date{} = shop_date) do
     ShopDayOpen
+    |> Tenancy.scope_to_branch()
     |> where([o], o.shop_date == ^shop_date)
     |> preload(:opened_by_user)
     |> Repo.one()
@@ -234,7 +240,9 @@ defmodule Espreso.Shifts do
             opening_cash: opening_cash,
             opened_at: opened_at,
             opened_by_user_id: user.id,
-            notes: notes
+            notes: notes,
+            tenant_id: user.tenant_id,
+            branch_id: user.branch_id
           })
           |> Repo.insert()
           |> case do
@@ -393,7 +401,9 @@ defmodule Espreso.Shifts do
               variance: variance,
               notes: notes,
               closed_by_user_id: user.id,
-              closed_at: closed_at
+              closed_at: closed_at,
+              tenant_id: user.tenant_id,
+              branch_id: user.branch_id
             })
             |> Repo.insert()
             |> case do

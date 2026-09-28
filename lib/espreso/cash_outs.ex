@@ -13,6 +13,7 @@ defmodule Espreso.CashOuts do
   alias Espreso.Repo
   alias Espreso.Shifts
   alias Espreso.StaffShifts
+  alias Espreso.Tenancy
 
   @doc """
   True when the user may open the Cash Out screen (barista / manager / owner).
@@ -50,7 +51,9 @@ defmodule Espreso.CashOuts do
         shop_date: shop_date,
         status: "recorded",
         created_by_user_id: actor.id,
-        staff_shift_id: staff_shift_id
+        staff_shift_id: staff_shift_id,
+        tenant_id: actor.tenant_id,
+        branch_id: actor.branch_id
       })
       |> Repo.insert()
       |> case do
@@ -70,6 +73,7 @@ defmodule Espreso.CashOuts do
   """
   def list_cash_outs_for_shop_date(%Date{} = shop_date) do
     CashOut
+    |> Tenancy.scope_to_branch()
     |> where([c], c.shop_date == ^shop_date)
     |> order_by([c], desc: c.recorded_at, desc: c.id)
     |> preload([:created_by_user])
@@ -81,6 +85,7 @@ defmodule Espreso.CashOuts do
   """
   def list_cash_outs_for_shop_dates(%Date{} = from_date, %Date{} = to_date) do
     CashOut
+    |> Tenancy.scope_to_branch()
     |> where([c], c.shop_date >= ^from_date and c.shop_date <= ^to_date)
     |> order_by([c], asc: c.shop_date, desc: c.recorded_at, desc: c.id)
     |> preload([:created_by_user])
@@ -119,7 +124,7 @@ defmodule Espreso.CashOuts do
     upper_bound = cursor || today
 
     shop_dates =
-      from(c in CashOut,
+      from(c in Tenancy.scope_to_branch(CashOut),
         where: c.shop_date < ^upper_bound,
         group_by: c.shop_date,
         select: c.shop_date,
@@ -176,6 +181,7 @@ defmodule Espreso.CashOuts do
   def total_for_shop_date(%Date{} = shop_date) do
     total =
       CashOut
+      |> Tenancy.scope_to_branch()
       |> where([c], c.shop_date == ^shop_date and c.status == "recorded")
       |> select([c], sum(c.amount))
       |> Repo.one()
@@ -188,6 +194,7 @@ defmodule Espreso.CashOuts do
   """
   def list_recorded_for_shop_date(%Date{} = shop_date) do
     CashOut
+    |> Tenancy.scope_to_branch()
     |> where([c], c.shop_date == ^shop_date and c.status == "recorded")
     |> order_by([c], desc: c.recorded_at, desc: c.id)
     |> preload([:created_by_user])

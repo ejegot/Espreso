@@ -9,6 +9,7 @@ defmodule Espreso.Menu do
   alias Espreso.Accounts.User
   alias Espreso.Repo
   alias Espreso.Menu.{Category, Product, ProductPhoto, ProductPrice}
+  alias Espreso.Tenancy
 
   @category_order ~w(HOT COLD FRAPPE SODA FOOD)
   @photo_max_bytes 3_000_000
@@ -339,6 +340,7 @@ defmodule Espreso.Menu do
   """
   def list_menu do
     Category
+    |> Tenancy.scope_to_branch()
     |> preload(products: :product_prices)
     |> Repo.all()
     |> Enum.map(&filter_available_products/1)
@@ -354,6 +356,7 @@ defmodule Espreso.Menu do
   """
   def list_products_for_availability do
     Category
+    |> Tenancy.scope_to_branch()
     |> preload(:products)
     |> Repo.all()
     |> Enum.map(fn category ->
@@ -508,7 +511,7 @@ defmodule Espreso.Menu do
         {:error, :invalid_category}
 
       true ->
-        case Repo.get_by(Category, name: name) do
+        case Repo.get_by(Category, name: name, branch_id: Tenancy.default_branch_id()) do
           %Category{} = category -> {:ok, category}
           nil -> {:error, :unknown_category}
         end
@@ -550,7 +553,10 @@ defmodule Espreso.Menu do
   end
 
   defp category_name_taken?(name) do
-    Repo.exists?(from c in Category, where: fragment("lower(?) = lower(?)", c.name, ^name))
+    Repo.exists?(
+      from c in Tenancy.scope_to_branch(Category),
+        where: fragment("lower(?) = lower(?)", c.name, ^name)
+    )
   end
 
   defp category_name_error(%Ecto.Changeset{} = changeset) do

@@ -8,12 +8,22 @@ defmodule Espreso.Customers.Customer do
     field :points_balance, :integer, default: 0
     field :spend_remainder_centavos, :integer, default: 0
 
+    belongs_to :tenant, Espreso.Tenancy.Tenant
+    belongs_to :branch, Espreso.Tenancy.Branch
+
     timestamps(type: :utc_datetime)
   end
 
   def changeset(customer, attrs) do
     customer
-    |> cast(attrs, [:phone_e164, :name, :points_balance, :spend_remainder_centavos])
+    |> cast(attrs, [
+      :phone_e164,
+      :name,
+      :points_balance,
+      :spend_remainder_centavos,
+      :tenant_id,
+      :branch_id
+    ])
     |> update_change(:name, &blank_to_nil/1)
     |> validate_required([:phone_e164])
     |> validate_format(:phone_e164, ~r/^\+639\d{9}$/,
@@ -26,6 +36,9 @@ defmodule Espreso.Customers.Customer do
       less_than: 20_000
     )
     |> unique_constraint(:phone_e164)
+    |> Espreso.Tenancy.put_ids()
+    |> foreign_key_constraint(:tenant_id)
+    |> foreign_key_constraint(:branch_id)
     |> check_constraint(:points_balance, name: :customers_points_balance_nonnegative)
     |> check_constraint(:spend_remainder_centavos, name: :customers_spend_remainder_range)
   end
