@@ -76,6 +76,39 @@ defmodule Espreso.Tenancy do
 
   def get_branch(id) when is_integer(id), do: Repo.get(Branch, id)
 
+  def get_tenant(id) when is_integer(id), do: Repo.get(Tenant, id)
+
+  def get_tenant_by_slug(slug) when is_binary(slug) do
+    Repo.get_by(Tenant, slug: String.downcase(String.trim(slug)))
+  end
+
+  def get_tenant_by_slug(_), do: nil
+
+  def list_tenants do
+    Tenant
+    |> order_by([t], asc: t.name)
+    |> Repo.all()
+  end
+
+  @doc """
+  CoffeeSpot owner only — not a renter café owner.
+  """
+  def platform_owner?(%{role: "owner", active: true, tenant_id: tenant_id})
+      when is_integer(tenant_id) do
+    coffeespot_tenant?(tenant_id)
+  end
+
+  def platform_owner?(_), do: false
+
+  def coffeespot_tenant?(tenant_id) when is_integer(tenant_id) do
+    case Repo.get(Tenant, tenant_id) do
+      %Tenant{slug: @coffeespot_slug} -> true
+      _ -> false
+    end
+  end
+
+  def coffeespot_tenant?(_), do: false
+
   def list_branches(tenant_id) when is_integer(tenant_id) do
     Branch
     |> where([b], b.tenant_id == ^tenant_id)
@@ -133,6 +166,53 @@ defmodule Espreso.Tenancy do
 
   def put_guest_branch(_), do: put_lilac_context()
 
+  def put_guest_tenant(slug) when is_binary(slug) do
+    case get_tenant_by_slug(slug) do
+      %Tenant{} = tenant ->
+        case main_branch(tenant.id) do
+          %Branch{} = branch ->
+            put_context(%{tenant_id: tenant.id, branch_id: branch.id})
+            {:ok, tenant}
+
+          nil ->
+            put_lilac_context()
+            {:error, :not_found}
+        end
+
+      nil ->
+        put_lilac_context()
+        {:error, :not_found}
+    end
+  end
+
+  def put_guest_tenant(_), do: put_lilac_context()
+
+  def put_guest_tenant_branch(tenant_slug, branch_slug)
+      when is_binary(tenant_slug) and is_binary(branch_slug) do
+    case get_tenant_by_slug(tenant_slug) do
+      %Tenant{} = tenant ->
+        case get_branch_by_slug(tenant.id, branch_slug) do
+          %Branch{} = branch ->
+            put_context(%{tenant_id: branch.tenant_id, branch_id: branch.id})
+            {:ok, branch}
+
+          nil ->
+            put_lilac_context()
+            {:error, :not_found}
+        end
+
+      nil ->
+        put_lilac_context()
+        {:error, :not_found}
+    end
+  end
+
+  def put_guest_tenant_branch(_, _), do: put_lilac_context()
+
+  def main_branch(tenant_id) when is_integer(tenant_id) do
+    Repo.get_by(Branch, tenant_id: tenant_id, main: true)
+  end
+
   def put_lilac_context do
     put_context(coffeespot_lilac_ids())
   end
@@ -159,6 +239,10 @@ defmodule Espreso.Tenancy do
   end
 
   def scope_to_tenant(query, _), do: query
+
+  def scope_to_tenant(query) do
+    scope_to_tenant(query, current_tenant_id())
+  end
 
   def scope_to_branch(query, nil), do: query
 

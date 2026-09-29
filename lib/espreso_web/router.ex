@@ -85,6 +85,8 @@ defmodule EspresoWeb.Router do
     live "/", HomeLive
     live "/menu", MenuLive
     live "/b/:branch_slug/menu", MenuLive
+    live "/t/:tenant_slug/menu", MenuLive
+    live "/t/:tenant_slug/b/:branch_slug/menu", MenuLive
     live "/order/:number", OrderLive
     live "/about", AboutLive
     live "/contact", ContactLive
@@ -105,6 +107,7 @@ defmodule EspresoWeb.Router do
     live_session :redirect_if_authenticated,
       on_mount: [{EspresoWeb.StaffAuth, :redirect_if_authenticated}] do
       live "/login", StaffLoginLive, :new
+      live "/t/:tenant_slug/login", StaffLoginLive, :new
       live "/setup", StaffOwnerSetupLive, :new
       live "/register", StaffRegisterLive, :new
     end
@@ -174,6 +177,11 @@ defmodule EspresoWeb.Router do
       on_mount: [{EspresoWeb.StaffAuth, :ensure_owner}] do
       live "/admin/users", AdminUsersLive
       live "/admin/branches", AdminBranchesLive
+    end
+
+    live_session :platform_owner,
+      on_mount: [{EspresoWeb.StaffAuth, :ensure_platform_owner}] do
+      live "/admin/tenants", AdminTenantsLive
     end
   end
 

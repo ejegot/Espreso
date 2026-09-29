@@ -49,8 +49,33 @@ defmodule Espreso.Tenancy.Branches do
 
   def create_as(_, _), do: {:error, :unauthorized}
 
-  def guest_menu_path(%Branch{slug: "lilac"}), do: "/menu"
-  def guest_menu_path(%Branch{slug: slug}), do: "/b/#{slug}/menu"
+  def guest_menu_path(%Branch{} = branch) do
+    tenant = Repo.get!(Tenant, branch.tenant_id)
+
+    cond do
+      tenant.slug == Tenancy.coffeespot_slug() and branch.slug == Tenancy.lilac_slug() ->
+        "/menu"
+
+      tenant.slug == Tenancy.coffeespot_slug() ->
+        "/b/#{branch.slug}/menu"
+
+      branch.main ->
+        "/t/#{tenant.slug}/menu"
+
+      true ->
+        "/t/#{tenant.slug}/b/#{branch.slug}/menu"
+    end
+  end
+
+  def guest_login_path(%Branch{} = branch) do
+    tenant = Repo.get!(Tenant, branch.tenant_id)
+
+    if tenant.slug == Tenancy.coffeespot_slug() do
+      "/login"
+    else
+      "/t/#{tenant.slug}/login"
+    end
+  end
 
   defp fetch_name(attrs) do
     name =

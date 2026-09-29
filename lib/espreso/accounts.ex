@@ -345,6 +345,7 @@ defmodule Espreso.Accounts do
   """
   def list_active_staff_for_roster do
     User
+    |> Tenancy.scope_to_tenant()
     |> where([u], u.active == true and u.role in ^@staff_roster_roles)
     |> order_by([u], asc: u.name)
     |> select([u], %{id: u.id, name: u.name, role: u.role})
@@ -356,6 +357,7 @@ defmodule Espreso.Accounts do
   """
   def list_staff_for_pin_login do
     User
+    |> Tenancy.scope_to_tenant()
     |> where(
       [u],
       u.active == true and u.role in ^@staff_roster_roles and not is_nil(u.pin_hash) and
