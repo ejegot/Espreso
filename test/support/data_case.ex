@@ -40,6 +40,7 @@ defmodule Espreso.DataCase do
     pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Espreso.Repo, shared: not tags[:async])
     on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
     Espreso.Tenancy.ensure_coffeespot_lilac!()
+    Espreso.Tenancy.put_lilac_context()
   end
 
   @doc """

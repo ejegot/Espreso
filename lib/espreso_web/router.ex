@@ -84,6 +84,7 @@ defmodule EspresoWeb.Router do
 
     live "/", HomeLive
     live "/menu", MenuLive
+    live "/b/:branch_slug/menu", MenuLive
     live "/order/:number", OrderLive
     live "/about", AboutLive
     live "/contact", ContactLive
@@ -148,6 +149,8 @@ defmodule EspresoWeb.Router do
     get "/staff/reports/export/close.pdf", CloseExportController, :pdf
     get "/staff/reports/export/attendance.xlsx", AttendanceExportController, :download
 
+    post "/session/branch", BranchSessionController, :update
+
     live_session :staff,
       on_mount: [{EspresoWeb.StaffAuth, :ensure_staff}] do
       live "/staff", StaffHomeLive
@@ -170,6 +173,7 @@ defmodule EspresoWeb.Router do
     live_session :owner,
       on_mount: [{EspresoWeb.StaffAuth, :ensure_owner}] do
       live "/admin/users", AdminUsersLive
+      live "/admin/branches", AdminBranchesLive
     end
   end
 

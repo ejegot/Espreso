@@ -1,9 +1,9 @@
 defmodule Espreso.Tenancy do
   @moduledoc """
-  CoffeeSpot Lilac is tenant + main branch. Queries and inserts attach those IDs.
+  CoffeeSpot Lilac is the first tenant + main branch.
 
-  No Add Branch / Add Tenant UI here — only the lockbox so a second shop cannot
-  share Lilac rows by accident.
+  Request-scoped `put_context/1` is the working shop (staff session or guest slug).
+  Inserts and list queries follow that context, not always Lilac.
   """
 
   import Ecto.Changeset
@@ -15,6 +15,7 @@ defmodule Espreso.Tenancy do
   @coffeespot_slug "coffeespot"
   @lilac_slug "lilac"
   @lilac_code "lilac"
+  @context_key :espreso_tenancy
 
   def coffeespot_slug, do: @coffeespot_slug
   def lilac_slug, do: @lilac_slug
@@ -39,6 +40,108 @@ defmodule Espreso.Tenancy do
   def coffeespot_lilac_ids do
     %{tenant: tenant, branch: branch} = ensure_coffeespot_lilac!()
     %{tenant_id: tenant.id, branch_id: branch.id}
+  end
+
+  @doc """
+  Sets the working tenant/branch for this process (one HTTP/LiveView request).
+  """
+  def put_context(%{tenant_id: tenant_id, branch_id: branch_id})
+      when is_integer(tenant_id) and is_integer(branch_id) do
+    Process.put(@context_key, %{tenant_id: tenant_id, branch_id: branch_id})
+    :ok
+  end
+
+  def put_context(_), do: :ok
+
+  def current_ids do
+    case Process.get(@context_key) do
+      %{tenant_id: tenant_id, branch_id: branch_id}
+      when is_integer(tenant_id) and is_integer(branch_id) ->
+        %{tenant_id: tenant_id, branch_id: branch_id}
+
+      _ ->
+        coffeespot_lilac_ids()
+    end
+  end
+
+  def current_tenant_id, do: current_ids().tenant_id
+  def current_branch_id, do: current_ids().branch_id
+
+  def current_branch do
+    case Repo.get(Branch, current_branch_id()) do
+      %Branch{} = branch -> branch
+      nil -> ensure_coffeespot_lilac!().branch
+    end
+  end
+
+  def get_branch(id) when is_integer(id), do: Repo.get(Branch, id)
+
+  def list_branches(tenant_id) when is_integer(tenant_id) do
+    Branch
+    |> where([b], b.tenant_id == ^tenant_id)
+    |> order_by([b], desc: b.main, asc: b.name)
+    |> Repo.all()
+  end
+
+  def get_branch_by_slug(tenant_id, slug) when is_integer(tenant_id) and is_binary(slug) do
+    Repo.get_by(Branch, tenant_id: tenant_id, slug: String.downcase(String.trim(slug)))
+  end
+
+  def switcher?(%{role: role, active: true}) when role in ~w(owner manager), do: true
+  def switcher?(_), do: false
+
+  @doc """
+  Working branch for staff: home branch, unless owner/manager picked another
+  shop in the same tenant.
+  """
+  def resolve_working_branch_id(user, session_branch_id)
+
+  def resolve_working_branch_id(%{branch_id: home_id, tenant_id: tenant_id} = user, session_id)
+      when is_integer(home_id) do
+    session_id = parse_id(session_id)
+
+    cond do
+      not switcher?(user) ->
+        home_id
+
+      is_integer(session_id) ->
+        case get_branch(session_id) do
+          %Branch{tenant_id: ^tenant_id} -> session_id
+          _ -> home_id
+        end
+
+      true ->
+        home_id
+    end
+  end
+
+  def resolve_working_branch_id(_, _), do: default_branch_id()
+
+  def put_guest_branch(slug) when is_binary(slug) do
+    %{tenant: tenant} = ensure_coffeespot_lilac!()
+
+    case get_branch_by_slug(tenant.id, slug) do
+      %Branch{} = branch ->
+        put_context(%{tenant_id: branch.tenant_id, branch_id: branch.id})
+        {:ok, branch}
+
+      nil ->
+        put_lilac_context()
+        {:error, :not_found}
+    end
+  end
+
+  def put_guest_branch(_), do: put_lilac_context()
+
+  def put_lilac_context do
+    put_context(coffeespot_lilac_ids())
+  end
+
+  def put_staff_context(user, session_branch_id) do
+    branch_id = resolve_working_branch_id(user, session_branch_id)
+    tenant_id = user.tenant_id || default_tenant_id()
+    put_context(%{tenant_id: tenant_id, branch_id: branch_id})
+    branch_id
   end
 
   def scope_to_tenant(query, nil), do: query
@@ -77,14 +180,14 @@ defmodule Espreso.Tenancy do
   Scopes to the current staff branch, or Lilac when none is given.
   """
   def scope_to_branch(query) do
-    scope_to_branch(query, default_branch_id())
+    scope_to_branch(query, current_branch_id())
   end
 
   @doc """
-  Puts Lilac IDs when tenant_id / branch_id are missing. Existing values win.
+  Puts working-shop IDs when tenant_id / branch_id are missing. Existing values win.
   """
   def put_ids(%Ecto.Changeset{} = changeset) do
-    ids = coffeespot_lilac_ids()
+    ids = current_ids()
 
     changeset
     |> maybe_put(:tenant_id, ids.tenant_id)
@@ -92,7 +195,7 @@ defmodule Espreso.Tenancy do
   end
 
   def put_ids(attrs) when is_map(attrs) do
-    ids = coffeespot_lilac_ids()
+    ids = current_ids()
     attrs = stringify_keys(attrs)
 
     attrs
@@ -179,4 +282,15 @@ defmodule Espreso.Tenancy do
       {key, value} -> {key, value}
     end)
   end
+
+  defp parse_id(id) when is_integer(id) and id > 0, do: id
+
+  defp parse_id(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {int, ""} when int > 0 -> int
+      _ -> nil
+    end
+  end
+
+  defp parse_id(_), do: nil
 end

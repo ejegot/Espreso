@@ -1164,7 +1164,7 @@ defmodule Espreso.Orders do
       join: o in assoc(i, :order),
       where:
         o.payment_status == "paid" and o.settled_at >= ^today_start and
-          o.branch_id == ^Tenancy.default_branch_id(),
+          o.branch_id == ^Tenancy.current_branch_id(),
       group_by: i.name,
       order_by: [desc: sum(i.quantity), asc: i.name],
       limit: ^limit,

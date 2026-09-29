@@ -511,7 +511,7 @@ defmodule Espreso.Menu do
         {:error, :invalid_category}
 
       true ->
-        case Repo.get_by(Category, name: name, branch_id: Tenancy.default_branch_id()) do
+        case Repo.get_by(Category, name: name, branch_id: Tenancy.current_branch_id()) do
           %Category{} = category -> {:ok, category}
           nil -> {:error, :unknown_category}
         end

@@ -10997,6 +10997,69 @@ a.staff-home-card:focus-visible {
   outline: none;
 }
 
+.staff-branch-switch {
+  margin: 0 0.35rem 0 0;
+}
+
+.staff-branch-select {
+  max-width: 8.5rem;
+  min-height: 2rem;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--elilai-forest, #394331) 22%, transparent);
+  border-radius: 0.55rem;
+  background: var(--elilai-ivory, #f4efe3);
+  color: var(--elilai-forest, #394331);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.staff-branch-label {
+  margin: 0 0.4rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--elilai-forest, #394331);
+}
+
+.staff-branch-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.staff-branch-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.staff-branch-name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.staff-branch-pill {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--elilai-forest, #394331) 12%, transparent);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.staff-branch-meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--elilai-forest, #394331) 62%, #f4efe3);
+}
+
 @media (min-width: 800px) {
   .staff-team-page {
     width: min(calc(100% - 1.5rem), 72rem);
