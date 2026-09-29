@@ -18001,6 +18001,31 @@ body:has(.home-page-landing) {
   filter: drop-shadow(0 1px 10px rgba(20, 10, 6, 0.7));
 }
 
+.guest-cafe-mark {
+  display: inline-block;
+  font-family: "Fraunces", "Iowan Old Style", Georgia, serif;
+  font-size: clamp(1.05rem, 3.6vw, 1.35rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  color: #382010;
+}
+
+.guest-cafe-mark--on-dark {
+  color: #faf7f4;
+  text-shadow: 0 1px 10px rgba(20, 10, 6, 0.7);
+}
+
+.menu-qr-top-brand .guest-cafe-mark,
+.menu-qr-landing-top-brand .guest-cafe-mark {
+  line-height: 1.15;
+}
+
+.menu-page-brune .brune-mega-footer--secondary .brune-mega-brand .guest-cafe-mark {
+  display: block;
+  text-align: center;
+}
+
 .menu-qr-landing-carousel {
   position: relative;
   z-index: 1;
