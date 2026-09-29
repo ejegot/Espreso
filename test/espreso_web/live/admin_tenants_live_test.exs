@@ -87,6 +87,14 @@ defmodule EspresoWeb.AdminTenantsLiveTest do
 
     {:ok, _view, html} = live(conn, ~p"/t/isolated-cafe/menu")
     assert html =~ "Isolated Cafe"
+    assert html =~ "Visit Isolated Cafe"
+    refute html =~ "Pure Tableya"
+    refute html =~ "Come say hi in Lilac"
+    refute html =~ "Students: Free size upgrade"
+
+    {:ok, _view, cs_html} = live(conn, ~p"/menu")
+    assert cs_html =~ "Pure Tableya"
+    assert cs_html =~ "Visit CoffeeSpot"
 
     assert {:error, {:redirect, %{to: "/menu"}}} = live(conn, ~p"/t/not-a-cafe/menu")
   end

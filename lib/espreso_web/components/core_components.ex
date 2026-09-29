@@ -618,7 +618,7 @@ defmodule EspresoWeb.CoreComponents do
         class="site-top-social"
         target="_blank"
         rel="noopener noreferrer"
-        aria-label={"CoffeeSpot on #{link.label}"}
+        aria-label={Espreso.CoffeeSpot.social_aria(link.label)}
       >
         <.social_icon name={link.id} />
       </a>
@@ -647,6 +647,23 @@ defmodule EspresoWeb.CoreComponents do
       <img src={@src} alt="" class="coffeespot-wordmark-img" />
       <span class="sr-only">CoffeeSpot</span>
     </span>
+    """
+  end
+
+  attr :coffeespot?, :boolean, required: true
+  attr :name, :string, required: true
+  attr :variant, :string, default: "color", values: ~w(color on-dark)
+  attr :class, :any, default: nil
+
+  def guest_brand_mark(assigns) do
+    ~H"""
+    <%= if @coffeespot? do %>
+      <.coffeespot_wordmark variant={@variant} class={@class} />
+    <% else %>
+      <span class={["guest-cafe-mark", @variant == "on-dark" && "guest-cafe-mark--on-dark", @class]}>
+        {@name}
+      </span>
+    <% end %>
     """
   end
 
@@ -874,9 +891,12 @@ defmodule EspresoWeb.CoreComponents do
   Slim student promo strip for the Menu page.
   """
   def brune_student_promo(assigns) do
+    note = CoffeeSpot.student_promo_note()
+    assigns = assign(assigns, :note, note)
+
     ~H"""
-    <aside class="brune-student-promo" aria-label="Student promotion">
-      <p class="brune-student-promo-text">{CoffeeSpot.student_promo_note()}</p>
+    <aside :if={@note} class="brune-student-promo" aria-label="Student promotion">
+      <p class="brune-student-promo-text">{@note}</p>
     </aside>
     """
   end

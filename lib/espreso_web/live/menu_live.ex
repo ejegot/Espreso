@@ -31,6 +31,8 @@ defmodule EspresoWeb.MenuLive do
     {:ok,
      socket
      |> assign(:page_title, "Menu")
+     |> assign(:coffeespot_guest?, Tenancy.coffeespot_guest?())
+     |> assign(:guest_brand_name, CoffeeSpot.business_name())
      |> assign(:payments_mode, payment_config.payments_mode)
      |> assign(:gcash_pay_available?, wallet_pay_available?(payment_config, :gcash))
      |> assign(:maya_pay_available?, wallet_pay_available?(payment_config, :maya))
@@ -518,11 +520,18 @@ defmodule EspresoWeb.MenuLive do
       <div
         :if={@menu_stage == :landing}
         id="menu-landing"
-        class="menu-qr-landing menu-qr-landing--signature"
+        class={[
+          "menu-qr-landing",
+          @coffeespot_guest? && "menu-qr-landing--signature"
+        ]}
       >
         <header class="menu-qr-landing-top menu-qr-top" id="menu-landing-top">
           <p class="menu-qr-landing-top-brand menu-qr-top-brand">
-            <.coffeespot_wordmark variant="on-dark" />
+            <.guest_brand_mark
+              coffeespot?={@coffeespot_guest?}
+              name={@guest_brand_name}
+              variant="on-dark"
+            />
           </p>
         </header>
 
@@ -530,9 +539,10 @@ defmodule EspresoWeb.MenuLive do
           id="menu-landing-carousel"
           class="menu-qr-landing-carousel"
           phx-hook="LandingCarousel"
-          aria-label="CoffeeSpot intro"
+          aria-label={"#{@guest_brand_name} intro"}
         >
           <section
+            :if={@coffeespot_guest?}
             id="menu-landing-slide-welcome"
             class="menu-qr-landing-slide menu-qr-landing-slide--signature"
             aria-label="Pure Tableya, CoffeeSpot signature drink"
@@ -558,9 +568,9 @@ defmodule EspresoWeb.MenuLive do
           <section
             id="menu-landing-slide-visit"
             class="menu-qr-landing-slide"
-            aria-label="Visit CoffeeSpot"
+            aria-label={CoffeeSpot.visit_title()}
           >
-            <div class="menu-qr-landing-media" aria-hidden="true">
+            <div :if={@coffeespot_guest?} class="menu-qr-landing-media" aria-hidden="true">
               <img
                 src="/images/coffeespot/IMG_3497.jpg"
                 alt=""
@@ -571,9 +581,9 @@ defmodule EspresoWeb.MenuLive do
             </div>
             <div class="menu-qr-landing-scrim" aria-hidden="true"></div>
             <div class="menu-qr-landing-copy">
-              <h1 class="menu-qr-landing-headline">Visit CoffeeSpot</h1>
+              <h1 class="menu-qr-landing-headline">{CoffeeSpot.visit_title()}</h1>
               <p class="menu-qr-landing-lede">
-                {CoffeeSpot.location()} · Come say hi in Lilac, Marikina.
+                {CoffeeSpot.landing_lede()}
               </p>
               <button
                 type="button"
@@ -588,7 +598,12 @@ defmodule EspresoWeb.MenuLive do
         </div>
 
         <div class="menu-qr-landing-dock">
-          <div class="menu-qr-landing-dots" role="tablist" aria-label="Intro slides">
+          <div
+            :if={@coffeespot_guest?}
+            class="menu-qr-landing-dots"
+            role="tablist"
+            aria-label="Intro slides"
+          >
             <button
               type="button"
               class="menu-qr-landing-dot is-active"
@@ -604,7 +619,7 @@ defmodule EspresoWeb.MenuLive do
               data-landing-dot="1"
               role="tab"
               aria-selected="false"
-              aria-label="Visit CoffeeSpot slide"
+              aria-label={CoffeeSpot.visit_title() <> " slide"}
             >
             </button>
           </div>
@@ -635,7 +650,7 @@ defmodule EspresoWeb.MenuLive do
       </div>
 
       <div :if={@menu_stage == :craving} id="menu-craving-chooser" class="menu-qr-craving">
-        <div class="menu-qr-craving-bridge" aria-hidden="true">
+        <div :if={@coffeespot_guest?} class="menu-qr-craving-bridge" aria-hidden="true">
           <img
             src="/images/coffeespot/cold-signature-01.jpg"
             alt=""
@@ -650,11 +665,17 @@ defmodule EspresoWeb.MenuLive do
           <button type="button" class="menu-qr-craving-back" phx-click="back_to_landing">
             Back
           </button>
-          <p class="menu-qr-craving-brand"><.coffeespot_wordmark /></p>
+          <p class="menu-qr-craving-brand">
+            <.guest_brand_mark coffeespot?={@coffeespot_guest?} name={@guest_brand_name} />
+          </p>
           <h1 id="menu-craving-chooser-title" class="menu-qr-craving-title">
             What are you craving?
           </h1>
-          <p class="menu-qr-craving-lede">Choose something for your CoffeeSpot moment.</p>
+          <p class="menu-qr-craving-lede">
+            {if @coffeespot_guest?,
+              do: "Choose something for your CoffeeSpot moment.",
+              else: "Choose something from the menu."}
+          </p>
         </div>
 
         <div class="menu-qr-craving-body">
@@ -685,7 +706,7 @@ defmodule EspresoWeb.MenuLive do
       </div>
 
       <div :if={@menu_stage == :visit} id="menu-visit" class="menu-qr-visit">
-        <div class="menu-qr-visit-bridge" aria-hidden="true">
+        <div :if={@coffeespot_guest?} class="menu-qr-visit-bridge" aria-hidden="true">
           <img
             src="/images/coffeespot/IMG_3497.jpg"
             alt=""
@@ -701,8 +722,10 @@ defmodule EspresoWeb.MenuLive do
             Back
           </button>
 
-          <p class="menu-qr-visit-brand"><.coffeespot_wordmark /></p>
-          <h1 class="menu-qr-visit-title">Visit CoffeeSpot</h1>
+          <p class="menu-qr-visit-brand">
+            <.guest_brand_mark coffeespot?={@coffeespot_guest?} name={@guest_brand_name} />
+          </p>
+          <h1 class="menu-qr-visit-title">{CoffeeSpot.visit_title()}</h1>
           <p class="menu-qr-visit-place">{CoffeeSpot.location()}</p>
 
           <section class="menu-qr-visit-block" aria-labelledby="menu-visit-address-label">
@@ -758,7 +781,7 @@ defmodule EspresoWeb.MenuLive do
               class={"menu-qr-visit-social menu-qr-visit-social--#{link.id}"}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label={"CoffeeSpot on #{link.label}"}
+              aria-label={CoffeeSpot.social_aria(link.label)}
             >
               <.social_icon name={link.id} />
             </a>
@@ -783,12 +806,20 @@ defmodule EspresoWeb.MenuLive do
               id="menu-qr-back"
               class="menu-qr-chrome-back"
               phx-click="back_to_landing"
-              aria-label="Back to CoffeeSpot home"
+              aria-label={
+                if @coffeespot_guest?,
+                  do: "Back to CoffeeSpot home",
+                  else: "Back to #{@guest_brand_name}"
+              }
             >
               <.icon name="hero-arrow-left" class="menu-qr-chrome-icon" />
             </button>
             <p class="menu-qr-chrome-brand menu-qr-top-brand">
-              <.coffeespot_wordmark variant="on-dark" />
+              <.guest_brand_mark
+                coffeespot?={@coffeespot_guest?}
+                name={@guest_brand_name}
+                variant="on-dark"
+              />
             </p>
             <div class="menu-qr-chrome-trailing">
               <button
@@ -1040,8 +1071,13 @@ defmodule EspresoWeb.MenuLive do
           <.brune_hours_strip />
         </section>
 
-        <footer class="brune-mega-footer brune-mega-footer--secondary" aria-label="CoffeeSpot footer">
-          <p class="brune-mega-brand"><.coffeespot_wordmark /></p>
+        <footer
+          class="brune-mega-footer brune-mega-footer--secondary"
+          aria-label={"#{@guest_brand_name} footer"}
+        >
+          <p class="brune-mega-brand">
+            <.guest_brand_mark coffeespot?={@coffeespot_guest?} name={@guest_brand_name} />
+          </p>
           <p class="menu-footer-owned-label">Owned and Operated by:</p>
           <p class="menu-footer-owned-name">Elilai Kafe</p>
 
@@ -1053,7 +1089,7 @@ defmodule EspresoWeb.MenuLive do
               class={"menu-footer-social menu-footer-social--#{link.id}"}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label={"CoffeeSpot on #{link.label}"}
+              aria-label={CoffeeSpot.social_aria(link.label)}
             >
               <.social_icon name={link.id} />
             </a>
@@ -1126,7 +1162,9 @@ defmodule EspresoWeb.MenuLive do
               {@detail.product.description}
             </p>
             <p :if={!description?(@detail.product.description)} class="menu-detail-description">
-              Prepared fresh at CoffeeSpot Lilac Marikina.
+              {if @coffeespot_guest?,
+                do: "Prepared fresh at CoffeeSpot Lilac Marikina.",
+                else: "Prepared fresh."}
             </p>
 
             <div class="menu-detail-options">
@@ -1613,7 +1651,9 @@ defmodule EspresoWeb.MenuLive do
         >
           <header class="menu-my-orders-header">
             <div>
-              <p class="menu-my-orders-eyebrow"><.coffeespot_wordmark /></p>
+              <p class="menu-my-orders-eyebrow">
+                <.guest_brand_mark coffeespot?={@coffeespot_guest?} name={@guest_brand_name} />
+              </p>
               <h2 id="menu-my-orders-title">
                 <%= if @my_orders_tab == :rewards do %>
                   ELIlai Rewards
@@ -3013,11 +3053,33 @@ defmodule EspresoWeb.MenuLive do
   end
 
   defp category_blurb("HOT"), do: "Freshly pulled and served warm."
-  defp category_blurb("COLD"), do: "Iced and ready for a slow Lilac afternoon."
+
+  defp category_blurb("COLD") do
+    if Tenancy.coffeespot_guest?() do
+      "Iced and ready for a slow Lilac afternoon."
+    else
+      "Iced and ready to sip."
+    end
+  end
+
   defp category_blurb("FRAPPE"), do: "Blended, topped, and built to share."
   defp category_blurb("SODA"), do: "Bright, fizzy, and easy to sip."
-  defp category_blurb("FOOD"), do: "From the kitchen at CoffeeSpot Lilac."
-  defp category_blurb(_name), do: "Prepared fresh at CoffeeSpot Lilac Marikina."
+
+  defp category_blurb("FOOD") do
+    if Tenancy.coffeespot_guest?() do
+      "From the kitchen at CoffeeSpot Lilac."
+    else
+      "From the kitchen."
+    end
+  end
+
+  defp category_blurb(_name) do
+    if Tenancy.coffeespot_guest?() do
+      "Prepared fresh at CoffeeSpot Lilac Marikina."
+    else
+      "Prepared fresh."
+    end
+  end
 
   defp description?(description) when is_binary(description) do
     String.trim(description) != ""

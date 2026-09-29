@@ -13,10 +13,17 @@ defmodule Espreso.CoffeeSpot do
   def business_name, do: settings().business_name
 
   def location do
-    case Tenancy.current_branch() do
-      %{slug: "lilac"} -> "Lilac, Marikina"
-      %{name: name} when is_binary(name) -> name
-      _ -> "Lilac, Marikina"
+    if Tenancy.coffeespot_guest?() do
+      case Tenancy.current_branch() do
+        %{slug: "lilac"} -> "Lilac, Marikina"
+        %{name: name} when is_binary(name) -> name
+        _ -> "Lilac, Marikina"
+      end
+    else
+      case Tenancy.current_branch() do
+        %{name: name} when is_binary(name) -> name
+        _ -> business_name()
+      end
     end
   end
 
@@ -72,8 +79,22 @@ defmodule Espreso.CoffeeSpot do
   Slim promo note shown on the Menu page above item listings.
   """
   def student_promo_note do
-    "Students: Free size upgrade on iced drinks — Mon–Thu, 2:00 PM – 5:00 PM. Show valid School ID at counter."
+    if Tenancy.coffeespot_guest?() do
+      "Students: Free size upgrade on iced drinks — Mon–Thu, 2:00 PM – 5:00 PM. Show valid School ID at counter."
+    else
+      nil
+    end
   end
+
+  def landing_lede do
+    if Tenancy.coffeespot_guest?() do
+      "#{location()} · Come say hi in Lilac, Marikina."
+    else
+      address_short()
+    end
+  end
+
+  def visit_title, do: "Visit #{business_name()}"
 
   def service_area, do: "Marikina City, Philippines"
 
@@ -260,7 +281,10 @@ defmodule Espreso.CoffeeSpot do
       %{id: :facebook, href: facebook_url(), label: "Facebook"},
       %{id: :tiktok, href: tiktok_url(), label: "TikTok"}
     ]
+    |> Enum.filter(&show_social?/1)
   end
+
+  def social_aria(label) when is_binary(label), do: "#{business_name()} on #{label}"
 
   def contact_links do
     [
@@ -303,6 +327,22 @@ defmodule Espreso.CoffeeSpot do
   end
 
   defp settings, do: BusinessSettings.get()
+
+  defp show_social?(%{href: href}) when is_binary(href) do
+    Tenancy.coffeespot_guest?() or social_has_handle?(href)
+  end
+
+  defp show_social?(_), do: false
+
+  defp social_has_handle?(href) do
+    case URI.parse(href) do
+      %URI{path: path} when is_binary(path) ->
+        path |> String.trim("/") |> String.trim() != ""
+
+      _ ->
+        false
+    end
+  end
 
   defp address_without_postal do
     address()
