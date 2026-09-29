@@ -60,7 +60,7 @@ defmodule EspresoWeb.StaffAuth do
 
     conn
     |> assign(:current_user, user)
-    |> assign_tenancy(user)
+    |> apply_tenancy(user)
   end
 
   def redirect_if_staff_is_authenticated(conn, _opts) do
@@ -213,30 +213,57 @@ defmodule EspresoWeb.StaffAuth do
         end
       end)
 
-    assign_tenancy(socket, socket.assigns.current_user)
+    apply_tenancy(socket, socket.assigns.current_user, session["branch_id"])
   end
 
-  defp assign_tenancy(conn_or_socket, %User{tenant_id: tenant_id, branch_id: branch_id})
-       when is_integer(tenant_id) and is_integer(branch_id) do
+  defp apply_tenancy(%Plug.Conn{} = conn, user) do
+    apply_tenancy(conn, user, get_session(conn, :branch_id))
+  end
+
+  defp apply_tenancy(conn_or_socket, %User{} = user, session_branch_id) do
+    branch_id = Tenancy.put_staff_context(user, session_branch_id)
+    tenant_id = Tenancy.current_tenant_id()
+    branch = Tenancy.current_branch()
+
+    branches =
+      if Tenancy.switcher?(user) do
+        Tenancy.list_branches(tenant_id)
+      else
+        [branch]
+      end
+
     conn_or_socket
-    |> assign_tenancy_ids(tenant_id, branch_id)
+    |> assign_tenancy_ids(tenant_id, branch_id, branch, branches)
   end
 
-  defp assign_tenancy(conn_or_socket, _) do
-    ids = Tenancy.coffeespot_lilac_ids()
-    assign_tenancy_ids(conn_or_socket, ids.tenant_id, ids.branch_id)
+  defp apply_tenancy(conn_or_socket, _, _) do
+    Tenancy.put_lilac_context()
+    ids = Tenancy.current_ids()
+    branch = Tenancy.current_branch()
+
+    assign_tenancy_ids(conn_or_socket, ids.tenant_id, ids.branch_id, branch, [branch])
   end
 
-  defp assign_tenancy_ids(%Plug.Conn{} = conn, tenant_id, branch_id) do
+  defp assign_tenancy_ids(%Plug.Conn{} = conn, tenant_id, branch_id, branch, branches) do
     conn
     |> assign(:current_tenant_id, tenant_id)
     |> assign(:current_branch_id, branch_id)
+    |> assign(:current_branch, branch)
+    |> assign(:tenant_branches, branches)
   end
 
-  defp assign_tenancy_ids(%Phoenix.LiveView.Socket{} = socket, tenant_id, branch_id) do
+  defp assign_tenancy_ids(
+         %Phoenix.LiveView.Socket{} = socket,
+         tenant_id,
+         branch_id,
+         branch,
+         branches
+       ) do
     socket
     |> Phoenix.Component.assign(:current_tenant_id, tenant_id)
     |> Phoenix.Component.assign(:current_branch_id, branch_id)
+    |> Phoenix.Component.assign(:current_branch, branch)
+    |> Phoenix.Component.assign(:tenant_branches, branches)
   end
 
   defp renew_session(conn) do

@@ -9,6 +9,7 @@ defmodule EspresoWeb.StaffComponents do
   alias Espreso.Accounts.Authorization
   alias Espreso.Accounts.User
   alias Espreso.Orders
+  alias Espreso.Tenancy
   alias EspresoWeb.StaffNavDrawerComponent
 
   use EspresoWeb, :verified_routes
@@ -78,6 +79,33 @@ defmodule EspresoWeb.StaffComponents do
           </button>
 
           <div class="staff-pos-rail-end">
+            <form
+              :if={branch_switcher?(assigns)}
+              id="staff-branch-switch"
+              class="staff-branch-switch"
+              method="post"
+              action={~p"/session/branch"}
+            >
+              <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+              <label class="sr-only" for="staff-branch-select">Branch</label>
+              <select
+                id="staff-branch-select"
+                name="branch_id"
+                class="staff-branch-select"
+                onchange="this.form.submit()"
+              >
+                <option
+                  :for={branch <- tenant_branches(assigns)}
+                  value={branch.id}
+                  selected={branch.id == current_branch_id(assigns)}
+                >
+                  {branch.name}
+                </option>
+              </select>
+            </form>
+            <p :if={not branch_switcher?(assigns)} class="staff-branch-label">
+              {current_branch_name(assigns)}
+            </p>
             <div :if={@tools != []} class="staff-pos-rail-tools">
               {render_slot(@tools)}
             </div>
@@ -338,6 +366,14 @@ defmodule EspresoWeb.StaffComponents do
         show?: Authorization.can?(user, :user_management)
       },
       %{
+        key: :branches,
+        label: "Branches",
+        icon: "hero-building-storefront",
+        path: ~p"/admin/branches",
+        group: :manage,
+        show?: Authorization.can?(user, :user_management)
+      },
+      %{
         key: :settings,
         label: "Settings",
         icon: "hero-cog-6-tooth",
@@ -351,6 +387,28 @@ defmodule EspresoWeb.StaffComponents do
 
   defp hop_badge_count(count) when count > 9, do: "9+"
   defp hop_badge_count(count), do: Integer.to_string(count)
+
+  defp current_branch_id(assigns) do
+    Map.get(assigns, :current_branch_id) || Tenancy.current_branch_id()
+  end
+
+  defp current_branch_name(assigns) do
+    case Map.get(assigns, :current_branch) || Tenancy.current_branch() do
+      %{name: name} -> name
+      _ -> "Lilac"
+    end
+  end
+
+  defp tenant_branches(assigns) do
+    case Map.get(assigns, :tenant_branches) do
+      list when is_list(list) and list != [] -> list
+      _ -> Tenancy.list_branches(Tenancy.current_tenant_id())
+    end
+  end
+
+  defp branch_switcher?(assigns) do
+    Tenancy.switcher?(assigns.current_user) and length(tenant_branches(assigns)) > 1
+  end
 
   attr :status, :atom, required: true
   attr :id, :string, required: true

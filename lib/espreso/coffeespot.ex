@@ -8,10 +8,17 @@ defmodule Espreso.CoffeeSpot do
 
   alias Espreso.BusinessSettings
   alias Espreso.Menu
+  alias Espreso.Tenancy
 
   def business_name, do: settings().business_name
 
-  def location, do: "Lilac, Marikina"
+  def location do
+    case Tenancy.current_branch() do
+      %{slug: "lilac"} -> "Lilac, Marikina"
+      %{name: name} when is_binary(name) -> name
+      _ -> "Lilac, Marikina"
+    end
+  end
 
   def address, do: settings().address
 

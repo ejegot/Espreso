@@ -7,6 +7,7 @@ defmodule EspresoWeb.Plugs.ApiAuth do
   import Phoenix.Controller, only: [json: 2]
 
   alias Espreso.Accounts.Token
+  alias Espreso.Tenancy
 
   def init(opts), do: opts
 
@@ -18,6 +19,7 @@ defmodule EspresoWeb.Plugs.ApiAuth do
       token ->
         case Token.verify_access(token) do
           {:ok, user} ->
+            Tenancy.put_staff_context(user, user.branch_id)
             assign(conn, :current_user, user)
 
           {:error, _} ->

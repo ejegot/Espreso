@@ -13,6 +13,7 @@ defmodule EspresoWeb.ProductLiveTest do
              view,
              "img.espreso-product-logo[src='/images/elilai-kafe/elilai-kafe-mark-product.png']"
            )
+
     assert has_element?(view, ".espreso-product-wordmark", "Elilai Kafe")
     assert has_element?(view, ".espreso-product-kicker-sub", "Café management system")
     assert html =~ "Run the café as one shift"

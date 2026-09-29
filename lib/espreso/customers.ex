@@ -41,7 +41,7 @@ defmodule Espreso.Customers do
   """
   def get_by_phone(raw) do
     with {:ok, phone} <- normalize_phone(raw) do
-      case Repo.get_by(Customer, phone_e164: phone, branch_id: Tenancy.default_branch_id()) do
+      case Repo.get_by(Customer, phone_e164: phone, branch_id: Tenancy.current_branch_id()) do
         %Customer{} = customer -> {:ok, customer}
         nil -> {:error, :not_found}
       end
@@ -60,7 +60,7 @@ defmodule Espreso.Customers do
     with {:ok, phone} <- normalize_phone(raw) do
       name = optional_name(attrs)
 
-      case Repo.get_by(Customer, phone_e164: phone, branch_id: Tenancy.default_branch_id()) do
+      case Repo.get_by(Customer, phone_e164: phone, branch_id: Tenancy.current_branch_id()) do
         %Customer{} = customer ->
           maybe_fill_name(customer, name)
 
@@ -81,7 +81,7 @@ defmodule Espreso.Customers do
               if phone_taken?(changeset) do
                 case Repo.get_by(Customer,
                        phone_e164: phone,
-                       branch_id: Tenancy.default_branch_id()
+                       branch_id: Tenancy.current_branch_id()
                      ) do
                   %Customer{} = customer -> maybe_fill_name(customer, name)
                   nil -> {:error, changeset}

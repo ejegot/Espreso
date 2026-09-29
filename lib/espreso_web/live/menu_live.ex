@@ -9,9 +9,20 @@ defmodule EspresoWeb.MenuLive do
   alias Espreso.BusinessSettings
   alias Espreso.PayMongo
   alias Espreso.Shifts
+  alias Espreso.Tenancy
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(params, _session, socket) do
+    case put_menu_branch(params) do
+      {:error, :not_found} ->
+        {:ok, Phoenix.LiveView.redirect(socket, to: ~p"/menu")}
+
+      _ ->
+        mount_menu(socket)
+    end
+  end
+
+  defp mount_menu(socket) do
     categories = Menu.list_menu()
     selected = default_category(categories)
 
@@ -57,12 +68,27 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:my_orders_rewards, %{kind: :prompt}), layout: false}
   end
 
+  defp put_menu_branch(%{"branch_slug" => slug}) when is_binary(slug) do
+    Tenancy.put_guest_branch(slug)
+  end
+
+  defp put_menu_branch(_params) do
+    Tenancy.put_lilac_context()
+    :ok
+  end
+
   @impl true
   def handle_params(params, _uri, socket) do
-    {:noreply,
-     socket
-     |> apply_table_param(params)
-     |> apply_menu_stage_param(params)}
+    case put_menu_branch(params) do
+      {:error, :not_found} ->
+        {:noreply, Phoenix.LiveView.redirect(socket, to: ~p"/menu")}
+
+      _ ->
+        {:noreply,
+         socket
+         |> apply_table_param(params)
+         |> apply_menu_stage_param(params)}
+    end
   end
 
   @impl true

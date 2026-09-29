@@ -35,7 +35,7 @@ defmodule Espreso.BusinessSettings do
   Returns settings for Lilac (current live shop), creating defaults if missing.
   """
   def get do
-    get_for_branch(Tenancy.default_branch_id())
+    get_for_branch(Tenancy.current_branch_id())
   end
 
   def get_for_branch(branch_id) when is_integer(branch_id) do
@@ -49,7 +49,7 @@ defmodule Espreso.BusinessSettings do
   Idempotent insert of the CoffeeSpot Lilac settings row.
   """
   def ensure_defaults! do
-    get_for_branch(Tenancy.default_branch_id())
+    get_for_branch(Tenancy.current_branch_id())
   end
 
   defp ensure_defaults_for_branch!(branch_id) do
