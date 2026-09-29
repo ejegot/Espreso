@@ -2,7 +2,9 @@ defmodule Espreso.Tenancy.TenantsTest do
   use Espreso.DataCase, async: true
 
   alias Espreso.Accounts
+  alias Espreso.Marketing
   alias Espreso.Menu
+  alias Espreso.Repo
   alias Espreso.Tenancy
   alias Espreso.Tenancy.Tenants
 
@@ -63,5 +65,34 @@ defmodule Espreso.Tenancy.TenantsTest do
                owner_name: "X",
                pin: "1111"
              })
+  end
+
+  test "opening a waitlist request marks it opened and copies contact", %{owner: owner} do
+    {:ok, request} =
+      Marketing.create_shop_request(%{
+        "contact_name" => "Ana",
+        "cafe_name" => "Waitlist Brew",
+        "city" => "Marikina",
+        "email" => "ana@waitlist.ph",
+        "mobile" => "09171234567"
+      })
+
+    assert {:ok, %{tenant: tenant, branch: branch}} =
+             Tenants.create_as(owner, %{
+               name: request.cafe_name,
+               owner_name: request.contact_name,
+               address: request.city,
+               pin: "1357",
+               shop_request_id: request.id
+             })
+
+    request = Repo.reload!(request)
+    assert request.status == "opened"
+    assert request.tenant_id == tenant.id
+
+    settings = Espreso.BusinessSettings.get_for_branch(branch.id)
+    assert settings.email == "ana@waitlist.ph"
+    assert settings.phone == "+639171234567"
+    assert settings.address == "Marikina"
   end
 end

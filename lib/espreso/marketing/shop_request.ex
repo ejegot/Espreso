@@ -14,10 +14,23 @@ defmodule Espreso.Marketing.ShopRequest do
     field :phone_e164, :string
     field :note, :string
     field :status, :string, default: "pending"
+    field :opened_at, :utc_datetime
     field :mobile, :string, virtual: true
     field :company_url, :string, virtual: true
 
+    belongs_to :tenant, Espreso.Tenancy.Tenant
+
     timestamps(type: :utc_datetime)
+  end
+
+  def statuses, do: ~w(pending opened dismissed)
+
+  def status_changeset(request, attrs) do
+    request
+    |> cast(attrs, [:status, :tenant_id, :opened_at])
+    |> validate_required([:status])
+    |> validate_inclusion(:status, statuses())
+    |> foreign_key_constraint(:tenant_id)
   end
 
   def changeset(request, attrs) do

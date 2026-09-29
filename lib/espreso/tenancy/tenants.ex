@@ -8,6 +8,7 @@ defmodule Espreso.Tenancy.Tenants do
   alias Espreso.Accounts
   alias Espreso.Accounts.User
   alias Espreso.BusinessSettings.Setting
+  alias Espreso.Marketing
   alias Espreso.Repo
   alias Espreso.Tenancy
   alias Espreso.Tenancy.{Branch, Tenant}
@@ -21,11 +22,13 @@ defmodule Espreso.Tenancy.Tenants do
     prev = Process.get(:espreso_tenancy)
 
     with true <- Tenancy.platform_owner?(actor),
+         {:ok, request} <- fetch_pending_request(attrs),
          {:ok, name} <- fetch_name(attrs),
          {:ok, owner_name} <- fetch_owner_name(attrs),
          {:ok, pin} <- fetch_pin(attrs) do
       slug = unique_slug(slugify(name))
-      address = optional_address(attrs) || name
+      address = optional_address(attrs) || (request && request.city) || name
+      contact = settings_contact(request)
 
       result =
         Repo.transaction(fn ->
@@ -46,7 +49,7 @@ defmodule Espreso.Tenancy.Tenants do
               tenant_id: tenant.id
             })
 
-          insert_settings!(tenant, branch, address)
+          insert_settings!(tenant, branch, address, contact)
 
           Tenancy.put_context(%{tenant_id: tenant.id, branch_id: branch.id})
 
@@ -68,6 +71,8 @@ defmodule Espreso.Tenancy.Tenants do
               {:error, reason} ->
                 Repo.rollback(reason)
             end
+
+          if request, do: Marketing.mark_opened!(request, tenant)
 
           %{tenant: tenant, branch: branch, owner: owner}
         end)
@@ -108,12 +113,15 @@ defmodule Espreso.Tenancy.Tenants do
   defp changeset_for(%Tenant{}, _, attrs), do: Tenant.changeset(%Tenant{}, attrs)
   defp changeset_for(%Branch{}, _, attrs), do: Branch.changeset(%Branch{}, attrs)
 
-  defp insert_settings!(%Tenant{} = tenant, %Branch{} = branch, address) do
+  defp insert_settings!(%Tenant{} = tenant, %Branch{} = branch, address, contact) do
+    phone = Map.get(contact, :phone) || "+63 000 0000"
+    email = Map.get(contact, :email) || "hello@internal.espreso.invalid"
+
     attrs = %{
       business_name: tenant.guest_brand_name,
       address: address,
-      phone: "+63 000 0000",
-      email: "hello@internal.espreso.invalid",
+      phone: phone,
+      email: email,
       hours_lines: ["Daily · 8:00 AM – 8:00 PM"],
       instagram_url: "https://www.instagram.com/",
       facebook_url: "https://www.facebook.com/",
@@ -139,6 +147,36 @@ defmodule Espreso.Tenancy.Tenants do
 
   defp restore_context(_) do
     Tenancy.put_lilac_context()
+  end
+
+  defp fetch_pending_request(attrs) do
+    id = attr(attrs, :shop_request_id)
+
+    cond do
+      is_nil(id) or to_string(id) |> String.trim() == "" ->
+        {:ok, nil}
+
+      true ->
+        case Marketing.get_shop_request(id) do
+          %Espreso.Marketing.ShopRequest{status: "pending"} = request ->
+            {:ok, request}
+
+          %Espreso.Marketing.ShopRequest{} ->
+            {:error, :request_not_pending}
+
+          nil ->
+            {:error, :request_not_found}
+        end
+    end
+  end
+
+  defp settings_contact(nil), do: %{}
+
+  defp settings_contact(request) do
+    %{
+      phone: request.phone_e164,
+      email: request.email
+    }
   end
 
   defp fetch_name(attrs) do

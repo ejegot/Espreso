@@ -4,7 +4,9 @@ defmodule EspresoWeb.AdminTenantsLiveTest do
   import Phoenix.LiveViewTest
 
   alias Espreso.Accounts
+  alias Espreso.Marketing
   alias Espreso.Menu
+  alias Espreso.Repo
   alias Espreso.Tenancy
   alias Espreso.Tenancy.Tenants
 
@@ -113,6 +115,61 @@ defmodule EspresoWeb.AdminTenantsLiveTest do
     {:ok, view, _html} = live(conn, ~p"/t/#{tenant.slug}/login")
     html = render_click(view, "open_roster")
     assert html =~ "Roster Owner"
+  end
+
+  test "waitlist request can be opened into a tenant", %{conn: conn, owner: owner} do
+    {:ok, request} =
+      Marketing.create_shop_request(%{
+        "contact_name" => "Ana Cruz",
+        "cafe_name" => "Lilac Brew Waitlist",
+        "city" => "Marikina",
+        "email" => "ana.waitlist@cafe.ph",
+        "mobile" => "09171234567",
+        "note" => "Two counters"
+      })
+
+    {:ok, view, html} = live(log_in(conn, owner), ~p"/admin/tenants")
+    assert html =~ "Lilac Brew Waitlist"
+    assert has_element?(view, "#waitlist-open-#{request.id}")
+
+    view |> element("#waitlist-open-#{request.id}") |> render_click()
+    html = render(view)
+    assert html =~ "Waitlist: Lilac Brew Waitlist"
+
+    view
+    |> form("#admin-tenant-form",
+      tenant: %{
+        pin: "2468",
+        pin_confirmation: "2468"
+      }
+    )
+    |> render_submit()
+
+    html = render(view)
+    assert html =~ "Lilac Brew Waitlist is ready"
+    assert html =~ "/t/lilac-brew-waitlist/menu"
+    refute has_element?(view, "#waitlist-row-#{request.id}")
+
+    request = Repo.reload!(request)
+    assert request.status == "opened"
+    assert request.tenant_id
+  end
+
+  test "waitlist request can be dismissed", %{conn: conn, owner: owner} do
+    {:ok, request} =
+      Marketing.create_shop_request(%{
+        "contact_name" => "Ben",
+        "cafe_name" => "Skip Cafe",
+        "city" => "Pasig",
+        "email" => "ben@skip.ph",
+        "mobile" => "09180001111"
+      })
+
+    {:ok, view, _html} = live(log_in(conn, owner), ~p"/admin/tenants")
+    view |> element("#waitlist-dismiss-#{request.id}") |> render_click()
+
+    refute has_element?(view, "#waitlist-row-#{request.id}")
+    assert Repo.reload!(request).status == "dismissed"
   end
 
   defp log_in(conn, user) do
