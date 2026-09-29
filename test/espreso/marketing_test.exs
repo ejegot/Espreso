@@ -1,6 +1,7 @@
 defmodule Espreso.MarketingTest do
   use Espreso.DataCase, async: true
 
+  alias Espreso.Accounts
   alias Espreso.Marketing
   alias Espreso.Marketing.ShopRequest
   alias Espreso.Repo
@@ -47,5 +48,23 @@ defmodule Espreso.MarketingTest do
              Marketing.create_shop_request(Map.put(@valid, "company_url", "https://spam.test"))
 
     assert Repo.aggregate(ShopRequest, :count) == 0
+  end
+
+  test "lists pending requests and dismisses as platform owner" do
+    {:ok, owner} =
+      Accounts.register_user(%{
+        name: "CS",
+        email: "cs.waitlist@test.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    {:ok, request} = Marketing.create_shop_request(@valid)
+    assert [%ShopRequest{id: id}] = Marketing.list_pending_shop_requests()
+    assert id == request.id
+
+    assert {:ok, dismissed} = Marketing.dismiss_as(owner, request)
+    assert dismissed.status == "dismissed"
+    assert Marketing.list_pending_shop_requests() == []
   end
 end
