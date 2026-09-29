@@ -111,6 +111,10 @@ defmodule Espreso.Tenancy do
 
   def coffeespot_guest?, do: coffeespot_tenant?(current_tenant_id())
 
+  def lilac_guest? do
+    coffeespot_guest?() and current_branch().slug == @lilac_slug
+  end
+
   def list_branches(tenant_id) when is_integer(tenant_id) do
     Branch
     |> where([b], b.tenant_id == ^tenant_id)
