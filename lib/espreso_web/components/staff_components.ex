@@ -374,6 +374,14 @@ defmodule EspresoWeb.StaffComponents do
         show?: Authorization.can?(user, :user_management)
       },
       %{
+        key: :tenants,
+        label: "Tenants",
+        icon: "hero-building-office",
+        path: ~p"/admin/tenants",
+        group: :manage,
+        show?: Tenancy.platform_owner?(user)
+      },
+      %{
         key: :settings,
         label: "Settings",
         icon: "hero-cog-6-tooth",

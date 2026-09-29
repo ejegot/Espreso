@@ -107,6 +107,19 @@ defmodule EspresoWeb.StaffAuth do
     require_permission(conn, :user_management)
   end
 
+  def require_platform_owner(conn, _opts) do
+    user = conn.assigns[:current_user]
+
+    if Tenancy.platform_owner?(user) do
+      conn
+    else
+      conn
+      |> put_flash(:error, "You don’t have permission to do that.")
+      |> redirect(to: home_path(user))
+      |> halt()
+    end
+  end
+
   def on_mount(:mount_current_user, _params, session, socket) do
     {:cont, mount_current_user(socket, session)}
   end
@@ -144,6 +157,21 @@ defmodule EspresoWeb.StaffAuth do
 
   def on_mount(:ensure_owner, _params, session, socket) do
     on_mount({:ensure_permission, :user_management}, %{}, session, socket)
+  end
+
+  def on_mount(:ensure_platform_owner, _params, session, socket) do
+    socket = mount_current_user(socket, session)
+
+    if Tenancy.platform_owner?(socket.assigns.current_user) do
+      {:cont, socket}
+    else
+      socket =
+        socket
+        |> Phoenix.LiveView.put_flash(:error, "You don’t have permission to do that.")
+        |> Phoenix.LiveView.redirect(to: home_path(socket.assigns.current_user))
+
+      {:halt, socket}
+    end
   end
 
   def on_mount(:ensure_barista, _params, session, socket) do

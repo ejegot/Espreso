@@ -2,22 +2,36 @@ defmodule EspresoWeb.StaffLoginLive do
   use EspresoWeb, :live_view
 
   alias Espreso.Accounts
+  alias Espreso.Tenancy
 
   @pin_max 6
   @pin_display 4
 
   @impl true
+  def mount(%{"tenant_slug" => slug}, _session, socket) do
+    case Tenancy.put_guest_tenant(slug) do
+      {:ok, tenant} ->
+        mount_login(socket, tenant)
+
+      {:error, :not_found} ->
+        {:ok, Phoenix.LiveView.redirect(socket, to: ~p"/login")}
+    end
+  end
+
   def mount(_params, _session, socket) do
-    # Roster first: skip empty-DB check when PIN staff already exist (one query).
-    # Empty roster still needs the setup check (zero users → /setup vs no PINs → login).
+    Tenancy.put_lilac_context()
+    mount_login(socket, nil)
+  end
+
+  defp mount_login(socket, tenant) do
     roster = Accounts.list_staff_for_pin_login()
 
-    if roster == [] and Accounts.needs_initial_owner_setup?() do
+    if is_nil(tenant) and roster == [] and Accounts.needs_initial_owner_setup?() do
       {:ok, push_navigate(socket, to: ~p"/setup")}
     else
       {:ok,
        socket
-       |> assign(:page_title, "Welcome back")
+       |> assign(:page_title, login_page_title(tenant))
        |> assign(:login_mode, :pin)
        |> assign(:roster, roster)
        |> assign(:roster_query, "")
@@ -26,6 +40,8 @@ defmodule EspresoWeb.StaffLoginLive do
        |> assign(:pin_max, @pin_max)
        |> assign(:pin_display, @pin_display)
        |> assign(:show_password?, false)
+       |> assign(:tenant_slug, tenant && tenant.slug)
+       |> assign(:tenant_name, tenant && tenant.guest_brand_name)
        |> assign(:form, to_form(%{"email" => "", "password" => ""}, as: :user)), layout: false}
     end
   end
@@ -129,7 +145,11 @@ defmodule EspresoWeb.StaffLoginLive do
             </header>
 
             <h1 class="staff-auth-title">{login_title(@login_mode)}</h1>
-            <p class="staff-auth-subtitle">{login_subtitle(@login_mode)}</p>
+            <p class="staff-auth-subtitle">
+              {if @tenant_name,
+                do: "#{@tenant_name} · Elilai",
+                else: login_subtitle(@login_mode)}
+            </p>
 
             <p :if={msg = Phoenix.Flash.get(@flash, :error)} class="staff-auth-error" role="alert">
               {msg}
@@ -243,6 +263,7 @@ defmodule EspresoWeb.StaffLoginLive do
                     name="_csrf_token"
                     value={Plug.CSRFProtection.get_csrf_token()}
                   />
+                  <input :if={@tenant_slug} type="hidden" name="tenant_slug" value={@tenant_slug} />
                   <input
                     :if={@selected_staff}
                     type="hidden"
@@ -378,6 +399,7 @@ defmodule EspresoWeb.StaffLoginLive do
               id="staff-login-form"
             >
               <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+              <input :if={@tenant_slug} type="hidden" name="tenant_slug" value={@tenant_slug} />
 
               <label class="staff-auth-field">
                 <span>Email</span>
@@ -467,6 +489,10 @@ defmodule EspresoWeb.StaffLoginLive do
     </div>
     """
   end
+
+  defp login_page_title(nil), do: "Welcome back"
+  defp login_page_title(%{guest_brand_name: name}) when is_binary(name), do: name
+  defp login_page_title(_), do: "Welcome back"
 
   defp login_title(:pin), do: "Welcome back"
   defp login_title(:email), do: "Account recovery"

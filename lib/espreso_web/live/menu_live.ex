@@ -68,6 +68,15 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:my_orders_rewards, %{kind: :prompt}), layout: false}
   end
 
+  defp put_menu_branch(%{"tenant_slug" => tenant_slug, "branch_slug" => branch_slug})
+       when is_binary(tenant_slug) and is_binary(branch_slug) do
+    Tenancy.put_guest_tenant_branch(tenant_slug, branch_slug)
+  end
+
+  defp put_menu_branch(%{"tenant_slug" => tenant_slug}) when is_binary(tenant_slug) do
+    Tenancy.put_guest_tenant(tenant_slug)
+  end
+
   defp put_menu_branch(%{"branch_slug" => slug}) when is_binary(slug) do
     Tenancy.put_guest_branch(slug)
   end

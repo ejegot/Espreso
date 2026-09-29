@@ -1,19 +1,20 @@
 ---
-description: Start work on a git branch without Linear tickets
+description: Git and GitHub — user ships, agent opens PRs only
 alwaysApply: true
 ---
 
-# Git start — no Linear
+# Git — no Linear, user ships, agent PRs
 
-Do not wait for Linear, a Linear issue ID, or a paste from Linear. That workflow is retired.
+Do not wait for Linear or a Linear issue ID.
 
-When the user asks to implement, fix, or ship code:
+When implementing:
 
-1. If not already on a matching feature branch, create one from up-to-date `main`:
-   `git checkout main && git pull && git checkout -b ej/<short-kebab-slug>`
-2. Slug = the work in a few words. No ticket number required.
-   - Good: `ej/tenancy-lilac-backfill`, `ej/elilai-product-waitlist`
-   - Bad: `ej/esp-201-...` only because Linear used that — do not invent Linear IDs
-3. Then make the changes on that branch. Commit / PR / merge only when the user asks.
+1. From up-to-date `main`: `git checkout -b ej/<short-kebab-slug>`
+2. No ticket number. Good: `ej/add-coffeespot-branch`. Bad: invented `ej/esp-201-...`
+3. Make the code changes on that branch.
 
-Do not create GitHub Issues unless the user asks. A branch name is enough to start.
+**The user** does add, commit, push, merge, and pull.
+
+**The agent** only opens the GitHub Pull Request when asked (`gh pr create`). Do not merge to `main`, do not pull `main` as a finish step, do not push unless the branch must be on GitHub for that PR and the user asked for the PR.
+
+Do not create GitHub Issues unless the user asks.

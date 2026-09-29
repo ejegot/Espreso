@@ -3,33 +3,42 @@ defmodule EspresoWeb.UserSessionController do
 
   alias Espreso.Accounts
   alias Espreso.Auth.PinAttemptLimiter
+  alias Espreso.Tenancy
   alias EspresoWeb.ClientIP
   alias EspresoWeb.StaffAuth
 
-  def create(conn, %{"user" => user_params}) do
+  def create(conn, %{"user" => user_params} = params) do
     email = user_params["email"]
     password = user_params["password"]
+    login_path = login_path(params)
 
     case Accounts.authenticate_user(email, password) do
       {:ok, user} ->
-        conn
-        |> put_flash(:info, "Welcome back, #{user.name}.")
-        |> StaffAuth.log_in_user(user, user_params)
+        if tenant_ok?(user, params) do
+          conn
+          |> put_flash(:info, "Welcome back, #{user.name}.")
+          |> StaffAuth.log_in_user(user, user_params)
+        else
+          conn
+          |> put_flash(:error, "Invalid email or password.")
+          |> redirect(to: login_path)
+        end
 
       {:error, :invalid_credentials} ->
         conn
         |> put_flash(:error, "Invalid email or password.")
-        |> redirect(to: ~p"/login")
+        |> redirect(to: login_path)
     end
   end
 
-  def create_pin(conn, %{"user_id" => user_id, "pin" => pin}) when is_binary(pin) do
+  def create_pin(conn, %{"user_id" => user_id, "pin" => pin} = params) when is_binary(pin) do
     pin = String.trim(pin)
+    login_path = login_path(params)
 
     if pin == "" do
       conn
       |> put_flash(:error, "Enter your PIN.")
-      |> redirect(to: ~p"/login")
+      |> redirect(to: login_path)
     else
       ip = ClientIP.from_conn(conn)
 
@@ -37,32 +46,40 @@ defmodule EspresoWeb.UserSessionController do
         {:error, :rate_limited} ->
           conn
           |> put_flash(:error, "Too many attempts. Please wait a moment before trying again.")
-          |> redirect(to: ~p"/login")
+          |> redirect(to: login_path)
 
         :ok ->
           case Accounts.verify_pin(user_id, pin) do
             {:ok, user} ->
-              PinAttemptLimiter.record_success(user_id, ip)
+              if tenant_ok?(user, params) do
+                PinAttemptLimiter.record_success(user_id, ip)
 
-              conn
-              |> put_flash(:info, "Welcome back, #{user.name}.")
-              |> StaffAuth.log_in_user(user, %{})
+                conn
+                |> put_flash(:info, "Welcome back, #{user.name}.")
+                |> StaffAuth.log_in_user(user, %{})
+              else
+                PinAttemptLimiter.record_failure(user_id, ip)
+
+                conn
+                |> put_flash(:error, "Incorrect PIN. Try again.")
+                |> redirect(to: login_path)
+              end
 
             {:error, _} ->
               PinAttemptLimiter.record_failure(user_id, ip)
 
               conn
               |> put_flash(:error, "Incorrect PIN. Try again.")
-              |> redirect(to: ~p"/login")
+              |> redirect(to: login_path)
           end
       end
     end
   end
 
-  def create_pin(conn, _params) do
+  def create_pin(conn, params) do
     conn
     |> put_flash(:error, "Select your name first.")
-    |> redirect(to: ~p"/login")
+    |> redirect(to: login_path(params))
   end
 
   def create_from_token(conn, %{"token" => token}) when is_binary(token) do
@@ -92,4 +109,26 @@ defmodule EspresoWeb.UserSessionController do
     |> put_flash(:info, "Logged out.")
     |> StaffAuth.log_out_user()
   end
+
+  defp tenant_ok?(user, params) do
+    case params["tenant_slug"] do
+      slug when is_binary(slug) and slug != "" ->
+        case Tenancy.get_tenant_by_slug(slug) do
+          %{id: tenant_id} -> user.tenant_id == tenant_id
+          _ -> false
+        end
+
+      _ ->
+        Tenancy.coffeespot_tenant?(user.tenant_id)
+    end
+  end
+
+  defp login_path(%{"tenant_slug" => slug}) when is_binary(slug) and slug != "" do
+    case Tenancy.get_tenant_by_slug(slug) do
+      %{slug: slug} -> "/t/#{slug}/login"
+      _ -> "/login"
+    end
+  end
+
+  defp login_path(_), do: "/login"
 end
