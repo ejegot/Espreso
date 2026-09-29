@@ -32,6 +32,7 @@ defmodule EspresoWeb.MenuLive do
      socket
      |> assign(:page_title, "Menu")
      |> assign(:coffeespot_guest?, Tenancy.coffeespot_guest?())
+     |> assign(:lilac_guest?, Tenancy.lilac_guest?())
      |> assign(:guest_brand_name, CoffeeSpot.business_name())
      |> assign(:payments_mode, payment_config.payments_mode)
      |> assign(:gcash_pay_available?, wallet_pay_available?(payment_config, :gcash))
@@ -522,7 +523,7 @@ defmodule EspresoWeb.MenuLive do
         id="menu-landing"
         class={[
           "menu-qr-landing",
-          @coffeespot_guest? && "menu-qr-landing--signature"
+          @lilac_guest? && "menu-qr-landing--signature"
         ]}
       >
         <header class="menu-qr-landing-top menu-qr-top" id="menu-landing-top">
@@ -542,7 +543,7 @@ defmodule EspresoWeb.MenuLive do
           aria-label={"#{@guest_brand_name} intro"}
         >
           <section
-            :if={@coffeespot_guest?}
+            :if={@lilac_guest?}
             id="menu-landing-slide-welcome"
             class="menu-qr-landing-slide menu-qr-landing-slide--signature"
             aria-label="Pure Tableya, CoffeeSpot signature drink"
@@ -570,7 +571,7 @@ defmodule EspresoWeb.MenuLive do
             class="menu-qr-landing-slide"
             aria-label={CoffeeSpot.visit_title()}
           >
-            <div :if={@coffeespot_guest?} class="menu-qr-landing-media" aria-hidden="true">
+            <div :if={@lilac_guest?} class="menu-qr-landing-media" aria-hidden="true">
               <img
                 src="/images/coffeespot/IMG_3497.jpg"
                 alt=""
@@ -599,7 +600,7 @@ defmodule EspresoWeb.MenuLive do
 
         <div class="menu-qr-landing-dock">
           <div
-            :if={@coffeespot_guest?}
+            :if={@lilac_guest?}
             class="menu-qr-landing-dots"
             role="tablist"
             aria-label="Intro slides"
@@ -650,7 +651,7 @@ defmodule EspresoWeb.MenuLive do
       </div>
 
       <div :if={@menu_stage == :craving} id="menu-craving-chooser" class="menu-qr-craving">
-        <div :if={@coffeespot_guest?} class="menu-qr-craving-bridge" aria-hidden="true">
+        <div :if={@lilac_guest?} class="menu-qr-craving-bridge" aria-hidden="true">
           <img
             src="/images/coffeespot/cold-signature-01.jpg"
             alt=""
@@ -706,7 +707,7 @@ defmodule EspresoWeb.MenuLive do
       </div>
 
       <div :if={@menu_stage == :visit} id="menu-visit" class="menu-qr-visit">
-        <div :if={@coffeespot_guest?} class="menu-qr-visit-bridge" aria-hidden="true">
+        <div :if={@lilac_guest?} class="menu-qr-visit-bridge" aria-hidden="true">
           <img
             src="/images/coffeespot/IMG_3497.jpg"
             alt=""
@@ -1162,7 +1163,7 @@ defmodule EspresoWeb.MenuLive do
               {@detail.product.description}
             </p>
             <p :if={!description?(@detail.product.description)} class="menu-detail-description">
-              {if @coffeespot_guest?,
+              {if @lilac_guest?,
                 do: "Prepared fresh at CoffeeSpot Lilac Marikina.",
                 else: "Prepared fresh."}
             </p>
@@ -3055,7 +3056,7 @@ defmodule EspresoWeb.MenuLive do
   defp category_blurb("HOT"), do: "Freshly pulled and served warm."
 
   defp category_blurb("COLD") do
-    if Tenancy.coffeespot_guest?() do
+    if Tenancy.lilac_guest?() do
       "Iced and ready for a slow Lilac afternoon."
     else
       "Iced and ready to sip."
@@ -3066,7 +3067,7 @@ defmodule EspresoWeb.MenuLive do
   defp category_blurb("SODA"), do: "Bright, fizzy, and easy to sip."
 
   defp category_blurb("FOOD") do
-    if Tenancy.coffeespot_guest?() do
+    if Tenancy.lilac_guest?() do
       "From the kitchen at CoffeeSpot Lilac."
     else
       "From the kitchen."
@@ -3074,7 +3075,7 @@ defmodule EspresoWeb.MenuLive do
   end
 
   defp category_blurb(_name) do
-    if Tenancy.coffeespot_guest?() do
+    if Tenancy.lilac_guest?() do
       "Prepared fresh at CoffeeSpot Lilac Marikina."
     else
       "Prepared fresh."

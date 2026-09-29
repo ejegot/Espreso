@@ -79,7 +79,7 @@ defmodule Espreso.CoffeeSpot do
   Slim promo note shown on the Menu page above item listings.
   """
   def student_promo_note do
-    if Tenancy.coffeespot_guest?() do
+    if Tenancy.lilac_guest?() do
       "Students: Free size upgrade on iced drinks — Mon–Thu, 2:00 PM – 5:00 PM. Show valid School ID at counter."
     else
       nil
@@ -87,10 +87,15 @@ defmodule Espreso.CoffeeSpot do
   end
 
   def landing_lede do
-    if Tenancy.coffeespot_guest?() do
-      "#{location()} · Come say hi in Lilac, Marikina."
-    else
-      address_short()
+    cond do
+      Tenancy.lilac_guest?() ->
+        "#{location()} · Come say hi in Lilac, Marikina."
+
+      Tenancy.coffeespot_guest?() ->
+        "#{location()} · #{address_short()}"
+
+      true ->
+        address_short()
     end
   end
 

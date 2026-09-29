@@ -66,6 +66,24 @@ defmodule EspresoWeb.AdminBranchesLiveTest do
     assert {:error, {:redirect, %{to: "/menu"}}} = live(conn, ~p"/b/not-a-shop/menu")
   end
 
+  test "extra CoffeeSpot branch guest landing is that shop, not Lilac Tableya", %{
+    conn: conn,
+    owner: owner
+  } do
+    {:ok, _branch} = Branches.create_as(owner, %{name: "Ortigas", address: "Ortigas Ave"})
+
+    {:ok, _view, html} = live(conn, ~p"/b/ortigas/menu")
+    assert html =~ "Visit CoffeeSpot"
+    assert html =~ "Ortigas"
+    assert html =~ "Ortigas Ave"
+    refute html =~ "Pure Tableya"
+    refute html =~ "Come say hi in Lilac"
+
+    {:ok, _view, lilac} = live(conn, ~p"/menu")
+    assert lilac =~ "Pure Tableya"
+    assert lilac =~ "Come say hi in Lilac"
+  end
+
   defp log_in(conn, user) do
     conn
     |> Phoenix.ConnTest.init_test_session(%{})
