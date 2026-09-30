@@ -105,9 +105,7 @@ defmodule EspresoWeb.UserSessionController do
   end
 
   def delete(conn, _params) do
-    conn
-    |> put_flash(:info, "Logged out.")
-    |> StaffAuth.log_out_user()
+    StaffAuth.log_out_user(conn)
   end
 
   defp tenant_ok?(user, params) do

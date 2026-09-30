@@ -685,7 +685,8 @@ defmodule EspresoWeb.StaffAuthTest do
 
     {:ok, view, html} = live(conn, ~p"/login")
     assert html =~ "Welcome back"
-    assert html =~ "Please login to your account"
+    refute html =~ "Please login to your account"
+    assert html =~ "CoffeeSpot · Elilai"
     assert html =~ "Elilai Kafe"
 
     assert has_element?(
@@ -701,18 +702,19 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(view, "header.staff-auth-brand p.staff-auth-wordmark", "ELILAI KAFE")
     refute html =~ "/images/elilai-kafe/elilai-kafe-mark.png"
 
-    assert has_element?(view, ".staff-auth-page--approved")
+    assert has_element?(view, ".staff-auth-page--approved.staff-auth-page--lock")
     assert has_element?(view, ".staff-auth-stage")
-    assert has_element?(view, "aside.staff-auth-visual img.staff-auth-visual-img")
+    refute has_element?(view, "aside.staff-auth-visual")
+    refute has_element?(view, ".staff-auth-card-art")
 
     assert has_element?(
              view,
-             "aside.staff-auth-visual source[type='image/webp'][srcset='/images/elilai-kafe/login-brand-panel.webp']"
+             ".staff-auth-backdrop source[type='image/webp'][srcset='/images/elilai-kafe/login-kalachuchi.webp']"
            )
 
     assert has_element?(
              view,
-             "aside.staff-auth-visual img.staff-auth-visual-img[src='/images/elilai-kafe/login-brand-panel.jpg'][width='1084'][height='1310']"
+             ".staff-auth-backdrop img.staff-auth-backdrop-img[src='/images/elilai-kafe/login-kalachuchi.jpg'][width='1024'][height='640']"
            )
 
     assert has_element?(view, "#staff-pin-login")
@@ -856,9 +858,11 @@ defmodule EspresoWeb.StaffAuthTest do
     logged_out = delete(recycle(logged_in), ~p"/logout")
     assert redirected_to(logged_out) == ~p"/login"
 
-    {:ok, _view, html} = live(recycle(logged_out), ~p"/login")
+    {:ok, view, html} = live(recycle(logged_out), ~p"/login")
     assert html =~ "Welcome back"
-    assert html =~ "Please login to your account"
+    assert html =~ "Logged out."
+    assert render(view) =~ "Logged out."
+    refute html =~ "Please login to your account"
   end
 
   test "repeated wrong pins trigger cooldown without locking other staff", %{
