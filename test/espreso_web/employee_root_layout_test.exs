@@ -28,7 +28,7 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
     assert html =~ ~s(name="theme-color" content="#394331")
     assert html =~ ~s(rel="apple-touch-icon")
     assert html =~ ~s(href="/images/elilai-kafe/apple-touch-icon.png")
-    assert html =~ ~s(href="/assets/app.css?v=elilai-staff-3")
+    assert html =~ ~s(href="/assets/app.css?v=orders-cancel-1")
 
     # Employee login fonts: DM Sans + Instrument Serif only (not Fraunces/Figtree).
     assert html =~ "family=DM+Sans"
