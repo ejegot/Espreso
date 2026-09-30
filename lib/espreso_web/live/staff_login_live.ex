@@ -42,6 +42,8 @@ defmodule EspresoWeb.StaffLoginLive do
        |> assign(:show_password?, false)
        |> assign(:tenant_slug, tenant && tenant.slug)
        |> assign(:tenant_name, tenant && tenant.guest_brand_name)
+       |> assign(:notice, Phoenix.Flash.get(socket.assigns.flash, :info))
+       |> assign(:alert, Phoenix.Flash.get(socket.assigns.flash, :error))
        |> assign(:form, to_form(%{"email" => "", "password" => ""}, as: :user)), layout: false}
     end
   end
@@ -118,11 +120,26 @@ defmodule EspresoWeb.StaffLoginLive do
 
     ~H"""
     <div class={[
-      "staff-auth-page staff-auth-page--approved",
+      "staff-auth-page staff-auth-page--approved staff-auth-page--float staff-auth-page--lock",
       @login_mode == :pin && "staff-auth-page--pin",
       @login_mode == :email && "staff-auth-page--recovery"
     ]}>
       <div class="staff-auth-stage">
+        <div class="staff-auth-backdrop" aria-hidden="true">
+          <picture class="staff-auth-backdrop-picture">
+            <source srcset={~p"/images/elilai-kafe/login-kalachuchi.webp"} type="image/webp" />
+            <img
+              src={~p"/images/elilai-kafe/login-kalachuchi.jpg"}
+              alt=""
+              class="staff-auth-backdrop-img"
+              width="1024"
+              height="640"
+              decoding="async"
+              fetchpriority="high"
+            />
+          </picture>
+        </div>
+
         <main class="staff-auth-panel">
           <div class="staff-auth-panel-inner staff-auth-panel-inner--login">
             <header class="staff-auth-brand">
@@ -144,18 +161,22 @@ defmodule EspresoWeb.StaffLoginLive do
               <p class="staff-auth-wordmark">ELILAI KAFE</p>
             </header>
 
-            <h1 class="staff-auth-title">{login_title(@login_mode)}</h1>
+            <h1 class={["staff-auth-title", @login_mode == :pin && "sr-only"]}>
+              {login_title(@login_mode)}
+            </h1>
             <p class="staff-auth-subtitle">
-              {if @tenant_name,
-                do: "#{@tenant_name} · Elilai",
-                else: login_subtitle(@login_mode)}
+              {cond do
+                @login_mode == :email -> login_subtitle(:email)
+                is_binary(@tenant_name) and @tenant_name != "" -> "#{@tenant_name} · Elilai"
+                true -> "CoffeeSpot · Elilai"
+              end}
             </p>
 
-            <p :if={msg = Phoenix.Flash.get(@flash, :error)} class="staff-auth-error" role="alert">
-              {msg}
+            <p :if={@alert} class="staff-auth-error" role="alert">
+              {@alert}
             </p>
-            <p :if={msg = Phoenix.Flash.get(@flash, :info)} class="staff-auth-info" role="status">
-              {msg}
+            <p :if={@notice} class="staff-auth-info" id="staff-auth-notice" role="status">
+              {@notice}
             </p>
 
             <div :if={@login_mode == :pin} id="staff-pin-login" class="staff-pin-login">
@@ -457,34 +478,6 @@ defmodule EspresoWeb.StaffLoginLive do
             </.form>
           </div>
         </main>
-
-        <aside class="staff-auth-visual" aria-hidden="true">
-          <picture class="staff-auth-visual-picture">
-            <source srcset={~p"/images/elilai-kafe/login-brand-panel.webp"} type="image/webp" />
-            <img
-              src={~p"/images/elilai-kafe/login-brand-panel.jpg"}
-              alt=""
-              class="staff-auth-visual-img"
-              width="1084"
-              height="1310"
-              decoding="async"
-              fetchpriority="high"
-            />
-          </picture>
-
-          <svg
-            class="staff-auth-wave staff-auth-wave--bottom"
-            viewBox="0 0 900 56"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <path
-              class="staff-auth-wave-fill"
-              d="M0 56C90 18 180 40 270 20C360 2 450 34 540 16C630 0 720 28 810 12C860 4 885 8 900 14V56H0Z"
-            />
-          </svg>
-        </aside>
       </div>
     </div>
     """

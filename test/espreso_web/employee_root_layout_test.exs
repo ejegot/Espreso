@@ -28,7 +28,7 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
     assert html =~ ~s(name="theme-color" content="#394331")
     assert html =~ ~s(rel="apple-touch-icon")
     assert html =~ ~s(href="/images/elilai-kafe/apple-touch-icon.png")
-    assert html =~ ~s(name="apple-mobile-web-app-title")
+    assert html =~ ~s(href="/assets/app.css?v=login-lock-2")
 
     # Employee login fonts: DM Sans + Instrument Serif only (not Fraunces/Figtree).
     assert html =~ "family=DM+Sans"
@@ -47,7 +47,7 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
 
     assert has_element?(
              view,
-             "aside.staff-auth-visual source[type='image/webp'][srcset='/images/elilai-kafe/login-brand-panel.webp']"
+             ".staff-auth-backdrop source[type='image/webp'][srcset='/images/elilai-kafe/login-kalachuchi.webp']"
            )
 
     assert has_element?(view, "h1.staff-auth-title")

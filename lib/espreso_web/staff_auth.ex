@@ -51,6 +51,7 @@ defmodule EspresoWeb.StaffAuth do
     conn
     |> renew_session()
     |> delete_session(:user_id)
+    |> put_flash(:info, "Logged out.")
     |> redirect(to: ~p"/login")
   end
 
