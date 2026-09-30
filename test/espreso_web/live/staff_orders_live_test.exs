@@ -670,8 +670,28 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/orders")
     assert has_element?(view, "#cancel-order-#{order.id}", "Cancel")
+    refute has_element?(view, "#staff-order-cancel")
 
     view |> element("#cancel-order-#{order.id}") |> render_click()
+
+    assert has_element?(view, "#staff-order-cancel-dialog", "#{order.number}")
+
+    assert has_element?(
+             view,
+             "#staff-order-cancel-dialog",
+             "This takes the ticket off the board. It was not paid."
+           )
+
+    assert has_element?(view, ".staff-order-number", order.number)
+
+    view |> element("#staff-order-cancel-keep") |> render_click()
+
+    refute has_element?(view, "#staff-order-cancel")
+    assert has_element?(view, ".staff-order-number", order.number)
+    assert Orders.list_active_orders() != []
+
+    view |> element("#cancel-order-#{order.id}") |> render_click()
+    view |> element("#staff-order-cancel-confirm") |> render_click()
 
     assert has_element?(view, "#orders-flash", "#{order.number} cancelled.")
     refute has_element?(view, ".staff-order-number", order.number)

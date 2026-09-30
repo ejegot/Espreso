@@ -46,6 +46,7 @@ defmodule EspresoWeb.StaffOrdersLive do
      |> assign(:refunding_order, nil)
      |> assign(:refund_reason, "")
      |> assign(:refund_error, nil)
+     |> assign(:cancelling_order, nil)
      |> assign(:can_refund?, Authorization.can?(socket.assigns.current_user, :reports))
      |> assign(:alert_banner, nil)
      |> assign(:pubsub_reload_timer, nil)
@@ -568,33 +569,22 @@ defmodule EspresoWeb.StaffOrdersLive do
     confirm_refund(socket, socket.assigns.refund_reason)
   end
 
-  def handle_event("cancel_order", %{"id" => id}, socket) do
-    order = Espreso.Repo.get!(Espreso.Orders.Order, id)
-
-    case Orders.cancel_order(order) do
-      {:ok, cancelled} ->
-        {:noreply,
-         socket
-         |> assign(:flash_note, "#{cancelled.number} cancelled.")
-         |> patch_board_order(cancelled.id)}
-
-      {:error, :paid} ->
-        {:noreply, assign(socket, :flash_note, "Paid orders cannot be cancelled.")}
-
-      {:error, :checkout_in_progress} ->
-        {:noreply,
-         assign(
-           socket,
-           :flash_note,
-           "Online payment is in progress. This order cannot be cancelled."
-         )}
-
-      {:error, :invalid_status} ->
-        {:noreply, assign(socket, :flash_note, "This order can no longer be cancelled.")}
-
-      {:error, _} ->
-        {:noreply, assign(socket, :flash_note, "Could not cancel order.")}
+  def handle_event("open_cancel", %{"id" => id}, socket) do
+    with {order_id, ""} <- Integer.parse(id),
+         %Espreso.Orders.Order{} = order <- Repo.get(Espreso.Orders.Order, order_id),
+         true <- show_cancel_action?(order) do
+      {:noreply, assign(socket, :cancelling_order, order)}
+    else
+      _ -> {:noreply, assign(socket, :flash_note, "This order can no longer be cancelled.")}
     end
+  end
+
+  def handle_event("dismiss_cancel", _params, socket) do
+    {:noreply, assign(socket, :cancelling_order, nil)}
+  end
+
+  def handle_event("confirm_cancel", _params, socket) do
+    confirm_cancel_order(socket)
   end
 
   def handle_event("abandon_online_payment", %{"id" => id}, socket) do
@@ -1004,6 +994,7 @@ defmodule EspresoWeb.StaffOrdersLive do
         {split_pay_modal(assigns)}
         {mark_paid_modal(assigns)}
         {refund_modal(assigns)}
+        {cancel_order_modal(assigns)}
       </div>
     </.staff_shell>
     """
@@ -1198,16 +1189,6 @@ defmodule EspresoWeb.StaffOrdersLive do
                 Refund
               </button>
               <button
-                :if={show_cancel_action?(@order)}
-                type="button"
-                class="staff-action staff-action-cancel"
-                id={"cancel-order-#{@order.id}"}
-                phx-value-id={@order.id}
-                phx-click="cancel_order"
-              >
-                Cancel
-              </button>
-              <button
                 :if={show_abandon_payment?(@order)}
                 type="button"
                 class="staff-action staff-action-muted"
@@ -1306,6 +1287,18 @@ defmodule EspresoWeb.StaffOrdersLive do
             </div>
           </details>
         </div>
+
+        <div :if={show_cancel_action?(@order)} class="staff-order-secondary-row">
+          <button
+            type="button"
+            class="staff-action staff-action-cancel"
+            id={"cancel-order-#{@order.id}"}
+            phx-value-id={@order.id}
+            phx-click="open_cancel"
+          >
+            Cancel
+          </button>
+        </div>
       </div>
     </article>
     """
@@ -1330,7 +1323,7 @@ defmodule EspresoWeb.StaffOrdersLive do
 
     paid_print? = order.payment_status == "paid" and Printer.enabled?()
 
-    show_cancel_action?(order) or show_refund_action?(order, can_refund?) or abandon? or kitchen? or
+    show_refund_action?(order, can_refund?) or abandon? or kitchen? or
       paid_print?
   end
 
@@ -1823,6 +1816,39 @@ defmodule EspresoWeb.StaffOrdersLive do
             </button>
           </div>
         </form>
+      </div>
+    </.modal>
+    """
+  end
+
+  defp cancel_order_modal(%{cancelling_order: nil}), do: nil
+
+  defp cancel_order_modal(assigns) do
+    ~H"""
+    <.modal id="staff-order-cancel" show on_cancel={JS.push("dismiss_cancel")}>
+      <div class="staff-confirm-dialog" id="staff-order-cancel-dialog">
+        <p class="staff-confirm-dialog-title">Cancel {@cancelling_order.number}?</p>
+        <p class="staff-confirm-dialog-copy">
+          This takes the ticket off the board. It was not paid.
+        </p>
+        <div class="staff-confirm-dialog-actions">
+          <button
+            type="button"
+            class="staff-shell-tool"
+            id="staff-order-cancel-keep"
+            phx-click="dismiss_cancel"
+          >
+            Keep ticket
+          </button>
+          <button
+            type="button"
+            class="staff-action staff-action-cancel"
+            id="staff-order-cancel-confirm"
+            phx-click="confirm_cancel"
+          >
+            Cancel order
+          </button>
+        </div>
       </div>
     </.modal>
     """
@@ -2662,6 +2688,50 @@ defmodule EspresoWeb.StaffOrdersLive do
     |> assign(:refunding_order, nil)
     |> assign(:refund_reason, "")
     |> assign(:refund_error, nil)
+  end
+
+  defp confirm_cancel_order(socket) do
+    case socket.assigns.cancelling_order do
+      %Espreso.Orders.Order{} = order ->
+        case Orders.cancel_order(order) do
+          {:ok, cancelled} ->
+            {:noreply,
+             socket
+             |> assign(:cancelling_order, nil)
+             |> assign(:flash_note, "#{cancelled.number} cancelled.")
+             |> patch_board_order(cancelled.id)}
+
+          {:error, :paid} ->
+            {:noreply,
+             socket
+             |> assign(:cancelling_order, nil)
+             |> assign(:flash_note, "Paid orders cannot be cancelled.")}
+
+          {:error, :checkout_in_progress} ->
+            {:noreply,
+             socket
+             |> assign(:cancelling_order, nil)
+             |> assign(
+               :flash_note,
+               "Online payment is in progress. This order cannot be cancelled."
+             )}
+
+          {:error, :invalid_status} ->
+            {:noreply,
+             socket
+             |> assign(:cancelling_order, nil)
+             |> assign(:flash_note, "This order can no longer be cancelled.")}
+
+          {:error, _} ->
+            {:noreply,
+             socket
+             |> assign(:cancelling_order, nil)
+             |> assign(:flash_note, "Could not cancel order.")}
+        end
+
+      _ ->
+        {:noreply, assign(socket, :cancelling_order, nil)}
+    end
   end
 
   defp update_mark_paid_recovery(socket, order_id, paid_via, physical_result) do
