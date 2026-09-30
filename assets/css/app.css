@@ -5773,7 +5773,7 @@ a.dashboard-kpi-card {
 .staff-shift-close {
   --close-forest: var(--elilai-forest, #394331);
   --close-ivory: var(--elilai-ivory, #f4efe3);
-  --close-ink: var(--close-forest);
+  --close-ink: var(--elilai-ink, #2e3529);
   --close-muted: color-mix(in srgb, var(--close-forest) 55%, var(--close-ivory));
   --close-line: color-mix(in srgb, var(--close-forest) 14%, transparent);
   width: min(calc(100% - 1.5rem), 64rem);
@@ -11285,19 +11285,19 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-availability-item.is-unavailable {
-  background: color-mix(in srgb, #f4efe3 70%, #fff);
+  background: color-mix(in srgb, var(--elilai-ivory, #f4efe3) 70%, #fff);
 }
 
 .staff-availability-name {
   margin: 0;
-  color: #2e3529;
+  color: var(--elilai-ink, #2e3529);
   font-size: 0.92rem;
   font-weight: 800;
 }
 
 .staff-availability-state {
   margin: 0.1rem 0 0;
-  color: color-mix(in srgb, #2e3529 55%, #f4efe3);
+  color: color-mix(in srgb, var(--elilai-ink, #2e3529) 55%, var(--elilai-ivory, #f4efe3));
   font-size: 0.72rem;
   font-weight: 700;
 }
@@ -11341,7 +11341,7 @@ a.staff-home-card:focus-visible {
   padding: 0.85rem 0.9rem 1rem;
   border: 1px solid color-mix(in srgb, var(--elilai-forest, #394331) 12%, transparent);
   border-radius: 0.9rem;
-  background: #fff;
+  background: var(--elilai-ivory, #f4efe3);
 }
 
 .staff-settings-card-title {
@@ -11355,7 +11355,7 @@ a.staff-home-card:focus-visible {
 
 .staff-settings-card-note {
   margin: 0;
-  color: color-mix(in srgb, var(--elilai-forest, #394331) 58%, #f4efe3);
+  color: color-mix(in srgb, var(--elilai-forest, #394331) 58%, var(--elilai-ivory, #f4efe3));
   font-size: 0.8rem;
   font-weight: 600;
   line-height: 1.4;
@@ -11460,7 +11460,8 @@ a.staff-home-card:focus-visible {
 .staff-team-page {
   --team-forest: var(--elilai-forest, #394331);
   --team-ivory: var(--elilai-ivory, #f4efe3);
-  --team-ink: var(--team-forest);
+  --team-ink: var(--elilai-ink, #2e3529);
+  --team-gold: var(--elilai-gold, #b89a62);
   --team-muted: color-mix(in srgb, var(--team-forest) 55%, var(--team-ivory));
   --team-line: color-mix(in srgb, var(--team-forest) 14%, transparent);
   width: min(calc(100% - 1.5rem), 64rem);
@@ -11703,12 +11704,13 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-team-role--owner {
-  background: color-mix(in srgb, var(--team-forest) 16%, #fff);
+  background: color-mix(in srgb, var(--team-gold, #b89a62) 22%, var(--team-ivory));
+  color: var(--team-forest);
 }
 
 .staff-team-status--active {
-  background: color-mix(in srgb, #2f7a33 12%, #fff);
-  color: #2f7a33;
+  background: color-mix(in srgb, var(--team-forest) 12%, #fff);
+  color: var(--team-forest);
 }
 
 .staff-team-status--disabled {
@@ -11932,14 +11934,15 @@ a.staff-home-card:focus-visible {
   margin: 0 0 0.85rem;
   padding: 0.65rem 0.85rem;
   border-radius: 0.65rem;
-  background: #d8efd9;
-  color: #246628;
+  background: color-mix(in srgb, var(--elilai-forest, #394331) 10%, var(--elilai-ivory, #f4efe3));
+  color: var(--elilai-forest, #394331);
   font-size: 0.9rem;
   font-weight: 600;
 }
 
 .staff-admin-heading {
   margin: 0 0 0.85rem;
+  color: var(--elilai-ink, #2e3529);
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -11961,10 +11964,10 @@ a.staff-home-card:focus-visible {
 .staff-refresh {
   min-height: 2.25rem;
   padding: 0.35rem 0.85rem;
-  border: 1.5px solid #b7e0b9;
+  border: 1.5px solid color-mix(in srgb, var(--elilai-forest, #394331) 28%, transparent);
   border-radius: 999px;
-  background: #d8efd9;
-  color: #246628;
+  background: var(--elilai-ivory, #f4efe3);
+  color: var(--elilai-forest, #394331);
   font: inherit;
   font-size: 0.85rem;
   font-weight: 700;
@@ -12108,9 +12111,9 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-action-primary {
-  border-color: #b7e0b9;
-  background: #d8efd9;
-  color: #246628;
+  border-color: color-mix(in srgb, var(--elilai-forest, #394331) 28%, transparent);
+  background: var(--elilai-forest, #394331);
+  color: var(--elilai-ivory, #f4efe3);
 }
 
 /* —— Staff UX V3.1 shared shell —— */
@@ -12365,7 +12368,7 @@ a.staff-home-card:focus-visible {
   border-radius: 999px;
   background: #fff;
   padding: 0.25rem 0.65rem;
-  color: var(--cs-brown, #382010);
+  color: var(--elilai-ink, var(--cs-brown, #2e3529));
   font-size: 0.68rem;
   font-weight: 700;
   cursor: pointer;
@@ -12408,7 +12411,7 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-notif-item.is-unread {
-  background: color-mix(in srgb, var(--cs-orange, #f85020) 4%, #fff);
+  background: color-mix(in srgb, var(--elilai-forest, #394331) 4%, #fff);
 }
 
 .staff-notif-icon {
@@ -12423,13 +12426,13 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-notif-icon--new_order {
-  background: color-mix(in srgb, var(--cs-orange, #f85020) 12%, #fff);
-  color: var(--cs-orange, #f85020);
+  background: color-mix(in srgb, var(--elilai-forest, #394331) 12%, #fff);
+  color: var(--elilai-forest, #394331);
 }
 
 .staff-notif-icon--payment {
-  background: color-mix(in srgb, #246628 12%, #fff);
-  color: #246628;
+  background: color-mix(in srgb, var(--elilai-gold, #b89a62) 18%, #fff);
+  color: var(--elilai-forest, #394331);
 }
 
 .staff-notif-icon--ready {
@@ -12449,7 +12452,7 @@ a.staff-home-card:focus-visible {
 
 .staff-notif-item-body {
   margin: 0.15rem 0 0;
-  color: color-mix(in srgb, var(--cs-brown, #382010) 70%, #fff);
+  color: color-mix(in srgb, var(--elilai-ink, var(--cs-brown, #2e3529)) 70%, #fff);
   font-size: 0.78rem;
   line-height: 1.35;
 }
@@ -12466,7 +12469,7 @@ a.staff-home-card:focus-visible {
   height: 0.45rem;
   margin-top: 0.35rem;
   border-radius: 999px;
-  background: var(--cs-orange, #f85020);
+  background: var(--elilai-forest, #394331);
 }
 
 .staff-shell-tool,
@@ -24254,10 +24257,10 @@ a.brune-contact-value:focus-visible {
 .staff-transactions {
   --txn-forest: var(--elilai-forest, #394331);
   --txn-ivory: var(--elilai-ivory, #f4efe3);
-  --txn-ink: var(--cs-brown, var(--txn-forest));
+  --txn-ink: var(--elilai-ink, var(--cs-brown, var(--txn-forest)));
   --txn-muted: color-mix(in srgb, var(--txn-forest) 55%, var(--txn-ivory));
   --txn-line: color-mix(in srgb, var(--txn-forest) 14%, transparent);
-  --txn-surface: #fffef9;
+  --txn-surface: var(--elilai-ivory, #f4efe3);
   width: min(100%, 92rem);
   margin: 0 auto;
   padding: 0.65rem 0.85rem 1rem;
@@ -25148,7 +25151,7 @@ a.brune-contact-value:focus-visible {
   padding: 1rem 1.05rem 1.15rem;
   border: 1px solid color-mix(in srgb, var(--rpt-forest) 12%, transparent);
   border-radius: 0.95rem;
-  background: #fffef9;
+  background: var(--rpt-ivory);
   box-shadow: 0 10px 28px color-mix(in srgb, var(--rpt-forest) 6%, transparent);
 }
 
@@ -25436,9 +25439,9 @@ a.brune-contact-value:focus-visible {
 
 /* Staff Cash Out */
 .staff-cash-out {
-  --co-forest: #394331;
-  --co-ivory: #f4efe3;
-  --co-muted: color-mix(in srgb, #394331 58%, #7a7468);
+  --co-forest: var(--elilai-forest, #394331);
+  --co-ivory: var(--elilai-ivory, #f4efe3);
+  --co-muted: color-mix(in srgb, var(--elilai-forest, #394331) 58%, var(--elilai-muted, #8b877d));
   display: grid;
   gap: 0.95rem;
   padding: 0.75rem 1rem 2rem;
@@ -25755,10 +25758,10 @@ a.brune-contact-value:focus-visible {
 .staff-customer {
   --cust-forest: var(--elilai-forest, #394331);
   --cust-ivory: var(--elilai-ivory, #f4efe3);
-  --cust-ink: var(--cs-brown, var(--cust-forest));
+  --cust-ink: var(--elilai-ink, var(--cs-brown, var(--cust-forest)));
   --cust-muted: color-mix(in srgb, var(--cust-forest) 55%, var(--cust-ivory));
   --cust-line: color-mix(in srgb, var(--cust-forest) 14%, transparent);
-  --cust-surface: #fffef9;
+  --cust-surface: var(--elilai-ivory, #f4efe3);
   width: min(100%, 72rem);
   margin: 0 auto;
   padding: 0.75rem 1rem 1.5rem;
