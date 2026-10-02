@@ -65,6 +65,7 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:place_flash_token, nil)
      |> assign(:place_flash_timer, nil)
      |> assign(:notes_open?, false)
+     |> assign(:ticket_extras_open?, false)
      |> assign(:discount_kind, "none")
      |> assign(:discount_peso, "")
      |> assign(:discount_open?, false)
@@ -164,6 +165,8 @@ defmodule EspresoWeb.StaffPosLive do
              "select_redeem_price",
              "confirm_redeem",
              "set_notes",
+             "toggle_notes",
+             "toggle_ticket_extras",
              "toggle_discount",
              "set_discount",
              "set_discount_peso",
@@ -438,12 +441,22 @@ defmodule EspresoWeb.StaffPosLive do
     {:noreply, clear_place_flash(socket)}
   end
 
+  def handle_event("toggle_ticket_extras", _params, socket) do
+    {:noreply, assign(socket, :ticket_extras_open?, !socket.assigns[:ticket_extras_open?])}
+  end
+
   def handle_event("toggle_notes", _params, socket) do
-    {:noreply, assign(socket, :notes_open?, !socket.assigns[:notes_open?])}
+    {:noreply,
+     socket
+     |> assign(:ticket_extras_open?, true)
+     |> assign(:notes_open?, true)}
   end
 
   def handle_event("toggle_discount", _params, socket) do
-    {:noreply, assign(socket, :discount_open?, !socket.assigns[:discount_open?])}
+    {:noreply,
+     socket
+     |> assign(:ticket_extras_open?, true)
+     |> assign(:discount_open?, true)}
   end
 
   def handle_event("set_discount", %{"kind" => kind}, socket)
@@ -456,10 +469,13 @@ defmodule EspresoWeb.StaffPosLive do
         {:noreply, socket}
 
       true ->
+        extras_open? = kind == "peso"
+
         {:noreply,
          socket
          |> assign(:discount_kind, kind)
-         |> assign(:discount_open?, true)
+         |> assign(:discount_open?, extras_open?)
+         |> assign(:ticket_extras_open?, extras_open?)
          |> then(fn socket ->
            if kind == "peso", do: socket, else: assign(socket, :discount_peso, "")
          end)
@@ -1365,6 +1381,13 @@ defmodule EspresoWeb.StaffPosLive do
                 </div>
               <% else %>
                 <form class="staff-pos-order-form" id="pos-order-form" phx-submit="place_order">
+                  <input
+                    :if={not @ticket_extras_open?}
+                    type="hidden"
+                    name="customer_name"
+                    value={@customer_name}
+                  />
+                  <input :if={not @ticket_extras_open?} type="hidden" name="notes" value={@notes} />
                   <div class="staff-pos-ticket-head">
                     <div class="staff-pos-ticket-title-row">
                       <h2>Cart</h2>
@@ -1372,6 +1395,23 @@ defmodule EspresoWeb.StaffPosLive do
                         <span :if={cart_item_count(@cart) > 0} class="staff-pos-cart-count">
                           {cart_item_count(@cart)} items
                         </span>
+                        <button
+                          type="button"
+                          class={[
+                            "staff-pos-ticket-extras-toggle",
+                            ticket_extras_applied?(assigns) && "is-applied",
+                            @ticket_extras_open? && "is-open"
+                          ]}
+                          id="pos-ticket-extras-toggle"
+                          phx-click="toggle_ticket_extras"
+                          aria-expanded={to_string(@ticket_extras_open?)}
+                          aria-controls="pos-ticket-extras"
+                        >
+                          <span class="staff-pos-ticket-extras-toggle-label">
+                            {ticket_extras_summary(assigns)}
+                          </span>
+                          <span aria-hidden="true">▾</span>
+                        </button>
                         <button
                           :if={@cart != []}
                           type="button"
@@ -1413,7 +1453,13 @@ defmodule EspresoWeb.StaffPosLive do
                           Take Out
                         </button>
                       </div>
+                    </div>
 
+                    <div
+                      :if={@ticket_extras_open?}
+                      class="staff-pos-ticket-extras-panel"
+                      id="pos-ticket-extras"
+                    >
                       <div class="staff-pos-ticket-identity">
                         <label class="staff-pos-field staff-pos-field--name" for="pos-customer-name">
                           <span class="staff-pos-field-label">Customer name</span>
@@ -1432,101 +1478,54 @@ defmodule EspresoWeb.StaffPosLive do
                           />
                         </label>
 
-                        <div
-                          class={[
-                            "staff-pos-ticket-extras",
-                            @cart != [] && "is-armed"
-                          ]}
-                          id="pos-ticket-extras"
-                        >
-                          <div class="staff-pos-loyalty-entry-wrap" id="pos-loyalty">
-                            <button
-                              type="button"
-                              id="pos-loyalty-entry"
-                              class={[
-                                "staff-pos-ticket-extra",
-                                "staff-pos-loyalty-entry",
-                                @loyalty_open? && "is-active",
-                                @loyalty_customer && "is-linked",
-                                @loyalty_customer &&
-                                  @loyalty_customer.points_balance >= Loyalty.redeem_cost() &&
-                                  "is-ready",
-                                loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer) &&
-                                  "is-attention"
-                              ]}
-                              phx-click="open_loyalty"
-                              aria-expanded={to_string(@loyalty_open?)}
-                              aria-controls="pos-loyalty-modal"
-                            >
-                              {loyalty_entry_label(@loyalty_customer, @loyalty_phone)}
-                            </button>
-                          </div>
-
+                        <div class="staff-pos-loyalty-entry-wrap" id="pos-loyalty">
                           <button
-                            :if={@cart != []}
                             type="button"
+                            id="pos-loyalty-entry"
                             class={[
                               "staff-pos-ticket-extra",
-                              "staff-pos-notes-toggle",
-                              (@notes_open? or order_note(%{notes: @notes}) != nil) && "is-active"
+                              "staff-pos-loyalty-entry",
+                              @loyalty_open? && "is-active",
+                              @loyalty_customer && "is-linked",
+                              @loyalty_customer &&
+                                @loyalty_customer.points_balance >= Loyalty.redeem_cost() &&
+                                "is-ready",
+                              loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer) &&
+                                "is-attention"
                             ]}
-                            id="pos-notes-toggle"
-                            phx-click="toggle_notes"
-                            aria-expanded={
-                              to_string(@notes_open? or order_note(%{notes: @notes}) != nil)
-                            }
-                            aria-controls="pos-notes"
+                            phx-click="open_loyalty"
+                            aria-expanded={to_string(@loyalty_open?)}
+                            aria-controls="pos-loyalty-modal"
                           >
-                            Notes
-                          </button>
-
-                          <button
-                            :if={@cart != []}
-                            type="button"
-                            class={[
-                              "staff-pos-ticket-extra",
-                              "staff-pos-discount-toggle",
-                              (@discount_open? or Orders.Discount.applied?(ticket_quote(assigns))) &&
-                                "is-active"
-                            ]}
-                            id="pos-discount-toggle"
-                            phx-click="toggle_discount"
-                            aria-expanded={to_string(@discount_open?)}
-                            aria-controls="pos-discount-panel"
-                          >
-                            {discount_entry_label(ticket_quote(assigns))}
+                            {loyalty_entry_label(@loyalty_customer, @loyalty_phone)}
                           </button>
                         </div>
                       </div>
-                    </div>
-                    <p
-                      :if={loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)}
-                      class="staff-pos-submission-error"
-                      id="pos-loyalty-find-hint"
-                    >
-                      Find this customer before placing the order.
-                    </p>
 
-                    <label
-                      :if={@cart != [] and (@notes_open? or order_note(%{notes: @notes}) != nil)}
-                      class="staff-pos-field staff-pos-field--notes"
-                      for="pos-notes"
-                    >
-                      <textarea
-                        class="staff-pos-field-textarea"
-                        id="pos-notes"
-                        name="notes"
-                        phx-change="set_notes"
-                        phx-debounce="300"
-                        rows="2"
-                        placeholder="Less ice, oat milk…"
-                      >{@notes}</textarea>
-                    </label>
-                    <div
-                      :if={@cart != [] and @discount_open?}
-                      class="staff-pos-discount-panel"
-                      id="pos-discount-panel"
-                    >
+                      <p
+                        :if={loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)}
+                        class="staff-pos-submission-error"
+                        id="pos-loyalty-find-hint"
+                      >
+                        Find this customer before placing the order.
+                      </p>
+
+                      <label class="staff-pos-field staff-pos-field--notes" for="pos-notes">
+                        <span class="staff-pos-field-label">Notes</span>
+                        <textarea
+                          class="staff-pos-field-textarea"
+                          id="pos-notes"
+                          name="notes"
+                          phx-change="set_notes"
+                          phx-debounce="300"
+                          rows="2"
+                          placeholder="Less ice, oat milk…"
+                        >{@notes}</textarea>
+                      </label>
+
+                      <div class="staff-pos-discount-panel" id="pos-discount-panel">
+                        <span class="staff-pos-field-label">Discount</span>
+                    
                       <button
                         type="button"
                         class={["staff-pos-discount-chip", @discount_kind == "senior" && "is-active"]}
@@ -1591,6 +1590,7 @@ defmodule EspresoWeb.StaffPosLive do
                           autocomplete="off"
                         />
                       </label>
+                    </div>
                     </div>
                   </div>
 
@@ -3082,8 +3082,52 @@ defmodule EspresoWeb.StaffPosLive do
     end
   end
 
-  defp discount_entry_label(quote) do
-    if Orders.Discount.applied?(quote), do: quote.label, else: "Discount"
+  defp ticket_extras_name(name) when is_binary(name) do
+    trimmed = String.trim(name)
+
+    if trimmed == "" or trimmed == "Walk-in" do
+      "Walk-in"
+    else
+      trimmed
+    end
+  end
+
+  defp ticket_extras_name(_), do: "Walk-in"
+
+  defp ticket_extras_loyalty_part(customer, phone) do
+    cond do
+      match?(%{points_balance: balance} when balance >= 0, customer) and
+          customer.points_balance >= Loyalty.redeem_cost() ->
+        "Reward ready"
+
+      match?(%{points_balance: _}, customer) ->
+        "#{customer.points_balance} pts"
+
+      loyalty_phone_unresolved?(phone, customer) ->
+        "Find needed"
+
+      true ->
+        nil
+    end
+  end
+
+  defp ticket_extras_summary(assigns) do
+    parts = [ticket_extras_name(assigns[:customer_name])]
+
+    parts =
+      case ticket_extras_loyalty_part(assigns[:loyalty_customer], assigns[:loyalty_phone]) do
+        nil -> parts
+        part -> parts ++ [part]
+      end
+
+    parts =
+      if order_note(%{notes: assigns[:notes]}), do: parts ++ ["Note"], else: parts
+
+    Enum.join(parts, " · ")
+  end
+
+  defp ticket_extras_applied?(assigns) do
+    ticket_extras_summary(assigns) != "Walk-in"
   end
 
   defp payment_method_label("gcash"), do: "GCash"
@@ -3718,6 +3762,7 @@ defmodule EspresoWeb.StaffPosLive do
     |> close_redeem()
     |> assign(:notes, "")
     |> assign(:notes_open?, false)
+    |> assign(:ticket_extras_open?, false)
     |> assign(:discount_kind, "none")
     |> assign(:discount_peso, "")
     |> assign(:discount_open?, false)
@@ -3765,6 +3810,7 @@ defmodule EspresoWeb.StaffPosLive do
       :customer_name,
       :notes,
       :notes_open?,
+      :ticket_extras_open?,
       :fulfillment,
       :table_number,
       :payment_choice,
