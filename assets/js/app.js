@@ -776,6 +776,23 @@ Hooks.MenuBrowse = {
     }
 
     this.el.addEventListener("click", this.onChipClick)
+    this.onAddPointer = (event) => {
+      const origin = event.target.closest(
+        ".brune-menu-add, .menu-buy-now, .menu-signature-card"
+      )
+      if (!(origin instanceof HTMLElement)) return
+
+      const root =
+        origin.closest("article, .menu-signature-card, #menu-buy-panel, #menu-page") ||
+        origin
+      const img = root.querySelector("img")
+      this._flyFrom = {
+        rect: origin.getBoundingClientRect(),
+        src: img instanceof HTMLImageElement ? img.currentSrc || img.src : "",
+      }
+    }
+    this.el.addEventListener("pointerdown", this.onAddPointer, true)
+    this._lastBagFly = this.el.dataset.bagFly || "0"
     this.restorePersistedCart()
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
@@ -790,10 +807,57 @@ Hooks.MenuBrowse = {
     this.persistCartFromDom()
     this.ensureMyOrdersRestored()
     this.ensureLoyaltyPhoneRestored()
+    this.maybeFlyToBag()
   },
 
   destroyed() {
     if (this.onChipClick) this.el.removeEventListener("click", this.onChipClick)
+    if (this.onAddPointer) this.el.removeEventListener("pointerdown", this.onAddPointer, true)
+  },
+
+  maybeFlyToBag() {
+    const token = this.el.dataset.bagFly || "0"
+    if (!token || token === "0" || token === this._lastBagFly) return
+    this._lastBagFly = token
+    this.flyAddedItemToBag()
+  },
+
+  flyAddedItemToBag() {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
+
+    const bag = this.el.querySelector("#menu-qr-bag")
+    if (!(bag instanceof HTMLElement)) return
+
+    const from = this._flyFrom && this._flyFrom.rect
+    const start = from || { left: window.innerWidth / 2, top: window.innerHeight * 0.55, width: 40, height: 40 }
+    const end = bag.getBoundingClientRect()
+    const orb = document.createElement(this._flyFrom && this._flyFrom.src ? "img" : "span")
+    orb.className = "menu-bag-fly"
+    if (orb instanceof HTMLImageElement) {
+      orb.src = this._flyFrom.src
+      orb.alt = ""
+    }
+    const size = 38
+    orb.style.left = `${start.left + start.width / 2 - size / 2}px`
+    orb.style.top = `${start.top + start.height / 2 - size / 2}px`
+    document.body.appendChild(orb)
+
+    const dx = end.left + end.width / 2 - size / 2 - (start.left + start.width / 2 - size / 2)
+    const dy = end.top + end.height / 2 - size / 2 - (start.top + start.height / 2 - size / 2)
+    const anim = orb.animate(
+      [
+        { transform: "translate(0, 0) scale(1)", opacity: 1 },
+        { transform: `translate(${dx * 0.55}px, ${dy * 0.35 - 48}px) scale(0.72)`, opacity: 1, offset: 0.55 },
+        { transform: `translate(${dx}px, ${dy}px) scale(0.28)`, opacity: 0.35 },
+      ],
+      { duration: 560, easing: "cubic-bezier(0.22, 1, 0.36, 1)", fill: "forwards" }
+    )
+    const cleanup = () => orb.remove()
+    if (anim && typeof anim.finished !== "undefined") {
+      anim.finished.then(cleanup).catch(cleanup)
+    } else {
+      window.setTimeout(cleanup, 650)
+    }
   },
 
   cartStorageKey() {

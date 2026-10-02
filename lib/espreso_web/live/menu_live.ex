@@ -52,6 +52,7 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:toast, nil)
      |> assign(:basket_pulse?, false)
      |> assign(:bag_add_delta, nil)
+     |> assign(:bag_fly_n, 0)
      |> assign(:fulfillment, :dine_in)
      |> assign(:fulfillment_touched?, false)
      |> assign(:table_number, "")
@@ -116,6 +117,13 @@ defmodule EspresoWeb.MenuLive do
      socket
      |> assign(:basket_open?, false)
      |> assign(:basket_closing?, false)}
+  end
+
+  def handle_info(:clear_bag_pulse, socket) do
+    {:noreply,
+     socket
+     |> assign(:basket_pulse?, false)
+     |> assign(:bag_add_delta, nil)}
   end
 
   def handle_info(:clear_toast, socket) do
@@ -512,6 +520,7 @@ defmodule EspresoWeb.MenuLive do
       id="menu-page"
       phx-hook="MenuBrowse"
       data-cart={Jason.encode!(cart_storage_payload(@cart))}
+      data-bag-fly={@bag_fly_n}
       class={[
         "menu-live-root",
         @menu_stage != :menu && "menu-live-root--qr-entry",
@@ -801,20 +810,87 @@ defmodule EspresoWeb.MenuLive do
 
       <div :if={@menu_stage == :menu} class="menu-page menu-page-brune site-page menu-page--qr">
         <div id="menu-qr-sticky" class="menu-qr-sticky">
-          <header id="menu-qr-chrome" class="menu-qr-chrome menu-qr-top">
-            <button
-              type="button"
-              id="menu-qr-back"
-              class="menu-qr-chrome-back"
-              phx-click="back_to_landing"
-              aria-label={
-                if @coffeespot_guest?,
-                  do: "Back to CoffeeSpot home",
-                  else: "Back to #{@guest_brand_name}"
-              }
+          <header
+            id="menu-qr-chrome"
+            class={[
+              "menu-qr-chrome menu-qr-top",
+              (@search_open? or search_active?(@search)) && "is-search-open"
+            ]}
+          >
+            <div id="menu-qr-chrome-leading" class="menu-qr-chrome-leading">
+            <div
+              id="menu-search"
+              class={[
+                "menu-qr-search-inline",
+                (@search_open? or search_active?(@search)) && "is-open"
+              ]}
             >
-              <.icon name="hero-arrow-left" class="menu-qr-chrome-icon" />
-            </button>
+              <button
+                type="button"
+                id="menu-qr-search-toggle"
+                class="menu-qr-search-inline-toggle"
+                phx-click="toggle_search"
+                aria-label="Search menu"
+                aria-expanded={to_string(@search_open? or search_active?(@search))}
+                aria-controls="menu-search-input"
+              >
+                <.icon name="hero-magnifying-glass" class="menu-qr-chrome-icon" />
+              </button>
+
+              <form class="menu-qr-search-inline-form" phx-change="search" phx-submit="search">
+                <div class="menu-qr-search-inline-wrap">
+                  <span class="menu-qr-search-inline-icon" aria-hidden="true">
+                    <.icon name="hero-magnifying-glass" class="menu-qr-search-inline-glyph" />
+                  </span>
+                  <input
+                    id="menu-search-input"
+                    type="text"
+                    name="search"
+                    value={@search}
+                    placeholder="Search menu…"
+                    class="menu-qr-search-inline-input"
+                    autocomplete="off"
+                    phx-debounce="200"
+                  />
+                  <button
+                    type="button"
+                    id="menu-qr-search-close"
+                    class="menu-qr-search-close menu-qr-search-inline-close"
+                    phx-click="clear_search"
+                    aria-label="Clear search"
+                  >
+                    <.icon name="hero-x-mark" class="menu-qr-search-close-icon" />
+                  </button>
+                </div>
+              </form>
+            </div>
+              <button
+                :if={show_floating_rewards?(@my_orders_open?, @basket_open?, @detail)}
+                type="button"
+                id="menu-qr-rewards"
+                class={[
+                  "menu-qr-customer-nav-btn",
+                  "menu-qr-rewards",
+                  rewards_available?(@my_orders_rewards) && "menu-qr-rewards--available"
+                ]}
+                phx-click="open_my_orders"
+                phx-value-tab="rewards"
+                aria-expanded={to_string(@my_orders_open? and @my_orders_tab == :rewards)}
+                aria-controls="menu-my-orders-panel"
+                aria-label={rewards_trigger_aria(@my_orders_rewards)}
+              >
+                <span class="menu-qr-customer-nav-icon" aria-hidden="true">
+                  <.icon name="hero-gift" class="menu-qr-customer-nav-icon-glyph" />
+                </span>
+                <span class="sr-only">Rewards</span>
+                <span
+                  :if={rewards_available?(@my_orders_rewards)}
+                  class="menu-qr-rewards-badge"
+                  aria-hidden="true"
+                >
+                </span>
+              </button>
+            </div>
             <p class="menu-qr-chrome-brand menu-qr-top-brand">
               <.guest_brand_mark
                 coffeespot?={@coffeespot_guest?}
@@ -822,7 +898,30 @@ defmodule EspresoWeb.MenuLive do
                 variant="on-dark"
               />
             </p>
-            <div class="menu-qr-chrome-trailing">
+            <div id="menu-qr-chrome-trailing" class="menu-qr-chrome-trailing">
+              <button
+                :if={show_floating_orders?(@my_orders, @my_orders_open?, @basket_open?, @detail)}
+                type="button"
+                id="menu-qr-my-orders"
+                class={[
+                  "menu-qr-customer-nav-btn",
+                  "menu-qr-my-orders",
+                  my_orders_trigger_status?(@my_orders) && "menu-qr-my-orders--status"
+                ]}
+                phx-click="open_my_orders"
+                phx-value-tab="orders"
+                aria-expanded={to_string(@my_orders_open? and @my_orders_tab == :orders)}
+                aria-controls="menu-my-orders-panel"
+                aria-label={my_orders_trigger_aria(@my_orders)}
+              >
+                <span class="menu-qr-customer-nav-icon" aria-hidden="true">
+                  <.icon
+                    name="hero-clipboard-document-list"
+                    class="menu-qr-customer-nav-icon-glyph"
+                  />
+                </span>
+                <span class="sr-only">Orders</span>
+              </button>
               <button
                 type="button"
                 id="menu-qr-bag"
@@ -847,102 +946,6 @@ defmodule EspresoWeb.MenuLive do
               </button>
             </div>
           </header>
-
-          <nav
-            id="menu-craving"
-            class="menu-craving menu-craving--sticky"
-            aria-label="Menu categories"
-          >
-            <div class="menu-craving-head">
-              <p class="menu-craving-context" id="menu-craving-context">Categories</p>
-              <div
-                id="menu-search"
-                class={[
-                  "menu-qr-search-inline",
-                  (@search_open? or search_active?(@search)) && "is-open"
-                ]}
-              >
-                <button
-                  type="button"
-                  id="menu-qr-search-toggle"
-                  class="menu-qr-search-inline-toggle"
-                  phx-click="toggle_search"
-                  aria-label="Search menu"
-                  aria-expanded={to_string(@search_open? or search_active?(@search))}
-                  aria-controls="menu-search-input"
-                >
-                  <.icon name="hero-magnifying-glass" class="menu-qr-chrome-icon" />
-                </button>
-
-                <form class="menu-qr-search-inline-form" phx-change="search" phx-submit="search">
-                  <div class="menu-qr-search-inline-wrap">
-                    <span class="menu-qr-search-inline-icon" aria-hidden="true">
-                      <.icon name="hero-magnifying-glass" class="menu-qr-search-inline-glyph" />
-                    </span>
-                    <input
-                      id="menu-search-input"
-                      type="text"
-                      name="search"
-                      value={@search}
-                      placeholder="Search menu…"
-                      class="menu-qr-search-inline-input"
-                      autocomplete="off"
-                      phx-debounce="200"
-                    />
-                    <button
-                      type="button"
-                      id="menu-qr-search-close"
-                      class="menu-qr-search-close menu-qr-search-inline-close"
-                      phx-click="clear_search"
-                      aria-label="Clear search"
-                    >
-                      <.icon name="hero-x-mark" class="menu-qr-search-close-icon" />
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-
-            <div class="menu-craving-rail">
-              <button
-                :for={chip <- menu_craving_chips(@categories)}
-                type="button"
-                id={"menu-craving-chip-#{chip.key}"}
-                phx-click={chip.event}
-                phx-value-name={chip[:name]}
-                phx-value-id={chip[:id]}
-                class={[
-                  "menu-craving-chip",
-                  chip_active?(chip, @selected_category, @menu_filter) && "is-active"
-                ]}
-                aria-pressed={to_string(chip_active?(chip, @selected_category, @menu_filter))}
-                aria-current={if(chip_active?(chip, @selected_category, @menu_filter), do: "true")}
-                aria-label={
-                  craving_chip_aria_label(
-                    chip,
-                    chip_active?(chip, @selected_category, @menu_filter)
-                  )
-                }
-              >
-                <img
-                  src={chip.thumb}
-                  alt=""
-                  class="menu-craving-thumb"
-                  loading="lazy"
-                  width="32"
-                  height="32"
-                />
-                <span class="menu-craving-label">{chip.label}</span>
-                <span
-                  :if={chip_active?(chip, @selected_category, @menu_filter)}
-                  class="menu-craving-check"
-                  aria-hidden="true"
-                >
-                  ✓
-                </span>
-              </button>
-            </div>
-          </nav>
         </div>
 
         <section class="brune-menu-shell" id="menu">
@@ -991,7 +994,7 @@ defmodule EspresoWeb.MenuLive do
             >
               <p class="menu-filter-empty-title">Nothing here right now</p>
               <p class="menu-filter-empty-lede">
-                Try another craving pick, or browse a category above.
+                Try another craving pick, or browse a category below.
               </p>
             </div>
 
@@ -1236,75 +1239,52 @@ defmodule EspresoWeb.MenuLive do
       <nav
         :if={
           @menu_stage == :menu &&
-            show_floating_customer_nav?(@my_orders, @my_orders_open?, @basket_open?, @detail)
+            show_floating_categories?(@basket_open?, @detail, @my_orders_open?)
         }
-        id="menu-qr-customer-nav"
-        class="menu-qr-customer-nav"
-        aria-label="Orders and Rewards"
+        id="menu-craving"
+        class="menu-craving menu-craving--dock"
+        aria-label="Menu categories"
       >
-        <button
-          :if={show_floating_orders?(@my_orders, @my_orders_open?, @basket_open?, @detail)}
-          type="button"
-          id="menu-qr-my-orders"
-          class={[
-            "menu-qr-customer-nav-btn",
-            "menu-qr-my-orders",
-            my_orders_trigger_status?(@my_orders) && "menu-qr-my-orders--status"
-          ]}
-          phx-click="open_my_orders"
-          phx-value-tab="orders"
-          aria-expanded={to_string(@my_orders_open? and @my_orders_tab == :orders)}
-          aria-controls="menu-my-orders-panel"
-          aria-label={my_orders_trigger_aria(@my_orders)}
-        >
-          <span class="menu-qr-customer-nav-icon" aria-hidden="true">
-            <.icon name="hero-shopping-bag" class="menu-qr-customer-nav-icon-glyph" />
-          </span>
-          <span class="menu-qr-customer-nav-label">Orders</span>
-        </button>
-
-        <button
-          :if={show_floating_rewards?(@my_orders_open?, @basket_open?, @detail)}
-          type="button"
-          id="menu-qr-rewards"
-          class={[
-            "menu-qr-customer-nav-btn",
-            "menu-qr-rewards",
-            rewards_available?(@my_orders_rewards) && "menu-qr-rewards--available"
-          ]}
-          phx-click="open_my_orders"
-          phx-value-tab="rewards"
-          aria-expanded={to_string(@my_orders_open? and @my_orders_tab == :rewards)}
-          aria-controls="menu-my-orders-panel"
-          aria-label={rewards_trigger_aria(@my_orders_rewards)}
-        >
-          <span class="menu-qr-customer-nav-icon" aria-hidden="true">
-            <.icon name="hero-gift" class="menu-qr-customer-nav-icon-glyph" />
-          </span>
-          <span class="menu-qr-customer-nav-label">Rewards</span>
-          <span
-            :if={rewards_available?(@my_orders_rewards)}
-            class="menu-qr-rewards-badge"
-            aria-hidden="true"
+        <div class="menu-craving-rail">
+          <button
+            :for={chip <- menu_craving_chips(@categories)}
+            type="button"
+            id={"menu-craving-chip-#{chip.key}"}
+            phx-click={chip.event}
+            phx-value-name={chip[:name]}
+            phx-value-id={chip[:id]}
+            class={[
+              "menu-craving-chip",
+              chip_active?(chip, @selected_category, @menu_filter) && "is-active"
+            ]}
+            aria-pressed={to_string(chip_active?(chip, @selected_category, @menu_filter))}
+            aria-current={if(chip_active?(chip, @selected_category, @menu_filter), do: "true")}
+            aria-label={
+              craving_chip_aria_label(
+                chip,
+                chip_active?(chip, @selected_category, @menu_filter)
+              )
+            }
           >
-          </span>
-        </button>
+            <img
+              src={chip.thumb}
+              alt=""
+              class="menu-craving-thumb"
+              loading="lazy"
+              width="32"
+              height="32"
+            />
+            <span class="menu-craving-label">{chip.label}</span>
+            <span
+              :if={chip_active?(chip, @selected_category, @menu_filter)}
+              class="menu-craving-check"
+              aria-hidden="true"
+            >
+              ✓
+            </span>
+          </button>
+        </div>
       </nav>
-
-      <button
-        :if={@menu_stage == :menu && show_floating_bag?(@cart, @basket_open?, @detail)}
-        type="button"
-        id="menu-floating-bag"
-        class="menu-floating-bag"
-        phx-click="open_basket"
-        aria-label={floating_bag_label(@cart)}
-      >
-        <span class="menu-floating-bag-summary">
-          <span class="menu-floating-bag-count">{cart_count(@cart)}</span>
-          <span class="menu-floating-bag-total">{Menu.format_price(cart_total(@cart))}</span>
-        </span>
-        <span class="menu-floating-bag-cta">View order</span>
-      </button>
 
       <div
         :if={@menu_stage == :menu && @basket_open?}
@@ -2178,13 +2158,18 @@ defmodule EspresoWeb.MenuLive do
         Menu.product_image(category_name, product)
       )
 
+    socket =
+      socket
+      |> assign(:cart, cart)
+      |> assign(:detail, nil)
+      |> assign(:detail_closing?, false)
+      |> assign(:toast, nil)
+      |> assign(:basket_pulse?, true)
+      |> assign(:bag_add_delta, qty)
+      |> assign(:bag_fly_n, Map.get(socket.assigns, :bag_fly_n, 0) + 1)
+
+    Process.send_after(self(), :clear_bag_pulse, 800)
     socket
-    |> assign(:cart, cart)
-    |> assign(:detail, nil)
-    |> assign(:detail_closing?, false)
-    |> assign(:toast, nil)
-    |> assign(:basket_pulse?, true)
-    |> assign(:bag_add_delta, qty)
   end
 
   defp add_line(cart, product, price, quantity, category_name, image) do
@@ -2672,13 +2657,17 @@ defmodule EspresoWeb.MenuLive do
         {:noreply,
          socket
          |> assign(:my_orders_open?, false)
-         |> assign(:my_orders_tab, :orders)}
+         |> assign(:my_orders_tab, :orders)
+         |> assign(:basket_pulse?, false)
+         |> assign(:bag_add_delta, nil)}
 
       true ->
         {:noreply,
          socket
          |> assign(:my_orders_open?, true)
          |> assign(:my_orders_tab, tab)
+         |> assign(:basket_pulse?, false)
+         |> assign(:bag_add_delta, nil)
          |> refresh_my_orders_rewards()}
     end
   end
@@ -2718,17 +2707,16 @@ defmodule EspresoWeb.MenuLive do
     if rewards_available?(rewards), do: "Rewards, reward available", else: "Rewards"
   end
 
-  defp show_floating_customer_nav?(my_orders, my_orders_open?, basket_open?, detail) do
-    show_floating_orders?(my_orders, my_orders_open?, basket_open?, detail) or
-      show_floating_rewards?(my_orders_open?, basket_open?, detail)
+  defp show_floating_categories?(basket_open?, detail, my_orders_open?) do
+    not basket_open? and is_nil(detail) and not my_orders_open?
   end
 
-  defp show_floating_orders?(my_orders, my_orders_open?, basket_open?, detail) do
-    my_orders != [] and not my_orders_open? and not basket_open? and is_nil(detail)
+  defp show_floating_orders?(my_orders, _my_orders_open?, basket_open?, detail) do
+    my_orders != [] and not basket_open? and is_nil(detail)
   end
 
-  defp show_floating_rewards?(my_orders_open?, basket_open?, detail) do
-    not my_orders_open? and not basket_open? and is_nil(detail)
+  defp show_floating_rewards?(_my_orders_open?, basket_open?, detail) do
+    not basket_open? and is_nil(detail)
   end
 
   # Customer-facing My Orders labels only — DB status remains unchanged.
@@ -2884,18 +2872,6 @@ defmodule EspresoWeb.MenuLive do
   end
 
   defp normalize_restored_image(_), do: nil
-
-  defp show_floating_bag?(cart, basket_open?, detail) do
-    cart != [] && not basket_open? && is_nil(detail)
-  end
-
-  defp floating_bag_items_label(cart) do
-    if cart_count(cart) == 1, do: "item", else: "items"
-  end
-
-  defp floating_bag_label(cart) do
-    "Your order, #{cart_count(cart)} #{floating_bag_items_label(cart)}, #{Menu.format_price(cart_total(cart))}, view order"
-  end
 
   defp cart_total(cart) do
     Enum.reduce(cart, Decimal.new(0), fn line, acc ->
