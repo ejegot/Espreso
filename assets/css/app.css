@@ -12206,6 +12206,11 @@ a.staff-home-card:focus-visible {
   color: var(--elilai-ivory, #f4efe3);
 }
 
+.staff-action-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 /* —— Staff UX V3.1 shared shell —— */
 /* Employee-scoped ELIlai tokens. Customer pages do not use .staff-app. */
 .staff-app {

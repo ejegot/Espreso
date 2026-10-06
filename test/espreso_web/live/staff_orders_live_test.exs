@@ -401,8 +401,29 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     assert has_element?(view, "#split-pay-modal")
     refute has_element?(view, "#orders-cash-tender-modal")
+    refute has_element?(view, "#orders-split-wallet-amount")
+
+    assert has_element?(
+             view,
+             "#orders-split-portion-hint",
+             "Enter an amount less than the total."
+           )
+
+    assert has_element?(view, ~s(#orders-confirm-split[disabled]))
+    assert has_element?(view, "#split-pay-modal", "Enter cash first. GCash covers the rest.")
+
+    view |> element("#orders-split-cash") |> render_keyup(%{"value" => "0"})
+    refute has_element?(view, "#orders-split-wallet-amount")
+    assert has_element?(view, ~s(#orders-confirm-split[disabled]))
+
+    view |> element("#orders-split-cash") |> render_keyup(%{"value" => "75"})
+    refute has_element?(view, "#orders-split-wallet-amount")
+    assert has_element?(view, ~s(#orders-confirm-split[disabled]))
 
     view |> element("#orders-split-cash") |> render_keyup(%{"value" => "25"})
+    assert has_element?(view, "#orders-split-wallet-amount", "₱50")
+    refute has_element?(view, "#orders-split-portion-hint")
+    refute has_element?(view, ~s(#orders-confirm-split[disabled]))
     view |> element("#orders-confirm-split") |> render_click()
 
     refute has_element?(view, "#split-pay-modal")

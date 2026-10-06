@@ -1664,11 +1664,13 @@ defmodule EspresoWeb.StaffOrdersLive do
   defp split_pay_modal(assigns) do
     order = assigns.split_pay_order
     remainder = split_wallet_remainder(assigns.split_cash, order.total)
+    portion_ready? = split_portion_ready?(assigns.split_cash, order.total)
 
     assigns =
       assigns
       |> assign(:order, order)
       |> assign(:remainder, remainder)
+      |> assign(:portion_ready?, portion_ready?)
       |> assign(:wallet_label, if(assigns.split_wallet == "maya", do: "Maya", else: "GCash"))
 
     ~H"""
@@ -1694,7 +1696,7 @@ defmodule EspresoWeb.StaffOrdersLive do
         </header>
 
         <p class="staff-mark-paid-modal-note">
-          Cash plus GCash or Maya. Amounts must equal the total.
+          Enter cash first. {@wallet_label} covers the rest.
         </p>
 
         <div class="staff-pos-split-wallets" role="group" aria-label="Wallet for split">
@@ -1719,7 +1721,7 @@ defmodule EspresoWeb.StaffOrdersLive do
         </div>
 
         <label class="staff-pos-split-field" for="orders-split-cash">
-          <span>Cash</span>
+          <span>Cash portion</span>
           <span class="staff-pos-cash-input-wrap">
             <span aria-hidden="true">₱</span>
             <input
@@ -1737,7 +1739,11 @@ defmodule EspresoWeb.StaffOrdersLive do
           </span>
         </label>
 
-        <div class="staff-pos-split-remainder" id="orders-split-wallet-amount">
+        <p :if={!@portion_ready?} class="staff-pos-split-cue" id="orders-split-portion-hint">
+          Enter an amount less than the total.
+        </p>
+
+        <div :if={@portion_ready?} class="staff-pos-split-remainder" id="orders-split-wallet-amount">
           <span>{@wallet_label}</span>
           <strong>{format_money(@remainder)}</strong>
         </div>
@@ -1751,12 +1757,29 @@ defmodule EspresoWeb.StaffOrdersLive do
           class="staff-action staff-action-primary"
           id="orders-confirm-split"
           phx-click="confirm_split_pay"
+          disabled={!@portion_ready?}
         >
           Continue to cash received
         </button>
       </div>
     </div>
     """
+  end
+
+  defp split_portion_ready?(cash_input, total) do
+    case parse_money(cash_input) do
+      {:ok, cash} ->
+        remainder =
+          total
+          |> Decimal.round(2)
+          |> Decimal.sub(cash)
+          |> Decimal.round(2)
+
+        Decimal.compare(remainder, 0) == :gt
+
+      :error ->
+        false
+    end
   end
 
   defp split_wallet_remainder(cash_input, total) do
