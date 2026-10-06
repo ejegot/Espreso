@@ -42,8 +42,7 @@ defmodule EspresoWeb.OrderLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    confirming? =
-      not is_nil(socket.assigns.order) and Map.get(params, "confirm") in ["1", "true"]
+    confirming? = order_confirming?(socket.assigns.order, params)
 
     {:noreply,
      socket
@@ -60,8 +59,15 @@ defmodule EspresoWeb.OrderLive do
         {:noreply,
          socket
          |> assign(:order, order)
-         |> assign(:page_title, page_title(order, socket.assigns.confirming?))
          |> maybe_leave_confirm_after_payment(previous)
+         |> maybe_leave_confirm_after_cancel(previous)
+         |> then(fn socket ->
+           assign(
+             socket,
+             :page_title,
+             page_title(socket.assigns.order, socket.assigns.confirming?)
+           )
+         end)
          |> maybe_begin_complete_return(previous)}
 
       _ ->
@@ -108,7 +114,7 @@ defmodule EspresoWeb.OrderLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="menu-page-brune site-page order-page">
+    <div class="menu-page-brune site-page order-page menu-page--glass">
       <header class="order-chrome menu-qr-chrome menu-qr-top" id="order-chrome">
         <.link
           navigate={menu_browse_path()}
@@ -153,7 +159,9 @@ defmodule EspresoWeb.OrderLive do
           phx-hook="OrderConfirm"
           data-order-number={@order.number}
         >
-          <p :if={not show_qrph_payment?(@order)} class="order-eyebrow"><.coffeespot_wordmark /></p>
+          <p :if={not show_qrph_payment?(@order)} class="order-eyebrow">
+            <.coffeespot_wordmark variant="on-dark" />
+          </p>
           <%= if show_qrph_payment?(@order) do %>
             <%!-- Pay screen content is the QRPh section below (header is Pay with GCash / Maya). --%>
           <% else %>
@@ -184,38 +192,43 @@ defmodule EspresoWeb.OrderLive do
             {qrph_payment_section(assign(assigns, :id_prefix, "order-confirm"))}
           </section>
 
-          <dl
-            :if={not confirm_payment_processing?(@order) and not show_qrph_payment?(@order)}
-            id="order-confirm-recap"
-            class="order-confirm-recap"
-          >
-            <div class="order-confirm-recap-row">
-              <dt>Type</dt>
-              <dd>{Orders.fulfillment_label(@order.fulfillment)}</dd>
-            </div>
-            <div class="order-confirm-recap-row order-confirm-recap-total">
-              <dt>Total</dt>
-              <dd>{Orders.format_total(@order)}</dd>
-            </div>
-          </dl>
-
-          <div :if={not show_qrph_payment?(@order)} class="order-actions order-actions--confirm">
-            <.link
-              navigate={~p"/order/#{@order.number}"}
-              class="order-view-link"
-              id="order-view-my-order"
+          <div :if={not show_qrph_payment?(@order)} class="order-confirm-footer">
+            <dl
+              :if={not confirm_payment_processing?(@order)}
+              id="order-confirm-recap"
+              class="order-confirm-recap"
             >
-              View My Order
-            </.link>
-            <.link navigate={menu_browse_path()} class="order-more-link" id="order-order-more">
-              Order More
-            </.link>
+              <div class="order-confirm-recap-row">
+                <dt>Type</dt>
+                <dd>{Orders.fulfillment_label(@order.fulfillment)}</dd>
+              </div>
+              <div class="order-confirm-recap-row order-confirm-recap-total">
+                <dt>Total</dt>
+                <dd>{Orders.format_total(@order)}</dd>
+              </div>
+            </dl>
+
+            <div class="order-actions order-actions--confirm">
+              <.link
+                navigate={~p"/order/#{@order.number}"}
+                class="order-view-link"
+                id="order-view-my-order"
+              >
+                View My Order
+              </.link>
+              <.link navigate={menu_browse_path()} class="order-more-link" id="order-order-more">
+                Order More
+              </.link>
+            </div>
           </div>
         </div>
 
         <div
           :if={@order && !@confirming?}
-          class={["order-card", show_qrph_payment?(@order) && "order-card--pay"]}
+          class={[
+            show_qrph_payment?(@order) && "order-card order-card--pay",
+            not show_qrph_payment?(@order) && "order-status-stack"
+          ]}
         >
           <section
             :if={show_qrph_payment?(@order)}
@@ -226,10 +239,10 @@ defmodule EspresoWeb.OrderLive do
             {qrph_payment_section(assign(assigns, :id_prefix, "order"))}
           </section>
 
-          <div
+          <section
             :if={not show_qrph_payment?(@order)}
             class={[
-              "order-status-block",
+              "order-status-card",
               @order.status == "completed" && "order-status-block--complete"
             ]}
           >
@@ -305,7 +318,7 @@ defmodule EspresoWeb.OrderLive do
             <p :if={@order.status not in ["completed"]} class="order-hint" id="order-hint">
               {customer_status_hint(@order)}
             </p>
-          </div>
+          </section>
 
           <.elilai_rewards
             :if={not @complete_return? and not show_qrph_payment?(@order)}
@@ -386,7 +399,9 @@ defmodule EspresoWeb.OrderLive do
   end
 
   defp show_order_push_prompt?(order, assigns) do
-    CustomerPush.promptable?(order) and
+    not assigns.confirming? and
+      not show_qrph_payment?(order) and
+      CustomerPush.promptable?(order) and
       assigns.push_vapid_public_key != "" and
       not assigns.push_prompt_dismissed? and
       not assigns.push_subscribed?
@@ -428,15 +443,13 @@ defmodule EspresoWeb.OrderLive do
 
   defp order_chrome_title(nil, _confirming?), do: "Order"
 
-  defp order_chrome_title(order, true) do
+  defp order_chrome_title(order, confirming?) do
     cond do
       show_qrph_payment?(order) -> qrph_title(order)
-      confirm_payment_processing?(order) -> "Payment"
-      true -> "Confirmed"
+      confirming? and confirm_payment_processing?(order) -> "Payment"
+      true -> "Your order"
     end
   end
-
-  defp order_chrome_title(_order, _confirming?), do: "Your order"
 
   defp page_title(nil, _confirming?), do: "Order not found"
 
@@ -472,7 +485,6 @@ defmodule EspresoWeb.OrderLive do
     assigns =
       assigns
       |> assign_new(:id_prefix, fn -> "order" end)
-      |> assign(:wallet_brand, qrph_wallet_brand(assigns.order))
       |> assign(:qrph_codes, qrph_codes)
       |> assign(:open_code, Enum.find(qrph_codes, &(&1.id == open_id)))
 
@@ -481,7 +493,6 @@ defmodule EspresoWeb.OrderLive do
       <p class="order-qrph-order-number" id={"#{@id_prefix}-qrph-number"}>{@order.number}</p>
       <p class="order-qrph-awaiting" id={"#{@id_prefix}-qrph-awaiting"}>
         <span class="order-qrph-chip">Waiting</span>
-        <span :if={@wallet_brand} class="order-qrph-awaiting-wallet">· {@wallet_brand}</span>
       </p>
       <h2 id={"#{@id_prefix}-qrph-payment-title"} class="sr-only">
         {qrph_title(@order)}
@@ -726,6 +737,12 @@ defmodule EspresoWeb.OrderLive do
   defp tracker_sr_prefix("upcoming"), do: "Upcoming: "
   defp tracker_sr_prefix(_), do: ""
 
+  defp order_confirming?(%{status: "cancelled"}, _params), do: false
+
+  defp order_confirming?(order, params) do
+    not is_nil(order) and Map.get(params, "confirm") in ["1", "true"]
+  end
+
   defp maybe_leave_confirm_after_payment(socket, previous) do
     order = socket.assigns.order
 
@@ -744,6 +761,27 @@ defmodule EspresoWeb.OrderLive do
 
       true ->
         socket
+        |> assign(:qrph_code_open, nil)
+        |> push_patch(to: ~p"/order/#{order.number}")
+    end
+  end
+
+  defp maybe_leave_confirm_after_cancel(socket, previous) do
+    order = socket.assigns.order
+
+    cond do
+      is_nil(order) or is_nil(previous) ->
+        socket
+
+      order.status != "cancelled" ->
+        socket
+
+      previous.status == "cancelled" and not socket.assigns.confirming? ->
+        socket
+
+      true ->
+        socket
+        |> assign(:confirming?, false)
         |> assign(:qrph_code_open, nil)
         |> push_patch(to: ~p"/order/#{order.number}")
     end
