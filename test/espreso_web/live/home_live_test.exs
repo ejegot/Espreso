@@ -57,14 +57,14 @@ defmodule EspresoWeb.HomeLiveTest do
     assert has_element?(view, ".brune-mega-label", "Location")
   end
 
-  test "/menu opens QR landing with Pure Tableya signature", %{conn: conn} do
+  test "/menu opens QR landing poster", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
 
-    assert has_element?(view, "#menu-landing.menu-qr-landing--signature")
+    assert has_element?(view, "#menu-landing.menu-qr-landing--poster")
 
     assert has_element?(
              view,
-             ~s(.menu-qr-landing-photo--signature[src="/images/coffeespot/signature-pure-tableya-portrait.jpg"])
+             ~s(.menu-qr-landing-photo[src="/images/coffeespot/landing-latte-paddle.jpg"])
            )
   end
 end

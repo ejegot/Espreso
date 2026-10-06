@@ -43,7 +43,9 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:signature_feature, Menu.find_signature_product(categories))
      |> assign(:selected_category, selected)
      |> assign(:search, "")
-     |> assign(:search_open?, false)
+     |> assign(:search_open?, true)
+     |> assign(:saved_product_ids, MapSet.new())
+     |> assign(:saved_open?, false)
      |> assign(:cart, [])
      |> assign(:basket_open?, false)
      |> assign(:basket_closing?, false)
@@ -140,7 +142,10 @@ defmodule EspresoWeb.MenuLive do
         {:noreply, socket}
 
       existing ->
-        {:noreply, update_my_order_summary(socket, existing, order)}
+        {:noreply,
+         socket
+         |> update_my_order_summary(existing, order)
+         |> maybe_toast_order_cancelled(existing, order)}
     end
   end
 
@@ -213,6 +218,25 @@ defmodule EspresoWeb.MenuLive do
     end
   end
 
+  def handle_event("swipe_category", %{"dir" => dir}, socket) when dir in ["next", "prev"] do
+    cond do
+      not category_swipe_enabled?(socket.assigns) ->
+        {:noreply, socket}
+
+      true ->
+        case neighbor_menu_chip(socket.assigns, dir) do
+          nil ->
+            {:noreply, socket}
+
+          chip ->
+            {:noreply,
+             apply_menu_chip(socket, chip, scroll_content: false, chip_behavior: "smooth")}
+        end
+    end
+  end
+
+  def handle_event("swipe_category", _params, socket), do: {:noreply, socket}
+
   def handle_event("toggle_search", _params, socket) do
     open? = not socket.assigns.search_open?
 
@@ -228,7 +252,58 @@ defmodule EspresoWeb.MenuLive do
     {:noreply,
      socket
      |> assign(:search, "")
-     |> assign(:search_open?, false)}
+     |> assign(:search_open?, true)}
+  end
+
+  def handle_event("toggle_save", %{"id" => id}, socket) do
+    {:noreply, toggle_saved_product(socket, id)}
+  end
+
+  def handle_event("open_saved", _params, socket) do
+    {:noreply,
+     if socket.assigns.saved_open? do
+       assign(socket, :saved_open?, false)
+     else
+       socket
+       |> assign(:saved_open?, true)
+       |> assign(:my_orders_open?, false)
+       |> assign(:basket_open?, false)
+       |> assign(:basket_closing?, false)
+       |> assign(:detail, nil)
+       |> assign(:detail_closing?, false)
+       |> assign(:basket_pulse?, false)
+       |> assign(:bag_add_delta, nil)
+     end}
+  end
+
+  def handle_event("close_saved", _params, socket) do
+    {:noreply, assign(socket, :saved_open?, false)}
+  end
+
+  def handle_event("menu_home", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:saved_open?, false)
+     |> assign(:my_orders_open?, false)
+     |> assign(:basket_open?, false)
+     |> assign(:basket_closing?, false)
+     |> assign(:detail, nil)
+     |> assign(:detail_closing?, false)
+     |> assign(:search, "")
+     |> push_patch(to: menu_path(socket, :menu, category: "ALL", filter: nil))
+     |> push_event("scroll_active_chip", %{id: "menu-craving-chip-ALL"})
+     |> push_event("scroll_to_menu_content", %{})}
+  end
+
+  def handle_event("focus_categories", _params, socket) do
+    chip_id =
+      cond do
+        socket.assigns.menu_filter == :matcha -> "menu-craving-chip-matcha"
+        socket.assigns.menu_filter == :sweets -> "menu-craving-chip-sweets"
+        true -> "menu-craving-chip-#{socket.assigns.selected_category || "ALL"}"
+      end
+
+    {:noreply, push_event(socket, "scroll_active_chip", %{id: chip_id})}
   end
 
   def handle_event("search", %{"search" => query}, socket) do
@@ -309,6 +384,7 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:basket_open?, true)
      |> assign(:basket_closing?, false)
      |> assign(:my_orders_open?, false)
+     |> assign(:saved_open?, false)
      |> assign(:checkout_errors, %{})
      |> push_event("scroll_basket_top", %{})}
   end
@@ -346,26 +422,16 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:customer_name, name)
      |> assign(:table_number, table)
      |> assign(:loyalty_phone, phone)
-     |> assign(:checkout_errors, %{})}
+     |> assign(:checkout_errors, %{})
+     |> put_payment_method_from_params(params)}
   end
 
   def handle_event("validate_checkout", _params, socket) do
     {:noreply, assign(socket, :checkout_errors, checkout_errors(socket.assigns))}
   end
 
-  def handle_event("set_payment_method", %{"method" => method}, socket) do
-    payment_method =
-      resolve_payment_method(
-        method,
-        socket.assigns.payments_mode,
-        socket.assigns.gcash_pay_available?,
-        socket.assigns.maya_pay_available?
-      )
-
-    {:noreply,
-     socket
-     |> assign(:payment_method, payment_method)
-     |> assign(:payment_touched?, true)}
+  def handle_event("set_payment_method", params, socket) do
+    {:noreply, put_payment_method_from_params(socket, params)}
   end
 
   def handle_event("place_order", _params, socket) do
@@ -523,18 +589,27 @@ defmodule EspresoWeb.MenuLive do
       data-bag-fly={@bag_fly_n}
       class={[
         "menu-live-root",
+        @menu_stage == :menu && "menu-live-root--glass",
         @menu_stage != :menu && "menu-live-root--qr-entry",
-        (@detail || @basket_open? || @my_orders_open?) && "menu-page-locked"
+        (@detail || @basket_open? || @my_orders_open? || @saved_open?) && "menu-page-locked"
       ]}
+      data-category-swipe={if(category_swipe_enabled?(assigns), do: "1", else: "0")}
     >
       <div
         :if={@menu_stage == :landing}
         id="menu-landing"
-        class={[
-          "menu-qr-landing",
-          @lilac_guest? && "menu-qr-landing--signature"
-        ]}
+        class="menu-qr-landing menu-qr-landing--poster"
       >
+        <div class="menu-qr-landing-media" aria-hidden="true">
+          <img
+            src="/images/coffeespot/landing-latte-paddle.jpg"
+            alt=""
+            class="menu-qr-landing-photo"
+            width="573"
+            height="1024"
+          />
+        </div>
+        <div class="menu-qr-landing-scrim" aria-hidden="true"></div>
         <header class="menu-qr-landing-top menu-qr-top" id="menu-landing-top">
           <p class="menu-qr-landing-top-brand menu-qr-top-brand">
             <.guest_brand_mark
@@ -544,118 +619,19 @@ defmodule EspresoWeb.MenuLive do
             />
           </p>
         </header>
-
-        <div
-          id="menu-landing-carousel"
-          class="menu-qr-landing-carousel"
-          phx-hook="LandingCarousel"
-          aria-label={"#{@guest_brand_name} intro"}
-        >
-          <section
-            :if={@lilac_guest?}
-            id="menu-landing-slide-welcome"
-            class="menu-qr-landing-slide menu-qr-landing-slide--signature"
-            aria-label="Pure Tableya, CoffeeSpot signature drink"
+        <div class="menu-qr-landing-sheet" id="menu-landing-sheet">
+          <h1 class="menu-qr-landing-sheet-title">
+            Your table.<br /> Our bar.
+          </h1>
+          <p class="menu-qr-landing-sheet-lede">Scan, order, and we’ll bring it over.</p>
+          <button
+            type="button"
+            id="menu-cta-view-menu"
+            class="menu-qr-landing-cta-pill"
+            phx-click="enter_menu"
           >
-            <div class="menu-qr-landing-media" aria-hidden="true">
-              <img
-                src="/images/coffeespot/signature-pure-tableya-portrait.jpg"
-                alt=""
-                class="menu-qr-landing-photo menu-qr-landing-photo--signature"
-                width="1024"
-                height="1536"
-              />
-            </div>
-            <div class="menu-qr-landing-scrim menu-qr-landing-scrim--signature" aria-hidden="true">
-            </div>
-            <p class="menu-qr-landing-tradition">
-              <span class="menu-qr-landing-tradition-line">More than a drink,</span>
-              <span class="menu-qr-landing-tradition-line">A Filipino tradition.</span>
-              <span class="menu-qr-landing-tradition-mark" aria-hidden="true"></span>
-            </p>
-          </section>
-
-          <section
-            id="menu-landing-slide-visit"
-            class="menu-qr-landing-slide"
-            aria-label={CoffeeSpot.visit_title()}
-          >
-            <div :if={@lilac_guest?} class="menu-qr-landing-media" aria-hidden="true">
-              <img
-                src="/images/coffeespot/IMG_3497.jpg"
-                alt=""
-                class="menu-qr-landing-photo menu-qr-landing-photo--visit"
-                width="800"
-                height="1000"
-              />
-            </div>
-            <div class="menu-qr-landing-scrim" aria-hidden="true"></div>
-            <div class="menu-qr-landing-copy">
-              <h1 class="menu-qr-landing-headline">{CoffeeSpot.visit_title()}</h1>
-              <p class="menu-qr-landing-lede">
-                {CoffeeSpot.landing_lede()}
-              </p>
-              <button
-                type="button"
-                id="menu-cta-visit-coffeespot"
-                class="menu-qr-landing-visit-link"
-                phx-click="enter_visit"
-              >
-                See hours &amp; directions →
-              </button>
-            </div>
-          </section>
-        </div>
-
-        <div class="menu-qr-landing-dock">
-          <div
-            :if={@lilac_guest?}
-            class="menu-qr-landing-dots"
-            role="tablist"
-            aria-label="Intro slides"
-          >
-            <button
-              type="button"
-              class="menu-qr-landing-dot is-active"
-              data-landing-dot="0"
-              role="tab"
-              aria-selected="true"
-              aria-label="Welcome slide"
-            >
-            </button>
-            <button
-              type="button"
-              class="menu-qr-landing-dot"
-              data-landing-dot="1"
-              role="tab"
-              aria-selected="false"
-              aria-label={CoffeeSpot.visit_title() <> " slide"}
-            >
-            </button>
-          </div>
-
-          <div
-            id="menu-slide-to-start"
-            class="menu-qr-landing-cta menu-qr-landing-cta--slide"
-            phx-hook="SlideToStart"
-            data-event="enter_menu"
-          >
-            <div class="menu-qr-slide-track" data-slide-track>
-              <div class="menu-qr-slide-fill" data-slide-fill aria-hidden="true"></div>
-              <span class="menu-qr-slide-hint" data-slide-hint aria-hidden="true">Get Started</span>
-              <button
-                type="button"
-                class="menu-qr-slide-handle"
-                data-slide-handle
-                aria-label="Slide to get started"
-              >
-                <span class="menu-qr-slide-handle-icon" aria-hidden="true">→</span>
-              </button>
-            </div>
-            <button type="button" id="menu-cta-view-menu" class="sr-only" phx-click="enter_menu">
-              Get Started
-            </button>
-          </div>
+            Get In Now
+          </button>
         </div>
       </div>
 
@@ -808,89 +784,15 @@ defmodule EspresoWeb.MenuLive do
         </div>
       </div>
 
-      <div :if={@menu_stage == :menu} class="menu-page menu-page-brune site-page menu-page--qr">
+      <div
+        :if={@menu_stage == :menu}
+        class="menu-page menu-page-brune site-page menu-page--qr menu-page--glass"
+      >
         <div id="menu-qr-sticky" class="menu-qr-sticky">
           <header
             id="menu-qr-chrome"
-            class={[
-              "menu-qr-chrome menu-qr-top",
-              (@search_open? or search_active?(@search)) && "is-search-open"
-            ]}
+            class="menu-qr-chrome menu-qr-top menu-qr-chrome--glass is-search-open"
           >
-            <div id="menu-qr-chrome-leading" class="menu-qr-chrome-leading">
-            <div
-              id="menu-search"
-              class={[
-                "menu-qr-search-inline",
-                (@search_open? or search_active?(@search)) && "is-open"
-              ]}
-            >
-              <button
-                type="button"
-                id="menu-qr-search-toggle"
-                class="menu-qr-search-inline-toggle"
-                phx-click="toggle_search"
-                aria-label="Search menu"
-                aria-expanded={to_string(@search_open? or search_active?(@search))}
-                aria-controls="menu-search-input"
-              >
-                <.icon name="hero-magnifying-glass" class="menu-qr-chrome-icon" />
-              </button>
-
-              <form class="menu-qr-search-inline-form" phx-change="search" phx-submit="search">
-                <div class="menu-qr-search-inline-wrap">
-                  <span class="menu-qr-search-inline-icon" aria-hidden="true">
-                    <.icon name="hero-magnifying-glass" class="menu-qr-search-inline-glyph" />
-                  </span>
-                  <input
-                    id="menu-search-input"
-                    type="text"
-                    name="search"
-                    value={@search}
-                    placeholder="Search menu…"
-                    class="menu-qr-search-inline-input"
-                    autocomplete="off"
-                    phx-debounce="200"
-                  />
-                  <button
-                    type="button"
-                    id="menu-qr-search-close"
-                    class="menu-qr-search-close menu-qr-search-inline-close"
-                    phx-click="clear_search"
-                    aria-label="Clear search"
-                  >
-                    <.icon name="hero-x-mark" class="menu-qr-search-close-icon" />
-                  </button>
-                </div>
-              </form>
-            </div>
-              <button
-                :if={show_floating_rewards?(@my_orders_open?, @basket_open?, @detail)}
-                type="button"
-                id="menu-qr-rewards"
-                class={[
-                  "menu-qr-customer-nav-btn",
-                  "menu-qr-rewards",
-                  rewards_available?(@my_orders_rewards) && "menu-qr-rewards--available"
-                ]}
-                phx-click="open_my_orders"
-                phx-value-tab="rewards"
-                aria-expanded={to_string(@my_orders_open? and @my_orders_tab == :rewards)}
-                aria-controls="menu-my-orders-panel"
-                aria-label={rewards_trigger_aria(@my_orders_rewards)}
-              >
-                <span class="menu-qr-customer-nav-icon" aria-hidden="true">
-                  <.icon name="hero-gift" class="menu-qr-customer-nav-icon-glyph" />
-                </span>
-                <span class="sr-only">Rewards</span>
-                <span
-                  :if={rewards_available?(@my_orders_rewards)}
-                  class="menu-qr-rewards-badge"
-                  aria-hidden="true"
-                >
-                </span>
-              </button>
-            </div>
             <p class="menu-qr-chrome-brand menu-qr-top-brand">
               <.guest_brand_mark
                 coffeespot?={@coffeespot_guest?}
@@ -898,93 +800,172 @@ defmodule EspresoWeb.MenuLive do
                 variant="on-dark"
               />
             </p>
-            <div id="menu-qr-chrome-trailing" class="menu-qr-chrome-trailing">
-              <button
-                :if={show_floating_orders?(@my_orders, @my_orders_open?, @basket_open?, @detail)}
-                type="button"
-                id="menu-qr-my-orders"
-                class={[
-                  "menu-qr-customer-nav-btn",
-                  "menu-qr-my-orders",
-                  my_orders_trigger_status?(@my_orders) && "menu-qr-my-orders--status"
-                ]}
-                phx-click="open_my_orders"
-                phx-value-tab="orders"
-                aria-expanded={to_string(@my_orders_open? and @my_orders_tab == :orders)}
-                aria-controls="menu-my-orders-panel"
-                aria-label={my_orders_trigger_aria(@my_orders)}
-              >
-                <span class="menu-qr-customer-nav-icon" aria-hidden="true">
-                  <.icon
-                    name="hero-clipboard-document-list"
-                    class="menu-qr-customer-nav-icon-glyph"
-                  />
-                </span>
-                <span class="sr-only">Orders</span>
-              </button>
-              <button
-                type="button"
-                id="menu-qr-bag"
-                class={[
-                  "menu-qr-chrome-bag",
-                  "brune-icon-bag",
-                  @basket_pulse? && "is-bag-confirm"
-                ]}
-                phx-click="open_basket"
-                aria-label={"Your order, #{cart_count(@cart)} items"}
-              >
-                <.icon name="hero-shopping-bag" class="menu-qr-chrome-bag-icon" />
-                <span
-                  :if={cart_count(@cart) > 0}
-                  class={["brune-bag-count", @basket_pulse? && "is-pulse"]}
+            <div class="menu-qr-chrome-tools">
+              <div id="menu-qr-chrome-leading" class="menu-qr-chrome-leading">
+                <div id="menu-search" class="menu-qr-search-inline is-open">
+                  <button
+                    type="button"
+                    id="menu-qr-search-toggle"
+                    class="menu-qr-search-inline-toggle"
+                    phx-click="toggle_search"
+                    aria-label="Search menu"
+                    aria-expanded="true"
+                    aria-controls="menu-search-input"
+                  >
+                    <.icon name="hero-magnifying-glass" class="menu-qr-chrome-icon" />
+                  </button>
+
+                  <form class="menu-qr-search-inline-form" phx-change="search" phx-submit="search">
+                    <div class="menu-qr-search-inline-wrap">
+                      <span class="menu-qr-search-inline-icon" aria-hidden="true">
+                        <.icon name="hero-magnifying-glass" class="menu-qr-search-inline-glyph" />
+                      </span>
+                      <input
+                        id="menu-search-input"
+                        type="text"
+                        name="search"
+                        value={@search}
+                        placeholder="Search menu…"
+                        class="menu-qr-search-inline-input"
+                        autocomplete="off"
+                        phx-debounce="200"
+                      />
+                      <button
+                        type="button"
+                        id="menu-qr-search-close"
+                        class="menu-qr-search-close menu-qr-search-inline-close"
+                        phx-click="clear_search"
+                        aria-label="Clear search"
+                      >
+                        <.icon name="hero-x-mark" class="menu-qr-search-close-icon" />
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+              <div id="menu-qr-chrome-trailing" class="menu-qr-chrome-trailing">
+                <button
+                  type="button"
+                  id="menu-qr-category"
+                  class="menu-qr-category-btn"
+                  phx-click="focus_categories"
+                  aria-label="Categories"
                 >
-                  {cart_count(@cart)}
-                </span>
-                <span :if={@bag_add_delta} class="menu-qr-bag-plus" aria-hidden="true">
-                  +{@bag_add_delta}
-                </span>
-              </button>
+                  <.icon name="hero-adjustments-horizontal" class="menu-qr-chrome-icon" />
+                </button>
+              </div>
             </div>
+            <nav
+              :if={show_floating_tabbar?(@basket_open?, @detail, @my_orders_open?, @saved_open?)}
+              id="menu-craving"
+              class="menu-craving menu-craving--header"
+              aria-label="Menu categories"
+            >
+              <div class="menu-craving-rail">
+                <button
+                  :for={chip <- menu_craving_chips()}
+                  type="button"
+                  id={"menu-craving-chip-#{chip.key}"}
+                  phx-click={chip.event}
+                  phx-value-name={chip[:name]}
+                  phx-value-id={chip[:id]}
+                  class={[
+                    "menu-craving-chip",
+                    chip_active?(chip, @selected_category, @menu_filter) && "is-active"
+                  ]}
+                  aria-pressed={to_string(chip_active?(chip, @selected_category, @menu_filter))}
+                  aria-current={if(chip_active?(chip, @selected_category, @menu_filter), do: "true")}
+                  aria-label={
+                    craving_chip_aria_label(
+                      chip,
+                      chip_active?(chip, @selected_category, @menu_filter)
+                    )
+                  }
+                >
+                  <span class="menu-craving-label">{chip.label}</span>
+                </button>
+              </div>
+            </nav>
           </header>
         </div>
 
         <section class="brune-menu-shell" id="menu">
           <div class="brune-menu-body" id="menu-items">
             <section
-              :if={match?({_, _}, @signature_feature) and @search == "" and is_nil(@menu_filter)}
+              :if={
+                show_signature_feature?(
+                  @signature_feature,
+                  @search,
+                  @menu_filter,
+                  @selected_category
+                )
+              }
               id="menu-signature-feature"
               class="menu-signature-feature"
               aria-label="Our signature"
             >
               <% {signature_category, signature_product} = @signature_feature %>
-              <button
-                type="button"
-                id={"menu-signature-feature-#{signature_product.id}"}
-                class="menu-signature-card"
-                phx-click="open_detail"
-                phx-value-id={signature_product.id}
-              >
-                <div class="menu-signature-card-media" aria-hidden="true">
-                  <img
-                    src={Menu.product_image(signature_category, signature_product)}
-                    alt=""
-                    class="menu-signature-card-photo"
-                    loading="lazy"
-                    width="320"
-                    height="320"
+              <article class="menu-signature-card">
+                <button
+                  type="button"
+                  id={"menu-signature-feature-#{signature_product.id}"}
+                  class="menu-signature-card-open"
+                  phx-click="open_detail"
+                  phx-value-id={signature_product.id}
+                  aria-label={signature_product.name}
+                >
+                  <div class="menu-signature-card-media" aria-hidden="true">
+                    <img
+                      src={Menu.product_image(signature_category, signature_product)}
+                      alt=""
+                      class="menu-signature-card-photo"
+                      loading="lazy"
+                      width="320"
+                      height="320"
+                    />
+                    <span class="menu-item-rating">
+                      <.icon name="hero-star" class="menu-item-rating-icon" />
+                    </span>
+                  </div>
+                  <div class="menu-signature-card-copy">
+                    <p class="menu-signature-card-kicker">OUR SIGNATURE</p>
+                    <h2 class="menu-signature-card-title">{signature_product.name}</h2>
+                    <p class="menu-signature-card-lede">
+                      {product_blurb(signature_product, signature_category)}
+                    </p>
+                    <p class="menu-signature-card-price">
+                      {card_price_label(signature_product)}
+                    </p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  id={"menu-item-save-#{signature_product.id}"}
+                  class={[
+                    "menu-item-heart",
+                    MapSet.member?(@saved_product_ids, signature_product.id) && "is-on"
+                  ]}
+                  phx-click="toggle_save"
+                  phx-value-id={signature_product.id}
+                  aria-pressed={to_string(MapSet.member?(@saved_product_ids, signature_product.id))}
+                  aria-label={
+                    if(MapSet.member?(@saved_product_ids, signature_product.id),
+                      do: "Unsave #{signature_product.name}",
+                      else: "Save #{signature_product.name}"
+                    )
+                  }
+                >
+                  <.icon
+                    name={
+                      if(MapSet.member?(@saved_product_ids, signature_product.id),
+                        do: "hero-heart-solid",
+                        else: "hero-heart"
+                      )
+                    }
+                    class="menu-item-heart-icon"
                   />
-                </div>
-                <div class="menu-signature-card-copy">
-                  <p class="menu-signature-card-kicker">OUR SIGNATURE</p>
-                  <h2 class="menu-signature-card-title">{signature_product.name}</h2>
-                  <p class="menu-signature-card-lede">
-                    {product_blurb(signature_product, signature_category)}
-                  </p>
-                  <p class="menu-signature-card-price">
-                    {card_price_label(signature_product)}
-                  </p>
-                </div>
-              </button>
+                </button>
+              </article>
             </section>
 
             <div
@@ -1007,7 +988,10 @@ defmodule EspresoWeb.MenuLive do
               id={"category-#{category.name}"}
               data-category={category.name}
             >
-              <h2 class="brune-menu-category-title">
+              <h2
+                :if={show_section_title?(@selected_category, @menu_filter, @search)}
+                class="brune-menu-category-title"
+              >
                 {menu_section_title(@menu_filter, category.name)}
               </h2>
               <div :for={group <- category.groups} class="brune-menu-group">
@@ -1021,49 +1005,77 @@ defmodule EspresoWeb.MenuLive do
                           group.products,
                           @signature_feature,
                           @search,
-                          @menu_filter
+                          @menu_filter,
+                          @selected_category
                         )
                     }
                     class="brune-menu-item"
                   >
                     <article class="brune-menu-item-card">
-                      <div class="brune-menu-item-thumb">
-                        <img
-                          src={Menu.product_image(category.name, product)}
-                          alt={product.name}
-                          class="brune-menu-item-photo"
-                          loading="lazy"
-                        />
-                        <span
-                          :if={badge = temperature_badge(category.name)}
-                          class={"menu-temp-badge menu-temp-badge--#{badge.tone}"}
-                        >
-                          {badge.label}
-                        </span>
-                        <span
-                          :if={Menu.signature_product?(product.name)}
-                          class="menu-signature-item-badge"
-                        >
-                          ✦ Signature
-                        </span>
-                      </div>
-                      <div class="brune-menu-item-body">
-                        <h3 class="brune-menu-item-name">{product.name}</h3>
-                        <p class="brune-menu-item-blurb">{product_blurb(product, category.name)}</p>
-                        <div class="brune-menu-item-actions">
-                          <p class="brune-menu-item-price">{card_price_label(product)}</p>
-                          <button
-                            type="button"
-                            class="brune-menu-add brune-menu-add--icon"
-                            phx-click="open_detail"
-                            phx-value-id={product.id}
-                            aria-label={"Add #{product.name}"}
-                            title={"Add #{product.name}"}
+                      <button
+                        type="button"
+                        id={"menu-item-open-#{product.id}"}
+                        class="brune-menu-item-open"
+                        phx-click="open_detail"
+                        phx-value-id={product.id}
+                        data-menu-item-name={product.name}
+                        aria-label={product.name}
+                      >
+                        <div class="brune-menu-item-thumb">
+                          <img
+                            src={Menu.product_image(category.name, product)}
+                            alt={product.name}
+                            class="brune-menu-item-photo"
+                            loading="lazy"
+                          />
+                          <span class="menu-item-rating" aria-hidden="true">
+                            <.icon name="hero-star" class="menu-item-rating-icon" />
+                          </span>
+                          <span
+                            :if={badge = temperature_badge(category.name)}
+                            class={"menu-temp-badge menu-temp-badge--#{badge.tone}"}
                           >
-                            <.icon name="hero-plus" class="brune-menu-add-icon" />
-                          </button>
+                            {badge.label}
+                          </span>
+                          <span
+                            :if={Menu.signature_product?(product.name)}
+                            class="menu-signature-item-badge"
+                          >
+                            ✦ Signature
+                          </span>
                         </div>
-                      </div>
+                        <div class="brune-menu-item-body">
+                          <h3 class="brune-menu-item-name">{product.name}</h3>
+                          <p class="brune-menu-item-price">{card_price_label(product)}</p>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        id={"menu-item-save-#{product.id}"}
+                        class={[
+                          "menu-item-heart",
+                          MapSet.member?(@saved_product_ids, product.id) && "is-on"
+                        ]}
+                        phx-click="toggle_save"
+                        phx-value-id={product.id}
+                        aria-pressed={to_string(MapSet.member?(@saved_product_ids, product.id))}
+                        aria-label={
+                          if(MapSet.member?(@saved_product_ids, product.id),
+                            do: "Unsave #{product.name}",
+                            else: "Save #{product.name}"
+                          )
+                        }
+                      >
+                        <.icon
+                          name={
+                            if(MapSet.member?(@saved_product_ids, product.id),
+                              do: "hero-heart-solid",
+                              else: "hero-heart"
+                            )
+                          }
+                          class="menu-item-heart-icon"
+                        />
+                      </button>
                     </article>
                   </li>
                 </ul>
@@ -1152,6 +1164,29 @@ defmodule EspresoWeb.MenuLive do
             >
               <.icon name="hero-arrow-left" class="menu-buy-hero-back-icon" />
             </button>
+            <button
+              type="button"
+              class="menu-buy-save"
+              phx-click="toggle_save"
+              phx-value-id={@detail.product.id}
+              aria-pressed={to_string(MapSet.member?(@saved_product_ids, @detail.product.id))}
+              aria-label={
+                if(MapSet.member?(@saved_product_ids, @detail.product.id),
+                  do: "Unsave #{@detail.product.name}",
+                  else: "Save #{@detail.product.name}"
+                )
+              }
+            >
+              <.icon
+                name={
+                  if(MapSet.member?(@saved_product_ids, @detail.product.id),
+                    do: "hero-heart-solid",
+                    else: "hero-heart"
+                  )
+                }
+                class="menu-item-heart-icon"
+              />
+            </button>
           </div>
 
           <div class="menu-buy-body">
@@ -1161,6 +1196,13 @@ defmodule EspresoWeb.MenuLive do
                 {Menu.format_price(selected_price(@detail).price)}
               </p>
             </div>
+            <p class="menu-detail-rating" aria-hidden="true">
+              <.icon name="hero-star" class="menu-item-rating-icon" />
+              <.icon name="hero-star" class="menu-item-rating-icon" />
+              <.icon name="hero-star" class="menu-item-rating-icon" />
+              <.icon name="hero-star" class="menu-item-rating-icon" />
+              <.icon name="hero-star" class="menu-item-rating-icon" />
+            </p>
 
             <p :if={description?(@detail.product.description)} class="menu-detail-description">
               {@detail.product.description}
@@ -1226,7 +1268,7 @@ defmodule EspresoWeb.MenuLive do
 
           <footer class="menu-buy-bar menu-buy-bar--detail">
             <button type="button" class="menu-buy-now" phx-click="buy_now">
-              Add to your order
+              Add to Cart
             </button>
           </footer>
         </aside>
@@ -1239,52 +1281,161 @@ defmodule EspresoWeb.MenuLive do
       <nav
         :if={
           @menu_stage == :menu &&
-            show_floating_categories?(@basket_open?, @detail, @my_orders_open?)
+            show_floating_tabbar?(@basket_open?, @detail, @my_orders_open?, @saved_open?)
         }
-        id="menu-craving"
-        class="menu-craving menu-craving--dock"
-        aria-label="Menu categories"
+        id="menu-qr-tabbar"
+        class="menu-qr-tabbar"
+        aria-label="Guest menu"
       >
-        <div class="menu-craving-rail">
-          <button
-            :for={chip <- menu_craving_chips(@categories)}
-            type="button"
-            id={"menu-craving-chip-#{chip.key}"}
-            phx-click={chip.event}
-            phx-value-name={chip[:name]}
-            phx-value-id={chip[:id]}
-            class={[
-              "menu-craving-chip",
-              chip_active?(chip, @selected_category, @menu_filter) && "is-active"
-            ]}
-            aria-pressed={to_string(chip_active?(chip, @selected_category, @menu_filter))}
-            aria-current={if(chip_active?(chip, @selected_category, @menu_filter), do: "true")}
-            aria-label={
-              craving_chip_aria_label(
-                chip,
-                chip_active?(chip, @selected_category, @menu_filter)
-              )
-            }
+        <button
+          type="button"
+          id="menu-qr-home"
+          class="menu-qr-tab"
+          phx-click="menu_home"
+          aria-label="Home"
+        >
+          <.icon name="hero-home" class="menu-qr-tab-icon" />
+          <span class="sr-only">Home</span>
+        </button>
+        <button
+          type="button"
+          id="menu-qr-rewards"
+          class={[
+            "menu-qr-tab",
+            "menu-qr-rewards",
+            rewards_available?(@my_orders_rewards) && "menu-qr-rewards--available"
+          ]}
+          phx-click="open_my_orders"
+          phx-value-tab="rewards"
+          aria-expanded={to_string(@my_orders_open? and @my_orders_tab == :rewards)}
+          aria-controls="menu-my-orders-panel"
+          aria-label={rewards_trigger_aria(@my_orders_rewards)}
+        >
+          <.icon name="hero-gift" class="menu-qr-tab-icon" />
+          <span class="sr-only">Rewards</span>
+          <span
+            :if={rewards_available?(@my_orders_rewards)}
+            class="menu-qr-rewards-badge"
+            aria-hidden="true"
           >
-            <img
-              src={chip.thumb}
-              alt=""
-              class="menu-craving-thumb"
-              loading="lazy"
-              width="32"
-              height="32"
-            />
-            <span class="menu-craving-label">{chip.label}</span>
-            <span
-              :if={chip_active?(chip, @selected_category, @menu_filter)}
-              class="menu-craving-check"
-              aria-hidden="true"
-            >
-              ✓
-            </span>
-          </button>
-        </div>
+          </span>
+        </button>
+        <button
+          type="button"
+          id="menu-qr-my-orders"
+          class={[
+            "menu-qr-tab",
+            "menu-qr-my-orders",
+            my_orders_trigger_status?(@my_orders) && "menu-qr-my-orders--status"
+          ]}
+          phx-click="open_my_orders"
+          phx-value-tab="orders"
+          aria-expanded={to_string(@my_orders_open? and @my_orders_tab == :orders)}
+          aria-controls="menu-my-orders-panel"
+          aria-label={my_orders_trigger_aria(@my_orders)}
+        >
+          <.icon name="hero-clipboard-document-list" class="menu-qr-tab-icon" />
+          <span class="sr-only">Orders</span>
+        </button>
+        <button
+          type="button"
+          id="menu-qr-saved"
+          class={["menu-qr-tab", @saved_open? && "is-active"]}
+          phx-click="open_saved"
+          aria-expanded={to_string(@saved_open?)}
+          aria-controls="menu-saved-panel"
+          aria-label="Saved"
+        >
+          <.icon name="hero-heart" class="menu-qr-tab-icon" />
+          <span class="sr-only">Saved</span>
+        </button>
+        <button
+          type="button"
+          id="menu-qr-bag"
+          class={[
+            "menu-qr-tab",
+            "menu-qr-chrome-bag",
+            "brune-icon-bag",
+            @basket_pulse? && "is-bag-confirm"
+          ]}
+          phx-click="open_basket"
+          aria-label={"Your order, #{cart_count(@cart)} items"}
+        >
+          <.icon name="hero-shopping-bag" class="menu-qr-chrome-bag-icon" />
+          <span :if={cart_count(@cart) > 0} class={["brune-bag-count", @basket_pulse? && "is-pulse"]}>
+            {cart_count(@cart)}
+          </span>
+          <span :if={@bag_add_delta} class="menu-qr-bag-plus" aria-hidden="true">
+            +{@bag_add_delta}
+          </span>
+        </button>
       </nav>
+
+      <div
+        :if={@menu_stage == :menu && @saved_open?}
+        class="menu-my-orders-layer"
+        id="menu-saved"
+        phx-window-keydown="close_saved"
+        phx-key="Escape"
+      >
+        <button
+          type="button"
+          class="menu-my-orders-backdrop"
+          phx-click="close_saved"
+          aria-label="Close saved"
+        >
+        </button>
+        <aside
+          id="menu-saved-panel"
+          class="menu-my-orders-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="menu-saved-title"
+        >
+          <header class="menu-my-orders-header">
+            <div>
+              <h2 id="menu-saved-title">Saved</h2>
+            </div>
+            <button
+              type="button"
+              class="menu-my-orders-close"
+              phx-click="close_saved"
+              aria-label="Close saved"
+            >
+              <.icon name="hero-x-mark" class="menu-my-orders-close-icon" />
+            </button>
+          </header>
+          <div class="menu-saved-body">
+            <p
+              :if={saved_products(@categories, @saved_product_ids) == []}
+              class="menu-my-orders-empty"
+            >
+              Save drinks with the heart, then find them here.
+            </p>
+            <ul :if={saved_products(@categories, @saved_product_ids) != []} class="menu-saved-list">
+              <li :for={{category, product} <- saved_products(@categories, @saved_product_ids)}>
+                <button
+                  type="button"
+                  id={"menu-saved-item-#{product.id}"}
+                  class="menu-saved-item"
+                  phx-click="open_detail"
+                  phx-value-id={product.id}
+                >
+                  <img
+                    src={Menu.product_image(category.name, product)}
+                    alt=""
+                    class="menu-saved-thumb"
+                  />
+                  <span class="menu-saved-copy">
+                    <span class="menu-saved-name">{product.name}</span>
+                    <span class="menu-saved-price">{card_price_label(product)}</span>
+                  </span>
+                </button>
+              </li>
+            </ul>
+          </div>
+        </aside>
+      </div>
 
       <div
         :if={@menu_stage == :menu && @basket_open?}
@@ -1445,42 +1596,44 @@ defmodule EspresoWeb.MenuLive do
                     </p>
                   </fieldset>
 
-                  <div class="menu-checkout-field">
-                    <label class="menu-checkout-label" for="checkout-name">Your name</label>
-                    <input
-                      id="checkout-name"
-                      type="text"
-                      name="customer_name"
-                      value={@customer_name}
-                      placeholder="Name for your order"
-                      autocomplete="name"
-                      maxlength="60"
-                      class={["menu-checkout-input", @checkout_errors[:customer_name] && "is-error"]}
-                      phx-debounce="200"
-                    />
-                    <p :if={@checkout_errors[:customer_name]} class="menu-checkout-error">
-                      {@checkout_errors[:customer_name]}
-                    </p>
-                  </div>
+                  <div class="menu-checkout-identity">
+                    <div class="menu-checkout-field">
+                      <label class="menu-checkout-label" for="checkout-name">Name</label>
+                      <input
+                        id="checkout-name"
+                        type="text"
+                        name="customer_name"
+                        value={@customer_name}
+                        placeholder="Name for your order"
+                        autocomplete="name"
+                        maxlength="60"
+                        class={["menu-checkout-input", @checkout_errors[:customer_name] && "is-error"]}
+                        phx-debounce="200"
+                      />
+                      <p :if={@checkout_errors[:customer_name]} class="menu-checkout-error">
+                        {@checkout_errors[:customer_name]}
+                      </p>
+                    </div>
 
-                  <div class="menu-checkout-field">
-                    <label class="menu-checkout-label" for="checkout-loyalty-phone">
-                      Loyalty phone <span class="menu-checkout-optional">(optional)</span>
-                    </label>
-                    <input
-                      id="checkout-loyalty-phone"
-                      type="tel"
-                      name="loyalty_phone"
-                      value={@loyalty_phone}
-                      placeholder="09XXXXXXXXX for points"
-                      autocomplete="tel"
-                      inputmode="tel"
-                      class={["menu-checkout-input", @checkout_errors[:loyalty_phone] && "is-error"]}
-                      phx-debounce="200"
-                    />
-                    <p :if={@checkout_errors[:loyalty_phone]} class="menu-checkout-error">
-                      {@checkout_errors[:loyalty_phone]}
-                    </p>
+                    <div class="menu-checkout-field">
+                      <label class="menu-checkout-label" for="checkout-loyalty-phone">
+                        Loyalty <span class="menu-checkout-optional">(optional)</span>
+                      </label>
+                      <input
+                        id="checkout-loyalty-phone"
+                        type="tel"
+                        name="loyalty_phone"
+                        value={@loyalty_phone}
+                        placeholder="for points"
+                        autocomplete="tel"
+                        inputmode="tel"
+                        class={["menu-checkout-input", @checkout_errors[:loyalty_phone] && "is-error"]}
+                        phx-debounce="200"
+                      />
+                      <p :if={@checkout_errors[:loyalty_phone]} class="menu-checkout-error">
+                        {@checkout_errors[:loyalty_phone]}
+                      </p>
+                    </div>
                   </div>
 
                   <fieldset
@@ -1489,59 +1642,44 @@ defmodule EspresoWeb.MenuLive do
                     id="menu-checkout-payment"
                   >
                     <legend class="menu-checkout-label">Pay with</legend>
-                    <div
-                      class={[
-                        "menu-checkout-options",
-                        "menu-checkout-options--pay",
-                        pay_option_count(@gcash_pay_available?, @maya_pay_available?) == 3 &&
-                          "is-three"
-                      ]}
-                      role="radiogroup"
+                    <select
+                      id="checkout-pay"
+                      name="payment_method"
+                      class="menu-checkout-select"
                       aria-label="Payment"
                     >
-                      <button
-                        type="button"
-                        class={[
-                          "menu-checkout-option",
-                          @payment_touched? && @payment_method == :counter && "is-active"
-                        ]}
+                      <option value="" disabled selected={!@payment_touched?}>
+                        Choose payment
+                      </option>
+                      <option
                         id="checkout-pay-counter"
-                        phx-click="set_payment_method"
-                        phx-value-method="counter"
-                        aria-pressed={to_string(@payment_touched? and @payment_method == :counter)}
+                        value="counter"
+                        selected={@payment_touched? and @payment_method == :counter}
                       >
                         Cash at counter
-                      </button>
-                      <button
+                      </option>
+                      <option
                         :if={@gcash_pay_available?}
-                        type="button"
-                        class={[
-                          "menu-checkout-option",
-                          @payment_touched? && @payment_method == :gcash && "is-active"
-                        ]}
                         id="checkout-pay-gcash"
-                        phx-click="set_payment_method"
-                        phx-value-method="gcash"
-                        aria-pressed={to_string(@payment_touched? and @payment_method == :gcash)}
+                        value="gcash"
+                        selected={@payment_touched? and @payment_method == :gcash}
                       >
                         GCash
-                      </button>
-                      <button
+                      </option>
+                      <option
                         :if={@maya_pay_available?}
-                        type="button"
-                        class={[
-                          "menu-checkout-option",
-                          @payment_touched? && @payment_method == :maya && "is-active"
-                        ]}
                         id="checkout-pay-maya"
-                        phx-click="set_payment_method"
-                        phx-value-method="maya"
-                        aria-pressed={to_string(@payment_touched? and @payment_method == :maya)}
+                        value="maya"
+                        selected={@payment_touched? and @payment_method == :maya}
                       >
                         Maya
-                      </button>
-                    </div>
-                    <p class="menu-checkout-payment-note menu-basket-note" id="checkout-payment-note">
+                      </option>
+                    </select>
+                    <p
+                      :if={@payment_touched?}
+                      class="menu-checkout-payment-note menu-basket-note"
+                      id="checkout-payment-note"
+                    >
                       {payment_checkout_note(@payment_method, @payments_mode)}
                     </p>
                   </fieldset>
@@ -1633,7 +1771,11 @@ defmodule EspresoWeb.MenuLive do
           <header class="menu-my-orders-header">
             <div>
               <p class="menu-my-orders-eyebrow">
-                <.guest_brand_mark coffeespot?={@coffeespot_guest?} name={@guest_brand_name} />
+                <.guest_brand_mark
+                  coffeespot?={@coffeespot_guest?}
+                  name={@guest_brand_name}
+                  variant="on-dark"
+                />
               </p>
               <h2 id="menu-my-orders-title">
                 <%= if @my_orders_tab == :rewards do %>
@@ -1962,10 +2104,20 @@ defmodule EspresoWeb.MenuLive do
     end
   end
 
+  defp show_signature_feature?(feature, search, filter, selected_category) do
+    match?({_, _}, feature) and not search_active?(search) and is_nil(filter) and
+      selected_category in ["ALL", "HOT"]
+  end
+
+  defp show_section_title?(selected_category, filter, search) do
+    search_active?(search) or filter == :matcha or
+      (is_nil(filter) and selected_category == "ALL")
+  end
+
   # When the top featured Signature card is visible, omit that SKU from the
   # regular category list so it does not appear again at the bottom of HOT.
-  defp regular_menu_products(products, signature_feature, search, menu_filter) do
-    if match?({_, _}, signature_feature) and search == "" and is_nil(menu_filter) do
+  defp regular_menu_products(products, signature_feature, search, menu_filter, selected_category) do
+    if show_signature_feature?(signature_feature, search, menu_filter, selected_category) do
       Enum.reject(products, &Menu.signature_product?(&1.name))
     else
       products
@@ -2144,6 +2296,7 @@ defmodule EspresoWeb.MenuLive do
         |> assign(:basket_open?, false)
         |> assign(:basket_closing?, false)
         |> assign(:my_orders_open?, false)
+        |> assign(:saved_open?, false)
     end
   end
 
@@ -2322,10 +2475,7 @@ defmodule EspresoWeb.MenuLive do
     orders = Orders.list_orders_by_numbers(numbers)
     summaries = Enum.map(orders, &my_order_summary/1)
 
-    # Drop cancelled from UI; keep numbers for completed/active in client sync.
-    visible =
-      summaries
-      |> Enum.reject(&(&1.status == "cancelled"))
+    visible = Enum.take(summaries, 20)
 
     subscribe_my_orders(socket, visible)
 
@@ -2346,7 +2496,6 @@ defmodule EspresoWeb.MenuLive do
       socket.assigns.my_orders
       |> Enum.reject(&(&1.id == order.id or &1.number == order.number))
       |> then(fn rest -> [summary | rest] end)
-      |> Enum.reject(&(&1.status == "cancelled"))
       |> Enum.take(20)
 
     socket
@@ -2370,7 +2519,6 @@ defmodule EspresoWeb.MenuLive do
       |> Enum.map(fn entry ->
         if entry.id == order.id, do: summary, else: entry
       end)
-      |> Enum.reject(&(&1.status == "cancelled"))
 
     socket
     |> assign(:my_orders, my_orders)
@@ -2610,8 +2758,18 @@ defmodule EspresoWeb.MenuLive do
 
   defp history_my_orders(orders) do
     orders
-    |> Enum.filter(&(&1.status == "completed"))
+    |> Enum.filter(&(&1.status in ["completed", "cancelled"]))
     |> Enum.sort_by(& &1.inserted_at, {:desc, DateTime})
+  end
+
+  defp maybe_toast_order_cancelled(socket, existing, order) do
+    if existing.status != "cancelled" and order.status == "cancelled" do
+      Process.send_after(self(), :clear_toast, 3200)
+
+      assign(socket, :toast, "#{order.number || existing.number} was cancelled.")
+    else
+      socket
+    end
   end
 
   defp my_order_history_when(%{inserted_at: %DateTime{} = at}) do
@@ -2650,9 +2808,6 @@ defmodule EspresoWeb.MenuLive do
     tab = my_orders_tab(tab)
 
     cond do
-      tab == :orders and socket.assigns.my_orders == [] ->
-        {:noreply, socket}
-
       socket.assigns.my_orders_open? and socket.assigns.my_orders_tab == tab ->
         {:noreply,
          socket
@@ -2666,6 +2821,7 @@ defmodule EspresoWeb.MenuLive do
          socket
          |> assign(:my_orders_open?, true)
          |> assign(:my_orders_tab, tab)
+         |> assign(:saved_open?, false)
          |> assign(:basket_pulse?, false)
          |> assign(:bag_add_delta, nil)
          |> refresh_my_orders_rewards()}
@@ -2707,19 +2863,40 @@ defmodule EspresoWeb.MenuLive do
     if rewards_available?(rewards), do: "Rewards, reward available", else: "Rewards"
   end
 
-  defp show_floating_categories?(basket_open?, detail, my_orders_open?) do
-    not basket_open? and is_nil(detail) and not my_orders_open?
+  defp show_floating_tabbar?(basket_open?, detail, my_orders_open?, saved_open?) do
+    not basket_open? and is_nil(detail) and not my_orders_open? and not saved_open?
   end
 
-  defp show_floating_orders?(my_orders, _my_orders_open?, basket_open?, detail) do
-    my_orders != [] and not basket_open? and is_nil(detail)
+  defp toggle_saved_product(socket, id) do
+    id =
+      case id do
+        n when is_integer(n) -> n
+        bin when is_binary(bin) -> String.to_integer(bin)
+      end
+
+    saved = socket.assigns.saved_product_ids
+
+    saved =
+      if MapSet.member?(saved, id) do
+        MapSet.delete(saved, id)
+      else
+        MapSet.put(saved, id)
+      end
+
+    assign(socket, :saved_product_ids, saved)
   end
 
-  defp show_floating_rewards?(_my_orders_open?, basket_open?, detail) do
-    not basket_open? and is_nil(detail)
+  defp saved_products(categories, saved_ids) do
+    categories
+    |> Enum.flat_map(fn category ->
+      Enum.flat_map(category.products, fn product ->
+        if MapSet.member?(saved_ids, product.id), do: [{category, product}], else: []
+      end)
+    end)
   end
 
   # Customer-facing My Orders labels only — DB status remains unchanged.
+  defp customer_my_order_status_label(%{status: "cancelled"}), do: "Cancelled"
   defp customer_my_order_status_label(%{status: "ready"}), do: "Ready for pick up"
   defp customer_my_order_status_label(%{status: "completed"}), do: "Done"
   defp customer_my_order_status_label(%{status: "preparing"}), do: "Preparing"
@@ -2734,6 +2911,7 @@ defmodule EspresoWeb.MenuLive do
   defp customer_my_order_status_label(%{status: "received"}), do: "Received"
   defp customer_my_order_status_label(%{status: status}), do: Orders.status_label(status)
 
+  defp my_order_status_class(%{status: "cancelled"}), do: "menu-my-orders-status--cancelled"
   defp my_order_status_class(%{status: "ready"}), do: "menu-my-orders-status--ready"
   defp my_order_status_class(%{status: "completed"}), do: "menu-my-orders-status--done"
   defp my_order_status_class(%{status: "preparing"}), do: "menu-my-orders-status--preparing"
@@ -2885,18 +3063,9 @@ defmodule EspresoWeb.MenuLive do
 
   defp card_price_label(product) do
     case product.product_prices do
-      [price] ->
-        Menu.format_price(price.price)
-
       [_ | _] = prices ->
         amounts = Enum.map(prices, & &1.price)
-        lowest = Enum.min(amounts, Decimal)
-
-        if Enum.all?(amounts, &Decimal.equal?(&1, lowest)) do
-          Menu.format_price(lowest)
-        else
-          "from #{Menu.format_price(lowest)}"
-        end
+        Menu.format_price(Enum.min(amounts, Decimal))
 
       _ ->
         ""
@@ -2960,40 +3129,36 @@ defmodule EspresoWeb.MenuLive do
   defp temperature_badge("COLD"), do: %{label: "Iced", tone: "iced"}
   defp temperature_badge(_), do: nil
 
-  defp menu_craving_chips(categories) do
+  defp menu_craving_chips do
     all_chip = %{
       key: "ALL",
       label: "All",
       event: "select_category",
       name: "ALL",
       id: nil,
-      thumb: "/images/coffeespot/IMG_3498.png",
       kind: :all
     }
 
     category_chips =
       Enum.map(craving_options(), fn option ->
         case option do
-          %{filter: nil, category: category, label: label, image: image} ->
+          %{filter: nil, category: category, label: label} ->
             %{
               key: category,
               label: label,
               event: "select_category",
               name: category,
               id: nil,
-              thumb: qr_nav_thumb(categories, category, image),
               kind: :category
             }
 
-          %{filter: filter, id: id, label: label, image: image}
-          when filter in [:matcha, :sweets] ->
+          %{filter: filter, id: id, label: label} when filter in [:matcha, :sweets] ->
             %{
               key: id,
               label: label,
               event: "select_craving",
               name: nil,
               id: id,
-              thumb: image,
               kind: :filter
             }
         end
@@ -3002,32 +3167,81 @@ defmodule EspresoWeb.MenuLive do
     [all_chip | category_chips]
   end
 
-  defp qr_nav_thumb(categories, category_name, fallback_image) do
-    case Enum.find(categories, &(&1.name == category_name)) do
-      nil -> fallback_image
-      category -> craving_thumb(category)
-    end
-  end
-
   defp chip_active?(%{kind: :filter, id: "matcha"}, _selected, :matcha), do: true
   defp chip_active?(%{kind: :filter, id: "sweets"}, _selected, :sweets), do: true
   defp chip_active?(%{kind: :all}, "ALL", nil), do: true
   defp chip_active?(%{kind: :category, name: name}, selected, nil), do: selected == name
   defp chip_active?(_chip, _selected, _filter), do: false
 
-  defp craving_chip_aria_label(%{label: label}, true), do: "#{label}, selected"
-  defp craving_chip_aria_label(%{label: label}, false), do: "Show #{label} menu"
+  defp category_swipe_enabled?(assigns) do
+    assigns.menu_stage == :menu and
+      not search_active?(assigns.search) and
+      is_nil(assigns.detail) and
+      not assigns.basket_open? and
+      not assigns.saved_open? and
+      not assigns.my_orders_open?
+  end
 
-  defp craving_thumb(category) do
-    case craving_sample_product(category) do
-      nil -> Menu.product_image(category.name, category.name)
-      product -> Menu.product_image(category.name, product)
+  defp neighbor_menu_chip(assigns, dir) when dir in ["next", "prev"] do
+    chips = menu_craving_chips()
+
+    idx =
+      Enum.find_index(chips, &chip_active?(&1, assigns.selected_category, assigns.menu_filter))
+
+    delta = if dir == "next", do: 1, else: -1
+    next_idx = if is_integer(idx), do: idx + delta, else: nil
+
+    if is_integer(next_idx) and next_idx >= 0 do
+      Enum.at(chips, next_idx)
     end
   end
 
-  defp craving_sample_product(%{groups: groups}) do
-    Enum.find_value(groups, fn group -> List.first(group.products) end)
+  defp apply_menu_chip(socket, chip, opts)
+
+  defp apply_menu_chip(socket, %{kind: :all}, opts) do
+    socket
+    |> push_patch(to: menu_path(socket, :menu, category: "ALL", filter: nil))
+    |> push_chip_follow("menu-craving-chip-ALL", opts)
   end
+
+  defp apply_menu_chip(socket, %{kind: :category, name: name}, opts) do
+    if Enum.any?(socket.assigns.categories, &(&1.name == name)) do
+      socket
+      |> push_patch(to: menu_path(socket, :menu, category: name, filter: nil))
+      |> push_chip_follow("menu-craving-chip-#{name}", opts)
+    else
+      socket
+    end
+  end
+
+  defp apply_menu_chip(socket, %{kind: :filter, id: id}, opts) do
+    case Enum.find(craving_options(), &(&1.id == id)) do
+      nil ->
+        socket
+
+      option ->
+        socket
+        |> push_patch(to: craving_option_path(socket, option))
+        |> push_chip_follow("menu-craving-chip-#{id}", opts)
+    end
+  end
+
+  defp apply_menu_chip(socket, _chip, _opts), do: socket
+
+  defp push_chip_follow(socket, chip_id, opts) do
+    behavior = Keyword.get(opts, :chip_behavior, "auto")
+
+    socket = push_event(socket, "scroll_active_chip", %{id: chip_id, behavior: behavior})
+
+    if Keyword.get(opts, :scroll_content, true) do
+      push_event(socket, "scroll_to_menu_content", %{})
+    else
+      socket
+    end
+  end
+
+  defp craving_chip_aria_label(%{label: label}, true), do: "#{label}, selected"
+  defp craving_chip_aria_label(%{label: label}, false), do: "Show #{label} menu"
 
   defp category_blurb("HOT"), do: "Freshly pulled and served warm."
 
@@ -3577,6 +3791,26 @@ defmodule EspresoWeb.MenuLive do
   defp checkout_button_label(:gcash, false, _mode), do: "Continue to GCash"
   defp checkout_button_label(:maya, false, _mode), do: "Continue to Maya"
 
+  defp put_payment_method_from_params(socket, params) when is_map(params) do
+    method = Map.get(params, "payment_method") || Map.get(params, "method")
+
+    if is_binary(method) and method != "" do
+      payment_method =
+        resolve_payment_method(
+          method,
+          socket.assigns.payments_mode,
+          socket.assigns.gcash_pay_available?,
+          socket.assigns.maya_pay_available?
+        )
+
+      socket
+      |> assign(:payment_method, payment_method)
+      |> assign(:payment_touched?, true)
+    else
+      socket
+    end
+  end
+
   defp resolve_payment_method("gcash", mode, true, _maya)
        when mode in ["paymongo", "qrph_manual"],
        do: :gcash
@@ -3599,10 +3833,6 @@ defmodule EspresoWeb.MenuLive do
        do: true
 
   defp wallet_pay_available?(_, _), do: false
-
-  defp pay_option_count(gcash?, maya?) do
-    1 + if(gcash?, do: 1, else: 0) + if(maya?, do: 1, else: 0)
-  end
 
   defp payment_checkout_note(:counter, _), do: "Pay at the counter when your order is ready."
 

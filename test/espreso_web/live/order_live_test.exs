@@ -200,7 +200,10 @@ defmodule EspresoWeb.OrderLiveTest do
 
     {:ok, view, html} = live(conn, ~p"/order/#{order.number}?confirm=1")
 
+    assert has_element?(view, ".order-page.menu-page--glass")
+    assert html =~ "wordmark-on-dark.png"
     assert has_element?(view, "#order-confirm")
+    assert has_element?(view, "#order-chrome-title", "Your order")
     assert has_element?(view, "#order-confirm-title", "Order confirmed")
     assert has_element?(view, "#order-confirm-number", order.number)
     assert has_element?(view, ~s(#order-confirm[data-order-number="#{order.number}"]))
@@ -220,6 +223,7 @@ defmodule EspresoWeb.OrderLiveTest do
     assert html =~ ~s(phx-hook="OrderConfirm")
     refute has_element?(view, "#order-status-message")
     refute has_element?(view, "#order-receipt")
+    refute has_element?(view, "#order-push-prompt")
 
     view_href =
       view
@@ -249,6 +253,7 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(detail_view, "#order-status-message", "Received — kitchen has it")
     assert has_element?(detail_view, ".order-number", order.number)
     assert has_element?(detail_view, "#order-receipt", "Espresso")
+    assert has_element?(detail_view, "#order-push-prompt", "Get a ping")
     refute has_element?(detail_view, "#order-confirm")
 
     {:ok, menu_view, _html} =
@@ -401,6 +406,57 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, "#order-receipt")
   end
 
+  test "confirm screen switches to cancelled when staff cancels", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Confirm Cancel",
+          fulfillment: :dine_in,
+          table_number: "12",
+          payment_method: :counter
+        }
+      )
+
+    {:ok, view, _html} = live(conn, ~p"/order/#{order.number}?confirm=1")
+    assert has_element?(view, "#order-confirm-title", "Order confirmed")
+    refute has_element?(view, "#order-cancelled-state")
+
+    assert {:ok, _} = Orders.cancel_order(order)
+
+    refute has_element?(view, "#order-confirm")
+    assert has_element?(view, "#order-status-message", "Order cancelled")
+    assert has_element?(view, "#order-cancelled-state", "Cancelled")
+    assert has_element?(view, "#order-cancelled-state", "This order will not be prepared.")
+
+    assert has_element?(
+             view,
+             "#order-hint",
+             "This order was cancelled. You can place a new order from the menu."
+           )
+
+    assert has_element?(view, "a.order-more-link", "Order More")
+  end
+
+  test "confirm URL on a cancelled order shows cancelled, not confirmed", %{conn: conn} do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Refresh Cancel",
+          fulfillment: :pickup,
+          payment_method: :counter
+        }
+      )
+
+    assert {:ok, cancelled} = Orders.cancel_order(order)
+    {:ok, view, _html} = live(conn, ~p"/order/#{cancelled.number}?confirm=1")
+
+    refute has_element?(view, "#order-confirm")
+    assert has_element?(view, "#order-cancelled-state", "Cancelled")
+    assert has_element?(view, "#order-status-message", "Order cancelled")
+  end
+
   test "each order status shows the matching customer message", %{conn: conn} do
     {:ok, order} =
       Orders.create_order(
@@ -508,7 +564,8 @@ defmodule EspresoWeb.OrderLiveTest do
     assert has_element?(view, "#order-qrph-payment")
     assert has_element?(view, "#order-qrph-number", order.number)
     assert has_element?(view, "#order-qrph-awaiting", "Waiting")
-    assert has_element?(view, "#order-qrph-awaiting", "GCash")
+    refute has_element?(view, "#order-qrph-awaiting", "GCash")
+    assert has_element?(view, "#order-chrome-title", "Pay with GCash")
     assert has_element?(view, "#order-qrph-amount", "₱120")
     assert has_element?(view, "#order-qrph-waiting", "Waiting for staff to confirm.")
 
@@ -541,7 +598,7 @@ defmodule EspresoWeb.OrderLiveTest do
     refute has_element?(view, "#order-receipt")
     refute has_element?(view, "#order-order-more")
     refute has_element?(view, "#order-elilai-rewards")
-    assert has_element?(view, "#order-push-prompt", "Get a ping")
+    refute has_element?(view, "#order-push-prompt")
 
     view |> element("#order-qrph-code-gcash") |> render_click()
     assert has_element?(view, "#order-qrph-modal")
@@ -622,7 +679,7 @@ defmodule EspresoWeb.OrderLiveTest do
     refute has_element?(view, "#order-confirm-title", "Order confirmed")
     refute has_element?(view, "#order-confirm-recap")
     refute has_element?(view, "#order-confirm-number")
-    assert has_element?(view, "#order-push-prompt", "Get a ping")
+    refute has_element?(view, "#order-push-prompt")
 
     assert {:ok, _} = Orders.mark_paid(order, paid_via: "gcash")
     refute has_element?(view, "#order-confirm")

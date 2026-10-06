@@ -541,224 +541,14 @@ Hooks.StaffPinPad = {
   }
 }
 
-Hooks.LandingCarousel = {
-  mounted() {
-    this.carousel = this.el
-    this.root = this.el.closest("#menu-landing")
-    this.dots = this.root ? Array.from(this.root.querySelectorAll("[data-landing-dot]")) : []
-    this.onScroll = () => this.syncDots()
-    this.carousel.addEventListener("scroll", this.onScroll, {passive: true})
-    this.dotHandlers = this.dots.map((dot) => {
-      const handler = () => this.scrollToIndex(Number(dot.dataset.landingDot || 0))
-      dot.addEventListener("click", handler)
-      return {dot, handler}
-    })
-    this.syncDots()
-  },
-
-  updated() {
-    this.syncDots()
-  },
-
-  destroyed() {
-    if (this.carousel && this.onScroll) {
-      this.carousel.removeEventListener("scroll", this.onScroll)
-    }
-    if (this.dotHandlers) {
-      this.dotHandlers.forEach(({dot, handler}) => dot.removeEventListener("click", handler))
-    }
-  },
-
-  scrollToIndex(index) {
-    const width = this.carousel.clientWidth
-    if (!width) return
-    this.carousel.scrollTo({left: width * index, behavior: "smooth"})
-  },
-
-  syncDots() {
-    const width = this.carousel.clientWidth || 1
-    const index = Math.max(0, Math.min(this.dots.length - 1, Math.round(this.carousel.scrollLeft / width)))
-
-    this.dots.forEach((dot, dotIndex) => {
-      const active = dotIndex === index
-      dot.classList.toggle("is-active", active)
-      dot.setAttribute("aria-selected", active ? "true" : "false")
-    })
-
-    if (this.root) {
-      this.root.classList.toggle("menu-qr-landing--signature", index === 0)
-      this.root.classList.toggle("menu-qr-landing--visit", index === 1)
-    }
-  }
-}
-
-Hooks.SlideToStart = {
-  mounted() {
-    this.track = this.el.querySelector("[data-slide-track]")
-    this.handle = this.el.querySelector("[data-slide-handle]")
-    this.fill = this.el.querySelector("[data-slide-fill]")
-    this.hint = this.el.querySelector("[data-slide-hint]")
-    this.eventName = this.el.dataset.event || "enter_menu"
-    this.completed = false
-    this.dragging = false
-    this.pointerId = null
-    this.startX = 0
-    this.offsetX = 0
-    this.reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-
-    if (!this.track || !this.handle) return
-
-    this.onPointerDown = (event) => this.beginDrag(event)
-    this.onPointerMove = (event) => this.moveDrag(event)
-    this.onPointerUp = (event) => this.endDrag(event)
-    this.onKeyDown = (event) => this.onHandleKey(event)
-    this.onLostCapture = () => this.cancelDrag()
-
-    this.handle.addEventListener("pointerdown", this.onPointerDown)
-    this.handle.addEventListener("keydown", this.onKeyDown)
-    this.handle.addEventListener("lostpointercapture", this.onLostCapture)
-    this.render(0, false)
-  },
-
-  destroyed() {
-    this.teardownListeners()
-    if (this.completeTimer) window.clearTimeout(this.completeTimer)
-  },
-
-  teardownListeners() {
-    if (!this.handle) return
-    this.handle.removeEventListener("pointerdown", this.onPointerDown)
-    this.handle.removeEventListener("keydown", this.onKeyDown)
-    this.handle.removeEventListener("lostpointercapture", this.onLostCapture)
-    window.removeEventListener("pointermove", this.onPointerMove)
-    window.removeEventListener("pointerup", this.onPointerUp)
-    window.removeEventListener("pointercancel", this.onPointerUp)
-  },
-
-  maxTravel() {
-    const trackWidth = this.track.clientWidth
-    const handleWidth = this.handle.offsetWidth
-    const styles = window.getComputedStyle(this.track)
-    const padLeft = parseFloat(styles.paddingLeft) || 0
-    const padRight = parseFloat(styles.paddingRight) || 0
-    return Math.max(0, trackWidth - handleWidth - padLeft - padRight)
-  },
-
-  beginDrag(event) {
-    if (this.completed || event.button === 2) return
-    event.preventDefault()
-    this.dragging = true
-    this.pointerId = event.pointerId
-    this.startX = event.clientX - this.offsetX
-    this.el.classList.add("is-dragging")
-    this.handle.setPointerCapture?.(event.pointerId)
-    window.addEventListener("pointermove", this.onPointerMove, {passive: false})
-    window.addEventListener("pointerup", this.onPointerUp)
-    window.addEventListener("pointercancel", this.onPointerUp)
-  },
-
-  moveDrag(event) {
-    if (!this.dragging || this.completed) return
-    if (this.pointerId != null && event.pointerId !== this.pointerId) return
-    event.preventDefault()
-    const max = this.maxTravel()
-    const next = Math.max(0, Math.min(max, event.clientX - this.startX))
-    this.offsetX = next
-    this.render(next / (max || 1), false)
-  },
-
-  endDrag(event) {
-    if (!this.dragging) return
-    if (this.pointerId != null && event && event.pointerId !== this.pointerId) return
-    this.dragging = false
-    this.el.classList.remove("is-dragging")
-    window.removeEventListener("pointermove", this.onPointerMove)
-    window.removeEventListener("pointerup", this.onPointerUp)
-    window.removeEventListener("pointercancel", this.onPointerUp)
-
-    const max = this.maxTravel()
-    const progress = max > 0 ? this.offsetX / max : 0
-    if (progress >= 0.86) {
-      this.complete()
-    } else {
-      this.snapBack()
-    }
-  },
-
-  cancelDrag() {
-    if (!this.dragging || this.completed) return
-    this.dragging = false
-    this.el.classList.remove("is-dragging")
-    window.removeEventListener("pointermove", this.onPointerMove)
-    window.removeEventListener("pointerup", this.onPointerUp)
-    window.removeEventListener("pointercancel", this.onPointerUp)
-    this.snapBack()
-  },
-
-  onHandleKey(event) {
-    if (this.completed) return
-    if (event.key === "Enter" || event.key === " " || event.key === "ArrowRight") {
-      event.preventDefault()
-      this.complete()
-    } else if (event.key === "Home" || event.key === "ArrowLeft") {
-      event.preventDefault()
-      this.snapBack()
-    }
-  },
-
-  snapBack() {
-    this.offsetX = 0
-    this.render(0, true)
-  },
-
-  complete() {
-    if (this.completed) return
-    this.completed = true
-    this.dragging = false
-    this.el.classList.remove("is-dragging")
-    this.el.classList.add("is-complete")
-    this.handle.setAttribute("aria-disabled", "true")
-    this.handle.tabIndex = -1
-    const max = this.maxTravel()
-    this.offsetX = max
-    this.render(1, true)
-
-    const delay = this.reduceMotion ? 0 : 220
-    this.completeTimer = window.setTimeout(() => {
-      this.pushEvent(this.eventName, {})
-    }, delay)
-  },
-
-  render(progress, animate) {
-    const max = this.maxTravel()
-    const x = Math.max(0, Math.min(max, progress * max))
-    this.offsetX = x
-    const easing = animate && !this.reduceMotion ? "transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)" : "none"
-
-    if (this.handle) {
-      this.handle.style.transition = easing
-      this.handle.style.transform = `translate3d(${x}px, 0, 0)`
-    }
-    if (this.fill) {
-      this.fill.style.transition = animate && !this.reduceMotion
-        ? "width 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease"
-        : "none"
-      this.fill.style.width = `${Math.max((this.handle?.offsetWidth || 0) + x, 0)}px`
-      this.fill.style.opacity = String(0.22 + progress * 0.55)
-    }
-    if (this.hint) {
-      this.hint.style.transition = animate && !this.reduceMotion ? "opacity 0.28s ease" : "none"
-      this.hint.style.opacity = String(Math.max(0, 1 - progress * 1.35))
-    }
-  }
-}
-
 Hooks.MenuBrowse = {
   mounted() {
     this.handleEvent("scroll_to_items", () => this.scrollToItems())
     this.handleEvent("scroll_to_category", ({name}) => this.scrollToCategory(name))
     this.handleEvent("scroll_to_menu_content", () => this.scrollToMenuContent())
-    this.handleEvent("scroll_active_chip", ({id}) => this.scrollActiveChip(id))
+    this.handleEvent("scroll_active_chip", ({id, behavior}) =>
+      this.scrollActiveChip(id, behavior)
+    )
     this.handleEvent("scroll_basket_top", () => this.scrollBasketTop())
     this.handleEvent("focus_menu_search", () => this.focusMenuSearch())
     this.handleEvent("clear_persisted_cart", () => this.clearPersistedCart())
@@ -778,7 +568,7 @@ Hooks.MenuBrowse = {
     this.el.addEventListener("click", this.onChipClick)
     this.onAddPointer = (event) => {
       const origin = event.target.closest(
-        ".brune-menu-add, .menu-buy-now, .menu-signature-card"
+        ".brune-menu-add, .menu-buy-now, .menu-signature-card, .brune-menu-item-open"
       )
       if (!(origin instanceof HTMLElement)) return
 
@@ -793,6 +583,7 @@ Hooks.MenuBrowse = {
     }
     this.el.addEventListener("pointerdown", this.onAddPointer, true)
     this._lastBagFly = this.el.dataset.bagFly || "0"
+    this.bindCategorySwipe()
     this.restorePersistedCart()
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
@@ -801,6 +592,7 @@ Hooks.MenuBrowse = {
       })
     )
     this.persistCartFromDom()
+    this.syncShellChrome()
   },
 
   updated() {
@@ -808,11 +600,271 @@ Hooks.MenuBrowse = {
     this.ensureMyOrdersRestored()
     this.ensureLoyaltyPhoneRestored()
     this.maybeFlyToBag()
+    this.bindCategorySwipe()
+    this.playSwipeIn()
+    this.syncShellChrome()
   },
 
   destroyed() {
     if (this.onChipClick) this.el.removeEventListener("click", this.onChipClick)
     if (this.onAddPointer) this.el.removeEventListener("pointerdown", this.onAddPointer, true)
+    this.unbindCategorySwipe()
+    this.clearShellChrome()
+  },
+
+  syncShellChrome() {
+    const landing = Boolean(this.el.querySelector("#menu-landing"))
+    const dark = Boolean(
+      landing ||
+        this.el.classList.contains("menu-live-root--glass") ||
+        this.el.classList.contains("menu-live-root--qr-entry")
+    )
+    const color = landing ? "#1a100c" : dark ? "#382010" : "#FAF7F4"
+    const theme = document.querySelector('meta[name="theme-color"]')
+    if (theme) theme.setAttribute("content", color)
+    const bar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
+    if (bar) bar.setAttribute("content", dark ? "black-translucent" : "default")
+  },
+
+  clearShellChrome() {
+    const theme = document.querySelector('meta[name="theme-color"]')
+    if (theme) theme.setAttribute("content", "#FAF7F4")
+    const bar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
+    if (bar) bar.setAttribute("content", "default")
+  },
+
+  bindCategorySwipe() {
+    const items = this.el.querySelector("#menu-items")
+    if (items === this._swipeEl) return
+    this.unbindCategorySwipe()
+    this._swipeEl = items instanceof HTMLElement ? items : null
+    if (!this._swipeEl) return
+
+    this._onSwipePointerDown = (event) => this.beginCategorySwipe(event)
+    this._onSwipePointerMove = (event) => this.moveCategorySwipe(event)
+    this._onSwipePointerUp = (event) => this.endCategorySwipe(event)
+    this._onSwipeClick = (event) => this.suppressSwipeClick(event)
+
+    this._swipeEl.addEventListener("pointerdown", this._onSwipePointerDown, true)
+    this._swipeEl.addEventListener("pointermove", this._onSwipePointerMove, true)
+    this._swipeEl.addEventListener("pointerup", this._onSwipePointerUp, true)
+    this._swipeEl.addEventListener("pointercancel", this._onSwipePointerUp, true)
+    this._swipeEl.addEventListener("click", this._onSwipeClick, true)
+  },
+
+  unbindCategorySwipe() {
+    if (!this._swipeEl) return
+    this._swipeEl.removeEventListener("pointerdown", this._onSwipePointerDown, true)
+    this._swipeEl.removeEventListener("pointermove", this._onSwipePointerMove, true)
+    this._swipeEl.removeEventListener("pointerup", this._onSwipePointerUp, true)
+    this._swipeEl.removeEventListener("pointercancel", this._onSwipePointerUp, true)
+    this._swipeEl.removeEventListener("click", this._onSwipeClick, true)
+    this._swipeEl = null
+  },
+
+  categorySwipeEnabled() {
+    return this.el.dataset.categorySwipe === "1"
+  },
+
+  beginCategorySwipe(event) {
+    if (!this.categorySwipeEnabled()) return
+    if (event.pointerType === "mouse" && event.button !== 0) return
+    if (event.target.closest("a, input, textarea, select, .menu-item-heart")) return
+
+    this._swipe = {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      axis: null,
+      locked: false,
+      previewDir: null,
+    }
+  },
+
+  moveCategorySwipe(event) {
+    const swipe = this._swipe
+    if (!swipe || swipe.id !== event.pointerId) return
+
+    const dx = event.clientX - swipe.x
+    const dy = event.clientY - swipe.y
+    if (!swipe.axis) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return
+      swipe.axis = Math.abs(dx) > Math.abs(dy) * 1.15 ? "x" : "y"
+      if (swipe.axis === "x" && this._swipeEl) {
+        swipe.locked = true
+        try {
+          this._swipeEl.setPointerCapture(event.pointerId)
+        } catch (_error) {
+          /* ignore */
+        }
+      }
+    }
+
+    if (swipe.axis !== "x") return
+    event.preventDefault()
+    this.dragCategorySwipe(dx)
+  },
+
+  dragCategorySwipe(dx) {
+    const items = this._swipeEl
+    if (!(items instanceof HTMLElement)) return
+
+    const dir = dx < 0 ? "next" : "prev"
+    const hasNeighbor = this.hasSwipeNeighbor(dir)
+    const width = Math.max(items.clientWidth, 1)
+    const rubber = hasNeighbor ? 1 : 0.22
+    const travel = Math.max(-width * 0.38, Math.min(width * 0.38, dx * rubber))
+    items.style.transition = "none"
+    items.style.transform = `translate3d(${travel}px, 0, 0)`
+    items.style.opacity = String(1 - Math.min(0.22, Math.abs(travel) / width))
+
+    if (hasNeighbor && Math.abs(dx) > 36) {
+      this.previewSwipeChip(dir)
+    } else {
+      this.clearSwipePreview()
+    }
+  },
+
+  endCategorySwipe(event) {
+    const swipe = this._swipe
+    this._swipe = null
+    if (!swipe || swipe.id !== event.pointerId || swipe.axis !== "x") return
+
+    const dx = event.clientX - swipe.x
+    if (Math.abs(dx) < 48) {
+      this.clearSwipePreview()
+      this.settleCategorySwipe(0, 1)
+      return
+    }
+
+    this.commitCategorySwipe(dx < 0 ? "next" : "prev")
+  },
+
+  hasSwipeNeighbor(dir) {
+    return Boolean(this.neighborSwipeChip(dir))
+  },
+
+  neighborSwipeChip(dir) {
+    const chips = Array.from(this.el.querySelectorAll("#menu-craving .menu-craving-chip"))
+    const index = chips.findIndex((chip) => chip.classList.contains("is-active"))
+    if (index < 0) return null
+    return (dir === "next" ? chips[index + 1] : chips[index - 1]) || null
+  },
+
+  previewSwipeChip(dir) {
+    const next = this.neighborSwipeChip(dir)
+    if (!next || this._previewChip === next) return
+    this.clearSwipePreview()
+    next.classList.add("is-swipe-preview")
+    this._previewChip = next
+    this.scrollActiveChip(next.id, "smooth")
+  },
+
+  followSwipeChip(dir) {
+    const next = this.neighborSwipeChip(dir)
+    if (!(next instanceof HTMLElement)) return
+    this.clearSwipePreview()
+    this.el.querySelectorAll("#menu-craving .menu-craving-chip.is-active").forEach((chip) => {
+      chip.classList.remove("is-active")
+      chip.setAttribute("aria-pressed", "false")
+      chip.removeAttribute("aria-current")
+    })
+    next.classList.add("is-active")
+    next.setAttribute("aria-pressed", "true")
+    next.setAttribute("aria-current", "true")
+    this.scrollActiveChip(next.id, "smooth")
+  },
+
+  clearSwipePreview() {
+    if (this._previewChip instanceof HTMLElement) {
+      this._previewChip.classList.remove("is-swipe-preview")
+    }
+    this._previewChip = null
+  },
+
+  settleCategorySwipe(x, opacity) {
+    const items = this._swipeEl
+    if (!(items instanceof HTMLElement)) return
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      this.resetSwipeTransform(items)
+      return
+    }
+    items.style.transition =
+      "transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.32s ease"
+    items.style.transform = `translate3d(${x}px, 0, 0)`
+    items.style.opacity = String(opacity)
+    if (x === 0) {
+      window.setTimeout(() => this.resetSwipeTransform(items), 340)
+    }
+  },
+
+  resetSwipeTransform(items) {
+    if (!(items instanceof HTMLElement)) return
+    items.style.transition = ""
+    items.style.transform = ""
+    items.style.opacity = ""
+  },
+
+  bounceCategorySwipe(dx) {
+    this.settleCategorySwipe(dx < 0 ? -18 : 18, 1)
+    window.setTimeout(() => this.settleCategorySwipe(0, 1), 160)
+  },
+
+  commitCategorySwipe(dir) {
+    if (!this.hasSwipeNeighbor(dir)) {
+      this.clearSwipePreview()
+      this.bounceCategorySwipe(dir === "next" ? -80 : 80)
+      return
+    }
+
+    const items = this._swipeEl
+    this._pendingSwipeIn = dir
+    this._didSwipe = true
+    window.setTimeout(() => {
+      this._didSwipe = false
+    }, 450)
+
+    this.followSwipeChip(dir)
+
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    if (reduce || !(items instanceof HTMLElement)) {
+      this.resetSwipeTransform(items)
+      this.pushEvent("swipe_category", {dir})
+      return
+    }
+
+    const width = Math.max(items.clientWidth, 1)
+    this.settleCategorySwipe(dir === "next" ? -width * 0.18 : width * 0.18, 0.72)
+    this.pushEvent("swipe_category", {dir})
+  },
+
+  playSwipeIn() {
+    const dir = this._pendingSwipeIn
+    this._pendingSwipeIn = null
+    const items = this.el.querySelector("#menu-items")
+    if (!dir || !(items instanceof HTMLElement)) return
+    this.clearSwipePreview()
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      this.resetSwipeTransform(items)
+      return
+    }
+
+    const from = dir === "next" ? "14%" : "-14%"
+    items.style.transition = "none"
+    items.style.transform = `translate3d(${from}, 0, 0)`
+    items.style.opacity = "0.62"
+    void items.offsetWidth
+    items.style.transition =
+      "transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.36s ease"
+    items.style.transform = "translate3d(0, 0, 0)"
+    items.style.opacity = "1"
+    window.setTimeout(() => this.resetSwipeTransform(items), 380)
+  },
+
+  suppressSwipeClick(event) {
+    if (!this._didSwipe) return
+    event.preventDefault()
+    event.stopPropagation()
   },
 
   maybeFlyToBag() {
@@ -1038,8 +1090,9 @@ Hooks.MenuBrowse = {
     this.scrollToMenuContent()
   },
 
-  scrollActiveChip(id) {
+  scrollActiveChip(id, behavior = "auto") {
     if (!id) return
+    const motion = behavior === "smooth" ? "smooth" : "auto"
     const go = () => {
       const chip = this.el.querySelector(`#${CSS.escape(id)}`)
       if (!chip) return
@@ -1051,14 +1104,14 @@ Hooks.MenuBrowse = {
           chipRect.left - railRect.left - (railRect.width / 2 - chipRect.width / 2)
         rail.scrollTo({
           left: Math.max(0, rail.scrollLeft + delta),
-          behavior: "auto"
+          behavior: motion
         })
         return
       }
       chip.scrollIntoView({
         inline: "center",
         block: "nearest",
-        behavior: "auto"
+        behavior: motion
       })
     }
     requestAnimationFrame(go)
@@ -1388,6 +1441,19 @@ Hooks.OrderPushPrompt = {
 
 function registerEmployeeServiceWorker() {
   registerServiceWorker()
+}
+
+const syncMenuChromeInset = () => {
+  const vv = window.visualViewport
+  const bottom = vv ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0
+  document.documentElement.style.setProperty("--menu-chrome-bottom", `${bottom}px`)
+}
+
+syncMenuChromeInset()
+window.addEventListener("resize", syncMenuChromeInset)
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", syncMenuChromeInset)
+  window.visualViewport.addEventListener("scroll", syncMenuChromeInset)
 }
 
 // connect if there are any LiveViews on the page
