@@ -118,20 +118,14 @@ defmodule EspresoWeb.MenuLiveTest do
     view = enter_menu_browse(view)
 
     assert has_element?(view, "#menu-signature-feature")
-    assert has_element?(view, ".menu-signature-card-kicker", "OUR SIGNATURE")
-    assert has_element?(view, ".menu-signature-card-title", "Signature Tablea")
+    refute has_element?(view, ".menu-signature-card-kicker")
+    refute has_element?(view, ".menu-signature-card-title")
+    refute has_element?(view, ".menu-signature-card-lede")
+    refute has_element?(view, ".menu-signature-card-price")
 
     assert has_element?(
              view,
-             ".menu-signature-card-lede",
-             "Rich local cacao, our signature blend"
-           )
-
-    assert has_element?(view, ".menu-signature-card-price", "₱169")
-
-    assert has_element?(
-             view,
-             ~s(#menu-signature-feature-#{tablea.id} .menu-signature-card-photo[src="/images/coffeespot/signature-pure-tableya-portrait.jpg"])
+             ~s(#menu-signature-feature-#{tablea.id} .menu-signature-card-photo[src="/images/coffeespot/signature-tablea-card-banner.jpg"])
            )
 
     assert has_element?(view, "#menu-signature-feature .menu-item-rating")
@@ -149,6 +143,11 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#menu-detail")
     assert has_element?(view, "#menu-detail-title", "Signature Tablea")
     assert has_element?(view, "#menu-detail .menu-detail-price", "₱169")
+    assert has_element?(
+             view,
+             "#menu-detail .menu-detail-description",
+             "Rich local cacao, our signature blend"
+           )
   end
 
   test "/menu shows only one Signature Tablea featured card and omits it from HOT list", %{
@@ -374,8 +373,25 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#menu-items")
     refute has_element?(view, "#menu-qr-back")
     assert has_element?(view, "#menu-qr-chrome #menu-qr-search-toggle")
+    assert has_element?(view, "#menu-qr-visit")
+    assert has_element?(view, "#menu-qr-category")
     refute has_element?(view, ".brune-drawer")
     refute has_element?(view, ".brune-top-nav")
+  end
+
+  test "/menu hamburger opens Visit and back returns to browse", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/menu")
+    view = enter_menu_browse(view)
+
+    view |> element("#menu-qr-visit") |> render_click()
+    assert has_element?(view, "#menu-visit")
+    refute has_element?(view, "#menu-items")
+    refute has_element?(view, "#menu-landing")
+
+    view |> element("#menu-visit .menu-qr-visit-back") |> render_click()
+    assert has_element?(view, "#menu-items")
+    refute has_element?(view, "#menu-visit")
+    refute has_element?(view, "#menu-landing")
   end
 
   test "/menu QR menu flow has no public website navbar", %{conn: conn} do
@@ -384,6 +400,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
     assert has_element?(view, "#menu-qr-chrome")
     assert has_element?(view, ".menu-qr-chrome-brand", "CoffeeSpot")
+    assert has_element?(view, "#menu-qr-visit")
     assert has_element?(view, "#menu-search")
     refute has_element?(view, ".brune-top")
     refute has_element?(view, ".brune-top-nav")
@@ -455,6 +472,8 @@ defmodule EspresoWeb.MenuLiveTest do
   test "/menu Visit CoffeeSpot opens visit panel without About/Contact pages", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu?stage=visit")
     assert has_element?(view, "#menu-visit")
+    assert has_element?(view, "#menu-visit.menu-page--glass")
+    assert has_element?(view, "#menu-page.menu-live-root--glass")
     assert has_element?(view, ".menu-qr-visit-title", "Visit CoffeeSpot")
     assert has_element?(view, ".menu-qr-visit-brand", "CoffeeSpot")
     assert has_element?(view, ".menu-qr-visit-place", "Lilac, Marikina")
@@ -829,6 +848,7 @@ defmodule EspresoWeb.MenuLiveTest do
       end)
 
     assert sticky_ids == ["menu-qr-chrome", "menu-craving"]
+    assert has_element?(view, "#menu-qr-sticky.menu-qr-sticky--glass")
     assert has_element?(view, "#menu-qr-sticky #menu-craving")
     assert has_element?(view, "#menu-search-input")
 
@@ -1155,7 +1175,7 @@ defmodule EspresoWeb.MenuLiveTest do
 
     view = enter_menu_browse(view)
 
-    assert has_element?(view, "#menu-qr-sticky")
+    assert has_element?(view, "#menu-qr-sticky.menu-qr-sticky--glass")
     assert has_element?(view, "#menu-craving.menu-craving--header")
     assert has_element?(view, "button.brune-icon-bag[aria-label='Your order, 0 items']")
     assert has_element?(view, "#menu-qr-tabbar #menu-qr-rewards")

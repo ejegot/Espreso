@@ -38,6 +38,7 @@ defmodule EspresoWeb.MenuLive do
      |> assign(:gcash_pay_available?, wallet_pay_available?(payment_config, :gcash))
      |> assign(:maya_pay_available?, wallet_pay_available?(payment_config, :maya))
      |> assign(:menu_stage, :landing)
+     |> assign(:visit_return, :landing)
      |> assign(:menu_filter, nil)
      |> assign(:categories, categories)
      |> assign(:signature_feature, Menu.find_signature_product(categories))
@@ -151,6 +152,7 @@ defmodule EspresoWeb.MenuLive do
 
   @impl true
   def handle_event("enter_menu", _params, socket) do
+    socket = assign(socket, :visit_return, :landing)
     category = default_category(socket.assigns.categories)
 
     {:noreply,
@@ -173,7 +175,22 @@ defmodule EspresoWeb.MenuLive do
   end
 
   def handle_event("enter_visit", _params, socket) do
+    socket = assign(socket, :visit_return, :menu)
     {:noreply, push_patch(socket, to: menu_path(socket, :visit))}
+  end
+
+  def handle_event("leave_visit", _params, socket) do
+    target =
+      if socket.assigns.visit_return == :menu do
+        menu_path(socket, :menu)
+      else
+        menu_path(socket, :landing)
+      end
+
+    {:noreply,
+     socket
+     |> assign(:visit_return, :landing)
+     |> push_patch(to: target)}
   end
 
   def handle_event("back_to_landing", _params, socket) do
@@ -589,8 +606,8 @@ defmodule EspresoWeb.MenuLive do
       data-bag-fly={@bag_fly_n}
       class={[
         "menu-live-root",
-        @menu_stage == :menu && "menu-live-root--glass",
-        @menu_stage != :menu && "menu-live-root--qr-entry",
+        @menu_stage in [:menu, :visit] && "menu-live-root--glass",
+        @menu_stage not in [:menu, :visit] && "menu-live-root--qr-entry",
         (@detail || @basket_open? || @my_orders_open? || @saved_open?) && "menu-page-locked"
       ]}
       data-category-swipe={if(category_swipe_enabled?(assigns), do: "1", else: "0")}
@@ -691,7 +708,7 @@ defmodule EspresoWeb.MenuLive do
         </div>
       </div>
 
-      <div :if={@menu_stage == :visit} id="menu-visit" class="menu-qr-visit">
+      <div :if={@menu_stage == :visit} id="menu-visit" class="menu-qr-visit menu-page--glass">
         <div :if={@lilac_guest?} class="menu-qr-visit-bridge" aria-hidden="true">
           <img
             src="/images/coffeespot/IMG_3497.jpg"
@@ -704,12 +721,16 @@ defmodule EspresoWeb.MenuLive do
         </div>
 
         <div class="menu-qr-visit-sheet">
-          <button type="button" class="menu-qr-visit-back" phx-click="back_to_landing">
+          <button type="button" class="menu-qr-visit-back" phx-click="leave_visit">
             Back
           </button>
 
           <p class="menu-qr-visit-brand">
-            <.guest_brand_mark coffeespot?={@coffeespot_guest?} name={@guest_brand_name} />
+            <.guest_brand_mark
+              coffeespot?={@coffeespot_guest?}
+              name={@guest_brand_name}
+              variant="on-dark"
+            />
           </p>
           <h1 class="menu-qr-visit-title">{CoffeeSpot.visit_title()}</h1>
           <p class="menu-qr-visit-place">{CoffeeSpot.location()}</p>
@@ -788,18 +809,29 @@ defmodule EspresoWeb.MenuLive do
         :if={@menu_stage == :menu}
         class="menu-page menu-page-brune site-page menu-page--qr menu-page--glass"
       >
-        <div id="menu-qr-sticky" class="menu-qr-sticky">
+        <div id="menu-qr-sticky" class="menu-qr-sticky menu-qr-sticky--glass">
           <header
             id="menu-qr-chrome"
             class="menu-qr-chrome menu-qr-top menu-qr-chrome--glass is-search-open"
           >
-            <p class="menu-qr-chrome-brand menu-qr-top-brand">
-              <.guest_brand_mark
-                coffeespot?={@coffeespot_guest?}
-                name={@guest_brand_name}
-                variant="on-dark"
-              />
-            </p>
+            <div class="menu-qr-chrome-bar">
+              <button
+                type="button"
+                id="menu-qr-visit"
+                class="menu-qr-visit-btn"
+                phx-click="enter_visit"
+                aria-label="Visit CoffeeSpot"
+              >
+                <.icon name="hero-bars-3" class="menu-qr-chrome-icon" />
+              </button>
+              <p class="menu-qr-chrome-brand menu-qr-top-brand">
+                <.guest_brand_mark
+                  coffeespot?={@coffeespot_guest?}
+                  name={@guest_brand_name}
+                  variant="on-dark"
+                />
+              </p>
+            </div>
             <div class="menu-qr-chrome-tools">
               <div id="menu-qr-chrome-leading" class="menu-qr-chrome-leading">
                 <div id="menu-search" class="menu-qr-search-inline is-open">
@@ -904,7 +936,7 @@ defmodule EspresoWeb.MenuLive do
               class="menu-signature-feature"
               aria-label="Our signature"
             >
-              <% {signature_category, signature_product} = @signature_feature %>
+              <% {_signature_category, signature_product} = @signature_feature %>
               <article class="menu-signature-card">
                 <button
                   type="button"
@@ -916,26 +948,16 @@ defmodule EspresoWeb.MenuLive do
                 >
                   <div class="menu-signature-card-media" aria-hidden="true">
                     <img
-                      src={Menu.product_image(signature_category, signature_product)}
+                      src="/images/coffeespot/signature-tablea-card-banner.jpg"
                       alt=""
                       class="menu-signature-card-photo"
                       loading="lazy"
-                      width="320"
-                      height="320"
+                      width="1280"
+                      height="720"
                     />
                     <span class="menu-item-rating">
                       <.icon name="hero-star" class="menu-item-rating-icon" />
                     </span>
-                  </div>
-                  <div class="menu-signature-card-copy">
-                    <p class="menu-signature-card-kicker">OUR SIGNATURE</p>
-                    <h2 class="menu-signature-card-title">{signature_product.name}</h2>
-                    <p class="menu-signature-card-lede">
-                      {product_blurb(signature_product, signature_category)}
-                    </p>
-                    <p class="menu-signature-card-price">
-                      {card_price_label(signature_product)}
-                    </p>
                   </div>
                 </button>
                 <button
@@ -3243,48 +3265,11 @@ defmodule EspresoWeb.MenuLive do
   defp craving_chip_aria_label(%{label: label}, true), do: "#{label}, selected"
   defp craving_chip_aria_label(%{label: label}, false), do: "Show #{label} menu"
 
-  defp category_blurb("HOT"), do: "Freshly pulled and served warm."
-
-  defp category_blurb("COLD") do
-    if Tenancy.lilac_guest?() do
-      "Iced and ready for a slow Lilac afternoon."
-    else
-      "Iced and ready to sip."
-    end
-  end
-
-  defp category_blurb("FRAPPE"), do: "Blended, topped, and built to share."
-  defp category_blurb("SODA"), do: "Bright, fizzy, and easy to sip."
-
-  defp category_blurb("FOOD") do
-    if Tenancy.lilac_guest?() do
-      "From the kitchen at CoffeeSpot Lilac."
-    else
-      "From the kitchen."
-    end
-  end
-
-  defp category_blurb(_name) do
-    if Tenancy.lilac_guest?() do
-      "Prepared fresh at CoffeeSpot Lilac Marikina."
-    else
-      "Prepared fresh."
-    end
-  end
-
   defp description?(description) when is_binary(description) do
     String.trim(description) != ""
   end
 
   defp description?(_description), do: false
-
-  defp product_blurb(product, category_name) do
-    if description?(product.description) do
-      product.description
-    else
-      category_blurb(category_name)
-    end
-  end
 
   defp apply_table_param(socket, %{"table" => table}) do
     case Integer.parse(to_string(table)) do
@@ -3310,10 +3295,7 @@ defmodule EspresoWeb.MenuLive do
         |> clear_transient_menu_state()
 
       "visit" ->
-        socket
-        |> assign(:menu_stage, :visit)
-        |> assign(:selected_category, default_category(socket.assigns.categories))
-        |> clear_transient_menu_state()
+        apply_visit_stage_param(socket, params)
 
       "menu" ->
         socket
@@ -3478,6 +3460,19 @@ defmodule EspresoWeb.MenuLive do
 
   defp maybe_put_stage(params, :landing, _category, _filter, _socket), do: params
 
+  defp maybe_put_stage(params, :visit, category, filter, socket) do
+    params = Map.put(params, "stage", "visit")
+
+    if socket.assigns[:visit_return] == :menu do
+      params
+      |> Map.put("from", "menu")
+      |> maybe_put_menu_category(category, filter, socket)
+      |> maybe_put_menu_filter(filter, socket)
+    else
+      params
+    end
+  end
+
   defp maybe_put_stage(params, stage, category, filter, socket) do
     params = Map.put(params, "stage", Atom.to_string(stage))
 
@@ -3487,6 +3482,23 @@ defmodule EspresoWeb.MenuLive do
       |> maybe_put_menu_filter(filter, socket)
     else
       params
+    end
+  end
+
+  defp apply_visit_stage_param(socket, params) do
+    from_menu? = Map.get(params, "from") == "menu"
+
+    socket =
+      socket
+      |> assign(:menu_stage, :visit)
+      |> assign(:visit_return, if(from_menu?, do: :menu, else: :landing))
+
+    if from_menu? do
+      apply_menu_browse_param(socket, params)
+    else
+      socket
+      |> assign(:selected_category, default_category(socket.assigns.categories))
+      |> clear_transient_menu_state()
     end
   end
 
