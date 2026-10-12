@@ -147,7 +147,9 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(owner_view, "#dashboard-panel-popular-products", "Sales by item")
     assert has_element?(owner_view, "#dashboard-panel-payout", "Payout today")
     assert has_element?(owner_view, "#dashboard-panel-top-item", "Top-selling item")
-    assert has_element?(owner_view, "#staff-home-reports-link", "Reports")
+    assert has_element?(owner_view, "#staff-home-shop-line")
+    refute has_element?(owner_view, "#staff-home-reports-link")
+    assert has_element?(owner_view, "#owner-dash-nav-reports", "Reports")
     refute has_element?(owner_view, "#dashboard-panel-staff-activity")
     refute render(owner_view) =~ "Coming soon"
     refute render(owner_view) =~ "86 sold-out"
@@ -167,7 +169,9 @@ defmodule EspresoWeb.StaffAuthTest do
     refute render(manager_view) =~ "86 sold-out"
 
     assert has_element?(manager_view, "#dashboard-panel-top-item", "Top-selling item")
-    assert has_element?(manager_view, "#staff-home-reports-link", "Reports")
+    assert has_element?(manager_view, "#staff-home-shop-line")
+    refute has_element?(manager_view, "#staff-home-reports-link")
+    assert has_element?(manager_view, "#staff-nav-reports", "Reports")
     refute has_element?(manager_view, "#dashboard-panel-users")
     refute has_element?(manager_view, "#dashboard-panel-settings")
     assert has_element?(manager_view, "#dashboard-panel-popular-products", "Sales by item")
@@ -374,7 +378,7 @@ defmodule EspresoWeb.StaffAuthTest do
     refute has_element?(staff_view, "#dashboard-panel-payout")
   end
 
-  test "dashboard top-selling KPI is money-only; Reports stays a header link", %{
+  test "dashboard top-selling KPI is money-only; shop state sits under the greeting", %{
     conn: conn,
     owner: owner,
     manager: manager,
@@ -384,15 +388,18 @@ defmodule EspresoWeb.StaffAuthTest do
 
     {:ok, owner_empty, _html} = live(log_in(conn, owner), ~p"/staff")
     assert has_element?(owner_empty, "#dashboard-panel-top-item", "No sales yet")
-    assert has_element?(owner_empty, "#staff-home-reports-link", "Reports")
+    assert has_element?(owner_empty, "#staff-home-shop-line")
+    refute has_element?(owner_empty, "#staff-home-reports-link")
     refute has_element?(owner_empty, "#dashboard-panel-reports")
 
     {:ok, manager_empty, _html} = live(log_in(conn, manager), ~p"/staff")
     assert has_element?(manager_empty, "#dashboard-panel-top-item", "Top-selling item")
-    assert has_element?(manager_empty, "#staff-home-reports-link", "Reports")
+    assert has_element?(manager_empty, "#staff-home-shop-line")
+    refute has_element?(manager_empty, "#staff-home-reports-link")
 
     {:ok, staff_empty, _html} = live(log_in(conn, barista), ~p"/staff")
     refute has_element?(staff_empty, "#dashboard-panel-top-item")
+    assert has_element?(staff_empty, "#staff-home-shop-line")
     refute has_element?(staff_empty, "#staff-home-reports-link")
 
     {:ok, paid} =
