@@ -77,6 +77,23 @@ defmodule EspresoWeb.StaffComponents do
             <.icon name="hero-bars-3" class="staff-pos-rail-icon" />
             <span class="sr-only">Menu</span>
           </button>
+          <.link
+            :if={@chrome == :bar}
+            navigate={~p"/staff"}
+            class="staff-bar-brand"
+            id="staff-bar-brand"
+            aria-label="Elilai Kafe Home"
+          >
+            <img
+              src={~p"/images/elilai-kafe/elilai-kafe-logo.png"}
+              alt=""
+              class="staff-bar-brand-logo"
+              width="1024"
+              height="1024"
+              aria-hidden="true"
+            />
+            <span class="staff-bar-brand-name">Elilai Kafe</span>
+          </.link>
 
           <div class="staff-pos-rail-end">
             <form
@@ -147,7 +164,14 @@ defmodule EspresoWeb.StaffComponents do
               </span>
               <span class="sr-only">Orders</span>
             </.link>
+            <.live_component
+              :if={@chrome == :bar}
+              module={EspresoWeb.StaffAccountMenuComponent}
+              id="staff-account-menu"
+              current_user={@current_user}
+            />
             <.link
+              :if={@chrome == :rail}
               navigate={~p"/staff"}
               class="staff-pos-rail-brand"
               id="staff-nav-logo"
@@ -257,6 +281,25 @@ defmodule EspresoWeb.StaffComponents do
       />
     </div>
     """
+  end
+
+  def staff_nav_items(%User{} = user), do: nav_items(user)
+
+  @nav_groups [
+    {:counter, "Counter"},
+    {:service, "Service"},
+    {:shift, "Shift"},
+    {:manage, "Manage"}
+  ]
+
+  def staff_nav_groups(items) when is_list(items) do
+    by_group = Enum.group_by(items, & &1.group)
+
+    for {key, title} <- @nav_groups,
+        grouped = Map.get(by_group, key, []),
+        grouped != [] do
+      %{key: key, title: title, items: grouped}
+    end
   end
 
   defp nav_items(%User{} = user) do

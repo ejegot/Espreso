@@ -591,6 +591,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#pos-ticket-extras-toggle", "Liza")
 
     view |> element("#pos-product-#{espresso.id}") |> render_click()
+
     view
     |> element("#pos-notes")
     |> render_change(%{"notes" => "Less ice"})
@@ -2663,7 +2664,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(home, "#staff-home-identity")
     assert has_element?(home, "#staff-home-orders", "Orders")
     assert has_element?(home, "#staff-home-pos", "Open POS")
-    assert has_element?(home, "#staff-home-open-shop", "Open shop")
+    refute has_element?(home, "#staff-home-open-shop")
     assert has_element?(home, "#staff-notif-toggle")
     refute has_element?(home, "#staff-home-shop-status")
     refute has_element?(home, "#staff-home-today")

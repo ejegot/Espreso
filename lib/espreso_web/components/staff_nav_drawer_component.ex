@@ -8,13 +8,7 @@ defmodule EspresoWeb.StaffNavDrawerComponent do
   import EspresoWeb.CoreComponents, only: [icon: 1]
 
   alias Espreso.Accounts.User
-
-  @groups [
-    {:counter, "Counter"},
-    {:service, "Service"},
-    {:shift, "Shift"},
-    {:manage, "Manage"}
-  ]
+  alias EspresoWeb.StaffComponents
 
   @impl true
   def update(assigns, socket) do
@@ -24,7 +18,7 @@ defmodule EspresoWeb.StaffNavDrawerComponent do
      socket
      |> assign(assigns)
      |> assign(:role_title, role_title)
-     |> assign(:groups, grouped_items(assigns.items))
+     |> assign(:groups, StaffComponents.staff_nav_groups(assigns.items))
      |> assign_new(:orders_badge_count, fn -> 0 end)
      |> assign_new(:open?, fn -> false end)}
   end
@@ -143,16 +137,6 @@ defmodule EspresoWeb.StaffNavDrawerComponent do
       </nav>
     </div>
     """
-  end
-
-  defp grouped_items(items) do
-    by_group = Enum.group_by(items, & &1.group)
-
-    for {key, title} <- @groups,
-        grouped = Map.get(by_group, key, []),
-        grouped != [] do
-      %{key: key, title: title, items: grouped}
-    end
   end
 
   defp nav_item_aria(%{key: :orders, label: label}, count) when is_integer(count) and count > 0 do
