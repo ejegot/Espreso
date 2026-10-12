@@ -368,6 +368,109 @@ Hooks.StaffNotifications = {
   }
 }
 
+// Owner dashboard rail: icon-only until hover (laptop) or tap (tablet).
+Hooks.OwnerDashRail = {
+  mounted() {
+    this.open = () => {
+      this.el.classList.add("is-open")
+      this.el.setAttribute("data-open", "true")
+    }
+
+    this.close = () => {
+      this.el.classList.remove("is-open")
+      this.el.setAttribute("data-open", "false")
+    }
+
+    this.canHover = () => window.matchMedia("(hover: hover) and (pointer: fine)").matches
+
+    this.onEnter = () => {
+      if (this.canHover()) this.open()
+    }
+
+    this.onLeave = () => {
+      if (this.canHover()) this.close()
+    }
+
+    this.onCaptureClick = (event) => {
+      if (this.canHover()) return
+      if (this.el.classList.contains("is-open")) return
+      event.preventDefault()
+      event.stopPropagation()
+      this.open()
+    }
+
+    this.onDocumentClick = (event) => {
+      if (this.canHover()) return
+      if (!this.el.classList.contains("is-open")) return
+      if (this.el.contains(event.target)) return
+      this.close()
+    }
+
+    this.el.addEventListener("mouseenter", this.onEnter)
+    this.el.addEventListener("mouseleave", this.onLeave)
+    this.el.addEventListener("click", this.onCaptureClick, true)
+    document.addEventListener("click", this.onDocumentClick)
+  },
+
+  destroyed() {
+    this.el.removeEventListener("mouseenter", this.onEnter)
+    this.el.removeEventListener("mouseleave", this.onLeave)
+    this.el.removeEventListener("click", this.onCaptureClick, true)
+    document.removeEventListener("click", this.onDocumentClick)
+  }
+}
+
+Hooks.OwnerSalesTrend = {
+  mounted() {
+    this.animate()
+  },
+
+  updated() {
+    this.animate()
+  },
+
+  animate() {
+    const path = this.el.querySelector("#owner-trends-line")
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+
+    if (this.frame) window.cancelAnimationFrame(this.frame)
+    this.el.classList.remove("is-drawn")
+
+    if (!path) {
+      this.el.classList.add("is-drawn")
+      return
+    }
+
+    if (reduce) {
+      path.style.strokeDasharray = "none"
+      path.style.strokeDashoffset = "0"
+      path.style.transition = "none"
+      this.el.classList.add("is-drawn")
+      return
+    }
+
+    let length = 0
+    try {
+      length = path.getTotalLength()
+    } catch (_error) {
+      length = 0
+    }
+
+    path.style.transition = "none"
+    path.style.strokeDasharray = `${length}`
+    path.style.strokeDashoffset = `${length}`
+    path.getBoundingClientRect()
+
+    this.frame = window.requestAnimationFrame(() => {
+      this.frame = window.requestAnimationFrame(() => {
+        path.style.transition = "stroke-dashoffset 1s cubic-bezier(0.22, 1, 0.36, 1)"
+        path.style.strokeDashoffset = "0"
+        this.el.classList.add("is-drawn")
+      })
+    })
+  }
+}
+
 // Keeps hamburger aria-expanded in sync with the LiveComponent drawer open state.
 Hooks.StaffNavDrawer = {
   mounted() {
