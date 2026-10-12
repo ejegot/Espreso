@@ -7,6 +7,7 @@ defmodule Espreso.Menu.Product do
     field :description, :string
     field :available, :boolean, default: true
     field :menu_group, :string
+    field :item_owner, :string
     field :has_custom_photo, :boolean, default: false
     field :photo_updated_at, :utc_datetime
 
@@ -27,6 +28,7 @@ defmodule Espreso.Menu.Product do
       :available,
       :category_id,
       :menu_group,
+      :item_owner,
       :has_custom_photo,
       :photo_updated_at,
       :tenant_id,
@@ -34,8 +36,10 @@ defmodule Espreso.Menu.Product do
     ])
     |> update_change(:name, &trim_name/1)
     |> update_change(:menu_group, &blank_to_nil/1)
+    |> update_change(:item_owner, &blank_to_nil/1)
     |> validate_required([:name, :available, :category_id])
     |> validate_length(:name, min: 1, max: 80)
+    |> validate_length(:item_owner, max: 40)
     |> unique_constraint(:name, name: :products_category_id_name_index)
     |> foreign_key_constraint(:category_id)
     |> Espreso.Tenancy.put_ids()

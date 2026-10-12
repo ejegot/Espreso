@@ -144,7 +144,8 @@ defmodule EspresoWeb.StaffAuthTest do
     refute has_element?(owner_view, "#dashboard-panel-transactions")
     refute has_element?(owner_view, "#dashboard-panel-close-shift")
     refute has_element?(owner_view, "#dashboard-todays-orders-preview")
-    assert has_element?(owner_view, "#dashboard-panel-popular-products", "Popular Products")
+    assert has_element?(owner_view, "#dashboard-panel-popular-products", "Sales by item")
+    assert has_element?(owner_view, "#dashboard-panel-payout", "Payout today")
     assert has_element?(owner_view, "#dashboard-panel-top-item", "Top-selling item")
     assert has_element?(owner_view, "#staff-home-reports-link", "Reports")
     refute has_element?(owner_view, "#dashboard-panel-staff-activity")
@@ -169,7 +170,8 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(manager_view, "#staff-home-reports-link", "Reports")
     refute has_element?(manager_view, "#dashboard-panel-users")
     refute has_element?(manager_view, "#dashboard-panel-settings")
-    refute has_element?(manager_view, "#dashboard-panel-popular-products")
+    assert has_element?(manager_view, "#dashboard-panel-popular-products", "Sales by item")
+    assert has_element?(manager_view, "#dashboard-panel-payout", "Payout today")
 
     {:ok, staff_view, _html} = live(log_in(conn, barista), ~p"/staff")
     refute has_element?(staff_view, "#staff-nav-dashboard")
@@ -278,7 +280,7 @@ defmodule EspresoWeb.StaffAuthTest do
     refute has_element?(staff_view, "#dashboard-panel-sales")
   end
 
-  test "dashboard Popular Products is owner-only with real or empty data", %{
+  test "dashboard sales by item is money-only with qty and peso", %{
     conn: conn,
     owner: owner,
     manager: manager,
@@ -294,16 +296,36 @@ defmodule EspresoWeb.StaffAuthTest do
              "No paid items yet."
            )
 
+    assert has_element?(owner_empty, "#dashboard-panel-payout", "Payout today")
+
+    assert has_element?(
+             owner_empty,
+             "#dashboard-panel-payout .staff-home-card-body",
+             "No paid items yet."
+           )
+
     {:ok, manager_empty, _html} = live(log_in(conn, manager), ~p"/staff")
-    refute has_element?(manager_empty, "#dashboard-panel-popular-products")
+
+    assert has_element?(
+             manager_empty,
+             "#dashboard-panel-popular-products .staff-home-card-body",
+             "No paid items yet."
+           )
 
     {:ok, staff_empty, _html} = live(log_in(conn, barista), ~p"/staff")
     refute has_element?(staff_empty, "#dashboard-panel-popular-products")
+    refute has_element?(staff_empty, "#dashboard-panel-payout")
 
     {:ok, paid} =
       Orders.create_order(
         [
-          %{name: "Americano", size: "12oz", quantity: 3, price: Decimal.new("120")},
+          %{
+            name: "Americano",
+            size: "12oz",
+            quantity: 3,
+            price: Decimal.new("120"),
+            item_owner: "Manager"
+          },
           %{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}
         ],
         %{customer_name: "Pop", fulfillment: :pickup, payment_method: :counter}
@@ -321,7 +343,7 @@ defmodule EspresoWeb.StaffAuthTest do
              "Americano"
            )
 
-    refute has_element?(
+    assert has_element?(
              owner_view,
              "#dashboard-panel-popular-products .dashboard-popular-name",
              "Espresso"
@@ -333,11 +355,23 @@ defmodule EspresoWeb.StaffAuthTest do
              "3"
            )
 
+    assert has_element?(owner_view, "#dashboard-panel-popular-products .dashboard-popular-total")
+
+    assert has_element?(
+             owner_view,
+             "#dashboard-panel-popular-products .dashboard-popular-owner",
+             "Manager"
+           )
+
     {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/staff")
-    refute has_element?(manager_view, "#dashboard-panel-popular-products")
+    assert has_element?(manager_view, "#dashboard-panel-popular-products", "Americano")
+    assert has_element?(owner_view, "#dashboard-panel-payout", "Manager")
+    assert has_element?(owner_view, "#dashboard-panel-payout", "Café")
+    assert has_element?(manager_view, "#dashboard-panel-payout", "Manager")
 
     {:ok, staff_view, _html} = live(log_in(conn, barista), ~p"/staff")
     refute has_element?(staff_view, "#dashboard-panel-popular-products")
+    refute has_element?(staff_view, "#dashboard-panel-payout")
   end
 
   test "dashboard top-selling KPI is money-only; Reports stays a header link", %{

@@ -139,7 +139,32 @@ defmodule EspresoWeb.AdminAvailabilityLiveTest do
 
     food_menu = Menu.list_menu() |> Enum.find(&(&1.name == "FOOD"))
     rice = Enum.find(food_menu.groups, &(&1.name == "Rice Meal"))
-    assert Enum.any?(rice.products, &(&1.name == "Chicken Teriyaki"))
+    product = Enum.find(rice.products, &(&1.name == "Chicken Teriyaki"))
+    assert product.item_owner == "Manager"
+    assert has_element?(view, "#availability-product-#{product.id}", "Manager food")
+  end
+
+  test "manager can switch FOOD payout between Manager and Café", %{
+    conn: conn,
+    manager: manager,
+    espresso: espresso
+  } do
+    food = insert_category!("FOOD")
+
+    ensaymada =
+      insert_product!(food, "Ensaymada", true, [{nil, "80"}], item_owner: "Manager")
+
+    {:ok, view, _html} = live(log_in(conn, manager), ~p"/admin/availability")
+    refute has_element?(view, "#availability-food-share-#{espresso.id}")
+    assert has_element?(view, "#availability-food-share-#{ensaymada.id}", "Manager")
+    assert has_element?(view, "#availability-product-#{ensaymada.id}", "Manager food")
+
+    view |> element("#availability-food-share-#{ensaymada.id}") |> render_click()
+
+    assert has_element?(view, "#availability-flash", "Ensaymada is Café food.")
+    assert is_nil(Repo.get!(Product, ensaymada.id).item_owner)
+    assert has_element?(view, "#availability-food-share-#{ensaymada.id}", "Café")
+    assert has_element?(view, "#availability-product-#{ensaymada.id}", "Café")
   end
 
   test "manager can change a product photo from the availability board", %{
@@ -241,10 +266,15 @@ defmodule EspresoWeb.AdminAvailabilityLiveTest do
     %Category{} |> Category.changeset(%{name: name}) |> Repo.insert!()
   end
 
-  defp insert_product!(category, name, available, prices) do
+  defp insert_product!(category, name, available, prices, opts \\ []) do
     product =
       %Product{}
-      |> Product.changeset(%{name: name, category_id: category.id, available: available})
+      |> Product.changeset(%{
+        name: name,
+        category_id: category.id,
+        available: available,
+        item_owner: Keyword.get(opts, :item_owner)
+      })
       |> Repo.insert!()
 
     Enum.each(prices, fn {size, price} ->

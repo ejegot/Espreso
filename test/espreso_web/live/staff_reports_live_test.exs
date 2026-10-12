@@ -48,6 +48,10 @@ defmodule EspresoWeb.StaffReportsLiveTest do
     assert has_element?(owner_view, "#staff-reports")
     assert has_element?(owner_view, "#staff-reports-from")
     assert has_element?(owner_view, "#staff-reports-to")
+    assert has_element?(owner_view, "#staff-reports-item-sales", "Sales by item")
+    assert has_element?(owner_view, "#staff-reports-item-empty", "No paid items in this range.")
+    assert has_element?(owner_view, "#staff-reports-payout", "Payout")
+    assert has_element?(owner_view, "#staff-reports-payout-empty", "No paid items in this range.")
     assert has_element?(owner_view, "#staff-reports-export", "Sales Excel")
     assert has_element?(owner_view, "#staff-reports-close-xlsx", "Close Excel")
     assert has_element?(owner_view, "#staff-reports-close-pdf", "Close PDF")
@@ -59,6 +63,48 @@ defmodule EspresoWeb.StaffReportsLiveTest do
 
     assert {:error, {:redirect, %{to: "/staff"}}} =
              live(log_in(conn, barista), ~p"/staff/reports")
+  end
+
+  test "reports lists paid item sales for owner and manager", %{
+    conn: conn,
+    owner: owner,
+    manager: manager
+  } do
+    {:ok, order} =
+      Orders.create_order(
+        [
+          %{
+            name: "Ensaymada",
+            size: nil,
+            quantity: 2,
+            price: Decimal.new("80"),
+            item_owner: "Manager"
+          }
+        ],
+        %{customer_name: "Item Guest", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, _} = Orders.mark_paid(order)
+
+    {:ok, owner_view, _html} = live(log_in(conn, owner), ~p"/staff/reports")
+    refute has_element?(owner_view, "#staff-reports-item-empty")
+    assert has_element?(owner_view, "#staff-reports-item-sales", "Ensaymada")
+
+    assert has_element?(
+             owner_view,
+             "#staff-reports-item-sales .staff-reports-item-owner",
+             "Manager"
+           )
+
+    assert has_element?(owner_view, "#staff-reports-item-sales", "2")
+    assert has_element?(owner_view, "#staff-reports-item-sales", "160")
+
+    {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/staff/reports")
+    assert has_element?(manager_view, "#staff-reports-item-sales", "Ensaymada")
+    refute has_element?(owner_view, "#staff-reports-payout-empty")
+    assert has_element?(owner_view, "#staff-reports-payout", "Manager")
+    assert has_element?(owner_view, "#staff-reports-payout", "160")
+    assert has_element?(manager_view, "#staff-reports-payout", "Manager")
   end
 
   test "rejects ranges longer than 31 days in the form", %{conn: conn, owner: owner} do

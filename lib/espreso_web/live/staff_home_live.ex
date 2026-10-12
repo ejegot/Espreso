@@ -580,22 +580,49 @@ defmodule EspresoWeb.StaffHomeLive do
               </section>
 
               <section
-                :if={@owner_dashboard?}
                 class="staff-home-card dashboard-card-metric-panel"
                 id="dashboard-panel-popular-products"
+                aria-label="Sales by item"
               >
-                <span class="staff-home-card-title">Popular Products</span>
+                <span class="staff-home-card-title">Sales by item</span>
                 <p :if={@popular_products == []} class="staff-home-card-body">
                   No paid items yet.
                 </p>
                 <ul :if={@popular_products != []} class="dashboard-popular-list">
                   <li :for={item <- @popular_products}>
-                    <span class="dashboard-popular-name">{item.name}</span>
-                    <span class="dashboard-popular-qty">{item.quantity}</span>
+                    <span class="dashboard-popular-copy">
+                      <span class="dashboard-popular-name">{item.name}</span>
+                      <span :if={item_owner(item)} class="dashboard-popular-owner">
+                        {item_owner(item)}
+                      </span>
+                    </span>
+                    <span class="dashboard-popular-qty">{item_qty(item.quantity)}</span>
+                    <span class="dashboard-popular-total">{peso(item.total)}</span>
                   </li>
                 </ul>
               </section>
             </div>
+
+            <section
+              :if={@money?}
+              class="staff-home-card dashboard-card-metric-panel"
+              id="dashboard-panel-payout"
+              aria-label="Payout today"
+            >
+              <span class="staff-home-card-title">Payout today</span>
+              <p :if={@item_payouts == []} class="staff-home-card-body">
+                No paid items yet.
+              </p>
+              <ul :if={@item_payouts != []} class="dashboard-popular-list">
+                <li :for={row <- @item_payouts}>
+                  <span class="dashboard-popular-copy">
+                    <span class="dashboard-popular-name">{payout_owner(row)}</span>
+                  </span>
+                  <span class="dashboard-popular-qty">{item_qty(row.quantity)}</span>
+                  <span class="dashboard-popular-total">{peso(row.total)}</span>
+                </li>
+              </ul>
+            </section>
 
             <section
               :if={not @owner_dashboard? and (@launch_tools != [] or @shift_tools != [])}
@@ -746,13 +773,8 @@ defmodule EspresoWeb.StaffHomeLive do
 
     ranked = if money?, do: Orders.popular_products(), else: []
     top_seller = List.first(ranked)
-
-    popular =
-      if user.role == "owner" do
-        popular_for_home(ranked)
-      else
-        []
-      end
+    popular = if money?, do: Orders.paid_item_sales(limit: 8), else: []
+    payouts = if money?, do: Orders.paid_item_payouts(), else: []
 
     tools = desk_tools(user)
     {shift_tools, launch_tools} = Enum.split_with(tools, &(&1.id == "my-shifts"))
@@ -788,6 +810,7 @@ defmodule EspresoWeb.StaffHomeLive do
     |> assign(:drawer_summary, drawer_summary(money?, shop_open, close, breakdown))
     |> assign(:today_visible?, money?)
     |> assign(:popular_products, popular)
+    |> assign(:item_payouts, payouts)
     |> assign(:printer_on_home?, money? and Printer.enabled?())
     |> assign(:greeting, staff_greeting(user))
     |> assign(:primary, primary_tiles(user, overview, shop_day_status))
@@ -1289,17 +1312,20 @@ defmodule EspresoWeb.StaffHomeLive do
 
   defp payment_mix_empty?(_), do: true
 
-  defp popular_for_home(items) when is_list(items) do
-    items
-    |> Enum.filter(&popular_qty?(&1.quantity))
-    |> Enum.take(5)
+  defp item_qty(qty) when is_integer(qty), do: qty
+  defp item_qty(%Decimal{} = qty), do: qty |> Decimal.round(0) |> Decimal.to_integer()
+  defp item_qty(_), do: 0
+
+  defp item_owner(%{item_owner: owner}) when is_binary(owner) and owner != "" do
+    case String.downcase(owner) do
+      "manager" -> "Manager"
+      _ -> owner
+    end
   end
 
-  defp popular_for_home(_), do: []
+  defp item_owner(_), do: nil
 
-  defp popular_qty?(qty) when is_integer(qty), do: qty >= 2
-  defp popular_qty?(%Decimal{} = qty), do: Decimal.compare(qty, 2) != :lt
-  defp popular_qty?(_), do: false
+  defp payout_owner(row), do: item_owner(row) || "Café"
 
   defp drawer_summary(false, _, _, _), do: nil
   defp drawer_summary(true, nil, nil, _), do: nil

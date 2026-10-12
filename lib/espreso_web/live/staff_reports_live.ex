@@ -5,6 +5,7 @@ defmodule EspresoWeb.StaffReportsLive do
   use EspresoWeb, :live_view
 
   alias Espreso.Accounts.Authorization
+  alias Espreso.Menu
   alias Espreso.Orders
 
   @impl true
@@ -19,7 +20,8 @@ defmodule EspresoWeb.StaffReportsLive do
        |> assign(:page_title, "Reports")
        |> assign(:from_date, today)
        |> assign(:to_date, today)
-       |> assign(:form_error, nil), layout: false}
+       |> assign(:form_error, nil)
+       |> assign_item_sales(today, today, nil), layout: false}
     else
       {:ok,
        socket
@@ -36,7 +38,8 @@ defmodule EspresoWeb.StaffReportsLive do
      socket
      |> assign(:from_date, from_date || socket.assigns.from_date)
      |> assign(:to_date, to_date || socket.assigns.to_date)
-     |> assign(:form_error, error)}
+     |> assign(:form_error, error)
+     |> assign_item_sales(from_date, to_date, error)}
   end
 
   def handle_event("export", params, socket) do
@@ -71,8 +74,9 @@ defmodule EspresoWeb.StaffReportsLive do
             <p class="staff-reports-eyebrow">Reports</p>
             <h2>Reports</h2>
             <p>
-              Export paid sales, day close, and staff attendance for a Manila shop-date
-              range. Maximum {Orders.max_sales_export_shop_days()} days. Owner and manager only.
+              Paid item sales and Manager vs Café payout for the selected Manila shop dates,
+              plus Excel/PDF exports. Maximum {Orders.max_sales_export_shop_days()} days.
+              Owner and manager only.
             </p>
           </div>
         </header>
@@ -151,6 +155,81 @@ defmodule EspresoWeb.StaffReportsLive do
             </p>
           </form>
         </section>
+
+        <section class="staff-reports-card" id="staff-reports-item-sales" aria-label="Sales by item">
+          <header class="staff-reports-item-head">
+            <h3>Sales by item</h3>
+            <p>Paid tickets only. Ranked by peso. Manager food is marked on the ticket.</p>
+          </header>
+          <p :if={@item_sales == []} class="staff-reports-item-empty" id="staff-reports-item-empty">
+            No paid items in this range.
+          </p>
+          <table :if={@item_sales != []} class="staff-reports-item-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Sales</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr :for={item <- @item_sales}>
+                <td class="staff-reports-item-name">
+                  <span>{item.name}</span>
+                  <span :if={item_owner(item)} class="staff-reports-item-owner">
+                    {item_owner(item)}
+                  </span>
+                </td>
+                <td class="staff-reports-item-qty">{item_qty(item.quantity)}</td>
+                <td class="staff-reports-item-total">{peso(item.total)}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <th>Total</th>
+                <td class="staff-reports-item-qty">{item_qty_total(@item_sales)}</td>
+                <td class="staff-reports-item-total">{peso(item_sales_total(@item_sales))}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </section>
+
+        <section class="staff-reports-card" id="staff-reports-payout" aria-label="Payout">
+          <header class="staff-reports-item-head">
+            <h3>Payout</h3>
+            <p>Settle Manager food vs Café from paid tickets.</p>
+          </header>
+          <p
+            :if={@item_payouts == []}
+            class="staff-reports-item-empty"
+            id="staff-reports-payout-empty"
+          >
+            No paid items in this range.
+          </p>
+          <table :if={@item_payouts != []} class="staff-reports-item-table">
+            <thead>
+              <tr>
+                <th>Share</th>
+                <th>Qty</th>
+                <th>Payout</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr :for={row <- @item_payouts}>
+                <td class="staff-reports-item-name">{payout_owner(row)}</td>
+                <td class="staff-reports-item-qty">{item_qty(row.quantity)}</td>
+                <td class="staff-reports-item-total">{peso(row.total)}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <th>Total</th>
+                <td class="staff-reports-item-qty">{item_qty_total(@item_payouts)}</td>
+                <td class="staff-reports-item-total">{peso(item_sales_total(@item_payouts))}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </section>
       </main>
     </.staff_shell>
     """
@@ -215,5 +294,51 @@ defmodule EspresoWeb.StaffReportsLive do
       {:ok, date} -> date
       _ -> nil
     end
+  end
+
+  defp assign_item_sales(socket, from_date, to_date, nil)
+       when not is_nil(from_date) and not is_nil(to_date) do
+    rows = Orders.paid_item_sales(from: from_date, to: to_date)
+
+    socket
+    |> assign(:item_sales, rows)
+    |> assign(:item_payouts, Orders.paid_item_payouts(from: from_date, to: to_date))
+  end
+
+  defp assign_item_sales(socket, _, _, _) do
+    socket
+    |> assign(:item_sales, [])
+    |> assign(:item_payouts, [])
+  end
+
+  defp peso(amount) do
+    amount
+    |> Menu.format_price()
+    |> String.replace(~r/^P(?=[\d,])/, "₱")
+  end
+
+  defp item_qty(qty) when is_integer(qty), do: qty
+  defp item_qty(%Decimal{} = qty), do: qty |> Decimal.round(0) |> Decimal.to_integer()
+  defp item_qty(_), do: 0
+
+  defp item_owner(%{item_owner: owner}) when is_binary(owner) and owner != "" do
+    case String.downcase(owner) do
+      "manager" -> "Manager"
+      _ -> owner
+    end
+  end
+
+  defp item_owner(_), do: nil
+
+  defp payout_owner(row), do: item_owner(row) || "Café"
+
+  defp item_qty_total(rows) when is_list(rows) do
+    Enum.reduce(rows, 0, fn row, acc -> acc + item_qty(row.quantity) end)
+  end
+
+  defp item_sales_total(rows) when is_list(rows) do
+    Enum.reduce(rows, Decimal.new("0"), fn row, acc ->
+      Decimal.add(acc, row.total || Decimal.new("0"))
+    end)
   end
 end

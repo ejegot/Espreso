@@ -8,6 +8,7 @@ defmodule Espreso.Orders.OrderItem do
     field :name, :string
     field :size, :string
     field :category, :string
+    field :item_owner, :string
     field :quantity, :integer
     field :unit_price, :decimal
     field :line_total, :decimal
@@ -19,11 +20,31 @@ defmodule Espreso.Orders.OrderItem do
 
   def changeset(item, attrs) do
     item
-    |> cast(attrs, [:name, :size, :category, :quantity, :unit_price, :line_total, :order_id])
+    |> cast(attrs, [
+      :name,
+      :size,
+      :category,
+      :item_owner,
+      :quantity,
+      :unit_price,
+      :line_total,
+      :order_id
+    ])
+    |> update_change(:item_owner, &blank_to_nil/1)
+    |> validate_length(:item_owner, max: 40)
     |> validate_required([:name, :quantity, :unit_price, :line_total])
     |> validate_number(:quantity, greater_than: 0)
     |> validate_number(:unit_price, greater_than_or_equal_to: 0)
     |> validate_number(:line_total, greater_than_or_equal_to: 0)
     |> foreign_key_constraint(:order_id)
   end
+
+  defp blank_to_nil(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp blank_to_nil(value), do: value
 end
