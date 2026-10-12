@@ -208,32 +208,15 @@ defmodule EspresoWeb.StaffHomeLive do
                 <p class="staff-home-lede dashboard-lede">
                   Here's what's happening at your coffee shop today.
                 </p>
-              </div>
-              <div class="dashboard-head-pills">
-                <span class="dashboard-date-pill">
-                  <span class="dashboard-pill-label">Shop day</span>
-                  <strong>{Calendar.strftime(@shop_date, "%a %b %d")}</strong>
-                </span>
-                <span class={["dashboard-date-pill", @shop_day_status == :open && "is-live"]}>
-                  <span class="dashboard-pill-label">Status</span>
-                  <strong>
-                    <span
-                      :if={@shop_day_status == :open}
-                      class="dashboard-status-dot"
-                      aria-hidden="true"
-                    >
-                    </span>
-                    {shop_day_status_label(@shop_day_status)}
-                  </strong>
-                </span>
-                <.link
-                  :if={@money?}
-                  navigate={~p"/staff/reports"}
-                  class="staff-home-reports-link"
-                  id="staff-home-reports-link"
+                <p
+                  class={["dashboard-shop-line", shop_line_class(@shop_day_status)]}
+                  id="staff-home-shop-line"
                 >
-                  Reports
-                </.link>
+                  <span class="dashboard-status-dot" aria-hidden="true"></span>
+                  <span>{Calendar.strftime(@shop_date, "%a %b %d")}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{shop_day_status_label(@shop_day_status)}</span>
+                </p>
               </div>
             </header>
 
@@ -476,153 +459,24 @@ defmodule EspresoWeb.StaffHomeLive do
               </.link>
             </section>
 
-            <div
-              :if={@money?}
-              class={if(@owner_dashboard?, do: "owner-home-boards", else: "dashboard-split")}
-            >
-              <section
-                :if={@drawer_summary || @shift_close}
-                class="staff-home-card staff-home-drawer-panel"
-                id="staff-home-today"
-                aria-label="Drawer"
-              >
-                <p :if={@shift_close} class="staff-home-today-closed" id="staff-home-shift-closed">
-                  Closed · {Shifts.format_closed_at(@shift_close.closed_at)}
-                  <span :if={@shift_close.closed_by_user}>
-                    by {@shift_close.closed_by_user.name}
-                  </span>
-                </p>
-
-                <div :if={@drawer_summary} class="staff-home-drawer" id="staff-home-drawer">
-                  <p class="staff-home-today-eyebrow">
-                    {if(@drawer_summary.sealed?, do: "Drawer · sealed", else: "Drawer")}
-                  </p>
-                  <ul class="staff-home-drawer-list">
-                    <li>
-                      <span>Opening</span>
-                      <strong>{peso(@drawer_summary.opening)}</strong>
-                    </li>
-                    <li>
-                      <span>Cash sales</span>
-                      <strong>{peso(@drawer_summary.cash_sales)}</strong>
-                    </li>
-                    <li>
-                      <span>Cash outs</span>
-                      <strong>{peso(@drawer_summary.cash_outs)}</strong>
-                    </li>
-                    <li>
-                      <span>Expected</span>
-                      <strong>{peso(@drawer_summary.expected)}</strong>
-                    </li>
-                    <li :if={@drawer_summary.sealed?}>
-                      <span>Counted</span>
-                      <strong>{peso(@drawer_summary.counted)}</strong>
-                    </li>
-                    <li :if={@drawer_summary.sealed?} id="staff-home-drawer-variance">
-                      <span>Variance</span>
-                      <strong>{variance_line(@drawer_summary.variance)}</strong>
-                    </li>
-                  </ul>
-                  <.link
-                    navigate={~p"/staff/close"}
-                    class="staff-home-drawer-link"
-                    id="staff-home-drawer-close"
-                  >
-                    {if(@drawer_summary.sealed?, do: "View close", else: "Close shift")}
-                  </.link>
-                </div>
-              </section>
-
-              <section
-                id="staff-home-paid-breakdown"
-                class="staff-home-card dashboard-donut-panel"
-                aria-label="Payment methods"
-              >
-                <span class="staff-home-card-title">Payment methods</span>
-                <p
-                  :if={payment_mix_empty?(@via_rows)}
-                  class="dashboard-kpi-hint"
-                  id="staff-home-mix-empty"
-                >
-                  No payments yet today
-                </p>
-                <div :if={not payment_mix_empty?(@via_rows)} class="dashboard-donut-row">
-                  <div class="dashboard-donut" style={donut_style(@via_rows)} aria-hidden="true">
-                  </div>
-                  <ul class="staff-paid-breakdown">
-                    <li
-                      :for={{row, index} <- Enum.with_index(@via_rows)}
-                      class="staff-paid-breakdown-row"
-                      style={"--mix-color: #{mix_color(index)}"}
-                    >
-                      <span class="staff-paid-breakdown-swatch" aria-hidden="true"></span>
-                      <span class="staff-paid-breakdown-label">{row.label}</span>
-                      <span class="staff-paid-breakdown-total">{peso(row.total)}</span>
-                      <span class="staff-paid-breakdown-count">{row.count}</span>
-                    </li>
-                  </ul>
-                </div>
-                <ul
-                  :if={payment_mix_empty?(@via_rows)}
-                  class="staff-paid-breakdown owner-mix-empty-list"
-                >
-                  <li
-                    :for={{row, index} <- Enum.with_index(@via_rows)}
-                    class="staff-paid-breakdown-row"
-                    style={"--mix-color: #{mix_color(index)}"}
-                  >
-                    <span class="staff-paid-breakdown-swatch" aria-hidden="true"></span>
-                    <span class="staff-paid-breakdown-label">{row.label}</span>
-                    <span class="staff-paid-breakdown-total">{peso(row.total)}</span>
-                    <span class="staff-paid-breakdown-count">{row.count}</span>
-                  </li>
-                </ul>
-              </section>
-
-              <section
-                class="staff-home-card dashboard-card-metric-panel"
-                id="dashboard-panel-popular-products"
-                aria-label="Sales by item"
-              >
-                <span class="staff-home-card-title">Sales by item</span>
-                <p :if={@popular_products == []} class="staff-home-card-body">
-                  No paid items yet.
-                </p>
-                <ul :if={@popular_products != []} class="dashboard-popular-list">
-                  <li :for={item <- @popular_products}>
-                    <span class="dashboard-popular-copy">
-                      <span class="dashboard-popular-name">{item.name}</span>
-                      <span :if={item_owner(item)} class="dashboard-popular-owner">
-                        {item_owner(item)}
-                      </span>
-                    </span>
-                    <span class="dashboard-popular-qty">{item_qty(item.quantity)}</span>
-                    <span class="dashboard-popular-total">{peso(item.total)}</span>
-                  </li>
-                </ul>
-              </section>
+            <div :if={@money? and @owner_dashboard?} class="owner-home-boards" id="owner-home-boards">
+              <div class="owner-board-stack">
+                <.payment_methods_card via_rows={@via_rows} />
+                <.drawer_card drawer_summary={@drawer_summary} shift_close={@shift_close} />
+              </div>
+              <div class="owner-board-stack">
+                <.sales_by_item_card popular_products={@popular_products} />
+                <.payout_card item_payouts={@item_payouts} />
+              </div>
             </div>
 
-            <section
-              :if={@money?}
-              class="staff-home-card dashboard-card-metric-panel"
-              id="dashboard-panel-payout"
-              aria-label="Payout today"
-            >
-              <span class="staff-home-card-title">Payout today</span>
-              <p :if={@item_payouts == []} class="staff-home-card-body">
-                No paid items yet.
-              </p>
-              <ul :if={@item_payouts != []} class="dashboard-popular-list">
-                <li :for={row <- @item_payouts}>
-                  <span class="dashboard-popular-copy">
-                    <span class="dashboard-popular-name">{payout_owner(row)}</span>
-                  </span>
-                  <span class="dashboard-popular-qty">{item_qty(row.quantity)}</span>
-                  <span class="dashboard-popular-total">{peso(row.total)}</span>
-                </li>
-              </ul>
-            </section>
+            <div :if={@money? and not @owner_dashboard?} class="dashboard-split">
+              <.drawer_card drawer_summary={@drawer_summary} shift_close={@shift_close} />
+              <.payment_methods_card via_rows={@via_rows} />
+              <.sales_by_item_card popular_products={@popular_products} />
+            </div>
+
+            <.payout_card :if={@money? and not @owner_dashboard?} item_payouts={@item_payouts} />
 
             <section
               :if={not @owner_dashboard? and (@launch_tools != [] or @shift_tools != [])}
@@ -936,6 +790,167 @@ defmodule EspresoWeb.StaffHomeLive do
   defp manager_or_owner?(_), do: false
 
   @donut_colors ["#394331", "#f85020", "#c4a574", "#6b7f5a", "#8b6914"]
+  @via_color_index %{"cash" => 0, "gcash" => 1, "maya" => 2, "counter" => 3, "paymongo" => 4}
+
+  attr :via_rows, :list, required: true
+
+  defp payment_methods_card(assigns) do
+    ~H"""
+    <section
+      id="staff-home-paid-breakdown"
+      class="staff-home-card dashboard-donut-panel"
+      aria-label="Payment methods"
+    >
+      <span class="staff-home-card-title">Payment methods</span>
+      <p :if={payment_mix_empty?(@via_rows)} class="dashboard-kpi-hint" id="staff-home-mix-empty">
+        No payments yet today
+      </p>
+      <div :if={not payment_mix_empty?(@via_rows)} class="dashboard-donut-row">
+        <div
+          class="dashboard-donut"
+          style={donut_style(active_via_rows(@via_rows))}
+          aria-hidden="true"
+        >
+        </div>
+        <ul class="staff-paid-breakdown">
+          <li
+            :for={row <- active_via_rows(@via_rows)}
+            class="staff-paid-breakdown-row"
+            style={"--mix-color: #{mix_color_for(row)}"}
+          >
+            <span class="staff-paid-breakdown-swatch" aria-hidden="true"></span>
+            <span class="staff-paid-breakdown-label">{row.label}</span>
+            <span class="staff-paid-breakdown-total">{peso(row.total)}</span>
+            <span class="staff-paid-breakdown-count">{row.count}</span>
+          </li>
+        </ul>
+      </div>
+      <ul :if={payment_mix_empty?(@via_rows)} class="staff-paid-breakdown owner-mix-empty-list">
+        <li
+          :for={row <- @via_rows}
+          class="staff-paid-breakdown-row"
+          style={"--mix-color: #{mix_color_for(row)}"}
+        >
+          <span class="staff-paid-breakdown-swatch" aria-hidden="true"></span>
+          <span class="staff-paid-breakdown-label">{row.label}</span>
+          <span class="staff-paid-breakdown-total">{peso(row.total)}</span>
+          <span class="staff-paid-breakdown-count">{row.count}</span>
+        </li>
+      </ul>
+    </section>
+    """
+  end
+
+  attr :drawer_summary, :any, default: nil
+  attr :shift_close, :any, default: nil
+
+  defp drawer_card(assigns) do
+    ~H"""
+    <section
+      :if={@drawer_summary || @shift_close}
+      class="staff-home-card staff-home-drawer-panel"
+      id="staff-home-today"
+      aria-label="Drawer"
+    >
+      <p :if={@shift_close} class="staff-home-today-closed" id="staff-home-shift-closed">
+        Closed · {Shifts.format_closed_at(@shift_close.closed_at)}
+        <span :if={@shift_close.closed_by_user}>
+          by {@shift_close.closed_by_user.name}
+        </span>
+      </p>
+
+      <div :if={@drawer_summary} class="staff-home-drawer" id="staff-home-drawer">
+        <p class="staff-home-today-eyebrow">
+          {if(@drawer_summary.sealed?, do: "Drawer · sealed", else: "Drawer")}
+        </p>
+        <ul class="staff-home-drawer-list">
+          <li>
+            <span>Opening</span>
+            <strong>{peso(@drawer_summary.opening)}</strong>
+          </li>
+          <li>
+            <span>Cash sales</span>
+            <strong>{peso(@drawer_summary.cash_sales)}</strong>
+          </li>
+          <li>
+            <span>Cash outs</span>
+            <strong>{peso(@drawer_summary.cash_outs)}</strong>
+          </li>
+          <li>
+            <span>Expected</span>
+            <strong>{peso(@drawer_summary.expected)}</strong>
+          </li>
+          <li :if={@drawer_summary.sealed?}>
+            <span>Counted</span>
+            <strong>{peso(@drawer_summary.counted)}</strong>
+          </li>
+          <li :if={@drawer_summary.sealed?} id="staff-home-drawer-variance">
+            <span>Variance</span>
+            <strong>{variance_line(@drawer_summary.variance)}</strong>
+          </li>
+        </ul>
+        <.link navigate={~p"/staff/close"} class="staff-home-drawer-link" id="staff-home-drawer-close">
+          {if(@drawer_summary.sealed?, do: "View close", else: "Close shift")}
+        </.link>
+      </div>
+    </section>
+    """
+  end
+
+  attr :popular_products, :list, required: true
+
+  defp sales_by_item_card(assigns) do
+    ~H"""
+    <section
+      class="staff-home-card dashboard-card-metric-panel"
+      id="dashboard-panel-popular-products"
+      aria-label="Sales by item"
+    >
+      <span class="staff-home-card-title">Sales by item</span>
+      <p :if={@popular_products == []} class="staff-home-card-body">
+        No paid items yet.
+      </p>
+      <ul :if={@popular_products != []} class="dashboard-popular-list">
+        <li :for={item <- @popular_products}>
+          <span class="dashboard-popular-copy">
+            <span class="dashboard-popular-name">{item.name}</span>
+            <span :if={item_owner(item)} class="dashboard-popular-owner">
+              {item_owner(item)}
+            </span>
+          </span>
+          <span class="dashboard-popular-qty">{item_qty(item.quantity)}</span>
+          <span class="dashboard-popular-total">{peso(item.total)}</span>
+        </li>
+      </ul>
+    </section>
+    """
+  end
+
+  attr :item_payouts, :list, required: true
+
+  defp payout_card(assigns) do
+    ~H"""
+    <section
+      class="staff-home-card dashboard-card-metric-panel"
+      id="dashboard-panel-payout"
+      aria-label="Payout today"
+    >
+      <span class="staff-home-card-title">Payout today</span>
+      <p :if={@item_payouts == []} class="staff-home-card-body">
+        No paid items yet.
+      </p>
+      <ul :if={@item_payouts != []} class="dashboard-popular-list">
+        <li :for={row <- @item_payouts}>
+          <span class="dashboard-popular-copy">
+            <span class="dashboard-popular-name">{payout_owner(row)}</span>
+          </span>
+          <span class="dashboard-popular-qty">{item_qty(row.quantity)}</span>
+          <span class="dashboard-popular-total">{peso(row.total)}</span>
+        </li>
+      </ul>
+    </section>
+    """
+  end
 
   defp donut_style(rows) when is_list(rows) do
     total =
@@ -948,15 +963,14 @@ defmodule EspresoWeb.StaffHomeLive do
     else
       {stops, _} =
         rows
-        |> Enum.with_index()
-        |> Enum.reduce({[], 0.0}, fn {row, index}, {acc, start} ->
+        |> Enum.reduce({[], 0.0}, fn row, {acc, start} ->
           pct =
             row.total
             |> Decimal.div(total)
             |> Decimal.mult(Decimal.new(100))
             |> Decimal.to_float()
 
-          color = mix_color(index)
+          color = mix_color_for(row)
           stop = start + pct
           {acc ++ ["#{color} #{start}% #{stop}%"], stop}
         end)
@@ -971,9 +985,27 @@ defmodule EspresoWeb.StaffHomeLive do
     Enum.at(@donut_colors, rem(index, length(@donut_colors)))
   end
 
+  defp mix_color_for(%{via: via}) when is_binary(via) do
+    mix_color(Map.get(@via_color_index, via, 0))
+  end
+
+  defp mix_color_for(_), do: mix_color(0)
+
+  defp active_via_rows(rows) when is_list(rows) do
+    Enum.filter(rows, fn row ->
+      Decimal.compare(row.total || Decimal.new("0"), 0) == :gt
+    end)
+  end
+
+  defp active_via_rows(_), do: []
+
   defp shop_day_status_label(:open), do: "Open"
   defp shop_day_status_label(:closed), do: "Closed"
   defp shop_day_status_label(_), do: "Not open"
+
+  defp shop_line_class(:open), do: "is-open"
+  defp shop_line_class(:closed), do: "is-closed"
+  defp shop_line_class(_), do: "is-pending"
 
   defp peso(amount) do
     amount
