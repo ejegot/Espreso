@@ -124,6 +124,34 @@ defmodule EspresoWeb.AdminAvailabilityLive do
     {:noreply, socket |> cancel_photo_uploads() |> assign(:photo_product, nil)}
   end
 
+  def handle_event("toggle_food_share", %{"id" => id}, socket) do
+    product = find_product(socket, String.to_integer(id))
+
+    cond do
+      not Authorization.can?(socket.assigns.current_user, :edit_menu) ->
+        {:noreply, assign(socket, :flash_note, "You don’t have permission to set food share.")}
+
+      is_nil(product) or not food_item?(socket, product) ->
+        {:noreply, assign(socket, :flash_note, "Only FOOD items can be Manager food.")}
+
+      true ->
+        case Menu.toggle_food_share_as(socket.assigns.current_user, product) do
+          {:ok, updated} ->
+            {:noreply,
+             socket
+             |> assign(:categories, Menu.list_products_for_availability())
+             |> assign(:flash_note, food_share_flash(updated))}
+
+          {:error, :unauthorized} ->
+            {:noreply,
+             assign(socket, :flash_note, "You don’t have permission to set food share.")}
+
+          {:error, _} ->
+            {:noreply, assign(socket, :flash_note, "Could not update food share.")}
+        end
+    end
+  end
+
   def handle_event("validate_item", params, socket) do
     item = Map.get(params, "item", socket.assigns.add_form.params)
     {:noreply, assign(socket, :add_form, to_form(item, as: :item))}
@@ -207,7 +235,7 @@ defmodule EspresoWeb.AdminAvailabilityLive do
             <p class="staff-availability-eyebrow">Menu</p>
             <h2 class="staff-availability-title">Availability</h2>
             <p class="staff-availability-lede">
-              Mark items unavailable when sold out (86). Add a photo from this tablet for QR and POS.
+              Mark items unavailable when sold out (86). FOOD items are Manager food or Café for payout.
             </p>
           </div>
           <div
@@ -257,6 +285,9 @@ defmodule EspresoWeb.AdminAvailabilityLive do
                 <p class="staff-availability-state">
                   {if product.available, do: "Available", else: "Unavailable"}
                   {if product.has_custom_photo, do: " · Photo", else: ""}
+                  {if category.name == "FOOD",
+                    do: if(Menu.manager_food?(product), do: " · Manager food", else: " · Café"),
+                    else: ""}
                 </p>
               </div>
               <div class="staff-availability-actions">
@@ -269,6 +300,22 @@ defmodule EspresoWeb.AdminAvailabilityLive do
                   id={"availability-photo-#{product.id}"}
                 >
                   Photo
+                </button>
+                <button
+                  :if={Authorization.can?(@current_user, :edit_menu) and category.name == "FOOD"}
+                  type="button"
+                  class="staff-availability-toggle"
+                  phx-click="toggle_food_share"
+                  phx-value-id={product.id}
+                  id={"availability-food-share-#{product.id}"}
+                  aria-label={
+                    if(Menu.manager_food?(product),
+                      do: "Mark as café food",
+                      else: "Mark as manager food"
+                    )
+                  }
+                >
+                  {if Menu.manager_food?(product), do: "Manager", else: "Café"}
                 </button>
                 <button
                   type="button"
@@ -328,6 +375,13 @@ defmodule EspresoWeb.AdminAvailabilityLive do
               type="select"
               label="Group"
               options={food_group_options()}
+            />
+            <.input
+              :if={add_value(@add_form, :category) == "FOOD"}
+              field={@add_form[:food_share]}
+              type="select"
+              label="Payout"
+              options={[{"Manager food", "manager"}, {"Café", "cafe"}]}
             />
 
             <.input
@@ -503,6 +557,7 @@ defmodule EspresoWeb.AdminAvailabilityLive do
     %{
       "category" => List.first(Menu.category_names()) || "HOT",
       "name" => "",
+      "food_share" => "manager",
       "hot_price_mode" => "sizes",
       "price" => "",
       "price_8oz" => "",
@@ -542,6 +597,20 @@ defmodule EspresoWeb.AdminAvailabilityLive do
     socket.assigns.categories
     |> Enum.flat_map(& &1.products)
     |> Enum.find(&(&1.id == product_id))
+  end
+
+  defp food_item?(socket, product) do
+    Enum.any?(socket.assigns.categories, fn category ->
+      category.name == "FOOD" and Enum.any?(category.products, &(&1.id == product.id))
+    end)
+  end
+
+  defp food_share_flash(%{name: name} = product) do
+    if Menu.manager_food?(product) do
+      "#{name} is Manager food."
+    else
+      "#{name} is Café food."
+    end
   end
 
   defp cancel_photo_uploads(socket) do
@@ -591,6 +660,7 @@ defmodule EspresoWeb.AdminAvailabilityLive do
   defp add_error_message(:unauthorized), do: "You don’t have permission to add items."
   defp add_error_message(:name_taken), do: "That name is already on this category."
   defp add_error_message(:invalid_name), do: "Enter a name."
+  defp add_error_message(:invalid_food_share), do: "Choose Manager food or Café."
   defp add_error_message(:invalid_price), do: "Enter a price greater than 0."
   defp add_error_message(:invalid_menu_group), do: "Choose a food group."
   defp add_error_message(:unknown_category), do: "That category is missing. Add it first."

@@ -427,9 +427,57 @@ defmodule Espreso.Menu do
          {:ok, category} <- fetch_category(attrs),
          {:ok, name} <- fetch_name(attrs),
          {:ok, menu_group} <- fetch_menu_group(category, attrs),
-         {:ok, prices} <- fetch_prices(category, attrs) do
-      insert_product_with_prices(category, name, menu_group, prices)
+         {:ok, prices} <- fetch_prices(category, attrs),
+         {:ok, item_owner} <- fetch_item_owner(category, attrs) do
+      insert_product_with_prices(category, name, menu_group, prices, item_owner)
     end
+  end
+
+  @manager_item_owner "Manager"
+
+  def manager_item_owner, do: @manager_item_owner
+
+  def manager_food?(%{item_owner: @manager_item_owner}), do: true
+  def manager_food?(_), do: false
+
+  @doc """
+  Marks a FOOD catalog item as Manager food or Café. Drinks stay Café.
+
+  Existing tickets keep the share snapshotted on `order_items`.
+  """
+  def update_food_share_as(%User{} = actor, product_id, share)
+      when is_integer(product_id) do
+    with :ok <- Authorization.authorize(actor, :edit_menu),
+         %Product{} = product <- get_product_with_category(product_id),
+         :ok <- assert_food_category(product),
+         {:ok, item_owner} <- food_share_owner(share) do
+      product
+      |> Product.changeset(%{item_owner: item_owner})
+      |> Repo.update()
+    else
+      nil -> {:error, :not_found}
+      {:error, :unauthorized} = err -> err
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def update_food_share_as(%User{} = actor, %Product{} = product, share) do
+    update_food_share_as(actor, product.id, share)
+  end
+
+  def toggle_food_share_as(%User{} = actor, product_id) when is_integer(product_id) do
+    case Repo.get(Product, product_id) do
+      nil ->
+        {:error, :not_found}
+
+      product ->
+        share = if manager_food?(product), do: :cafe, else: :manager
+        update_food_share_as(actor, product.id, share)
+    end
+  end
+
+  def toggle_food_share_as(%User{} = actor, %Product{} = product) do
+    toggle_food_share_as(actor, product.id)
   end
 
   @doc """
@@ -644,14 +692,42 @@ defmodule Espreso.Menu do
     Map.get(attrs, key) || Map.get(attrs, Atom.to_string(key))
   end
 
-  defp insert_product_with_prices(category, name, menu_group, prices) do
+  defp fetch_item_owner(%{name: "FOOD"}, attrs) when is_map(attrs) do
+    raw = attr(attrs, :food_share) || attr(attrs, :item_owner) || "manager"
+    food_share_owner(raw)
+  end
+
+  defp fetch_item_owner(_category, _attrs), do: {:ok, nil}
+
+  defp get_product_with_category(product_id) do
+    case Repo.get(Product, product_id) do
+      nil -> nil
+      product -> Repo.preload(product, :category)
+    end
+  end
+
+  defp assert_food_category(%Product{category: %{name: "FOOD"}}), do: :ok
+  defp assert_food_category(_), do: {:error, :not_food}
+
+  defp food_share_owner(share) when share in [:manager, "manager", "Manager"] do
+    {:ok, @manager_item_owner}
+  end
+
+  defp food_share_owner(share) when share in [:cafe, "cafe", "Café", "Cafe", "café", nil, ""] do
+    {:ok, nil}
+  end
+
+  defp food_share_owner(_), do: {:error, :invalid_food_share}
+
+  defp insert_product_with_prices(category, name, menu_group, prices, item_owner) do
     changeset =
       %Product{}
       |> Product.changeset(%{
         name: name,
         category_id: category.id,
         available: true,
-        menu_group: menu_group
+        menu_group: menu_group,
+        item_owner: item_owner
       })
 
     Repo.transaction(fn ->

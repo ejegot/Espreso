@@ -243,6 +243,55 @@ defmodule Espreso.MenuTest do
       assert photo.data == png
       assert photo.content_type == "image/png"
     end
+
+    test "FOOD defaults to Manager food; drinks stay Café" do
+      insert_category!("FOOD")
+      insert_category!("HOT")
+      owner = register!("Owner", "owner.itemowner@test.local", "owner")
+      manager = register!("Manager", "manager.itemowner@test.local", "manager")
+      barista = register!("Staff", "staff.itemowner@test.local", "barista")
+
+      assert {:ok, food} =
+               Menu.create_product_as(owner, %{
+                 "category" => "FOOD",
+                 "name" => "Ensaymada",
+                 "menu_group" => "Cakes / Breads",
+                 "price" => "80"
+               })
+
+      assert food.item_owner == "Manager"
+      assert Menu.manager_food?(food)
+
+      assert {:ok, cafe_food} =
+               Menu.create_product_as(owner, %{
+                 "category" => "FOOD",
+                 "name" => "Spam Musubi",
+                 "menu_group" => "Rice Meal",
+                 "price" => "75",
+                 "food_share" => "cafe"
+               })
+
+      assert is_nil(cafe_food.item_owner)
+
+      assert {:ok, drink} =
+               Menu.create_product_as(owner, %{
+                 "category" => "HOT",
+                 "name" => "Barako Share",
+                 "hot_price_mode" => "single",
+                 "price" => "90"
+               })
+
+      assert is_nil(drink.item_owner)
+
+      assert {:error, :unauthorized} = Menu.toggle_food_share_as(barista, food)
+      assert {:error, :not_food} = Menu.update_food_share_as(manager, drink, :manager)
+
+      assert {:ok, flipped} = Menu.toggle_food_share_as(manager, food)
+      assert is_nil(flipped.item_owner)
+
+      assert {:ok, restored} = Menu.update_food_share_as(owner, food.id, :manager)
+      assert restored.item_owner == "Manager"
+    end
   end
 
   describe "create_category_as/2" do

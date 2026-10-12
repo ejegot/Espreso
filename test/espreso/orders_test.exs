@@ -1685,16 +1685,92 @@ defmodule Espreso.OrdersTest do
 
     popular = Orders.popular_products()
 
-    assert popular == [
-             %{name: "Americano", quantity: 5},
-             %{name: "Espresso", quantity: 1},
-             %{name: "Latte", quantity: 1}
+    assert Enum.map(popular, &{&1.name, &1.quantity}) == [
+             {"Americano", 5},
+             {"Espresso", 1},
+             {"Latte", 1}
            ]
+
+    americano = Enum.find(popular, &(&1.name == "Americano"))
+    assert Decimal.equal?(americano.total, Decimal.new("580"))
 
     assert unpaid.payment_status == "unpaid"
     refute Enum.any?(popular, &(&1.name == "Mocha"))
 
-    assert Orders.popular_products(1) == [%{name: "Americano", quantity: 5}]
+    assert Enum.map(Orders.popular_products(1), & &1.name) == ["Americano"]
+
+    by_peso = Orders.paid_item_sales()
+    assert Enum.map(by_peso, & &1.name) == ["Americano", "Latte", "Espresso"]
+    assert Enum.all?(by_peso, &is_nil(&1.item_owner))
+  end
+
+  test "create_order snapshots item owner from the catalog product" do
+    food = insert_category!("FOOD")
+
+    product =
+      %Product{}
+      |> Product.changeset(%{
+        name: "Ensaymada",
+        category_id: food.id,
+        available: true,
+        item_owner: "Manager"
+      })
+      |> Repo.insert!()
+
+    %ProductPrice{}
+    |> ProductPrice.changeset(%{
+      product_id: product.id,
+      size: nil,
+      price: Decimal.new("80")
+    })
+    |> Repo.insert!()
+
+    {:ok, order} =
+      Orders.create_order(
+        [
+          %{
+            product_id: product.id,
+            name: "Ensaymada",
+            size: nil,
+            quantity: 1,
+            price: Decimal.new("80")
+          }
+        ],
+        %{customer_name: "Guest", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    [item] = order.items
+    assert item.item_owner == "Manager"
+    assert item.category == "FOOD"
+  end
+
+  test "paid_item_sales keeps the same item name separate by owner" do
+    {:ok, cafe} =
+      Orders.create_order(
+        [%{name: "Ensaymada", quantity: 1, price: Decimal.new("75"), item_owner: nil}],
+        %{customer_name: "Cafe", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, nene} =
+      Orders.create_order(
+        [%{name: "Ensaymada", quantity: 2, price: Decimal.new("80"), item_owner: "Manager"}],
+        %{customer_name: "Nene", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    {:ok, _} = Orders.mark_paid(cafe)
+    {:ok, _} = Orders.mark_paid(nene)
+
+    rows = Orders.paid_item_sales()
+
+    assert Enum.map(rows, &{&1.name, &1.item_owner, &1.quantity}) == [
+             {"Ensaymada", "Manager", 2},
+             {"Ensaymada", nil, 1}
+           ]
+
+    payouts = Orders.paid_item_payouts()
+    assert Enum.map(payouts, &{&1.item_owner, &1.quantity}) == [{"Manager", 2}, {nil, 1}]
+    assert Decimal.equal?(hd(payouts).total, Decimal.new("160"))
+    assert Decimal.equal?(List.last(payouts).total, Decimal.new("75"))
   end
 
   test "reports_overview returns zeros when empty" do
@@ -1880,7 +1956,8 @@ defmodule Espreso.OrdersTest do
     assert Decimal.equal?(sales.todays_paid_total, Decimal.new("75"))
 
     popular = Orders.popular_products()
-    assert %{name: "Espresso", quantity: 1} in popular
+    espresso = Enum.find(popular, &(&1.name == "Espresso"))
+    assert espresso.quantity == 1
     refute Enum.any?(popular, &(&1.name == "Mocha"))
 
     # Previous-day paid order still falls inside the 7-shop-day window.

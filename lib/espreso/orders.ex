@@ -199,7 +199,7 @@ defmodule Espreso.Orders do
       end)
       |> Ecto.Multi.insert(:order, Order.changeset(%Order{}, order_attrs))
       |> Ecto.Multi.run(:items, fn repo, %{order: order} ->
-        category_by_product_id = categories_for_lines(repo, lines)
+        snapshots = product_snapshots_for_lines(repo, lines)
 
         items =
           Enum.map(lines, fn line ->
@@ -212,7 +212,8 @@ defmodule Espreso.Orders do
               order_id: order.id,
               name: line.name,
               size: blank_to_nil(Map.get(line, :size)),
-              category: snapshot_line_category(line, category_by_product_id),
+              category: snapshot_line_category(line, snapshots),
+              item_owner: snapshot_line_item_owner(line, snapshots),
               quantity: qty,
               unit_price: unit,
               line_total: line_total
@@ -1153,25 +1154,117 @@ defmodule Espreso.Orders do
   defp decimalize(_), do: Decimal.new("0")
 
   @doc """
+  Paid item sales grouped by name for inclusive Asia/Manila shop dates.
+
+  Options:
+  - `:from` / `:to` — shop dates (default today)
+  - `:limit` — max rows
+  - `:rank` — `:total` (peso, default) or `:quantity`
+  """
+  def paid_item_sales(opts \\ []) when is_list(opts) do
+    today = shop_date_today()
+    from_date = Keyword.get(opts, :from, today)
+    to_date = Keyword.get(opts, :to, from_date)
+    limit = Keyword.get(opts, :limit)
+    rank = Keyword.get(opts, :rank, :total)
+
+    {from_start, _} = shop_day_bounds_utc(from_date)
+    {_, to_end} = shop_day_bounds_utc(to_date)
+
+    rows =
+      from(i in OrderItem,
+        join: o in assoc(i, :order),
+        where:
+          o.payment_status == "paid" and not is_nil(o.settled_at) and
+            o.settled_at >= ^from_start and o.settled_at < ^to_end and
+            o.branch_id == ^Tenancy.current_branch_id(),
+        group_by: [i.name, i.item_owner],
+        select: %{
+          name: i.name,
+          item_owner: i.item_owner,
+          quantity: sum(i.quantity),
+          total: sum(i.line_total)
+        }
+      )
+      |> Repo.all()
+      |> Enum.map(&normalize_item_sales_owner/1)
+      |> Enum.group_by(&{&1.name, &1.item_owner})
+      |> Enum.map(fn {_key, rows} -> merge_item_sales(rows) end)
+      |> Enum.sort_by(&item_sales_sort(&1, rank))
+
+    if is_integer(limit) and limit > 0, do: Enum.take(rows, limit), else: rows
+  end
+
+  @doc """
+  Paid item sales rolled up by item owner for inclusive Asia/Manila shop dates.
+
+  Blank owner (café items) is one row with `item_owner: nil`. Ranked by peso.
+  """
+  def paid_item_payouts(opts \\ []) when is_list(opts) do
+    opts
+    |> Keyword.drop([:limit, :rank])
+    |> paid_item_sales()
+    |> Enum.group_by(& &1.item_owner)
+    |> Enum.map(fn {owner, rows} ->
+      %{
+        item_owner: owner,
+        quantity: Enum.reduce(rows, 0, &(&2 + item_sales_qty(&1.quantity))),
+        total:
+          Enum.reduce(rows, Decimal.new("0"), fn row, acc ->
+            Decimal.add(acc, row.total || Decimal.new("0"))
+          end)
+      }
+    end)
+    |> Enum.sort_by(&item_payout_sort/1)
+  end
+
+  defp normalize_item_sales_owner(%{item_owner: owner} = row) do
+    %{row | item_owner: canonicalize_item_owner(owner)}
+  end
+
+  defp merge_item_sales([row]), do: row
+
+  defp merge_item_sales([first | rest]) do
+    Enum.reduce(rest, first, fn row, acc ->
+      %{
+        acc
+        | quantity: item_sales_qty(acc.quantity) + item_sales_qty(row.quantity),
+          total: Decimal.add(acc.total || Decimal.new("0"), row.total || Decimal.new("0"))
+      }
+    end)
+  end
+
+  defp item_sales_qty(qty) when is_integer(qty), do: qty
+  defp item_sales_qty(%Decimal{} = qty), do: qty |> Decimal.round(0) |> Decimal.to_integer()
+  defp item_sales_qty(_), do: 0
+
+  defp item_payout_sort(%{item_owner: owner, total: total, quantity: quantity}) do
+    cafe? = is_nil(owner) or owner == ""
+    {-item_sales_number(total), -item_sales_qty(quantity), if(cafe?, do: 1, else: 0), owner || ""}
+  end
+
+  @doc """
   Today's most ordered products from paid orders (current Asia/Manila shop day).
 
   Groups by item name and ranks by total quantity. Default limit is 5.
   """
   def popular_products(limit \\ 5) when is_integer(limit) and limit > 0 do
-    today_start = shop_day_start_utc()
-
-    from(i in OrderItem,
-      join: o in assoc(i, :order),
-      where:
-        o.payment_status == "paid" and o.settled_at >= ^today_start and
-          o.branch_id == ^Tenancy.current_branch_id(),
-      group_by: i.name,
-      order_by: [desc: sum(i.quantity), asc: i.name],
-      limit: ^limit,
-      select: %{name: i.name, quantity: sum(i.quantity)}
-    )
-    |> Repo.all()
+    paid_item_sales(limit: limit, rank: :quantity)
   end
+
+  defp item_sales_sort(row, :quantity) do
+    {-item_sales_number(row.quantity), row.name, row[:item_owner] || ""}
+  end
+
+  defp item_sales_sort(row, _) do
+    {-item_sales_number(row.total), -item_sales_number(row.quantity), row.name,
+     row[:item_owner] || ""}
+  end
+
+  defp item_sales_number(%Decimal{} = value), do: Decimal.to_float(value)
+  defp item_sales_number(value) when is_integer(value), do: value * 1.0
+  defp item_sales_number(value) when is_float(value), do: value
+  defp item_sales_number(_), do: 0.0
 
   # CoffeeSpot shop calendar helpers live above; kept here for call-site clarity.
 
@@ -2357,7 +2450,7 @@ defmodule Espreso.Orders do
     end
   end
 
-  defp categories_for_lines(repo, lines) do
+  defp product_snapshots_for_lines(repo, lines) do
     ids =
       lines
       |> Enum.map(&(Map.get(&1, :product_id) || Map.get(&1, "product_id")))
@@ -2372,18 +2465,22 @@ defmodule Espreso.Orders do
       |> preload(:category)
       |> repo.all()
       |> Map.new(fn product ->
-        name =
+        category =
           case product.category do
             %{name: name} when is_binary(name) and name != "" -> name
             _ -> nil
           end
 
-        {product.id, name}
+        {product.id,
+         %{
+           category: category,
+           item_owner: blank_to_nil(product.item_owner)
+         }}
       end)
     end
   end
 
-  defp snapshot_line_category(line, category_by_product_id) do
+  defp snapshot_line_category(line, snapshots) do
     explicit =
       blank_to_nil(Map.get(line, :category) || Map.get(line, "category"))
 
@@ -2391,8 +2488,36 @@ defmodule Espreso.Orders do
 
     cond do
       is_binary(explicit) -> explicit
-      is_integer(product_id) -> Map.get(category_by_product_id, product_id)
+      is_integer(product_id) -> snapshots |> Map.get(product_id, %{}) |> Map.get(:category)
       true -> nil
+    end
+  end
+
+  defp snapshot_line_item_owner(line, snapshots) do
+    explicit = Map.get(line, :item_owner) || Map.get(line, "item_owner")
+    product_id = Map.get(line, :product_id) || Map.get(line, "product_id")
+
+    cond do
+      not is_nil(explicit) ->
+        canonicalize_item_owner(explicit)
+
+      is_integer(product_id) ->
+        snapshots
+        |> Map.get(product_id, %{})
+        |> Map.get(:item_owner)
+        |> canonicalize_item_owner()
+
+      true ->
+        nil
+    end
+  end
+
+  defp canonicalize_item_owner(nil), do: nil
+
+  defp canonicalize_item_owner(value) do
+    case value |> to_string() |> String.trim() |> String.downcase() do
+      "manager" -> "Manager"
+      _ -> nil
     end
   end
 
