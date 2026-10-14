@@ -12571,6 +12571,211 @@ a.staff-home-card:focus-visible {
   color: color-mix(in srgb, var(--elilai-forest, #394331) 62%, #f4efe3);
 }
 
+#staff-branches,
+#staff-tenants {
+  width: min(calc(100% - 1.5rem), 52rem);
+  margin-inline: auto;
+  color: var(--elilai-ink, #2e3529);
+}
+
+#staff-branches .staff-places-head,
+#staff-tenants .staff-places-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem 0.85rem;
+  margin-bottom: 0.85rem;
+}
+
+#staff-branches .staff-places-scope,
+#staff-tenants .staff-places-scope {
+  margin: 0;
+  flex: 1 1 16rem;
+  max-width: 36rem;
+  color: var(--elilai-ink, #2e3529);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+#staff-branches .staff-places-add,
+#staff-tenants .staff-places-add,
+#staff-branches .staff-places-btn--primary,
+#staff-tenants .staff-places-btn--primary {
+  min-height: 2.5rem;
+  padding: 0.45rem 1rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--elilai-forest, #394331);
+  color: #fff;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#staff-branches .staff-places-section-head,
+#staff-tenants .staff-places-section-head {
+  margin: 0.35rem 0 0.55rem;
+}
+
+#staff-branches .staff-places-section-title,
+#staff-tenants .staff-places-section-title {
+  margin: 0;
+  color: var(--elilai-ink, #2e3529);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+#staff-branches .staff-places-card,
+#staff-tenants .staff-places-card {
+  margin-bottom: 0.65rem;
+  padding: 0.85rem 0.95rem;
+  border: 0;
+  border-radius: 1.15rem;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(57, 67, 49, 0.06);
+}
+
+#staff-branches .staff-places-name,
+#staff-tenants .staff-places-name {
+  margin: 0;
+  color: var(--elilai-forest, #394331);
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+#staff-branches .staff-places-meta,
+#staff-tenants .staff-places-meta,
+#staff-branches .staff-places-empty,
+#staff-tenants .staff-places-empty {
+  margin: 0.2rem 0 0;
+  color: color-mix(in srgb, var(--elilai-ink, #2e3529) 55%, #f4efe3);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+#staff-branches .staff-places-empty,
+#staff-tenants .staff-places-empty {
+  margin: 0 0 0.75rem;
+}
+
+#staff-branches .staff-places-actions,
+#staff-tenants .staff-places-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.7rem;
+}
+
+#staff-branches .staff-places-btn,
+#staff-tenants .staff-places-btn {
+  min-height: 2.5rem;
+  padding: 0.45rem 0.95rem;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--elilai-forest, #394331);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #394331 18%, transparent);
+  cursor: pointer;
+}
+
+#staff-branches .staff-places-note,
+#staff-tenants .staff-places-note {
+  margin: 0 0 0.75rem;
+  padding: 0.7rem 0.85rem;
+  border: 0;
+  border-radius: 1.15rem;
+  background: #fff;
+  color: var(--elilai-ink, #2e3529);
+  font-size: 0.9rem;
+  font-weight: 650;
+  box-shadow: 0 10px 28px rgba(57, 67, 49, 0.06);
+}
+
+#staff-branch-add-modal,
+#staff-tenant-add-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+}
+
+#staff-branch-add-modal-bg,
+#staff-tenant-add-modal-bg {
+  background: rgba(24, 16, 12, 0.46);
+}
+
+#staff-branch-add-modal-container,
+#staff-tenant-add-modal-container {
+  width: min(100%, 32rem);
+  max-height: calc(100dvh - 2rem);
+  margin-inline: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 1.25rem 1.35rem 1.2rem;
+  border: 0;
+  border-radius: 1.15rem;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(57, 67, 49, 0.16);
+}
+
+#staff-branch-add-modal .staff-places-dialog,
+#staff-tenant-add-modal .staff-places-dialog {
+  display: grid;
+  gap: 0.75rem;
+}
+
+#staff-branch-add-modal input:not([type="hidden"]),
+#staff-tenant-add-modal input:not([type="hidden"]) {
+  width: 100%;
+  min-height: 2.75rem;
+  margin-top: 0.35rem;
+  padding: 0.55rem 0.75rem;
+  border: 0;
+  border-radius: 0.95rem;
+  background: var(--elilai-ivory, #f4efe3);
+  color: var(--elilai-ink, #2e3529);
+  box-shadow: none;
+}
+
+#staff-branch-add-modal .staff-team-form label,
+#staff-tenant-add-modal .staff-team-form label {
+  color: var(--elilai-ink, #2e3529);
+  font-weight: 700;
+}
+
+#staff-branch-add-modal .staff-team-btn,
+#staff-tenant-add-modal .staff-team-btn {
+  min-height: 2.75rem;
+  padding: 0.45rem 1rem;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--elilai-forest, #394331);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #394331 18%, transparent);
+}
+
+#staff-branch-add-modal .staff-team-btn--primary,
+#staff-tenant-add-modal .staff-team-btn--primary {
+  background: var(--elilai-forest, #394331);
+  color: #fff;
+  box-shadow: none;
+}
+
+#staff-branch-add-modal .staff-places-note,
+#staff-tenant-add-modal .staff-places-note {
+  margin: 0;
+  box-shadow: none;
+  background: var(--elilai-ivory, #f4efe3);
+}
+
 @media (min-width: 800px) {
   .staff-team-page {
     width: min(calc(100% - 1.5rem), 72rem);
