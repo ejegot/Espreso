@@ -314,11 +314,20 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
                "#staff-shift-close-history-#{Date.to_iso8601(Date.add(today, -3))}"
              )
 
-      assert has_element?(view, "#staff-shift-close-history-list", "Day one")
       assert has_element?(view, "#staff-shift-close-history-list", "₱150")
       assert has_element?(view, "#staff-shift-close-history-list", "Ana")
+      refute has_element?(view, "#staff-shift-close-history-list", "Day one")
       assert has_element?(view, "#staff-shift-close-history-more", "Load more")
       assert has_element?(view, "#staff-shift-close-prepare", "Record close")
+
+      day_one = Date.to_iso8601(Date.add(today, -1))
+      view |> element("#staff-shift-close-history-toggle-#{day_one}") |> render_click()
+      assert has_element?(view, "#staff-shift-close-history-detail-#{day_one}", "Day one")
+
+      day_two = Date.to_iso8601(Date.add(today, -2))
+      view |> element("#staff-shift-close-history-toggle-#{day_two}") |> render_click()
+      assert has_element?(view, "#staff-shift-close-history-detail-#{day_two}", "Day two")
+      refute has_element?(view, "#staff-shift-close-history-detail-#{day_one}")
 
       view |> element("#staff-shift-close-history-more") |> render_click()
 
@@ -327,7 +336,11 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
                "#staff-shift-close-history-#{Date.to_iso8601(Date.add(today, -3))}"
              )
 
-      assert has_element?(view, "#staff-shift-close-history-list", "Day three")
+      day_three = Date.to_iso8601(Date.add(today, -3))
+      refute has_element?(view, "#staff-shift-close-history-list", "Day three")
+      view |> element("#staff-shift-close-history-toggle-#{day_three}") |> render_click()
+      assert has_element?(view, "#staff-shift-close-history-detail-#{day_three}", "Day three")
+      refute has_element?(view, "#staff-shift-close-history-detail-#{day_two}")
       refute has_element?(view, "#staff-shift-close-history-more")
 
       html = render(view)
