@@ -22,6 +22,7 @@ defmodule EspresoWeb.StaffTransactionsLive do
      |> assign(:show_totals?, Authorization.can?(socket.assigns.current_user, :reports))
      |> assign(:reprintable_statuses, @reprintable_statuses)
      |> assign(:selected_transaction, nil)
+     |> assign(:open_filter, nil)
      |> assign(:reprint_transaction, nil)
      |> assign(:reprint_permit, nil)
      |> assign(:action_note, nil)
@@ -54,6 +55,29 @@ defmodule EspresoWeb.StaffTransactionsLive do
     {:noreply,
      socket
      |> assign(:selected_transaction, nil)
+     |> assign(:open_filter, nil)
+     |> close_reprint()
+     |> load_transactions(filters)}
+  end
+
+  def handle_event("toggle_filter_menu", %{"menu" => menu}, socket)
+      when menu in ~w(payment status source) do
+    open = if socket.assigns.open_filter == menu, do: nil, else: menu
+    {:noreply, assign(socket, :open_filter, open)}
+  end
+
+  def handle_event("close_filter_menu", _params, socket) do
+    {:noreply, assign(socket, :open_filter, nil)}
+  end
+
+  def handle_event("choose_filter", %{"field" => field, "choice" => value}, socket)
+      when field in ~w(payment status source) do
+    filters = Map.put(socket.assigns.filters, String.to_existing_atom(field), value)
+
+    {:noreply,
+     socket
+     |> assign(:selected_transaction, nil)
+     |> assign(:open_filter, nil)
      |> close_reprint()
      |> load_transactions(filters)}
   end
@@ -138,13 +162,9 @@ defmodule EspresoWeb.StaffTransactionsLive do
     >
       <main class="staff-transactions" id="staff-transactions">
         <header class="staff-transactions-head">
-          <div>
-            <p class="staff-transactions-eyebrow">Paid receipts</p>
-            <h2>Transactions</h2>
-            <p id="transactions-scope">
-              Paid receipts for {format_shop_date(@filters.date)}
-            </p>
-          </div>
+          <p class="staff-transactions-scope" id="transactions-scope">
+            Paid receipts for {format_shop_date(@filters.date)}
+          </p>
 
           <%= if @show_totals? do %>
             <section class="staff-transactions-summary" id="transactions-summary" aria-label="Totals">
@@ -180,45 +200,30 @@ defmodule EspresoWeb.StaffTransactionsLive do
               id="transactions-search"
             />
           </label>
-          <label>
-            <span>Payment</span>
-            <select name="filters[payment]" id="transactions-payment">
-              <option value="all" selected={@filters.payment == "all"}>All payments</option>
-              <option
-                :for={via <- ~w(cash gcash maya counter paymongo)}
-                value={via}
-                selected={@filters.payment == via}
-              >
-                {Orders.paid_via_label(via)}
-              </option>
-            </select>
-          </label>
-          <label>
-            <span>Order status</span>
-            <select name="filters[status]" id="transactions-status">
-              <option value="all" selected={@filters.status == "all"}>All statuses</option>
-              <option
-                :for={status <- ~w(received preparing ready completed)}
-                value={status}
-                selected={@filters.status == status}
-              >
-                {Orders.status_label(status)}
-              </option>
-            </select>
-          </label>
-          <label>
-            <span>Settled via</span>
-            <select name="filters[source]" id="transactions-source">
-              <option value="all" selected={@filters.source == "all"}>All sources</option>
-              <option
-                :for={source <- ~w(pos staff_orders api paymongo manual legacy)}
-                value={source}
-                selected={@filters.source == source}
-              >
-                {source_label(source)}
-              </option>
-            </select>
-          </label>
+          <.filter_menu
+            field="payment"
+            id="transactions-payment"
+            label="Payment"
+            value={@filters.payment}
+            open={@open_filter == "payment"}
+            options={payment_filter_options()}
+          />
+          <.filter_menu
+            field="status"
+            id="transactions-status"
+            label="Order status"
+            value={@filters.status}
+            open={@open_filter == "status"}
+            options={status_filter_options()}
+          />
+          <.filter_menu
+            field="source"
+            id="transactions-source"
+            label="Settled via"
+            value={@filters.source}
+            open={@open_filter == "source"}
+            options={source_filter_options()}
+          />
         </form>
 
         <section
@@ -580,6 +585,93 @@ defmodule EspresoWeb.StaffTransactionsLive do
   defp settled_by_name(%Order{settled_by_user: %{name: name}}), do: name
   defp settled_by_name(%Order{settlement_time_estimated: true}), do: "Legacy record"
   defp settled_by_name(_), do: "Not recorded"
+
+  defp payment_filter_options do
+    [
+      {"all", "All payments"}
+      | Enum.map(~w(cash gcash maya counter paymongo), &{&1, Orders.paid_via_label(&1)})
+    ]
+  end
+
+  defp status_filter_options do
+    [
+      {"all", "All statuses"}
+      | Enum.map(~w(received preparing ready completed), &{&1, Orders.status_label(&1)})
+    ]
+  end
+
+  defp source_filter_options do
+    [
+      {"all", "All sources"}
+      | Enum.map(~w(pos staff_orders api paymongo manual legacy), &{&1, source_label(&1)})
+    ]
+  end
+
+  attr :field, :string, required: true
+  attr :id, :string, required: true
+  attr :label, :string, required: true
+  attr :value, :string, required: true
+  attr :open, :boolean, required: true
+  attr :options, :list, required: true
+
+  defp filter_menu(assigns) do
+    current =
+      Enum.find_value(assigns.options, fn {value, label} ->
+        if value == assigns.value, do: label
+      end) || "All"
+
+    assigns = assign(assigns, :current_label, current)
+
+    ~H"""
+    <div class={["staff-transactions-menu", @open && "is-open"]} id={@id <> "-menu"}>
+      <span>{@label}</span>
+      <button
+        type="button"
+        class="staff-transactions-menu-trigger"
+        id={@id <> "-trigger"}
+        phx-click="toggle_filter_menu"
+        phx-value-menu={@field}
+        aria-haspopup="listbox"
+        aria-expanded={to_string(@open)}
+        aria-controls={@id <> "-list"}
+      >
+        <span>{@current_label}</span>
+      </button>
+      <ul
+        :if={@open}
+        id={@id <> "-list"}
+        class="staff-transactions-menu-list"
+        role="listbox"
+        phx-click-away="close_filter_menu"
+      >
+        <li :for={{value, label} <- @options}>
+          <button
+            type="button"
+            role="option"
+            aria-selected={to_string(value == @value)}
+            class={value == @value && "is-selected"}
+            phx-click="choose_filter"
+            phx-value-field={@field}
+            phx-value-choice={value}
+          >
+            {label}
+          </button>
+        </li>
+      </ul>
+      <select
+        name={"filters[#{@field}]"}
+        id={@id}
+        class="staff-transactions-native-select"
+        tabindex="-1"
+        aria-hidden="true"
+      >
+        <option :for={{value, label} <- @options} value={value} selected={value == @value}>
+          {label}
+        </option>
+      </select>
+    </div>
+    """
+  end
 
   defp source_label("pos"), do: "POS"
   defp source_label("staff_orders"), do: "Orders board"
