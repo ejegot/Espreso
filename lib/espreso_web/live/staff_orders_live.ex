@@ -703,51 +703,53 @@ defmodule EspresoWeb.StaffOrdersLive do
             </div>
           </div>
 
-          <nav class="staff-orders-lane-jumps" aria-label="Jump to order lane">
-            <a href="#orders-new" class="staff-orders-lane-jump staff-orders-lane-jump--new">
-              New <span>{@actionable_received_count + @waiting_received_count}</span>
-            </a>
-            <a href="#orders-preparing" class="staff-orders-lane-jump">
-              Preparing <span>{length(@preparing_orders)}</span>
-            </a>
-            <a href="#orders-ready" class="staff-orders-lane-jump">
-              Ready <span>{length(@ready_orders)}</span>
-            </a>
-          </nav>
+          <div class="staff-orders-quiet" id="orders-quiet">
+            <nav class="staff-orders-lane-jumps" aria-label="Jump to order lane">
+              <a href="#orders-new" class="staff-orders-lane-jump staff-orders-lane-jump--new">
+                New <span>{@actionable_received_count + @waiting_received_count}</span>
+              </a>
+              <a href="#orders-preparing" class="staff-orders-lane-jump">
+                Preparing <span>{length(@preparing_orders)}</span>
+              </a>
+              <a href="#orders-ready" class="staff-orders-lane-jump">
+                Ready <span>{length(@ready_orders)}</span>
+              </a>
+            </nav>
 
-          <div class="staff-orders-board-tools" id="orders-board-tools">
-            <button
-              type="button"
-              class="staff-shell-tool staff-orders-header-tool staff-orders-unpaid-toggle"
-              id="unpaid-drawer-toggle"
-              phx-click="toggle_unpaid_drawer"
-              aria-expanded={to_string(@unpaid_drawer_open)}
-              aria-controls="unpaid-orders"
-              aria-label={"Unpaid orders: #{length(@unpaid_orders)}"}
-            >
-              <span>Unpaid</span>
-              <span
-                :if={@unpaid_orders != []}
-                class="staff-orders-tool-badge staff-orders-tool-badge--unpaid"
-                id="orders-unpaid-header-count"
+            <div class="staff-orders-board-tools" id="orders-board-tools">
+              <button
+                type="button"
+                class="staff-shell-tool staff-orders-header-tool staff-orders-unpaid-toggle"
+                id="unpaid-drawer-toggle"
+                phx-click="toggle_unpaid_drawer"
+                aria-expanded={to_string(@unpaid_drawer_open)}
+                aria-controls="unpaid-orders"
+                aria-label={"Unpaid orders: #{length(@unpaid_orders)}"}
               >
-                {length(@unpaid_orders)}
-              </span>
-            </button>
-            <button
-              :if={@paymongo_reconciliations != []}
-              type="button"
-              class="staff-shell-tool staff-orders-reconciliation-toggle"
-              id="reconciliation-drawer-toggle"
-              phx-click="toggle_reconciliation_drawer"
-              aria-expanded={to_string(@reconciliation_drawer_open)}
-              aria-controls="paymongo-reconciliations"
-            >
-              Reconciliation
-              <span class="staff-orders-reconciliation-toggle-count">
-                {length(@paymongo_reconciliations)}
-              </span>
-            </button>
+                <span>Unpaid</span>
+                <span
+                  :if={@unpaid_orders != []}
+                  class="staff-orders-tool-badge staff-orders-tool-badge--unpaid"
+                  id="orders-unpaid-header-count"
+                >
+                  {length(@unpaid_orders)}
+                </span>
+              </button>
+              <button
+                :if={@paymongo_reconciliations != []}
+                type="button"
+                class="staff-shell-tool staff-orders-reconciliation-toggle"
+                id="reconciliation-drawer-toggle"
+                phx-click="toggle_reconciliation_drawer"
+                aria-expanded={to_string(@reconciliation_drawer_open)}
+                aria-controls="paymongo-reconciliations"
+              >
+                Reconciliation
+                <span class="staff-orders-reconciliation-toggle-count">
+                  {length(@paymongo_reconciliations)}
+                </span>
+              </button>
+            </div>
           </div>
 
           <div class="staff-orders-board">
