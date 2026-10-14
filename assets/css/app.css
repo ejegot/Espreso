@@ -12311,6 +12311,134 @@ a.staff-home-card:focus-visible {
   touch-action: manipulation;
 }
 
+#staff-availability .staff-availability-scope {
+  margin: 0;
+  max-width: 36rem;
+  color: var(--elilai-ink, #2e3529);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+#staff-availability .staff-availability-category h2 {
+  margin: 0 0 0.45rem;
+  color: var(--elilai-ink, #2e3529);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+#staff-availability .staff-availability-item {
+  min-height: 0;
+  padding: 0.8rem 0.9rem;
+  border: 0;
+  border-radius: 1.15rem;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(57, 67, 49, 0.06);
+}
+
+#staff-availability .staff-availability-item.is-unavailable {
+  background: #fff;
+}
+
+#staff-availability .staff-availability-item.is-unavailable .staff-availability-name,
+#staff-availability .staff-availability-item.is-unavailable .staff-availability-state {
+  color: color-mix(in srgb, var(--elilai-ink, #2e3529) 55%, #f4efe3);
+}
+
+#staff-availability .staff-availability-state {
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+#staff-availability .staff-availability-toggle {
+  min-height: 2.4rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--elilai-ivory, #f4efe3);
+}
+
+#staff-availability .staff-availability-add {
+  border: 0;
+  border-radius: 999px;
+  background: var(--elilai-forest, #394331);
+  color: #fff;
+}
+
+#staff-availability .staff-availability-add--ghost {
+  background: #fff;
+  color: var(--elilai-forest, #394331);
+  box-shadow: 0 10px 28px rgba(57, 67, 49, 0.08);
+}
+
+#availability-add-modal-container,
+#availability-add-category-modal-container,
+#availability-photo-modal-container {
+  width: min(100%, 32rem);
+  padding: 1.25rem 1.35rem 1.2rem;
+  border-radius: 1.15rem;
+  box-shadow: 0 18px 48px rgba(57, 67, 49, 0.16);
+}
+
+#availability-add-modal .staff-availability-add-dialog,
+#availability-add-category-modal .staff-availability-add-dialog,
+#availability-photo-modal .staff-availability-add-dialog {
+  display: grid;
+  gap: 0.75rem;
+}
+
+#availability-add-modal input[type="text"],
+#availability-add-modal select,
+#availability-add-category-modal input[type="text"],
+#availability-photo-modal input[type="file"] {
+  width: 100%;
+  min-height: 2.75rem;
+  margin-top: 0.35rem;
+  padding: 0.55rem 0.75rem;
+  border: 0;
+  border-radius: 0.95rem;
+  background: var(--elilai-ivory, #f4efe3);
+  color: var(--elilai-ink, #2e3529);
+  box-shadow: none;
+}
+
+#availability-add-modal select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, #394331 50%),
+    linear-gradient(135deg, #394331 50%, transparent 50%);
+  background-position: calc(100% - 1.05rem) 50%, calc(100% - 0.75rem) 50%;
+  background-size: 0.35rem 0.35rem, 0.35rem 0.35rem;
+  background-repeat: no-repeat;
+}
+
+#availability-add-modal .staff-team-btn,
+#availability-add-category-modal .staff-team-btn,
+#availability-photo-modal .staff-team-btn {
+  min-height: 2.75rem;
+  padding: 0.45rem 1rem;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--elilai-forest, #394331);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #394331 18%, transparent);
+}
+
+#availability-add-modal .staff-team-btn--primary,
+#availability-add-category-modal .staff-team-btn--primary,
+#availability-photo-modal .staff-team-btn--primary {
+  background: var(--elilai-forest, #394331);
+  color: #fff;
+  box-shadow: none;
+}
+
+#staff-availability .staff-availability-empty {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
 .staff-settings-form {
   display: grid;
   gap: 0.75rem;
