@@ -1,7 +1,10 @@
 package ph.elilai.kafe;
 
+import android.os.Build;
 import android.os.Bundle;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
+import androidx.appcompat.app.AppCompatDelegate;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.Logger;
 import com.getcapacitor.WebViewListener;
@@ -18,6 +21,10 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // Shop tablets run system dark mode. DayNight was letting the WebView
+        // repaint the ivory staff shell dark brown. Stay on the light theme.
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
+
         // Cap 8.5.2 supported local-plugin registration: must run before super.onCreate
         // so Bridge.Builder includes the class when registerAllPlugins() runs and
         // JSExport.getPluginJS() builds Cap.Plugins / PluginHeaders.
@@ -29,6 +36,7 @@ public class MainActivity extends BridgeActivity {
             new WebViewListener() {
                 @Override
                 public void onPageLoaded(WebView webView) {
+                    keepLightWebView(webView);
                     injectNativeShell(webView);
                 }
 
@@ -50,7 +58,23 @@ public class MainActivity extends BridgeActivity {
             } else {
                 Logger.error("EscPosPrinter missing from Bridge after create");
             }
-            injectNativeShell(this.bridge.getWebView());
+            WebView webView = this.bridge.getWebView();
+            keepLightWebView(webView);
+            injectNativeShell(webView);
+        }
+    }
+
+    private void keepLightWebView(WebView webView) {
+        if (webView == null) {
+            return;
+        }
+
+        WebSettings settings = webView.getSettings();
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            settings.setAlgorithmicDarkeningAllowed(false);
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            settings.setForceDark(WebSettings.FORCE_DARK_OFF);
         }
     }
 

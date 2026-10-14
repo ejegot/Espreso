@@ -45,6 +45,9 @@ defmodule EspresoWeb.StaffComponents do
       |> assign(:owner_nav_groups, if(owner_rail?, do: staff_nav_groups(items), else: []))
 
     ~H"""
+    <style id="elilai-light-scheme">
+      html { color-scheme: light only; }
+    </style>
     <div
       class={[
         "staff-app site-page",
@@ -53,6 +56,7 @@ defmodule EspresoWeb.StaffComponents do
       ]}
       id="elilai-printer-bridge"
       phx-hook="ElilaiPrinter"
+      style="color-scheme: light only; background-color: #f4efe3; color: #2e3529;"
     >
       <%= if @chrome in [:rail, :bar] do %>
         <header
@@ -63,6 +67,7 @@ defmodule EspresoWeb.StaffComponents do
           ]}
           id="staff-pos-rail"
           aria-label="Staff"
+          style={@chrome == :bar && "background-color: #394331; color: #faf7f4;"}
         >
           <div class={["staff-bar-start", @chrome != :bar && "staff-bar-start--contents"]}>
             <button
@@ -102,7 +107,12 @@ defmodule EspresoWeb.StaffComponents do
               <span class="staff-bar-brand-name">Elilai Kafe</span>
             </.link>
           </div>
-          <h1 :if={@chrome == :bar} class="staff-bar-module staff-shell-title" id="staff-bar-module">
+          <h1
+            :if={@chrome == :bar}
+            class="staff-bar-module staff-shell-title"
+            id="staff-bar-module"
+            style="color: #faf7f4;"
+          >
             {@page_title}
           </h1>
 

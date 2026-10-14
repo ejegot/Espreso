@@ -9118,7 +9118,34 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
   margin-bottom: 0.35rem;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-title h2 {
+  margin: 0;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-title .staff-pos-cart-count {
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #8b877d;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-head .staff-pos-section-label {
@@ -9136,34 +9163,38 @@ a.staff-home-card:focus-visible {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.45rem;
+  gap: 0.4rem;
   min-width: 0;
-  flex: 1 1 auto;
+  margin-left: auto;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-extras-toggle,
-.staff-pos-page.staff-pos-page--cafe .staff-pos-clear-ticket {
+.staff-pos-page.staff-pos-page--cafe .staff-pos-clear-ticket,
+.staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-title-actions .staff-pos-loyalty-entry {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.28rem;
+  width: auto;
+  max-width: 9.5rem;
   min-width: 0;
-  min-height: 2.75rem;
-  padding: 0.25rem 0.8rem;
+  min-height: 2.85rem;
+  padding: 0.35rem 0.85rem;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--elilai-forest, #394331) 16%, transparent);
   background: #fff;
   color: var(--elilai-ink, #2e3529);
-  font-size: 0.78rem;
+  font-size: 0.84rem;
   font-weight: 700;
   cursor: pointer;
   touch-action: manipulation;
   text-decoration: none;
+  text-align: center;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-extras-toggle {
-  max-width: min(14.5rem, 52%);
-  padding: 0.25rem 0.65rem 0.25rem 0.75rem;
+  max-width: 9.5rem;
+  padding: 0.35rem 0.85rem;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-extras-toggle-label {
@@ -11059,8 +11090,8 @@ a.staff-home-card:focus-visible {
 
 @media (min-width: 760px) {
   #pos-loyalty-modal-container {
-    width: min(24.5rem, calc(100vw - 4rem));
-    padding: 1.05rem 1.1rem 1.1rem;
+    width: min(34rem, calc(100vw - 3rem));
+    padding: 1.35rem 1.45rem 1.4rem;
   }
 }
 
@@ -11858,6 +11889,30 @@ a.staff-home-card:focus-visible {
   overflow: hidden;
 }
 
+.staff-pos-page .staff-pos-ticket-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.staff-app:has(#pos-ticket-extras-modal),
+.staff-app:has(#pos-ticket-extras-modal) .staff-shell-body,
+.staff-app:has(#pos-ticket-extras-modal) .staff-shell-body--bar,
+.staff-app:has(#pos-ticket-extras-modal) .staff-shell-body--rail,
+.staff-pos-page:has(#pos-ticket-extras-modal),
+.staff-pos-page:has(#pos-ticket-extras-modal) .staff-pos-main,
+.staff-pos-page:has(#pos-ticket-extras-modal) .staff-pos-layout,
+.staff-pos-page .staff-pos-ticket:has(#pos-ticket-extras-modal),
+.staff-pos-page #pos-order-form:has(#pos-ticket-extras-modal) {
+  overflow: visible;
+}
+
+.staff-pos-page .staff-pos-ticket:has(#pos-ticket-extras-modal) {
+  z-index: 90;
+}
+
 @media (max-width: 759px) and (orientation: portrait) {
   .staff-app:has(.staff-pos-shell-root) .staff-shell-body,
   .staff-app:has(.staff-pos-shell-root) .staff-shell-body--rail,
@@ -12196,6 +12251,276 @@ a.staff-home-card:focus-visible {
     width: min(34rem, calc(100vw - 3rem));
     padding: 1.35rem 1.45rem 1.4rem;
   }
+}
+
+/* POS dialogs share one surface: white panel, ivory fields, forest pills. */
+#cash-tender-modal,
+#pos-split-modal,
+#pos-loyalty-modal,
+#pos-ticket-extras-modal {
+  z-index: 70;
+}
+
+#pos-ticket-extras-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+}
+
+#pos-loyalty-modal {
+  z-index: 100;
+}
+
+#cash-tender-modal-bg,
+#pos-split-modal-bg,
+#pos-loyalty-modal-bg,
+#pos-ticket-extras-modal-bg,
+.staff-pos-size-picker-backdrop,
+.staff-pos-order-review-backdrop {
+  background: rgba(57, 67, 49, 0.32);
+}
+
+#cash-tender-modal-container,
+#pos-split-modal-container,
+#pos-loyalty-modal-container,
+#pos-ticket-extras-modal-container,
+.staff-pos-page .staff-pos-size-picker-panel,
+.staff-pos-page .staff-pos-order-review-panel {
+  border: 0;
+  border-radius: 1.15rem;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(57, 67, 49, 0.12);
+  color: #2e3529;
+}
+
+#pos-ticket-extras-modal-container {
+  width: min(100%, 40rem);
+  max-height: calc(100dvh - 2rem);
+  margin-inline: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 1.45rem 1.55rem 1.5rem;
+}
+
+#pos-loyalty-modal-container {
+  width: min(100%, 34rem);
+}
+
+.staff-pos-page .staff-pos-ticket-title-actions .staff-pos-loyalty-entry,
+.staff-pos-page .staff-pos-ticket-title-actions .staff-pos-loyalty-entry.is-linked,
+.staff-pos-page .staff-pos-ticket-title-actions .staff-pos-loyalty-entry.is-ready,
+.staff-pos-page .staff-pos-ticket-title-actions .staff-pos-loyalty-entry.is-attention,
+.staff-pos-page .staff-pos-ticket-title-actions .staff-pos-loyalty-entry.is-active {
+  width: auto;
+  max-width: 9.5rem;
+  justify-content: center;
+  text-align: center;
+}
+
+#pos-ticket-extras-modal .staff-pos-ticket-extras-panel {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  gap: 0.85rem;
+}
+
+#cash-tender-modal .staff-pos-cash-modal,
+#pos-split-modal .staff-pos-cash-modal,
+#pos-loyalty-modal .staff-pos-loyalty-modal,
+#pos-ticket-extras-modal .staff-pos-ticket-extras-panel,
+.staff-pos-size-picker-panel,
+.staff-pos-order-review-panel {
+  color: #2e3529;
+}
+
+#cash-tender-modal .staff-pos-cash-modal-eyebrow,
+#pos-split-modal .staff-pos-cash-modal-eyebrow,
+.staff-pos-page .staff-pos-size-picker-eyebrow,
+.staff-pos-order-review-eyebrow {
+  color: #8b877d;
+}
+
+#cash-tender-modal .staff-pos-cash-modal-head h2,
+#pos-split-modal .staff-pos-cash-modal-head h2,
+#pos-loyalty-modal .staff-pos-loyalty-modal-head h2,
+#pos-ticket-extras-modal .staff-pos-cash-modal-head h2,
+.staff-pos-page .staff-pos-size-picker-title,
+.staff-pos-order-review-title {
+  color: #2e3529;
+}
+
+#cash-tender-modal .staff-pos-cash-modal-head p:last-child,
+#pos-split-modal .staff-pos-cash-modal-head p:last-child,
+#pos-loyalty-modal .staff-pos-loyalty-modal-head p,
+#pos-ticket-extras-modal .staff-pos-cash-modal-head p,
+.staff-pos-order-review-meta,
+.staff-pos-split-cue {
+  color: #8b877d;
+}
+
+#cash-tender-modal .staff-pos-cash-total,
+#pos-split-modal .staff-pos-cash-total,
+.staff-pos-order-review-total {
+  border-radius: 0.95rem;
+  background: #f4efe3;
+  color: #2e3529;
+}
+
+#cash-tender-modal .staff-pos-cash-total strong,
+#pos-split-modal .staff-pos-cash-total strong,
+.staff-pos-order-review-total strong,
+.staff-pos-size-option-price {
+  color: #394331;
+}
+
+#cash-tender-modal .staff-pos-cash-input-wrap,
+#pos-split-modal .staff-pos-cash-input-wrap,
+#pos-loyalty-modal .staff-pos-loyalty-lookup,
+#pos-ticket-extras-modal .staff-pos-field-input,
+#pos-ticket-extras-modal .staff-pos-field-textarea,
+#pos-ticket-extras-modal .staff-pos-discount-peso,
+.staff-pos-page .staff-pos-size-option {
+  border: 0;
+  border-radius: 0.95rem;
+  background: #f4efe3;
+  color: #2e3529;
+  box-shadow: none;
+}
+
+#pos-ticket-extras-modal .staff-pos-field-input,
+#pos-ticket-extras-modal .staff-pos-field-textarea {
+  min-height: 3.4rem;
+  font-size: 1.05rem;
+}
+
+#pos-ticket-extras-modal .staff-pos-discount-chip,
+#pos-ticket-extras-modal .staff-pos-place {
+  min-height: 3.2rem;
+  padding: 0.55rem 1.15rem;
+  font-size: 1rem;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-phone-input,
+#pos-loyalty-modal .staff-pos-loyalty-find,
+#pos-loyalty-modal .staff-pos-loyalty-modal-actions .staff-pos-place {
+  min-height: 3.15rem;
+  font-size: 1rem;
+}
+
+#cash-tender-modal .staff-pos-cash-input-wrap:focus-within,
+#pos-split-modal .staff-pos-cash-input-wrap:focus-within,
+#pos-loyalty-modal .staff-pos-loyalty-lookup:focus-within,
+#pos-ticket-extras-modal .staff-pos-field-input:focus,
+#pos-ticket-extras-modal .staff-pos-field-textarea:focus {
+  border: 0;
+  box-shadow: inset 0 0 0 2px #394331;
+  outline: none;
+}
+
+#cash-tender-modal .staff-pos-cash-quick button,
+#pos-split-modal .staff-pos-cash-quick button,
+#pos-split-modal .staff-pos-split-wallets button,
+#pos-loyalty-modal .staff-pos-redeem-temp,
+#pos-ticket-extras-modal .staff-pos-discount-chip,
+#pos-ticket-extras-modal .staff-pos-loyalty-entry {
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: #394331;
+  box-shadow: inset 0 0 0 1px rgba(57, 67, 49, 0.28);
+}
+
+#cash-tender-modal .staff-pos-cash-quick button:focus-visible,
+#cash-tender-modal .staff-pos-cash-quick button:active,
+#pos-split-modal .staff-pos-cash-quick button:focus-visible,
+#pos-split-modal .staff-pos-cash-quick button:active,
+#pos-split-modal .staff-pos-split-wallets button.is-selected,
+#pos-loyalty-modal .staff-pos-redeem-temp.is-active,
+#pos-ticket-extras-modal .staff-pos-discount-chip.is-active,
+#pos-ticket-extras-modal .staff-pos-loyalty-entry.is-active,
+.staff-pos-page .staff-pos-size-option:active,
+.staff-pos-page .staff-pos-size-option:focus-visible {
+  border: 0;
+  background: #394331;
+  color: #f4efe3;
+  box-shadow: none;
+  outline: none;
+}
+
+#cash-tender-modal .staff-pos-cash-modal-actions .staff-pos-place,
+#pos-split-modal .staff-pos-cash-modal-actions .staff-pos-place,
+#pos-loyalty-modal .staff-pos-loyalty-modal-actions .staff-pos-place,
+#pos-ticket-extras-modal .staff-pos-place,
+.staff-pos-order-review-done {
+  border: 0;
+  border-radius: 999px;
+  background: #394331;
+  color: #f4efe3;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  box-shadow: none;
+  opacity: 1;
+}
+
+#cash-tender-modal .staff-pos-cash-modal-actions .staff-pos-place--secondary,
+#pos-split-modal .staff-pos-cash-modal-actions .staff-pos-place--secondary,
+#pos-loyalty-modal .staff-pos-loyalty-modal-actions .staff-pos-place--secondary,
+.staff-pos-page .staff-pos-size-cancel {
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: #394331;
+  box-shadow: inset 0 0 0 1px #394331;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 1;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-find {
+  margin: 0.28rem 0.28rem 0.28rem 0;
+  border: 0;
+  border-radius: 999px;
+  background: #394331;
+  color: #f4efe3;
+}
+
+#pos-loyalty-modal .staff-pos-loyalty-find:hover,
+#pos-loyalty-modal .staff-pos-loyalty-find:focus-visible {
+  background: #394331;
+  color: #f4efe3;
+}
+
+#cash-tender-modal .staff-pos-cash-feedback,
+#pos-split-modal .staff-pos-cash-feedback {
+  border: 0;
+  border-radius: 0.95rem;
+  background: #f4efe3;
+  color: #2e3529;
+}
+
+#cash-tender-modal .staff-pos-cash-feedback.is-short,
+#cash-tender-modal .staff-pos-cash-feedback.is-error,
+#pos-split-modal .staff-pos-cash-feedback.is-short,
+#pos-split-modal .staff-pos-cash-feedback.is-error {
+  border: 0;
+  background: #f4efe3;
+  color: #394331;
+  box-shadow: inset 0 0 0 1px #394331;
+}
+
+#cash-tender-modal .staff-pos-cash-feedback-error,
+#pos-split-modal .staff-pos-cash-feedback-error {
+  color: #394331;
+}
+
+#cash-tender-modal-container button[aria-label="close"],
+#pos-split-modal-container button[aria-label="close"],
+#pos-loyalty-modal-container button[aria-label="close"],
+#pos-ticket-extras-modal-container button[aria-label="close"] {
+  color: #394331;
+  opacity: 1;
 }
 
 .staff-pos-page .staff-empty {
@@ -13765,6 +14090,12 @@ a.staff-home-card:focus-visible {
 
 /* —— Staff UX V3.1 shared shell —— */
 /* Employee-scoped ELIlai tokens. Customer pages do not use .staff-app. */
+/* Shop tablets often run system dark mode. Without this, Chrome recolors the
+   light staff shell (ivory page, forest header) into a dark brown POS. */
+html[data-application="elilai-kafe-employee"] {
+  color-scheme: light only;
+}
+
 .staff-app {
   --cs-orange: var(--elilai-forest);
   --cs-brown: var(--elilai-ink);
