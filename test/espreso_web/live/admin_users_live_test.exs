@@ -32,10 +32,14 @@ defmodule EspresoWeb.AdminUsersLiveTest do
   } do
     {:ok, view, html} = live(log_in(conn, owner), ~p"/admin/users")
 
-    assert has_element?(view, ".staff-team-title", "Staff")
-    assert has_element?(view, ".staff-team-eyebrow", "Team")
-    assert has_element?(view, "#staff-team-summary", "Active")
-    assert has_element?(view, "#staff-team-summary", "Disabled")
+    assert has_element?(
+             view,
+             "#staff-team-scope",
+             "Add someone, set a PIN, or disable an account."
+           )
+
+    refute has_element?(view, ".staff-team-title")
+    refute has_element?(view, "#staff-team-summary")
     assert has_element?(view, "#staff-team-roster", "Team roster")
     assert has_element?(view, "#staff-team-card-#{barista.id}", "Mia")
     assert has_element?(view, "#staff-team-card-#{barista.id}", "mia.adminusers@test.local")
