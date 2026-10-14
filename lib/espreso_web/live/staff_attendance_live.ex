@@ -70,14 +70,20 @@ defmodule EspresoWeb.StaffAttendanceLive do
                 {@shop_date_label}
               <% end %>
             </p>
-            <h2>Staff attendance</h2>
-            <p>
+            <p class="staff-attendance-lede">
               <%= if @today? do %>
                 Who’s working and their paid POS sales today
               <% else %>
                 Staff shifts and paid POS sales for this shop day
               <% end %>
             </p>
+          </div>
+
+          <form
+            class="staff-attendance-date-nav"
+            id="staff-attendance-date-nav"
+            phx-change="select_date"
+          >
             <.link
               href={
                 ~p"/staff/reports/export/attendance.xlsx?from=#{Date.to_iso8601(@selected_date)}&to=#{Date.to_iso8601(@selected_date)}"
@@ -87,13 +93,6 @@ defmodule EspresoWeb.StaffAttendanceLive do
             >
               Export Excel
             </.link>
-          </div>
-
-          <form
-            class="staff-attendance-date-nav"
-            id="staff-attendance-date-nav"
-            phx-change="select_date"
-          >
             <button
               type="button"
               id="staff-attendance-prev"
