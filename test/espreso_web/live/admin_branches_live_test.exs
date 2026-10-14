@@ -32,7 +32,11 @@ defmodule EspresoWeb.AdminBranchesLiveTest do
     {:ok, view, html} = live(log_in(conn, owner), ~p"/admin/branches")
 
     assert html =~ "Lilac"
+    refute has_element?(view, "#admin-branch-form")
+
+    view |> element("#branch-add-toggle") |> render_click()
     assert has_element?(view, "#admin-branch-form")
+    refute has_element?(view, "#staff-branch-add-modal-container[phx-click-away]")
 
     view
     |> form("#admin-branch-form", branch: %{name: "Ortigas", address: "Ortigas Ave"})

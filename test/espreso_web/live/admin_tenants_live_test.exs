@@ -34,7 +34,11 @@ defmodule EspresoWeb.AdminTenantsLiveTest do
     {:ok, view, html} = live(log_in(conn, owner), ~p"/admin/tenants")
 
     assert html =~ "CoffeeSpot"
+    refute has_element?(view, "#admin-tenant-form")
+
+    view |> element("#tenant-add-toggle") |> render_click()
     assert has_element?(view, "#admin-tenant-form")
+    refute has_element?(view, "#staff-tenant-add-modal-container[phx-click-away]")
 
     view
     |> form("#admin-tenant-form",
