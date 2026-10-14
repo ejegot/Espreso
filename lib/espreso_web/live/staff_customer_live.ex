@@ -119,11 +119,9 @@ defmodule EspresoWeb.StaffCustomerLive do
   defp customer_search(assigns) do
     ~H"""
     <header class="staff-customer-head">
-      <div>
-        <p class="staff-customer-eyebrow">Loyalty</p>
-        <h2>Customers</h2>
-        <p>Look up a phone to view points and recent history.</p>
-      </div>
+      <p class="staff-customer-scope" id="customer-search-scope">
+        Look up a phone to view points and recent history.
+      </p>
     </header>
 
     <form class="staff-customer-search" id="customer-search-form" phx-submit="search_phone">
@@ -167,7 +165,6 @@ defmodule EspresoWeb.StaffCustomerLive do
     ~H"""
     <header class="staff-customer-head" id="customer-profile">
       <div>
-        <p class="staff-customer-eyebrow">Customer</p>
         <h2 id="customer-name">{display_name(@customer)}</h2>
         <p id="customer-phone">{@customer.phone_e164}</p>
       </div>
