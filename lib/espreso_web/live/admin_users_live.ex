@@ -231,32 +231,9 @@ defmodule EspresoWeb.AdminUsersLive do
     <.staff_shell current={:staff} current_user={@current_user} page_title="Staff" chrome={:bar}>
       <main class="staff-team-page" id="staff-team-page">
         <header class="staff-team-head">
-          <div class="staff-team-head-copy">
-            <p class="staff-team-eyebrow">Team</p>
-            <h2 class="staff-team-title">Staff</h2>
-          </div>
-          <section class="staff-team-summary" id="staff-team-summary" aria-label="Team summary">
-            <div class="staff-team-summary-item">
-              <p class="staff-team-summary-value">{@summary.active}</p>
-              <p class="staff-team-summary-label">Active</p>
-            </div>
-            <div class="staff-team-summary-item">
-              <p class="staff-team-summary-value">{@summary.disabled}</p>
-              <p class="staff-team-summary-label">Disabled</p>
-            </div>
-            <div class="staff-team-summary-item">
-              <p class="staff-team-summary-value">{@summary.by_role.barista}</p>
-              <p class="staff-team-summary-label">Staff</p>
-            </div>
-            <div class="staff-team-summary-item">
-              <p class="staff-team-summary-value">{@summary.by_role.manager}</p>
-              <p class="staff-team-summary-label">Managers</p>
-            </div>
-            <div class="staff-team-summary-item">
-              <p class="staff-team-summary-value">{@summary.by_role.owner}</p>
-              <p class="staff-team-summary-label">Owners</p>
-            </div>
-          </section>
+          <p class="staff-team-scope" id="staff-team-scope">
+            Add someone, set a PIN, or disable an account.
+          </p>
           <button
             type="button"
             class="staff-team-add-toggle"
@@ -283,8 +260,7 @@ defmodule EspresoWeb.AdminUsersLive do
             :for={user <- @users}
             class={[
               "staff-team-card",
-              !user.active && "staff-team-card--disabled",
-              @editing && @editing.id == user.id && "is-editing"
+              !user.active && "staff-team-card--disabled"
             ]}
             id={"staff-team-card-#{user.id}"}
           >
@@ -317,116 +293,7 @@ defmodule EspresoWeb.AdminUsersLive do
               </div>
             </header>
 
-            <div
-              :if={@editing && @editing.id == user.id}
-              class="staff-team-edit"
-              id={"staff-team-edit-#{user.id}"}
-            >
-              <.form
-                for={@edit_form}
-                id={"edit-user-#{user.id}"}
-                phx-submit="update"
-                class="staff-team-form"
-              >
-                <div class="staff-team-edit-group">
-                  <p class="staff-team-edit-label">Profile</p>
-                  <.input field={@edit_form[:name]} type="text" label="Name" required />
-                  <.input field={@edit_form[:email]} type="email" label="Email" required />
-                </div>
-
-                <div class="staff-team-edit-group">
-                  <p class="staff-team-edit-label">Access</p>
-                  <.input
-                    field={@edit_form[:password]}
-                    type="password"
-                    label="New password (optional)"
-                  />
-                  <.input
-                    :if={user.id != @current_user.id}
-                    field={@edit_form[:role]}
-                    type="select"
-                    label="Role"
-                    options={role_options()}
-                  />
-                  <p :if={user.id == @current_user.id} class="staff-team-section-hint">
-                    You can’t change your own role here.
-                  </p>
-                </div>
-
-                <div class="staff-team-actions">
-                  <button
-                    type="submit"
-                    class="staff-team-btn staff-team-btn--primary"
-                    phx-disable-with="Saving…"
-                  >
-                    Save
-                  </button>
-                  <button type="button" class="staff-team-btn" phx-click="cancel_edit">
-                    Cancel
-                  </button>
-                </div>
-              </.form>
-
-              <.form
-                for={%{}}
-                id={"pin-form-#{user.id}"}
-                phx-submit="set_pin"
-                phx-value-id={user.id}
-                class="staff-team-form staff-team-pin-form"
-              >
-                <div class="staff-team-edit-group">
-                  <p class="staff-team-edit-label">PIN</p>
-                  <label class="staff-team-pin-label" for={"pin-input-#{user.id}"}>
-                    Staff PIN (4–6 digits, for tablet login)
-                  </label>
-                  <input
-                    type="password"
-                    name="pin"
-                    id={"pin-input-#{user.id}"}
-                    inputmode="numeric"
-                    pattern="[0-9]{4,6}"
-                    autocomplete="off"
-                    class="staff-team-input"
-                    placeholder={if(Accounts.pin_set?(user), do: "Enter new PIN", else: "Set PIN")}
-                  />
-                  <label class="staff-team-pin-label" for={"pin-confirm-#{user.id}"}>
-                    Confirm PIN
-                  </label>
-                  <input
-                    type="password"
-                    name="pin_confirmation"
-                    id={"pin-confirm-#{user.id}"}
-                    inputmode="numeric"
-                    pattern="[0-9]{4,6}"
-                    autocomplete="off"
-                    class="staff-team-input"
-                    placeholder="Re-enter PIN"
-                  />
-                </div>
-                <div class="staff-team-actions">
-                  <button
-                    type="submit"
-                    class="staff-team-btn staff-team-btn--primary"
-                    id={"set-pin-#{user.id}"}
-                    phx-disable-with="Saving PIN…"
-                  >
-                    {if(Accounts.pin_set?(user), do: "Update PIN", else: "Set PIN")}
-                  </button>
-                  <button
-                    :if={Accounts.pin_set?(user) and not confirming?(@confirm, :clear_pin, user.id)}
-                    type="button"
-                    class="staff-team-btn"
-                    id={"clear-pin-#{user.id}"}
-                    phx-click="ask_clear_pin"
-                    phx-value-id={user.id}
-                  >
-                    Clear PIN
-                  </button>
-                </div>
-              </.form>
-            </div>
-
-            <div :if={!(@editing && @editing.id == user.id)} class="staff-team-actions">
+            <div class="staff-team-actions">
               <button type="button" class="staff-team-btn" phx-click="edit" phx-value-id={user.id}>
                 Edit
               </button>
@@ -492,6 +359,113 @@ defmodule EspresoWeb.AdminUsersLive do
         </.modal>
 
         <.modal
+          :if={@editing}
+          id="staff-team-edit-modal"
+          show
+          click_away={false}
+          autofocus={false}
+          on_cancel={JS.push("cancel_edit")}
+        >
+          <section
+            class="staff-team-add"
+            id={"staff-team-edit-#{@editing.id}"}
+            aria-label="Edit staff"
+          >
+            <h3 class="staff-confirm-dialog-title">Edit {@editing.name}</h3>
+            <p class="staff-confirm-dialog-copy">Update the profile, role, or PIN.</p>
+            <.form
+              for={@edit_form}
+              id={"edit-user-#{@editing.id}"}
+              phx-submit="update"
+              class="staff-team-form"
+            >
+              <.input field={@edit_form[:name]} type="text" label="Name" required />
+              <.input field={@edit_form[:email]} type="email" label="Email" required />
+              <.input field={@edit_form[:password]} type="password" label="New password (optional)" />
+              <.input
+                :if={@editing.id != @current_user.id}
+                field={@edit_form[:role]}
+                type="select"
+                label="Role"
+                options={role_options()}
+              />
+              <p :if={@editing.id == @current_user.id} class="staff-team-section-hint">
+                You can’t change your own role here.
+              </p>
+              <div class="staff-confirm-dialog-actions">
+                <button
+                  type="submit"
+                  class="staff-team-btn staff-team-btn--primary"
+                  phx-disable-with="Saving…"
+                >
+                  Save
+                </button>
+                <button type="button" class="staff-team-btn" phx-click="cancel_edit">
+                  Cancel
+                </button>
+              </div>
+            </.form>
+
+            <.form
+              for={%{}}
+              id={"pin-form-#{@editing.id}"}
+              phx-submit="set_pin"
+              phx-value-id={@editing.id}
+              class="staff-team-form staff-team-pin-form"
+            >
+              <label class="staff-team-pin-label" for={"pin-input-#{@editing.id}"}>
+                Staff PIN (4–6 digits, for tablet login)
+              </label>
+              <input
+                type="password"
+                name="pin"
+                id={"pin-input-#{@editing.id}"}
+                inputmode="numeric"
+                pattern="[0-9]{4,6}"
+                autocomplete="off"
+                class="staff-team-input"
+                placeholder={if(Accounts.pin_set?(@editing), do: "Enter new PIN", else: "Set PIN")}
+              />
+              <label class="staff-team-pin-label" for={"pin-confirm-#{@editing.id}"}>
+                Confirm PIN
+              </label>
+              <input
+                type="password"
+                name="pin_confirmation"
+                id={"pin-confirm-#{@editing.id}"}
+                inputmode="numeric"
+                pattern="[0-9]{4,6}"
+                autocomplete="off"
+                class="staff-team-input"
+                placeholder="Re-enter PIN"
+              />
+              <div class="staff-confirm-dialog-actions">
+                <button
+                  type="submit"
+                  class="staff-team-btn staff-team-btn--primary"
+                  id={"set-pin-#{@editing.id}"}
+                  phx-disable-with="Saving PIN…"
+                >
+                  {if(Accounts.pin_set?(@editing), do: "Update PIN", else: "Set PIN")}
+                </button>
+                <button
+                  :if={
+                    Accounts.pin_set?(@editing) and not confirming?(@confirm, :clear_pin, @editing.id)
+                  }
+                  type="button"
+                  class="staff-team-btn"
+                  id={"clear-pin-#{@editing.id}"}
+                  phx-click="ask_clear_pin"
+                  phx-value-id={@editing.id}
+                >
+                  Clear PIN
+                </button>
+              </div>
+            </.form>
+          </section>
+        </.modal>
+
+        <.modal
           :if={@confirm}
           id="staff-team-confirm"
           show
@@ -512,7 +486,7 @@ defmodule EspresoWeb.AdminUsersLive do
             <div class="staff-confirm-dialog-actions">
               <button
                 type="button"
-                class="staff-team-btn staff-team-btn--danger"
+                class="staff-team-btn staff-team-btn--primary"
                 id={"confirm-disable-#{confirm_id(@confirm)}"}
                 phx-click="toggle_active"
                 phx-value-id={confirm_id(@confirm)}
