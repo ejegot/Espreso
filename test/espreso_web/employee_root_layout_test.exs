@@ -28,7 +28,7 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
     assert html =~ ~s(name="theme-color" content="#394331")
     assert html =~ ~s(rel="apple-touch-icon")
     assert html =~ ~s(href="/images/elilai-kafe/apple-touch-icon.png")
-    assert html =~ ~s(href="/assets/app.css?v=owner-dash-56")
+    assert html =~ ~s(href="/assets/app.css?v=owner-dash-58")
 
     # Employee login fonts: DM Sans + Instrument Serif only (not Fraunces/Figtree).
     assert html =~ "family=DM+Sans"
@@ -79,6 +79,7 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
       assert html =~ ~s(href="/images/elilai-kafe/apple-touch-icon.png")
 
       assert has_element?(view, "#staff-pos-rail #staff-bar-brand", "Elilai Kafe")
+      assert has_element?(view, "#staff-bar-module", expected_module(path))
 
       assert has_element?(
                view,
@@ -125,4 +126,13 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
     |> Phoenix.ConnTest.init_test_session(%{})
     |> Plug.Conn.put_session(:user_id, user.id)
   end
+
+  defp expected_module("/staff"), do: "Home"
+  defp expected_module("/orders"), do: "Orders"
+  defp expected_module("/pos"), do: "POS"
+  defp expected_module("/transactions"), do: "Transactions"
+  defp expected_module("/staff/close"), do: "Close shift"
+  defp expected_module("/admin/availability"), do: "Availability"
+  defp expected_module("/admin/users"), do: "Staff"
+  defp expected_module("/admin/settings"), do: "Settings"
 end
