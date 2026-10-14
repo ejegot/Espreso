@@ -36,6 +36,22 @@ defmodule EspresoWeb.StaffCashOutLive do
      |> assign(:form_error, nil)}
   end
 
+  def handle_event("toggle_category_menu", _params, socket) do
+    {:noreply, assign(socket, :open_category, !socket.assigns.open_category)}
+  end
+
+  def handle_event("close_category_menu", _params, socket) do
+    {:noreply, assign(socket, :open_category, false)}
+  end
+
+  def handle_event("choose_category", %{"choice" => category}, socket) do
+    {:noreply,
+     socket
+     |> assign(:category, category)
+     |> assign(:open_category, false)
+     |> assign(:form_error, nil)}
+  end
+
   def handle_event("create", %{"cash_out" => params}, socket) do
     if socket.assigns.blocked? do
       {:noreply, socket}
@@ -163,11 +179,8 @@ defmodule EspresoWeb.StaffCashOutLive do
     <.staff_shell current={:cash_out} current_user={@current_user} page_title="Cash Out" chrome={:bar}>
       <main class="staff-cash-out" id="staff-cash-out">
         <header class="staff-cash-out-head">
-          <p class="staff-home-desk-eyebrow">Drawer</p>
-          <h2 class="staff-home-desk-title">Cash Out</h2>
-          <p class="staff-home-lede">
-            Record money taken from the cash drawer for legitimate shop expenses.
-            This is not a sale.
+          <p class="staff-cash-out-scope" id="staff-cash-out-scope">
+            Record money taken from the cash drawer for legitimate shop expenses. This is not a sale.
           </p>
         </header>
 
@@ -224,15 +237,51 @@ defmodule EspresoWeb.StaffCashOutLive do
             </div>
           </label>
 
-          <label class="staff-cash-out-field">
+          <div
+            class={["staff-cash-out-menu", @open_category && "is-open"]}
+            id="staff-cash-out-category-menu"
+          >
             <span>Category</span>
+            <button
+              type="button"
+              class="staff-cash-out-menu-trigger"
+              id="staff-cash-out-category-trigger"
+              phx-click="toggle_category_menu"
+              aria-haspopup="listbox"
+              aria-expanded={to_string(@open_category)}
+              aria-controls="staff-cash-out-category-list"
+            >
+              <span>{(@category != "" && @category) || "Select category"}</span>
+            </button>
+            <ul
+              :if={@open_category}
+              id="staff-cash-out-category-list"
+              class="staff-cash-out-menu-list"
+              role="listbox"
+              phx-click-away="close_category_menu"
+            >
+              <li :for={category <- CashOut.categories()}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={to_string(@category == category)}
+                  class={@category == category && "is-selected"}
+                  phx-click="choose_category"
+                  phx-value-choice={category}
+                >
+                  {category}
+                </button>
+              </li>
+            </ul>
             <select
               name="cash_out[category]"
               required
-              class="staff-cash-out-input staff-cash-out-select"
+              class="staff-cash-out-native-select"
               id="staff-cash-out-category"
+              tabindex="-1"
+              aria-hidden="true"
             >
-              <option value="">Select category</option>
+              <option value="" selected={@category == ""}>Select category</option>
               <option
                 :for={category <- CashOut.categories()}
                 value={category}
@@ -241,7 +290,7 @@ defmodule EspresoWeb.StaffCashOutLive do
                 {category}
               </option>
             </select>
-          </label>
+          </div>
 
           <label class="staff-cash-out-field">
             <span>Note</span>
@@ -505,6 +554,7 @@ defmodule EspresoWeb.StaffCashOutLive do
     |> assign(:total, CashOuts.total_for_shop_date(shop_date))
     |> assign(:amount, "")
     |> assign(:category, "")
+    |> assign(:open_category, false)
     |> assign(:note, "")
     |> assign(:form_error, nil)
     |> assign(:last_recorded, nil)

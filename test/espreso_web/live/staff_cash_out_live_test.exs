@@ -51,6 +51,16 @@ defmodule EspresoWeb.StaffCashOutLiveTest do
     refute has_element?(view, "#staff-cash-out-blocked")
     assert has_element?(view, "#staff-cash-out-form")
 
+    view |> element("#staff-cash-out-category-trigger") |> render_click()
+    assert has_element?(view, "#staff-cash-out-category-list")
+
+    view
+    |> element("#staff-cash-out-category-list button[phx-value-choice=Supplies]")
+    |> render_click()
+
+    assert has_element?(view, "#staff-cash-out-category option[value=Supplies][selected]")
+    refute has_element?(view, "#staff-cash-out-category-list")
+
     view
     |> form("#staff-cash-out-form", %{
       cash_out: %{amount: "500", category: "Supplies", note: "Cleaning supplies"}
