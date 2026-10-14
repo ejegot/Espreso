@@ -39,6 +39,14 @@ defmodule EspresoWeb.AdminSettingsLiveTest do
     {:ok, view, _html} = live(log_in(conn, owner), ~p"/admin/settings")
 
     assert has_element?(view, ".staff-shell-title", "Settings")
+
+    assert has_element?(
+             view,
+             "#staff-settings-scope",
+             "Update the public contact, hours, and how guests pay."
+           )
+
+    refute has_element?(view, ".staff-settings-title")
     assert has_element?(view, "#admin-settings-form")
     assert has_element?(view, "#admin-settings-form input[name='settings[business_name]']")
 
