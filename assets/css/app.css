@@ -7817,8 +7817,8 @@ a.staff-home-card:focus-visible {
 
 .staff-pos-rail.staff-pos-rail--bar {
   flex: 0 0 auto;
-  flex-direction: row;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 0.4rem;
   width: 100%;
@@ -7826,6 +7826,43 @@ a.staff-home-card:focus-visible {
   padding: 0.28rem 0.65rem;
   border-right: none;
   border-bottom: 1px solid color-mix(in srgb, var(--elilai-ink, #2e3529) 10%, transparent);
+}
+
+.staff-bar-start {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.staff-bar-start--contents {
+  display: contents;
+}
+
+.staff-bar-module {
+  margin: 0;
+  max-width: 40vw;
+  overflow: hidden;
+  color: #faf7f4;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 720px) {
+  .staff-pos-rail--bar .staff-branch-label {
+    display: none;
+  }
+
+  .staff-bar-module {
+    max-width: 46vw;
+    font-size: 0.95rem;
+  }
 }
 
 .staff-pos-rail--bar .staff-pos-rail-brand {
@@ -7949,12 +7986,12 @@ a.staff-home-card:focus-visible {
 
 .staff-pos-rail--bar .staff-pos-rail-end {
   display: flex;
-  flex: 1 1 auto;
   align-items: center;
   justify-content: flex-end;
+  justify-self: end;
   gap: 0.75rem;
   min-width: 0;
-  margin-left: auto;
+  margin-left: 0;
 }
 
 .staff-account {
@@ -16623,6 +16660,7 @@ body:has(.staff-nav-drawer.is-open) {
 .staff-app.staff-app--bar > .staff-pos-rail.staff-pos-rail--bar .staff-pos-rail-hop:focus-visible,
 .staff-app.staff-app--bar > .staff-pos-rail.staff-pos-rail--bar .staff-bar-brand,
 .staff-app.staff-app--bar > .staff-pos-rail.staff-pos-rail--bar .staff-bar-brand-name,
+.staff-app.staff-app--bar > .staff-pos-rail.staff-pos-rail--bar .staff-bar-module,
 .staff-app.staff-app--bar > .staff-pos-rail.staff-pos-rail--bar .staff-branch-label,
 .staff-app.staff-app--bar > .staff-pos-rail.staff-pos-rail--bar .staff-account-name,
 .staff-app.staff-app--bar > .staff-pos-rail.staff-pos-rail--bar .staff-account-role,

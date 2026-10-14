@@ -64,42 +64,47 @@ defmodule EspresoWeb.StaffComponents do
           id="staff-pos-rail"
           aria-label="Staff"
         >
-          <button
-            type="button"
-            id="staff-nav-menu-open"
-            class={[
-              "staff-pos-rail-link staff-nav-menu-open",
-              @chrome == :rail && "staff-nav-menu-open--rail",
-              @chrome == :bar && "staff-nav-menu-open--bar"
-            ]}
-            phx-click="toggle"
-            phx-target="#staff-nav-drawer"
-            data-staff-nav-menu-open
-            aria-expanded="false"
-            aria-controls="staff-nav-drawer-panel"
-            aria-label="Open navigation menu"
-            title="Menu"
-          >
-            <.icon name="hero-bars-3" class="staff-pos-rail-icon" />
-            <span class="sr-only">Menu</span>
-          </button>
-          <.link
-            :if={@chrome == :bar}
-            navigate={~p"/staff"}
-            class="staff-bar-brand"
-            id="staff-bar-brand"
-            aria-label="Elilai Kafe Home"
-          >
-            <img
-              src={~p"/images/elilai-kafe/elilai-kafe-mark.png"}
-              alt=""
-              class="staff-bar-brand-logo"
-              width="1024"
-              height="1024"
-              aria-hidden="true"
-            />
-            <span class="staff-bar-brand-name">Elilai Kafe</span>
-          </.link>
+          <div class={["staff-bar-start", @chrome != :bar && "staff-bar-start--contents"]}>
+            <button
+              type="button"
+              id="staff-nav-menu-open"
+              class={[
+                "staff-pos-rail-link staff-nav-menu-open",
+                @chrome == :rail && "staff-nav-menu-open--rail",
+                @chrome == :bar && "staff-nav-menu-open--bar"
+              ]}
+              phx-click="toggle"
+              phx-target="#staff-nav-drawer"
+              data-staff-nav-menu-open
+              aria-expanded="false"
+              aria-controls="staff-nav-drawer-panel"
+              aria-label="Open navigation menu"
+              title="Menu"
+            >
+              <.icon name="hero-bars-3" class="staff-pos-rail-icon" />
+              <span class="sr-only">Menu</span>
+            </button>
+            <.link
+              :if={@chrome == :bar}
+              navigate={~p"/staff"}
+              class="staff-bar-brand"
+              id="staff-bar-brand"
+              aria-label="Elilai Kafe Home"
+            >
+              <img
+                src={~p"/images/elilai-kafe/elilai-kafe-mark.png"}
+                alt=""
+                class="staff-bar-brand-logo"
+                width="1024"
+                height="1024"
+                aria-hidden="true"
+              />
+              <span class="staff-bar-brand-name">Elilai Kafe</span>
+            </.link>
+          </div>
+          <h1 :if={@chrome == :bar} class="staff-bar-module staff-shell-title" id="staff-bar-module">
+            {@page_title}
+          </h1>
 
           <div class="staff-pos-rail-end">
             <form
@@ -210,12 +215,12 @@ defmodule EspresoWeb.StaffComponents do
             <div class="owner-dash" id="owner-dashboard">
               <.owner_dash_rail current={@current} groups={@owner_nav_groups} />
               <div class="owner-dash-canvas">
-                <h1 class="sr-only staff-shell-title">{@page_title}</h1>
+                <h1 :if={@chrome != :bar} class="sr-only staff-shell-title">{@page_title}</h1>
                 {render_slot(@inner_block)}
               </div>
             </div>
           <% else %>
-            <h1 class="sr-only staff-shell-title">{@page_title}</h1>
+            <h1 :if={@chrome != :bar} class="sr-only staff-shell-title">{@page_title}</h1>
             {render_slot(@inner_block)}
           <% end %>
         </div>
