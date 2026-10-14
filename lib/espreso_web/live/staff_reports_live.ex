@@ -70,15 +70,11 @@ defmodule EspresoWeb.StaffReportsLive do
     <.staff_shell current={:reports} current_user={@current_user} page_title="Reports" chrome={:bar}>
       <main class="staff-reports" id="staff-reports">
         <header class="staff-reports-head">
-          <div>
-            <p class="staff-reports-eyebrow">Reports</p>
-            <h2>Reports</h2>
-            <p>
-              Paid item sales and Manager vs Café payout for the selected Manila shop dates,
-              plus Excel/PDF exports. Maximum {Orders.max_sales_export_shop_days()} days.
-              Owner and manager only.
-            </p>
-          </div>
+          <p class="staff-reports-scope" id="staff-reports-scope">
+            Paid item sales and Manager vs Café payout for the selected Manila shop dates,
+            plus Excel/PDF exports. Maximum {Orders.max_sales_export_shop_days()} days.
+            Owner and manager only.
+          </p>
         </header>
 
         <section class="staff-reports-card" aria-label="Export reports">
