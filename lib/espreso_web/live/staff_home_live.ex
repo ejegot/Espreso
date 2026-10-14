@@ -10,7 +10,6 @@ defmodule EspresoWeb.StaffHomeLive do
   alias Espreso.Shifts
   alias Espreso.StaffShifts
   alias Espreso.Tenancy
-  alias EspresoWeb.StaffComponents
   alias EspresoWeb.StaffNotifications
 
   @pubsub_reload_debounce_ms 300
@@ -150,418 +149,362 @@ defmodule EspresoWeb.StaffHomeLive do
   def render(assigns) do
     ~H"""
     <.staff_shell current={:home} current_user={@current_user} page_title="Home" chrome={:bar}>
-      <div class={@owner_dashboard? && "owner-dash"} id={if(@owner_dashboard?, do: "owner-dashboard")}>
-        <aside
-          :if={@owner_dashboard?}
-          class="owner-dash-aside"
-          id="owner-dash-aside"
-          aria-label="Owner"
-          phx-hook="OwnerDashRail"
-        >
-          <div class="owner-dash-rail">
-            <nav class="owner-dash-nav">
-              <section
-                :for={group <- @owner_nav_groups}
-                class="owner-dash-nav-group"
-                id={"owner-dash-nav-group-#{group.key}"}
-                aria-label={group.title}
-              >
-                <p class="owner-dash-nav-group-label">{group.title}</p>
-                <.link
-                  :for={item <- group.items}
-                  navigate={item.path}
-                  class={["owner-dash-nav-link", item.key == :home && "is-active"]}
-                  id={"owner-dash-nav-#{item.key}"}
-                  title={item.label}
-                >
-                  <.icon name={item.icon} class="owner-dash-nav-icon" />
-                  <span class="owner-dash-nav-label">{item.label}</span>
-                </.link>
-              </section>
-            </nav>
-            <footer class="owner-dash-foot">
-              <.link
-                href={~p"/logout"}
-                method="delete"
-                class="owner-dash-nav-link owner-dash-logout"
-                id="owner-dash-nav-logout"
-                title="Log out"
-              >
-                <.icon name="hero-arrow-right-on-rectangle" class="owner-dash-nav-icon" />
-                <span class="owner-dash-nav-label">Log out</span>
-              </.link>
-            </footer>
+      <main
+        class={[
+          "staff-home-main dashboard-page dashboard-page--sales",
+          @owner_dashboard? && "owner-dash-main"
+        ]}
+        id="staff-home-desk"
+      >
+        <header class="dashboard-head" id="staff-home-identity">
+          <div class="dashboard-head-copy">
+            <p class="dashboard-kicker">{User.role_label(@current_user.role)}</p>
+            <h1 class="dashboard-heading text-slate-900" id="staff-home-greeting">{@greeting}</h1>
+            <p class="staff-home-lede dashboard-lede">
+              Here's what's happening at your coffee shop today.
+            </p>
+            <p
+              class={["dashboard-shop-line", shop_line_class(@shop_day_status)]}
+              id="staff-home-shop-line"
+            >
+              <span class="dashboard-status-dot" aria-hidden="true"></span>
+              <span>{Calendar.strftime(@shop_date, "%a %b %d")}</span>
+              <span aria-hidden="true">·</span>
+              <span>{shop_day_status_label(@shop_day_status)}</span>
+            </p>
           </div>
-        </aside>
-        <div class="owner-dash-canvas">
-          <main
-            class={[
-              "staff-home-main dashboard-page dashboard-page--sales",
-              @owner_dashboard? && "owner-dash-main"
-            ]}
-            id="staff-home-desk"
+        </header>
+
+        <section :if={@shop_open_prompt?} class="staff-home-shop-open" id="staff-home-shop-open">
+          <p class="staff-home-shop-open-title">Opening cash required</p>
+          <p class="staff-home-shop-open-body">
+            Count the drawer once before selling. POS and orders stay locked until this is recorded.
+          </p>
+        </section>
+
+        <.shop_day_sales_banner
+          :if={!@shop_open_prompt?}
+          status={@shop_day_status}
+          id="staff-home-shop-closed"
+          show_open_link={false}
+        />
+
+        <section
+          class={[
+            "mb-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4",
+            @owner_dashboard? && "owner-kpi-grid"
+          ]}
+          id="staff-home-kpis"
+          aria-label="Key numbers"
+        >
+          <%= if @money? do %>
+            <article class="staff-kpi-float" id="dashboard-panel-sales">
+              <div class="flex items-start justify-between gap-3">
+                <.icon name="hero-banknotes" class="h-5 w-5 text-[#394331]" />
+                <span class={["text-xs font-medium", sales_delta_class(@sales_delta)]}>
+                  {@sales_delta.short}
+                </span>
+              </div>
+              <strong class="mt-4 block text-[1.65rem] font-semibold tracking-tight text-slate-900">
+                {peso_kpi(@sales.todays_paid_total)}
+              </strong>
+              <p class="mt-1 text-sm font-medium text-slate-800">Total Sales Today</p>
+              <p class="mt-0.5 text-xs text-slate-400">vs yesterday</p>
+            </article>
+            <article class="staff-kpi-float" id="dashboard-kpi-tickets">
+              <div class="flex items-start justify-between gap-3">
+                <.icon name="hero-clipboard-document-list" class="h-5 w-5 text-[#394331]" />
+                <span class={["text-xs font-medium", sales_delta_class(@orders_delta)]}>
+                  {@orders_delta.short}
+                </span>
+              </div>
+              <strong class="mt-4 block text-[1.65rem] font-semibold tracking-tight text-slate-900">
+                {@sales.todays_paid_count}
+              </strong>
+              <p class="mt-1 text-sm font-medium text-slate-800">Orders Completed</p>
+              <p class="mt-0.5 text-xs text-slate-400">vs yesterday</p>
+            </article>
+            <article class="staff-kpi-float" id="dashboard-panel-top-item">
+              <div class="flex items-start justify-between gap-3">
+                <.icon name="hero-shopping-bag" class="h-5 w-5 text-[#394331]" />
+                <span class="text-xs font-medium text-[#3d6b45]">
+                  {top_seller_badge(@top_seller)}
+                </span>
+              </div>
+              <strong class="mt-4 block truncate text-[1.35rem] font-semibold tracking-tight text-slate-900">
+                {top_seller_name(@top_seller)}
+              </strong>
+              <p class="mt-1 text-sm font-medium text-slate-800">Top-selling item</p>
+              <p class="mt-0.5 text-xs text-slate-400">today</p>
+            </article>
+            <article :if={@owner_dashboard?} class="staff-kpi-float" id="dashboard-kpi-staff-shift">
+              <div class="flex items-start justify-between gap-3">
+                <.icon name="hero-user-group" class="h-5 w-5 text-[#394331]" />
+                <span class="text-xs font-medium text-[#3d6b45]">
+                  {staff_on_shift_badge(@staff_on_shift)}
+                </span>
+              </div>
+              <strong class="mt-4 block text-[1.65rem] font-semibold tracking-tight text-slate-900">
+                {@staff_on_shift}
+              </strong>
+              <p class="mt-1 text-sm font-medium text-slate-800">Active Staff on Shift</p>
+              <p class="mt-0.5 text-xs text-slate-400">current shift</p>
+            </article>
+            <article :if={not @owner_dashboard?} class="staff-kpi-float" id="dashboard-kpi-drawer">
+              <div class="flex items-start justify-between gap-3">
+                <.icon name="hero-wallet" class="h-5 w-5 text-[#394331]" />
+              </div>
+              <strong class="mt-4 block text-[1.65rem] font-semibold tracking-tight text-slate-900">
+                {peso_kpi(drawer_cash(@drawer_summary))}
+              </strong>
+              <p class="mt-1 text-sm font-medium text-slate-800">Cash in drawer</p>
+              <p class="mt-0.5 text-xs text-slate-400">{drawer_kpi_hint(@drawer_summary)}</p>
+            </article>
+          <% else %>
+            <article class="staff-kpi-float" id="staff-home-kpi-active">
+              <div class="flex items-start justify-between gap-3">
+                <.icon name="hero-user-group" class="h-5 w-5 text-[#394331]" />
+              </div>
+              <strong class="mt-4 block text-[1.65rem] font-semibold tracking-tight text-slate-900">
+                {@overview.active_count}
+              </strong>
+              <p class="mt-1 text-sm font-medium text-slate-800">Active</p>
+              <p class="mt-0.5 text-xs text-slate-400">Received + preparing</p>
+            </article>
+            <article class="staff-kpi-float" id="staff-home-kpi-unpaid">
+              <div class="flex items-start justify-between gap-3">
+                <.icon name="hero-exclamation-triangle" class="h-5 w-5 text-[#394331]" />
+              </div>
+              <strong class="mt-4 block text-[1.65rem] font-semibold tracking-tight text-slate-900">
+                {@overview.unpaid_active_count}
+              </strong>
+              <p class="mt-1 text-sm font-medium text-slate-800">Unpaid</p>
+              <p class="mt-0.5 text-xs text-slate-400">Still open on the board</p>
+            </article>
+            <article class="staff-kpi-float" id="staff-home-kpi-preparing">
+              <div class="flex items-start justify-between gap-3">
+                <.icon name="hero-clock" class="h-5 w-5 text-[#394331]" />
+              </div>
+              <strong class="mt-4 block text-[1.65rem] font-semibold tracking-tight text-slate-900">
+                {@overview.preparing_count}
+              </strong>
+              <p class="mt-1 text-sm font-medium text-slate-800">Preparing</p>
+              <p class="mt-0.5 text-xs text-slate-400">In progress</p>
+            </article>
+            <article class="staff-kpi-float" id="staff-home-kpi-tickets">
+              <div class="flex items-start justify-between gap-3">
+                <.icon name="hero-document-text" class="h-5 w-5 text-[#394331]" />
+              </div>
+              <strong class="mt-4 block text-[1.65rem] font-semibold tracking-tight text-slate-900">
+                {@overview.todays_count}
+              </strong>
+              <p class="mt-1 text-sm font-medium text-slate-800">Tickets</p>
+              <p class="mt-0.5 text-xs text-slate-400">Placed this shop day</p>
+            </article>
+          <% end %>
+        </section>
+
+        <section
+          :if={@owner_dashboard?}
+          class="owner-trends"
+          id="owner-sales-trends"
+          aria-labelledby="owner-trends-heading"
+          data-range={@chart_range}
+          phx-hook="OwnerSalesTrend"
+        >
+          <header class="owner-trends-head">
+            <h2 class="owner-trends-title" id="owner-trends-heading">Sales Trends</h2>
+            <div class="owner-trends-ranges" role="tablist" aria-label="Sales range">
+              <button
+                :for={range <- [:daily, :weekly, :monthly]}
+                type="button"
+                id={"owner-chart-#{range}"}
+                class={["owner-trends-range", @chart_range == range && "is-active"]}
+                phx-click="owner_chart_range"
+                phx-value-range={range}
+                role="tab"
+                aria-selected={@chart_range == range}
+              >
+                {owner_range_label(range)}
+              </button>
+            </div>
+          </header>
+          <div class="owner-trends-body">
+            <ul class="owner-trends-y" aria-hidden="true">
+              <li :for={tick <- @sales_trend.y_ticks}>{tick.label}</li>
+            </ul>
+            <div class="owner-trends-plot">
+              <div class="owner-trends-svg-wrap">
+                <svg
+                  class="owner-trends-svg"
+                  id={"owner-trends-plot-#{@chart_range}"}
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                  role="img"
+                  aria-label="Paid sales trend"
+                >
+                  <g class="owner-trends-grid" aria-hidden="true">
+                    <line :for={tick <- @sales_trend.y_ticks} x1="0" x2="100" y1={tick.y} y2={tick.y} />
+                  </g>
+                  <path
+                    :if={@sales_trend.fill_path != ""}
+                    id="owner-trends-fill"
+                    class="owner-trends-fill"
+                    d={@sales_trend.fill_path}
+                  />
+                  <path
+                    :if={@sales_trend.path != ""}
+                    id="owner-trends-line"
+                    class="owner-trends-line"
+                    d={@sales_trend.path}
+                    fill="none"
+                    stroke-linejoin="round"
+                    stroke-linecap="round"
+                  />
+                </svg>
+                <span
+                  :for={{point, index} <- Enum.with_index(@sales_trend.points)}
+                  id={"owner-trend-dot-#{index}"}
+                  class="owner-trends-dot"
+                  style={"left: #{point.x}%; top: #{point.y}%; --i: #{index}"}
+                >
+                </span>
+              </div>
+              <ol class="owner-trends-x">
+                <li
+                  :for={{point, index} <- Enum.with_index(@sales_trend.points)}
+                  id={"owner-trend-x-#{index}"}
+                  data-date={point.date}
+                >
+                  {point.label}
+                </li>
+              </ol>
+            </div>
+          </div>
+        </section>
+
+        <section
+          :if={@primary != [] and not @owner_dashboard?}
+          class={["dashboard-launch", length(@primary) == 1 && "is-single"]}
+          aria-label="Primary action"
+        >
+          <.link
+            :for={item <- @primary}
+            navigate={item.path}
+            class={["dashboard-launch-btn", item[:class]]}
+            id={"staff-home-#{item.id}"}
           >
-            <header class="dashboard-head" id="staff-home-identity">
-              <div class="dashboard-head-copy">
-                <p class="dashboard-kicker">{User.role_label(@current_user.role)}</p>
-                <h1 class="dashboard-heading text-slate-900" id="staff-home-greeting">{@greeting}</h1>
-                <p class="staff-home-lede dashboard-lede">
-                  Here's what's happening at your coffee shop today.
-                </p>
-                <p
-                  class={["dashboard-shop-line", shop_line_class(@shop_day_status)]}
-                  id="staff-home-shop-line"
-                >
-                  <span class="dashboard-status-dot" aria-hidden="true"></span>
-                  <span>{Calendar.strftime(@shop_date, "%a %b %d")}</span>
-                  <span aria-hidden="true">·</span>
-                  <span>{shop_day_status_label(@shop_day_status)}</span>
-                </p>
-              </div>
-            </header>
+            <span :if={item[:icon]} class="dashboard-launch-mark" aria-hidden="true">
+              <.icon name={item.icon} class="staff-home-card-glyph" />
+            </span>
+            <span class="dashboard-launch-copy">
+              <span class="dashboard-launch-title">{item.title}</span>
+              <span class="dashboard-launch-body">{item.body}</span>
+            </span>
+          </.link>
+        </section>
 
-            <section :if={@shop_open_prompt?} class="staff-home-shop-open" id="staff-home-shop-open">
-              <p class="staff-home-shop-open-title">Opening cash required</p>
-              <p class="staff-home-shop-open-body">
-                Count the drawer once before selling. POS and orders stay locked until this is recorded.
-              </p>
-            </section>
-
-            <.shop_day_sales_banner
-              :if={!@shop_open_prompt?}
-              status={@shop_day_status}
-              id="staff-home-shop-closed"
-              show_open_link={false}
-            />
-
-            <section
-              class={[
-                "mb-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4",
-                @owner_dashboard? && "owner-kpi-grid"
-              ]}
-              id="staff-home-kpis"
-              aria-label="Key numbers"
-            >
-              <%= if @money? do %>
-                <article class="staff-kpi-float" id="dashboard-panel-sales">
-                  <div class="flex items-start justify-between gap-3">
-                    <.icon name="hero-banknotes" class="h-5 w-5 text-[#394331]" />
-                    <span class={["text-xs font-medium", sales_delta_class(@sales_delta)]}>
-                      {@sales_delta.short}
-                    </span>
-                  </div>
-                  <strong class="mt-4 block text-[1.65rem] font-semibold tracking-tight text-slate-900">
-                    {peso_kpi(@sales.todays_paid_total)}
-                  </strong>
-                  <p class="mt-1 text-sm font-medium text-slate-800">Total Sales Today</p>
-                  <p class="mt-0.5 text-xs text-slate-400">vs yesterday</p>
-                </article>
-                <article class="staff-kpi-float" id="dashboard-kpi-tickets">
-                  <div class="flex items-start justify-between gap-3">
-                    <.icon name="hero-clipboard-document-list" class="h-5 w-5 text-[#394331]" />
-                    <span class={["text-xs font-medium", sales_delta_class(@orders_delta)]}>
-                      {@orders_delta.short}
-                    </span>
-                  </div>
-                  <strong class="mt-4 block text-[1.65rem] font-semibold tracking-tight text-slate-900">
-                    {@sales.todays_paid_count}
-                  </strong>
-                  <p class="mt-1 text-sm font-medium text-slate-800">Orders Completed</p>
-                  <p class="mt-0.5 text-xs text-slate-400">vs yesterday</p>
-                </article>
-                <article class="staff-kpi-float" id="dashboard-panel-top-item">
-                  <div class="flex items-start justify-between gap-3">
-                    <.icon name="hero-shopping-bag" class="h-5 w-5 text-[#394331]" />
-                    <span class="text-xs font-medium text-[#3d6b45]">
-                      {top_seller_badge(@top_seller)}
-                    </span>
-                  </div>
-                  <strong class="mt-4 block truncate text-[1.35rem] font-semibold tracking-tight text-slate-900">
-                    {top_seller_name(@top_seller)}
-                  </strong>
-                  <p class="mt-1 text-sm font-medium text-slate-800">Top-selling item</p>
-                  <p class="mt-0.5 text-xs text-slate-400">today</p>
-                </article>
-                <article
-                  :if={@owner_dashboard?}
-                  class="staff-kpi-float"
-                  id="dashboard-kpi-staff-shift"
-                >
-                  <div class="flex items-start justify-between gap-3">
-                    <.icon name="hero-user-group" class="h-5 w-5 text-[#394331]" />
-                    <span class="text-xs font-medium text-[#3d6b45]">
-                      {staff_on_shift_badge(@staff_on_shift)}
-                    </span>
-                  </div>
-                  <strong class="mt-4 block text-[1.65rem] font-semibold tracking-tight text-slate-900">
-                    {@staff_on_shift}
-                  </strong>
-                  <p class="mt-1 text-sm font-medium text-slate-800">Active Staff on Shift</p>
-                  <p class="mt-0.5 text-xs text-slate-400">current shift</p>
-                </article>
-                <article :if={not @owner_dashboard?} class="staff-kpi-float" id="dashboard-kpi-drawer">
-                  <div class="flex items-start justify-between gap-3">
-                    <.icon name="hero-wallet" class="h-5 w-5 text-[#394331]" />
-                  </div>
-                  <strong class="mt-4 block text-[1.65rem] font-semibold tracking-tight text-slate-900">
-                    {peso_kpi(drawer_cash(@drawer_summary))}
-                  </strong>
-                  <p class="mt-1 text-sm font-medium text-slate-800">Cash in drawer</p>
-                  <p class="mt-0.5 text-xs text-slate-400">{drawer_kpi_hint(@drawer_summary)}</p>
-                </article>
-              <% else %>
-                <article class="staff-kpi-float" id="staff-home-kpi-active">
-                  <div class="flex items-start justify-between gap-3">
-                    <.icon name="hero-user-group" class="h-5 w-5 text-[#394331]" />
-                  </div>
-                  <strong class="mt-4 block text-[1.65rem] font-semibold tracking-tight text-slate-900">
-                    {@overview.active_count}
-                  </strong>
-                  <p class="mt-1 text-sm font-medium text-slate-800">Active</p>
-                  <p class="mt-0.5 text-xs text-slate-400">Received + preparing</p>
-                </article>
-                <article class="staff-kpi-float" id="staff-home-kpi-unpaid">
-                  <div class="flex items-start justify-between gap-3">
-                    <.icon name="hero-exclamation-triangle" class="h-5 w-5 text-[#394331]" />
-                  </div>
-                  <strong class="mt-4 block text-[1.65rem] font-semibold tracking-tight text-slate-900">
-                    {@overview.unpaid_active_count}
-                  </strong>
-                  <p class="mt-1 text-sm font-medium text-slate-800">Unpaid</p>
-                  <p class="mt-0.5 text-xs text-slate-400">Still open on the board</p>
-                </article>
-                <article class="staff-kpi-float" id="staff-home-kpi-preparing">
-                  <div class="flex items-start justify-between gap-3">
-                    <.icon name="hero-clock" class="h-5 w-5 text-[#394331]" />
-                  </div>
-                  <strong class="mt-4 block text-[1.65rem] font-semibold tracking-tight text-slate-900">
-                    {@overview.preparing_count}
-                  </strong>
-                  <p class="mt-1 text-sm font-medium text-slate-800">Preparing</p>
-                  <p class="mt-0.5 text-xs text-slate-400">In progress</p>
-                </article>
-                <article class="staff-kpi-float" id="staff-home-kpi-tickets">
-                  <div class="flex items-start justify-between gap-3">
-                    <.icon name="hero-document-text" class="h-5 w-5 text-[#394331]" />
-                  </div>
-                  <strong class="mt-4 block text-[1.65rem] font-semibold tracking-tight text-slate-900">
-                    {@overview.todays_count}
-                  </strong>
-                  <p class="mt-1 text-sm font-medium text-slate-800">Tickets</p>
-                  <p class="mt-0.5 text-xs text-slate-400">Placed this shop day</p>
-                </article>
-              <% end %>
-            </section>
-
-            <section
-              :if={@owner_dashboard?}
-              class="owner-trends"
-              id="owner-sales-trends"
-              aria-labelledby="owner-trends-heading"
-              data-range={@chart_range}
-              phx-hook="OwnerSalesTrend"
-            >
-              <header class="owner-trends-head">
-                <h2 class="owner-trends-title" id="owner-trends-heading">Sales Trends</h2>
-                <div class="owner-trends-ranges" role="tablist" aria-label="Sales range">
-                  <button
-                    :for={range <- [:daily, :weekly, :monthly]}
-                    type="button"
-                    id={"owner-chart-#{range}"}
-                    class={["owner-trends-range", @chart_range == range && "is-active"]}
-                    phx-click="owner_chart_range"
-                    phx-value-range={range}
-                    role="tab"
-                    aria-selected={@chart_range == range}
-                  >
-                    {owner_range_label(range)}
-                  </button>
-                </div>
-              </header>
-              <div class="owner-trends-body">
-                <ul class="owner-trends-y" aria-hidden="true">
-                  <li :for={tick <- @sales_trend.y_ticks}>{tick.label}</li>
-                </ul>
-                <div class="owner-trends-plot">
-                  <div class="owner-trends-svg-wrap">
-                    <svg
-                      class="owner-trends-svg"
-                      id={"owner-trends-plot-#{@chart_range}"}
-                      viewBox="0 0 100 100"
-                      preserveAspectRatio="none"
-                      role="img"
-                      aria-label="Paid sales trend"
-                    >
-                      <g class="owner-trends-grid" aria-hidden="true">
-                        <line
-                          :for={tick <- @sales_trend.y_ticks}
-                          x1="0"
-                          x2="100"
-                          y1={tick.y}
-                          y2={tick.y}
-                        />
-                      </g>
-                      <path
-                        :if={@sales_trend.fill_path != ""}
-                        id="owner-trends-fill"
-                        class="owner-trends-fill"
-                        d={@sales_trend.fill_path}
-                      />
-                      <path
-                        :if={@sales_trend.path != ""}
-                        id="owner-trends-line"
-                        class="owner-trends-line"
-                        d={@sales_trend.path}
-                        fill="none"
-                        stroke-linejoin="round"
-                        stroke-linecap="round"
-                      />
-                    </svg>
-                    <span
-                      :for={{point, index} <- Enum.with_index(@sales_trend.points)}
-                      id={"owner-trend-dot-#{index}"}
-                      class="owner-trends-dot"
-                      style={"left: #{point.x}%; top: #{point.y}%; --i: #{index}"}
-                    >
-                    </span>
-                  </div>
-                  <ol class="owner-trends-x">
-                    <li
-                      :for={{point, index} <- Enum.with_index(@sales_trend.points)}
-                      id={"owner-trend-x-#{index}"}
-                      data-date={point.date}
-                    >
-                      {point.label}
-                    </li>
-                  </ol>
-                </div>
-              </div>
-            </section>
-
-            <section
-              :if={@primary != [] and not @owner_dashboard?}
-              class={["dashboard-launch", length(@primary) == 1 && "is-single"]}
-              aria-label="Primary action"
-            >
-              <.link
-                :for={item <- @primary}
-                navigate={item.path}
-                class={["dashboard-launch-btn", item[:class]]}
-                id={"staff-home-#{item.id}"}
-              >
-                <span :if={item[:icon]} class="dashboard-launch-mark" aria-hidden="true">
-                  <.icon name={item.icon} class="staff-home-card-glyph" />
-                </span>
-                <span class="dashboard-launch-copy">
-                  <span class="dashboard-launch-title">{item.title}</span>
-                  <span class="dashboard-launch-body">{item.body}</span>
-                </span>
-              </.link>
-            </section>
-
-            <div :if={@money? and @owner_dashboard?} class="owner-home-boards" id="owner-home-boards">
-              <div class="owner-board-stack">
-                <.payment_methods_card via_rows={@via_rows} />
-                <.drawer_card drawer_summary={@drawer_summary} shift_close={@shift_close} />
-              </div>
-              <div class="owner-board-stack">
-                <.sales_by_item_card popular_products={@popular_products} />
-                <.payout_card item_payouts={@item_payouts} />
-              </div>
-            </div>
-
-            <div :if={@money? and not @owner_dashboard?} class="dashboard-split">
-              <.drawer_card drawer_summary={@drawer_summary} shift_close={@shift_close} />
-              <.payment_methods_card via_rows={@via_rows} />
-              <.sales_by_item_card popular_products={@popular_products} />
-            </div>
-
-            <.payout_card :if={@money? and not @owner_dashboard?} item_payouts={@item_payouts} />
-
-            <section
-              :if={not @owner_dashboard? and (@launch_tools != [] or @shift_tools != [])}
-              class="staff-home-desk-tools"
-              aria-label="Now"
-            >
-              <div class="staff-home-secondary">
-                <.link
-                  :for={item <- @launch_tools}
-                  navigate={item.path}
-                  class={["staff-home-tool-link", item[:class]]}
-                  id={"staff-home-#{item.id}"}
-                >
-                  <span :if={item[:icon]} class="staff-home-tool-icon" aria-hidden="true">
-                    <.icon name={item.icon} class="staff-home-card-glyph" />
-                  </span>
-                  <span class="staff-home-tool-label">
-                    {item.title}
-                    <span
-                      :if={is_integer(item[:count]) and item.count > 0}
-                      class="staff-home-inline-count"
-                    >
-                      {item.count}
-                    </span>
-                  </span>
-                  <span class="staff-home-tool-body">{item.body}</span>
-                </.link>
-              </div>
-              <div :if={@shift_tools != []} class="staff-home-tertiary">
-                <.link
-                  :for={item <- @shift_tools}
-                  navigate={item.path}
-                  class={["staff-home-tool-link", "staff-home-tool-link--quiet", item[:class]]}
-                  id={"staff-home-#{item.id}"}
-                >
-                  <span :if={item[:icon]} class="staff-home-tool-icon" aria-hidden="true">
-                    <.icon name={item.icon} class="staff-home-card-glyph" />
-                  </span>
-                  <span class="staff-home-tool-label">{item.title}</span>
-                  <span class="staff-home-tool-body">{item.body}</span>
-                </.link>
-              </div>
-            </section>
-
-            <section
-              :if={@printer_on_home? and not @owner_dashboard?}
-              class="staff-home-printer staff-home-printer--compact"
-              id="staff-home-printer"
-              aria-label="Printer"
-            >
-              <div class="staff-home-printer-copy">
-                <p class="staff-home-today-eyebrow">Printer</p>
-                <p class="staff-home-today-meta">
-                  LAN · {Printer.host()}:{Printer.port()}
-                </p>
-              </div>
-              <div class="staff-home-printer-actions">
-                <button
-                  type="button"
-                  id="staff-printer-test"
-                  class="staff-home-printer-btn"
-                  phx-click="printer_test_print"
-                >
-                  Test print
-                </button>
-                <button
-                  type="button"
-                  id="staff-printer-drawer"
-                  class="staff-home-printer-btn"
-                  phx-click="printer_open_drawer"
-                >
-                  Test Drawer
-                </button>
-              </div>
-              <p
-                :if={@printer_note}
-                class="staff-home-today-meta staff-home-printer-note"
-                id="staff-printer-note"
-              >
-                {@printer_note}
-              </p>
-            </section>
-          </main>
+        <div :if={@money? and @owner_dashboard?} class="owner-home-boards" id="owner-home-boards">
+          <div class="owner-board-stack">
+            <.payment_methods_card via_rows={@via_rows} />
+            <.drawer_card drawer_summary={@drawer_summary} shift_close={@shift_close} />
+          </div>
+          <div class="owner-board-stack">
+            <.sales_by_item_card popular_products={@popular_products} />
+            <.payout_card item_payouts={@item_payouts} />
+          </div>
         </div>
-      </div>
+
+        <div :if={@money? and not @owner_dashboard?} class="dashboard-split">
+          <.drawer_card drawer_summary={@drawer_summary} shift_close={@shift_close} />
+          <.payment_methods_card via_rows={@via_rows} />
+          <.sales_by_item_card popular_products={@popular_products} />
+        </div>
+
+        <.payout_card :if={@money? and not @owner_dashboard?} item_payouts={@item_payouts} />
+
+        <section
+          :if={not @owner_dashboard? and (@launch_tools != [] or @shift_tools != [])}
+          class="staff-home-desk-tools"
+          aria-label="Now"
+        >
+          <div class="staff-home-secondary">
+            <.link
+              :for={item <- @launch_tools}
+              navigate={item.path}
+              class={["staff-home-tool-link", item[:class]]}
+              id={"staff-home-#{item.id}"}
+            >
+              <span :if={item[:icon]} class="staff-home-tool-icon" aria-hidden="true">
+                <.icon name={item.icon} class="staff-home-card-glyph" />
+              </span>
+              <span class="staff-home-tool-label">
+                {item.title}
+                <span
+                  :if={is_integer(item[:count]) and item.count > 0}
+                  class="staff-home-inline-count"
+                >
+                  {item.count}
+                </span>
+              </span>
+              <span class="staff-home-tool-body">{item.body}</span>
+            </.link>
+          </div>
+          <div :if={@shift_tools != []} class="staff-home-tertiary">
+            <.link
+              :for={item <- @shift_tools}
+              navigate={item.path}
+              class={["staff-home-tool-link", "staff-home-tool-link--quiet", item[:class]]}
+              id={"staff-home-#{item.id}"}
+            >
+              <span :if={item[:icon]} class="staff-home-tool-icon" aria-hidden="true">
+                <.icon name={item.icon} class="staff-home-card-glyph" />
+              </span>
+              <span class="staff-home-tool-label">{item.title}</span>
+              <span class="staff-home-tool-body">{item.body}</span>
+            </.link>
+          </div>
+        </section>
+
+        <section
+          :if={@printer_on_home? and not @owner_dashboard?}
+          class="staff-home-printer staff-home-printer--compact"
+          id="staff-home-printer"
+          aria-label="Printer"
+        >
+          <div class="staff-home-printer-copy">
+            <p class="staff-home-today-eyebrow">Printer</p>
+            <p class="staff-home-today-meta">
+              LAN · {Printer.host()}:{Printer.port()}
+            </p>
+          </div>
+          <div class="staff-home-printer-actions">
+            <button
+              type="button"
+              id="staff-printer-test"
+              class="staff-home-printer-btn"
+              phx-click="printer_test_print"
+            >
+              Test print
+            </button>
+            <button
+              type="button"
+              id="staff-printer-drawer"
+              class="staff-home-printer-btn"
+              phx-click="printer_open_drawer"
+            >
+              Test Drawer
+            </button>
+          </div>
+          <p
+            :if={@printer_note}
+            class="staff-home-today-meta staff-home-printer-note"
+            id="staff-printer-note"
+          >
+            {@printer_note}
+          </p>
+        </section>
+      </main>
     </.staff_shell>
     """
   end
@@ -638,13 +581,6 @@ defmodule EspresoWeb.StaffHomeLive do
     socket
     |> assign(:overview, overview)
     |> assign(:owner_dashboard?, owner_dashboard?)
-    |> assign(
-      :owner_nav_groups,
-      if(owner_dashboard?,
-        do: user |> StaffComponents.staff_nav_items() |> StaffComponents.staff_nav_groups(),
-        else: []
-      )
-    )
     |> assign(:staff_on_shift, if(owner_dashboard?, do: staff_on_shift_count(), else: 0))
     |> assign(:chart_range, if(owner_dashboard?, do: chart_range, else: :daily))
     |> assign(:sales_chart, sales_chart)
