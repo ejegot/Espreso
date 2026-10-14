@@ -139,6 +139,11 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     {:noreply, append_close_history(socket)}
   end
 
+  def handle_event("toggle_history", %{"date" => date}, socket) do
+    open = if socket.assigns.history_open == date, do: nil, else: date
+    {:noreply, assign(socket, :history_open, open)}
+  end
+
   def handle_event("print_day_report", params, socket) do
     close = printable_close(socket, params)
 
@@ -601,52 +606,76 @@ defmodule EspresoWeb.StaffShiftCloseLive do
           >
             <article
               :for={entry <- @close_history}
-              class="staff-shift-close-history-row"
+              class={[
+                "staff-shift-close-history-row",
+                history_open?(@history_open, entry.close.shop_date) && "is-open"
+              ]}
               id={"staff-shift-close-history-#{Date.to_iso8601(entry.close.shop_date)}"}
             >
-              <div class="staff-shift-close-history-row-main">
-                <p class="staff-shift-close-history-date">
+              <button
+                type="button"
+                class="staff-shift-close-history-summary"
+                id={"staff-shift-close-history-toggle-#{Date.to_iso8601(entry.close.shop_date)}"}
+                phx-click="toggle_history"
+                phx-value-date={Date.to_iso8601(entry.close.shop_date)}
+                aria-expanded={
+                  if(history_open?(@history_open, entry.close.shop_date),
+                    do: "true",
+                    else: "false"
+                  )
+                }
+              >
+                <span class="staff-shift-close-history-date">
                   {Calendar.strftime(entry.close.shop_date, "%b %-d, %Y")}
-                </p>
-                <p class="staff-shift-close-history-meta">
+                </span>
+                <span class="staff-shift-close-history-meta">
                   Closed {Shifts.format_closed_at(entry.close.closed_at)}
                   <span :if={entry.close.closed_by_user}>
                     · {entry.close.closed_by_user.name}
                   </span>
-                </p>
-                <p class="staff-shift-close-history-totals">
+                </span>
+                <span class="staff-shift-close-history-totals">
                   {Menu.format_price(entry.close.system_total)}
                   <span>· {entry.close.system_count} orders</span>
+                </span>
+                <span :if={entry.close.counted_cash} class="staff-shift-close-history-drawer">
+                  Drawer {Menu.format_price(entry.close.counted_cash)}
+                </span>
+              </button>
+
+              <div
+                :if={history_open?(@history_open, entry.close.shop_date)}
+                class="staff-shift-close-history-detail"
+                id={"staff-shift-close-history-detail-#{Date.to_iso8601(entry.close.shop_date)}"}
+              >
+                <ul class="staff-paid-breakdown staff-shift-close-history-breakdown">
+                  <li :for={row <- entry.via_rows} class="staff-paid-breakdown-row">
+                    <span class="staff-paid-breakdown-label">{row.label}</span>
+                    <span class="staff-paid-breakdown-total">{Menu.format_price(row.total)}</span>
+                    <span class="staff-paid-breakdown-count">{row.count}</span>
+                  </li>
+                </ul>
+
+                <p :if={entry.close.counted_cash} class="staff-shift-close-history-counted">
+                  Counted {Menu.format_price(entry.close.counted_cash)}
+                  <span :if={entry.close.variance}>
+                    · {variance_copy(entry.close.variance)}
+                  </span>
+                </p>
+                <button
+                  :if={Printer.enabled?()}
+                  type="button"
+                  class="staff-shift-close-history-print"
+                  id={"staff-shift-close-print-#{Date.to_iso8601(entry.close.shop_date)}"}
+                  phx-click="print_day_report"
+                  phx-value-date={Date.to_iso8601(entry.close.shop_date)}
+                >
+                  Print
+                </button>
+                <p :if={entry.close.notes} class="staff-shift-close-history-notes">
+                  {entry.close.notes}
                 </p>
               </div>
-
-              <ul class="staff-paid-breakdown staff-shift-close-history-breakdown">
-                <li :for={row <- entry.via_rows} class="staff-paid-breakdown-row">
-                  <span class="staff-paid-breakdown-label">{row.label}</span>
-                  <span class="staff-paid-breakdown-total">{Menu.format_price(row.total)}</span>
-                  <span class="staff-paid-breakdown-count">{row.count}</span>
-                </li>
-              </ul>
-
-              <p :if={entry.close.counted_cash} class="staff-shift-close-history-counted">
-                Counted {Menu.format_price(entry.close.counted_cash)}
-                <span :if={entry.close.variance}>
-                  · {variance_copy(entry.close.variance)}
-                </span>
-              </p>
-              <button
-                :if={Printer.enabled?()}
-                type="button"
-                class="staff-shift-close-history-more"
-                id={"staff-shift-close-print-#{Date.to_iso8601(entry.close.shop_date)}"}
-                phx-click="print_day_report"
-                phx-value-date={Date.to_iso8601(entry.close.shop_date)}
-              >
-                Print
-              </button>
-              <p :if={entry.close.notes} class="staff-shift-close-history-notes">
-                {entry.close.notes}
-              </p>
             </article>
           </div>
 
@@ -779,6 +808,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     |> assign(:close_history, Enum.map(closes, &history_entry/1))
     |> assign(:close_history_has_next?, has_next?)
     |> assign(:close_history_next_cursor, next_cursor)
+    |> assign_new(:history_open, fn -> nil end)
   end
 
   defp append_close_history(socket) do
@@ -803,6 +833,12 @@ defmodule EspresoWeb.StaffShiftCloseLive do
   defp history_entry(close) do
     %{close: close, via_rows: closed_via_rows(close)}
   end
+
+  defp history_open?(open, %Date{} = date) do
+    open == Date.to_iso8601(date)
+  end
+
+  defp history_open?(_, _), do: false
 
   defp latest_closed_shift(%User{id: user_id}) do
     case StaffShifts.list_shifts_for_user(user_id, limit: 1) do
