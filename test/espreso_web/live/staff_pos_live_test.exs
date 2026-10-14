@@ -543,11 +543,13 @@ defmodule EspresoWeb.StaffPosLiveTest do
     {:ok, owner_view, _html} = live(log_in(conn, owner), ~p"/pos")
     assert has_element?(owner_view, "#pos-place-order")
     refute has_element?(owner_view, "#owner-dashboard")
+    assert has_element?(owner_view, "#owner-dash-aside.owner-dash-aside--flyout")
+    assert has_element?(owner_view, "#owner-dash-nav-home", "Home")
     assert has_element?(owner_view, "#staff-nav-drawer-panel #staff-nav-staff", "Staff")
     assert has_element?(owner_view, "#staff-nav-drawer-panel #staff-nav-settings", "Settings")
   end
 
-  test "POS shows available products and hides unavailable", %{
+  test "POS shows unavailable products with a mark and does not add them", %{
     conn: conn,
     barista: barista,
     espresso: espresso
@@ -556,7 +558,8 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     assert has_element?(view, "#pos-product-#{espresso.id}", "Espresso")
     assert html =~ "Espresso"
-    refute html =~ "Hidden Mocha"
+    assert has_element?(view, "#pos-products", "Hidden Mocha")
+    assert has_element?(view, "#pos-products .is-unavailable", "Unavailable")
     assert has_element?(view, "#pos-category-HOT", "Hot coffee")
     assert has_element?(view, "#pos-category-COLD", "Iced coffee")
     assert has_element?(view, "#pos-catalog-title", "Categories")

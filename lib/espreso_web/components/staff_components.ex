@@ -33,13 +33,15 @@ defmodule EspresoWeb.StaffComponents do
         Orders.new_lane_count()
       end
 
-    owner_rail? = owner_rail?(assigns.current_user, assigns.current)
+    owner_rail? = owner_rail?(assigns.current_user)
+    owner_rail_overlay? = owner_rail? and assigns.current in [:orders, :pos]
 
     assigns =
       assigns
       |> assign(:drawer_nav, items)
       |> assign(:orders_badge_count, orders_badge_count)
       |> assign(:owner_rail?, owner_rail?)
+      |> assign(:owner_rail_overlay?, owner_rail_overlay?)
       |> assign(:owner_nav_groups, if(owner_rail?, do: staff_nav_groups(items), else: []))
 
     ~H"""
@@ -89,7 +91,7 @@ defmodule EspresoWeb.StaffComponents do
             aria-label="Elilai Kafe Home"
           >
             <img
-              src={~p"/images/elilai-kafe/elilai-kafe-logo.png"}
+              src={~p"/images/elilai-kafe/elilai-kafe-mark.png"}
               alt=""
               class="staff-bar-brand-logo"
               width="1024"
@@ -195,12 +197,16 @@ defmodule EspresoWeb.StaffComponents do
           </div>
         </header>
 
+        <%= if @owner_rail_overlay? do %>
+          <.owner_dash_rail flyout current={@current} groups={@owner_nav_groups} />
+        <% end %>
+
         <div class={[
           "staff-shell-body",
           @chrome == :rail && "staff-shell-body--rail",
           @chrome == :bar && "staff-shell-body--bar"
         ]}>
-          <%= if @owner_rail? do %>
+          <%= if @owner_rail? and not @owner_rail_overlay? do %>
             <div class="owner-dash" id="owner-dashboard">
               <.owner_dash_rail current={@current} groups={@owner_nav_groups} />
               <div class="owner-dash-canvas">
@@ -301,10 +307,16 @@ defmodule EspresoWeb.StaffComponents do
 
   attr :current, :atom, required: true
   attr :groups, :list, required: true
+  attr :flyout, :boolean, default: false
 
   defp owner_dash_rail(assigns) do
     ~H"""
-    <aside class="owner-dash-aside" id="owner-dash-aside" aria-label="Owner" phx-hook="OwnerDashRail">
+    <aside
+      class={["owner-dash-aside", @flyout && "owner-dash-aside--flyout"]}
+      id="owner-dash-aside"
+      aria-label="Owner"
+      phx-hook="OwnerDashRail"
+    >
       <div class="owner-dash-rail">
         <nav class="owner-dash-nav">
           <section
@@ -343,8 +355,8 @@ defmodule EspresoWeb.StaffComponents do
     """
   end
 
-  defp owner_rail?(%User{role: "owner"}, current) when current not in [:orders, :pos], do: true
-  defp owner_rail?(_user, _current), do: false
+  defp owner_rail?(%User{role: "owner"}), do: true
+  defp owner_rail?(_user), do: false
 
   @nav_groups [
     {:counter, "Counter"},

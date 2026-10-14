@@ -28,7 +28,7 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
     assert html =~ ~s(name="theme-color" content="#394331")
     assert html =~ ~s(rel="apple-touch-icon")
     assert html =~ ~s(href="/images/elilai-kafe/apple-touch-icon.png")
-    assert html =~ ~s(href="/assets/app.css?v=owner-dash-32")
+    assert html =~ ~s(href="/assets/app.css?v=owner-dash-34")
 
     # Employee login fonts: DM Sans + Instrument Serif only (not Fraunces/Figtree).
     assert html =~ "family=DM+Sans"
@@ -82,7 +82,7 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
 
       assert has_element?(
                view,
-               "#staff-bar-brand img.staff-bar-brand-logo[src='/images/elilai-kafe/elilai-kafe-logo.png']"
+               "#staff-bar-brand img.staff-bar-brand-logo[src='/images/elilai-kafe/elilai-kafe-mark.png']"
              )
 
       assert has_element?(view, "#staff-pos-rail #staff-account-menu")

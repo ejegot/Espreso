@@ -339,11 +339,23 @@ defmodule Espreso.Menu do
   and display groups (FOOD is split into subcategories).
   """
   def list_menu do
+    load_menu(true)
+  end
+
+  @doc """
+  Menu for POS and the QR menu. Unavailable products stay on the board
+  with `available: false` so staff and customers can see they exist.
+  """
+  def list_display_menu do
+    load_menu(false)
+  end
+
+  defp load_menu(available_only?) do
     Category
     |> Tenancy.scope_to_branch()
     |> preload(products: :product_prices)
     |> Repo.all()
-    |> Enum.map(&filter_available_products/1)
+    |> Enum.map(&prepare_menu_products(&1, available_only?))
     |> Enum.reject(&(&1.products == []))
     |> Enum.sort_by(&category_position/1)
     |> Enum.map(&decorate_category/1)
@@ -843,10 +855,10 @@ defmodule Espreso.Menu do
     Map.get(line, :name) || Map.get(line, "name") || "Item"
   end
 
-  defp filter_available_products(category) do
+  defp prepare_menu_products(category, available_only?) do
     products =
       category.products
-      |> Enum.filter(& &1.available)
+      |> Enum.filter(fn product -> not available_only? or product.available end)
       |> Enum.sort_by(& &1.id)
       |> Enum.map(fn product ->
         prices =

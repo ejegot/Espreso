@@ -145,6 +145,9 @@ defmodule Espreso.MenuTest do
       hot_after_86 = Menu.list_menu() |> Enum.find(&(&1.name == "HOT"))
       refute hot_after_86 && Enum.any?(hot_after_86.products, &(&1.id == product.id))
 
+      hot_display = Menu.list_display_menu() |> Enum.find(&(&1.name == "HOT"))
+      assert Enum.any?(hot_display.products, &(&1.id == product.id and &1.available == false))
+
       assert {:ok, available} = Menu.update_availability_as(owner, product.id, true)
       assert available.available == true
 

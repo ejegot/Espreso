@@ -5004,6 +5004,59 @@ body:has(.menu-page-locked) {
   }
 }
 
+.owner-dash-aside.owner-dash-aside--flyout {
+  display: none;
+}
+
+.owner-dash-aside.owner-dash-aside--flyout.is-open {
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  z-index: 35;
+  top: 3.5rem;
+  left: 0;
+  bottom: 0;
+  width: 13.25rem;
+  min-width: 13.25rem;
+  height: auto;
+  padding: 0.75rem 0.65rem 0.85rem;
+  overflow: hidden;
+  background: var(--elilai-forest, #394331);
+  color: #fff;
+  box-shadow: 12px 0 40px rgba(30, 37, 28, 0.22);
+}
+
+.owner-dash-aside.owner-dash-aside--flyout.is-open .owner-dash-rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.owner-dash-aside.owner-dash-aside--flyout.is-open .owner-dash-nav-group-label,
+.owner-dash-aside.owner-dash-aside--flyout.is-open .owner-dash-nav-label {
+  width: auto;
+  height: auto;
+  padding: 0.05rem 0.6rem 0.28rem;
+  opacity: 1;
+  overflow: visible;
+}
+
+.owner-dash-aside.owner-dash-aside--flyout.is-open .owner-dash-nav-label {
+  padding: 0;
+}
+
+.owner-dash-aside.owner-dash-aside--flyout.is-open .owner-dash-nav-link {
+  justify-content: flex-start;
+  gap: 0.55rem;
+  padding-inline: 0.6rem;
+}
+
 .dashboard-head {
   display: flex;
   flex-wrap: wrap;
@@ -8587,6 +8640,35 @@ a.staff-home-card:focus-visible {
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-product-card:active {
   transform: scale(0.985);
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-product-card.is-unavailable {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.staff-pos-page.staff-pos-page--cafe .staff-pos-product-card.is-unavailable:hover,
+.staff-pos-page.staff-pos-page--cafe .staff-pos-product-card.is-unavailable:active {
+  transform: none;
+  border-color: color-mix(in srgb, var(--elilai-ink, #2e3529) 10%, transparent);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--elilai-ink, #2e3529) 4%, transparent);
+}
+
+.staff-pos-unavailable-badge,
+.menu-unavailable-badge {
+  position: absolute;
+  left: 0.45rem;
+  bottom: 0.45rem;
+  z-index: 2;
+  padding: 0.18rem 0.45rem;
+  border-radius: 999px;
+  background: var(--elilai-forest, #394331);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-transform: uppercase;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-product-card.is-added {
@@ -13374,6 +13456,7 @@ body:has(.staff-nav-drawer.is-open) {
   height: 2.4rem;
   object-fit: contain;
   flex: 0 0 auto;
+  filter: brightness(0) invert(1);
 }
 
 .staff-nav-drawer-brand-name {
@@ -24704,6 +24787,21 @@ html:not(.page-is-loading) .brune-top {
 
 .menu-live-root .brune-menu-item-card:has(.brune-menu-add:active) {
   transform: scale(0.992);
+}
+
+.menu-live-root .brune-menu-item-card.is-unavailable,
+.menu-live-root .menu-signature-card.is-unavailable {
+  opacity: 0.72;
+}
+
+.menu-live-root .brune-menu-item-card.is-unavailable .brune-menu-item-open,
+.menu-live-root .menu-signature-card.is-unavailable .menu-signature-card-open {
+  cursor: default;
+}
+
+.menu-live-root .brune-menu-item-thumb,
+.menu-live-root .menu-signature-card-media {
+  position: relative;
 }
 
 .menu-live-root .brune-menu-body {

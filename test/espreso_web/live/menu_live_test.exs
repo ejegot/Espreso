@@ -143,6 +143,7 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#menu-detail")
     assert has_element?(view, "#menu-detail-title", "Signature Tablea")
     assert has_element?(view, "#menu-detail .menu-detail-price", "₱169")
+
     assert has_element?(
              view,
              "#menu-detail .menu-detail-description",
@@ -1010,13 +1011,15 @@ defmodule EspresoWeb.MenuLiveTest do
     assert muffins_index < cakes_index
   end
 
-  test "/menu does not display unavailable products", %{conn: conn} do
+  test "/menu marks unavailable products and does not open them", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/menu")
     view = enter_menu_browse(view)
     html = render(view)
 
-    refute html =~ "Secret Blend"
-    refute html =~ "₱999"
+    assert html =~ "Secret Blend"
+    assert html =~ "Unavailable"
+    assert html =~ "₱999"
+    refute has_element?(view, "#menu-detail")
   end
 
   test "/menu hides FOOD subgroups when all products are unavailable", %{conn: conn, food: food} do
@@ -1032,12 +1035,13 @@ defmodule EspresoWeb.MenuLiveTest do
 
     assert html =~ "Rice Meal"
     assert html =~ "Chicken Flakes"
-    refute html =~ "Appetizers"
-    refute html =~ "Solo Fries"
-    refute html =~ "Beef Nachos"
+    assert html =~ "Appetizers"
+    assert html =~ "Solo Fries"
+    assert html =~ "Beef Nachos"
+    assert html =~ "Unavailable"
   end
 
-  test "/menu hides categories when all products are unavailable", %{conn: conn, cold: cold} do
+  test "/menu keeps categories when every product is unavailable", %{conn: conn, cold: cold} do
     cold
     |> then(fn category ->
       Repo.get_by!(Product, name: "Hazelnut", category_id: category.id)
@@ -1049,8 +1053,9 @@ defmodule EspresoWeb.MenuLiveTest do
     view = enter_menu_browse(view)
     html = render(view)
 
-    refute has_element?(view, "#category-COLD")
-    refute html =~ "Hazelnut"
+    assert has_element?(view, "#category-COLD")
+    assert html =~ "Hazelnut"
+    assert html =~ "Unavailable"
     assert has_element?(view, "#category-HOT")
   end
 
