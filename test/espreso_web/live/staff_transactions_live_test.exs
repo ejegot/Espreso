@@ -63,6 +63,13 @@ defmodule EspresoWeb.StaffTransactionsLiveTest do
     view |> element("#transaction-detail .staff-transaction-modal-scrim") |> render_click()
     refute has_element?(view, "#transaction-detail")
 
+    view |> element("#transactions-payment-trigger") |> render_click()
+    assert has_element?(view, "#transactions-payment-list", "Cash")
+
+    view |> element("#transactions-payment-list button[phx-value-choice=cash]") |> render_click()
+    assert has_element?(view, "#transactions-payment option[value=cash][selected]")
+    refute has_element?(view, "#transactions-payment-list")
+
     view
     |> form("#transactions-filters", %{"filters" => %{"payment" => "gcash"}})
     |> render_change()
