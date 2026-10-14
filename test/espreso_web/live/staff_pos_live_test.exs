@@ -124,11 +124,12 @@ defmodule EspresoWeb.StaffPosLiveTest do
     conn = log_in(conn, barista)
     {:ok, view, _html} = live(conn, ~p"/pos")
     assert has_element?(view, "#pos-ticket-extras-toggle", "Walk-in")
-    refute has_element?(view, "#pos-loyalty-entry")
+    assert has_element?(view, ".staff-pos-ticket-title-actions #pos-loyalty-entry", "Loyalty")
     open_ticket_extras(view)
     assert has_element?(view, "#pos-loyalty-entry", "Loyalty")
     assert has_element?(view, ".staff-pos-ticket-identity #pos-customer-name")
-    assert has_element?(view, ".staff-pos-ticket-identity #pos-loyalty-entry")
+    assert has_element?(view, ".staff-pos-ticket-title-actions #pos-loyalty-entry")
+    refute has_element?(view, ".staff-pos-ticket-identity #pos-loyalty-entry")
     refute has_element?(view, "#pos-loyalty-history")
 
     view = find_loyalty(view, "09175550001")
@@ -568,7 +569,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     refute has_element?(view, "#pos-notes")
     refute has_element?(view, "#pos-discount-panel")
     assert has_element?(view, "#pos-ticket-extras-toggle", "Walk-in")
-    refute has_element?(view, "#pos-loyalty-entry")
+    assert has_element?(view, ".staff-pos-ticket-title-actions #pos-loyalty-entry", "Loyalty")
     assert has_element?(view, "#pos-ticket.is-empty")
 
     view |> element("#pos-product-#{espresso.id}") |> render_click()
