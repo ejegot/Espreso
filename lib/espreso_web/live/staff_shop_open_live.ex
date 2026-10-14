@@ -73,11 +73,9 @@ defmodule EspresoWeb.StaffShopOpenLive do
       page_title="Open shop"
       chrome={:bar}
     >
-      <main class="staff-shift-close" id="staff-shop-open">
+      <main class="staff-shift-close staff-shop-open" id="staff-shop-open">
         <header class="staff-shift-close-head">
-          <p class="staff-shift-close-eyebrow">Shop day</p>
-          <h2>Opening cash</h2>
-          <p>
+          <p class="staff-shop-open-scope" id="staff-shop-open-scope">
             Count the drawer once at the start of the day. Mid and close shifts do not enter this again.
           </p>
         </header>
