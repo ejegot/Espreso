@@ -42,10 +42,8 @@ defmodule EspresoWeb.AdminSettingsLive do
       <main class="staff-admin-main staff-settings" id="staff-settings">
         <p :if={@flash_note} class="staff-admin-note" id="settings-flash">{@flash_note}</p>
         <header class="staff-settings-head">
-          <p class="staff-settings-eyebrow">Shop</p>
-          <h2 class="staff-settings-title">Settings</h2>
-          <p class="staff-settings-lede">
-            Signed in as {@current_user.name} (Owner). Update public contact, hours, and social links.
+          <p class="staff-settings-scope" id="staff-settings-scope">
+            Update the public contact, hours, and how guests pay.
           </p>
         </header>
 
