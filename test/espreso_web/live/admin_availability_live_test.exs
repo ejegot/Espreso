@@ -141,7 +141,7 @@ defmodule EspresoWeb.AdminAvailabilityLiveTest do
     rice = Enum.find(food_menu.groups, &(&1.name == "Rice Meal"))
     product = Enum.find(rice.products, &(&1.name == "Chicken Teriyaki"))
     assert product.item_owner == "Manager"
-    assert has_element?(view, "#availability-product-#{product.id}", "Manager food")
+    assert has_element?(view, "#availability-food-share-#{product.id}", "Manager")
   end
 
   test "manager can switch FOOD payout between Manager and Café", %{
@@ -157,7 +157,6 @@ defmodule EspresoWeb.AdminAvailabilityLiveTest do
     {:ok, view, _html} = live(log_in(conn, manager), ~p"/admin/availability")
     refute has_element?(view, "#availability-food-share-#{espresso.id}")
     assert has_element?(view, "#availability-food-share-#{ensaymada.id}", "Manager")
-    assert has_element?(view, "#availability-product-#{ensaymada.id}", "Manager food")
 
     view |> element("#availability-food-share-#{ensaymada.id}") |> render_click()
 

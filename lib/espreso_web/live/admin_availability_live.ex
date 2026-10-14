@@ -231,13 +231,9 @@ defmodule EspresoWeb.AdminAvailabilityLive do
       <main class="staff-admin-main staff-availability" id="staff-availability">
         <p :if={@flash_note} class="staff-admin-note" id="availability-flash">{@flash_note}</p>
         <header class="staff-availability-head">
-          <div class="staff-availability-head-copy">
-            <p class="staff-availability-eyebrow">Menu</p>
-            <h2 class="staff-availability-title">Availability</h2>
-            <p class="staff-availability-lede">
-              Mark items unavailable when sold out (86). FOOD items are Manager food or Café for payout.
-            </p>
-          </div>
+          <p class="staff-availability-scope" id="staff-availability-scope">
+            Mark an item sold out when it runs out. FOOD items can be Café or Manager for payout.
+          </p>
           <div
             :if={Authorization.can?(@current_user, :edit_menu)}
             class="staff-availability-head-actions"
@@ -284,10 +280,6 @@ defmodule EspresoWeb.AdminAvailabilityLive do
                 <p class="staff-availability-name">{product.name}</p>
                 <p class="staff-availability-state">
                   {if product.available, do: "Available", else: "Unavailable"}
-                  {if product.has_custom_photo, do: " · Photo", else: ""}
-                  {if category.name == "FOOD",
-                    do: if(Menu.manager_food?(product), do: " · Manager food", else: " · Café"),
-                    else: ""}
                 </p>
               </div>
               <div class="staff-availability-actions">
@@ -325,7 +317,7 @@ defmodule EspresoWeb.AdminAvailabilityLive do
                   id={"availability-toggle-#{product.id}"}
                   aria-label={if(product.available, do: "Mark unavailable", else: "Mark available")}
                 >
-                  {if product.available, do: "86", else: "Restock"}
+                  {if product.available, do: "Sold out", else: "Restock"}
                 </button>
               </div>
             </article>
