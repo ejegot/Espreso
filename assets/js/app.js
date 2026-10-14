@@ -368,17 +368,39 @@ Hooks.StaffNotifications = {
   }
 }
 
-// Owner dashboard rail: icon-only until hover (laptop) or tap (tablet).
+// Owner dashboard rail: icon-only until hover, tap, or the header hamburger.
 Hooks.OwnerDashRail = {
   mounted() {
+    this.pinned = false
+
+    this.syncMenu = () => {
+      document.querySelectorAll("[data-staff-nav-menu-open]").forEach((btn) => {
+        btn.setAttribute("aria-expanded", this.pinned ? "true" : "false")
+        btn.setAttribute(
+          "aria-label",
+          this.pinned ? "Close navigation menu" : "Open navigation menu"
+        )
+        btn.setAttribute("aria-controls", "owner-dash-aside")
+        btn.classList.toggle("is-active", this.pinned)
+      })
+    }
+
     this.open = () => {
       this.el.classList.add("is-open")
       this.el.setAttribute("data-open", "true")
     }
 
     this.close = () => {
+      this.pinned = false
       this.el.classList.remove("is-open")
       this.el.setAttribute("data-open", "false")
+      this.syncMenu()
+    }
+
+    this.pin = () => {
+      this.pinned = true
+      this.open()
+      this.syncMenu()
     }
 
     this.canHover = () => window.matchMedia("(hover: hover) and (pointer: fine)").matches
@@ -388,35 +410,59 @@ Hooks.OwnerDashRail = {
     }
 
     this.onLeave = () => {
+      if (this.pinned) return
       if (this.canHover()) this.close()
     }
 
     this.onCaptureClick = (event) => {
-      if (this.canHover()) return
+      if (this.pinned || this.canHover()) return
       if (this.el.classList.contains("is-open")) return
       event.preventDefault()
       event.stopPropagation()
       this.open()
     }
 
+    this.onMenuClick = (event) => {
+      if (!event.target.closest("[data-staff-nav-menu-open]")) return
+      event.preventDefault()
+      event.stopPropagation()
+      if (this.pinned) this.close()
+      else this.pin()
+    }
+
     this.onDocumentClick = (event) => {
+      if (event.target.closest("[data-staff-nav-menu-open]")) return
+
+      if (this.pinned) {
+        if (!this.el.contains(event.target)) this.close()
+        return
+      }
+
       if (this.canHover()) return
       if (!this.el.classList.contains("is-open")) return
       if (this.el.contains(event.target)) return
       this.close()
     }
 
+    this.onKey = (event) => {
+      if (event.key === "Escape" && this.pinned) this.close()
+    }
+
     this.el.addEventListener("mouseenter", this.onEnter)
     this.el.addEventListener("mouseleave", this.onLeave)
     this.el.addEventListener("click", this.onCaptureClick, true)
+    document.addEventListener("click", this.onMenuClick, true)
     document.addEventListener("click", this.onDocumentClick)
+    document.addEventListener("keydown", this.onKey)
   },
 
   destroyed() {
     this.el.removeEventListener("mouseenter", this.onEnter)
     this.el.removeEventListener("mouseleave", this.onLeave)
     this.el.removeEventListener("click", this.onCaptureClick, true)
+    document.removeEventListener("click", this.onMenuClick, true)
     document.removeEventListener("click", this.onDocumentClick)
+    document.removeEventListener("keydown", this.onKey)
   }
 }
 

@@ -542,6 +542,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
 
     {:ok, owner_view, _html} = live(log_in(conn, owner), ~p"/pos")
     assert has_element?(owner_view, "#pos-place-order")
+    refute has_element?(owner_view, "#owner-dashboard")
     assert has_element?(owner_view, "#staff-nav-drawer-panel #staff-nav-staff", "Staff")
     assert has_element?(owner_view, "#staff-nav-drawer-panel #staff-nav-settings", "Settings")
   end

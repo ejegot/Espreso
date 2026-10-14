@@ -57,8 +57,11 @@ defmodule EspresoWeb.StaffReportsLiveTest do
     assert has_element?(owner_view, "#staff-reports-close-pdf", "Close PDF")
     assert has_element?(owner_view, "#staff-reports-attendance-xlsx", "Attendance Excel")
     assert has_element?(owner_view, "#staff-nav-reports")
+    assert has_element?(owner_view, "#owner-dash-aside")
+    assert has_element?(owner_view, "#owner-dash-nav-reports.is-active", "Reports")
 
     {:ok, manager_view, _html} = live(log_in(conn, manager), ~p"/staff/reports")
+    refute has_element?(manager_view, "#owner-dashboard")
     assert has_element?(manager_view, "#staff-reports-export", "Sales Excel")
 
     assert {:error, {:redirect, %{to: "/staff"}}} =

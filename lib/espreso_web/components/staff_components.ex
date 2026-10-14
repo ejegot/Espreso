@@ -33,10 +33,14 @@ defmodule EspresoWeb.StaffComponents do
         Orders.new_lane_count()
       end
 
+    owner_rail? = owner_rail?(assigns.current_user, assigns.current)
+
     assigns =
       assigns
       |> assign(:drawer_nav, items)
       |> assign(:orders_badge_count, orders_badge_count)
+      |> assign(:owner_rail?, owner_rail?)
+      |> assign(:owner_nav_groups, if(owner_rail?, do: staff_nav_groups(items), else: []))
 
     ~H"""
     <div
@@ -196,8 +200,18 @@ defmodule EspresoWeb.StaffComponents do
           @chrome == :rail && "staff-shell-body--rail",
           @chrome == :bar && "staff-shell-body--bar"
         ]}>
-          <h1 class="sr-only staff-shell-title">{@page_title}</h1>
-          {render_slot(@inner_block)}
+          <%= if @owner_rail? do %>
+            <div class="owner-dash" id="owner-dashboard">
+              <.owner_dash_rail current={@current} groups={@owner_nav_groups} />
+              <div class="owner-dash-canvas">
+                <h1 class="sr-only staff-shell-title">{@page_title}</h1>
+                {render_slot(@inner_block)}
+              </div>
+            </div>
+          <% else %>
+            <h1 class="sr-only staff-shell-title">{@page_title}</h1>
+            {render_slot(@inner_block)}
+          <% end %>
         </div>
       <% else %>
         <header class="staff-shell" id="staff-shell">
@@ -284,6 +298,53 @@ defmodule EspresoWeb.StaffComponents do
   end
 
   def staff_nav_items(%User{} = user), do: nav_items(user)
+
+  attr :current, :atom, required: true
+  attr :groups, :list, required: true
+
+  defp owner_dash_rail(assigns) do
+    ~H"""
+    <aside class="owner-dash-aside" id="owner-dash-aside" aria-label="Owner" phx-hook="OwnerDashRail">
+      <div class="owner-dash-rail">
+        <nav class="owner-dash-nav">
+          <section
+            :for={group <- @groups}
+            class="owner-dash-nav-group"
+            id={"owner-dash-nav-group-#{group.key}"}
+            aria-label={group.title}
+          >
+            <p class="owner-dash-nav-group-label">{group.title}</p>
+            <.link
+              :for={item <- group.items}
+              navigate={item.path}
+              class={["owner-dash-nav-link", item.key == @current && "is-active"]}
+              id={"owner-dash-nav-#{item.key}"}
+              title={item.label}
+            >
+              <.icon name={item.icon} class="owner-dash-nav-icon" />
+              <span class="owner-dash-nav-label">{item.label}</span>
+            </.link>
+          </section>
+        </nav>
+        <footer class="owner-dash-foot">
+          <.link
+            href={~p"/logout"}
+            method="delete"
+            class="owner-dash-nav-link owner-dash-logout"
+            id="owner-dash-nav-logout"
+            title="Log out"
+          >
+            <.icon name="hero-arrow-right-on-rectangle" class="owner-dash-nav-icon" />
+            <span class="owner-dash-nav-label">Log out</span>
+          </.link>
+        </footer>
+      </div>
+    </aside>
+    """
+  end
+
+  defp owner_rail?(%User{role: "owner"}, current) when current not in [:orders, :pos], do: true
+  defp owner_rail?(_user, _current), do: false
 
   @nav_groups [
     {:counter, "Counter"},
