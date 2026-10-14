@@ -17,7 +17,7 @@ defmodule EspresoWeb.StaffPosLive do
   def mount(_params, _session, socket) do
     if connected?(socket), do: Orders.subscribe()
 
-    categories = Menu.list_menu()
+    categories = Menu.list_display_menu()
     selected = default_pos_category(categories)
 
     {:ok,
@@ -303,7 +303,8 @@ defmodule EspresoWeb.StaffPosLive do
     product_id = String.to_integer(product_id)
 
     with {category_name, %{product_prices: prices} = product} <-
-           find_product_entry(socket.assigns.categories, product_id) do
+           find_product_entry(socket.assigns.categories, product_id),
+         true <- product.available do
       cond do
         picker_required?(prices, params) ->
           {:noreply, assign(socket, :size_picker_product_id, product_id)}
@@ -1176,14 +1177,22 @@ defmodule EspresoWeb.StaffPosLive do
               >
                 <article
                   :for={{dom_id, card} <- @streams.pos_products}
-                  class={["staff-pos-product-card", card.added? && "is-added"]}
+                  class={[
+                    "staff-pos-product-card",
+                    card.added? && "is-added",
+                    not card.product.available && "is-unavailable"
+                  ]}
                   id={dom_id}
-                  role="button"
-                  tabindex="0"
-                  phx-click="add_to_cart"
-                  phx-value-product-id={card.product.id}
+                  role={if(card.product.available, do: "button")}
+                  tabindex={if(card.product.available, do: "0")}
+                  phx-click={card.product.available && "add_to_cart"}
+                  phx-value-product-id={card.product.available && card.product.id}
+                  aria-disabled={if(not card.product.available, do: "true")}
                   aria-label={
                     cond do
+                      not card.product.available ->
+                        "#{card.product.name}, Unavailable"
+
                       card.added? ->
                         "Added #{card.product.name}"
 
@@ -1208,6 +1217,9 @@ defmodule EspresoWeb.StaffPosLive do
                       class="staff-pos-signature-badge"
                     >
                       ✦ SIGNATURE
+                    </span>
+                    <span :if={not card.product.available} class="staff-pos-unavailable-badge">
+                      Unavailable
                     </span>
                   </div>
                   <div class="staff-pos-product-card-body">
@@ -1243,7 +1255,7 @@ defmodule EspresoWeb.StaffPosLive do
                 <%= if String.trim(@search) != "" do %>
                   No products match “{@search}”.
                 <% else %>
-                  No available products in this category.
+                  No products in this category.
                 <% end %>
               </p>
             </section>
@@ -1525,72 +1537,75 @@ defmodule EspresoWeb.StaffPosLive do
 
                       <div class="staff-pos-discount-panel" id="pos-discount-panel">
                         <span class="staff-pos-field-label">Discount</span>
-                    
-                      <button
-                        type="button"
-                        class={["staff-pos-discount-chip", @discount_kind == "senior" && "is-active"]}
-                        id="pos-discount-senior"
-                        phx-click="set_discount"
-                        phx-value-kind="senior"
-                      >
-                        Senior 20%
-                      </button>
-                      <button
-                        type="button"
-                        class={["staff-pos-discount-chip", @discount_kind == "pwd" && "is-active"]}
-                        id="pos-discount-pwd"
-                        phx-click="set_discount"
-                        phx-value-kind="pwd"
-                      >
-                        PWD 20%
-                      </button>
-                      <button
-                        type="button"
-                        class={["staff-pos-discount-chip", @discount_kind == "staff" && "is-active"]}
-                        id="pos-discount-staff"
-                        phx-click="set_discount"
-                        phx-value-kind="staff"
-                      >
-                        Staff 20%
-                      </button>
-                      <button
-                        :if={Orders.Discount.can_peso?(@current_user)}
-                        type="button"
-                        class={["staff-pos-discount-chip", @discount_kind == "peso" && "is-active"]}
-                        id="pos-discount-peso"
-                        phx-click="set_discount"
-                        phx-value-kind="peso"
-                      >
-                        ₱ off
-                      </button>
-                      <button
-                        type="button"
-                        class="staff-pos-discount-chip"
-                        id="pos-discount-clear"
-                        phx-click="set_discount"
-                        phx-value-kind="none"
-                      >
-                        Clear
-                      </button>
-                      <label
-                        :if={Orders.Discount.can_peso?(@current_user) and @discount_kind == "peso"}
-                        class="staff-pos-discount-peso"
-                        for="pos-discount-peso-amount"
-                      >
-                        <span>₱</span>
-                        <input
-                          id="pos-discount-peso-amount"
-                          type="text"
-                          inputmode="decimal"
-                          name="discount_peso"
-                          value={@discount_peso}
-                          phx-change="set_discount_peso"
-                          phx-debounce="150"
-                          placeholder="0"
-                          autocomplete="off"
-                        />
-                      </label>
-                    </div>
+
+                        <button
+                          type="button"
+                          class={[
+                            "staff-pos-discount-chip",
+                            @discount_kind == "senior" && "is-active"
+                          ]}
+                          id="pos-discount-senior"
+                          phx-click="set_discount"
+                          phx-value-kind="senior"
+                        >
+                          Senior 20%
+                        </button>
+                        <button
+                          type="button"
+                          class={["staff-pos-discount-chip", @discount_kind == "pwd" && "is-active"]}
+                          id="pos-discount-pwd"
+                          phx-click="set_discount"
+                          phx-value-kind="pwd"
+                        >
+                          PWD 20%
+                        </button>
+                        <button
+                          type="button"
+                          class={["staff-pos-discount-chip", @discount_kind == "staff" && "is-active"]}
+                          id="pos-discount-staff"
+                          phx-click="set_discount"
+                          phx-value-kind="staff"
+                        >
+                          Staff 20%
+                        </button>
+                        <button
+                          :if={Orders.Discount.can_peso?(@current_user)}
+                          type="button"
+                          class={["staff-pos-discount-chip", @discount_kind == "peso" && "is-active"]}
+                          id="pos-discount-peso"
+                          phx-click="set_discount"
+                          phx-value-kind="peso"
+                        >
+                          ₱ off
+                        </button>
+                        <button
+                          type="button"
+                          class="staff-pos-discount-chip"
+                          id="pos-discount-clear"
+                          phx-click="set_discount"
+                          phx-value-kind="none"
+                        >
+                          Clear
+                        </button>
+                        <label
+                          :if={Orders.Discount.can_peso?(@current_user) and @discount_kind == "peso"}
+                          class="staff-pos-discount-peso"
+                          for="pos-discount-peso-amount"
+                        >
+                          <span>₱</span>
+                          <input
+                            id="pos-discount-peso-amount"
+                            type="text"
+                            inputmode="decimal"
+                            name="discount_peso"
+                            value={@discount_peso}
+                            phx-change="set_discount_peso"
+                            phx-debounce="150"
+                            placeholder="0"
+                            autocomplete="off"
+                          />
+                        </label>
+                      </div>
                     </div>
                   </div>
 
@@ -2758,7 +2773,7 @@ defmodule EspresoWeb.StaffPosLive do
          |> assign(:print_note, note)
          |> assign(:print_failed?, failed?)
          |> assign(:print_note_error?, note_error?)
-         |> assign(:categories, Menu.list_menu())
+         |> assign(:categories, Menu.list_display_menu())
          |> reset_pos_product_stream()
          |> assign(:last_order, order)
          |> remember_review_order(order)
@@ -2918,7 +2933,7 @@ defmodule EspresoWeb.StaffPosLive do
                  |> assign(:discount_kind, "none")
                  |> assign(:discount_peso, "")
                  |> assign(:discount_open?, false)
-                 |> assign(:categories, Menu.list_menu())
+                 |> assign(:categories, Menu.list_display_menu())
                  |> reset_pos_product_stream()
                  |> assign(:last_cash_change, cash_change)
                  |> assign(:print_note, note)
@@ -2957,7 +2972,7 @@ defmodule EspresoWeb.StaffPosLive do
                 {:noreply,
                  socket
                  |> assign(:placing_order?, false)
-                 |> assign(:categories, Menu.list_menu())
+                 |> assign(:categories, Menu.list_display_menu())
                  |> reset_pos_product_stream()
                  |> assign(:submission_error, "Price changed — please review your ticket.")}
 

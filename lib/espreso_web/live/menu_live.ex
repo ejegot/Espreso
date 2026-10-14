@@ -23,7 +23,7 @@ defmodule EspresoWeb.MenuLive do
   end
 
   defp mount_menu(socket) do
-    categories = Menu.list_menu()
+    categories = Menu.list_display_menu()
     selected = default_category(categories)
 
     payment_config = BusinessSettings.payment_config()
@@ -376,7 +376,7 @@ defmodule EspresoWeb.MenuLive do
   def handle_event("buy_now", _params, socket) do
     detail = socket.assigns.detail
 
-    if detail && !socket.assigns.detail_closing? do
+    if detail && detail.product.available && !socket.assigns.detail_closing? do
       with %{
              product: product,
              category_name: category_name,
@@ -937,14 +937,24 @@ defmodule EspresoWeb.MenuLive do
               aria-label="Our signature"
             >
               <% {_signature_category, signature_product} = @signature_feature %>
-              <article class="menu-signature-card">
+              <article class={[
+                "menu-signature-card",
+                not signature_product.available && "is-unavailable"
+              ]}>
                 <button
                   type="button"
                   id={"menu-signature-feature-#{signature_product.id}"}
                   class="menu-signature-card-open"
-                  phx-click="open_detail"
-                  phx-value-id={signature_product.id}
-                  aria-label={signature_product.name}
+                  phx-click={signature_product.available && "open_detail"}
+                  phx-value-id={signature_product.available && signature_product.id}
+                  disabled={not signature_product.available}
+                  aria-disabled={if(not signature_product.available, do: "true")}
+                  aria-label={
+                    if(signature_product.available,
+                      do: signature_product.name,
+                      else: "#{signature_product.name}, Unavailable"
+                    )
+                  }
                 >
                   <div class="menu-signature-card-media" aria-hidden="true">
                     <img
@@ -957,6 +967,9 @@ defmodule EspresoWeb.MenuLive do
                     />
                     <span class="menu-item-rating">
                       <.icon name="hero-star" class="menu-item-rating-icon" />
+                    </span>
+                    <span :if={not signature_product.available} class="menu-unavailable-badge">
+                      Unavailable
                     </span>
                   </div>
                 </button>
@@ -1033,15 +1046,25 @@ defmodule EspresoWeb.MenuLive do
                     }
                     class="brune-menu-item"
                   >
-                    <article class="brune-menu-item-card">
+                    <article class={[
+                      "brune-menu-item-card",
+                      not product.available && "is-unavailable"
+                    ]}>
                       <button
                         type="button"
                         id={"menu-item-open-#{product.id}"}
                         class="brune-menu-item-open"
-                        phx-click="open_detail"
-                        phx-value-id={product.id}
+                        phx-click={product.available && "open_detail"}
+                        phx-value-id={product.available && product.id}
                         data-menu-item-name={product.name}
-                        aria-label={product.name}
+                        disabled={not product.available}
+                        aria-disabled={if(not product.available, do: "true")}
+                        aria-label={
+                          if(product.available,
+                            do: product.name,
+                            else: "#{product.name}, Unavailable"
+                          )
+                        }
                       >
                         <div class="brune-menu-item-thumb">
                           <img
@@ -1064,6 +1087,9 @@ defmodule EspresoWeb.MenuLive do
                             class="menu-signature-item-badge"
                           >
                             ✦ Signature
+                          </span>
+                          <span :if={not product.available} class="menu-unavailable-badge">
+                            Unavailable
                           </span>
                         </div>
                         <div class="brune-menu-item-body">
@@ -2302,6 +2328,9 @@ defmodule EspresoWeb.MenuLive do
       nil ->
         socket
 
+      {_category, %{available: false}} ->
+        socket
+
       {category, product} ->
         price = List.first(product.product_prices)
 
@@ -2321,6 +2350,8 @@ defmodule EspresoWeb.MenuLive do
         |> assign(:saved_open?, false)
     end
   end
+
+  defp put_product_in_cart(socket, _category_name, %{available: false}, _price, _qty), do: socket
 
   defp put_product_in_cart(socket, category_name, product, price, qty) do
     cart =
@@ -3872,6 +3903,3 @@ defmodule EspresoWeb.MenuLive do
   defp order_create_failure_message(:shop_day_closed), do: shop_day_menu_message(:closed)
   defp order_create_failure_message(_), do: "Could not place order — try again"
 end
-
-
-
