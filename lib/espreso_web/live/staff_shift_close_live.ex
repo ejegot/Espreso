@@ -221,12 +221,8 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     <.staff_shell current={:close} current_user={@current_user} page_title="Close shift" chrome={:bar}>
       <main class="staff-home-main staff-shift-close" id="staff-shift-close">
         <header class="staff-shift-close-head">
-          <p class="staff-home-desk-eyebrow">End of day</p>
-          <div class="staff-shift-close-title-row">
-            <h2 class="staff-home-desk-title">
-              Close shift · {Calendar.strftime(@shop_date, "%b %d")}
-            </h2>
-            <p
+          <p class="staff-shift-close-scope">
+            <span
               class={[
                 "staff-shift-close-status",
                 @already_closed? && "staff-shift-close-status--closed",
@@ -244,9 +240,12 @@ defmodule EspresoWeb.StaffShiftCloseLive do
                 <% true -> %>
                   Open
               <% end %>
-            </p>
-          </div>
-          <p class="staff-home-lede staff-shift-close-lede">
+            </span>
+            <span class="staff-shift-close-scope-date">
+              {Calendar.strftime(@shop_date, "%b %d")}
+            </span>
+          </p>
+          <p class="staff-shift-close-lede">
             <%= cond do %>
               <% @already_closed? -> %>
                 Sealed snapshot of today’s settled sales and the drawer cash count that was recorded.
@@ -268,21 +267,23 @@ defmodule EspresoWeb.StaffShiftCloseLive do
             role="status"
             aria-label="Sealed shift close"
           >
-            <p class="staff-shift-close-done-badge">Shift closed</p>
-            <p class="staff-shift-close-done-copy" id="staff-shift-close-done-meta">
-              Closed at {Shifts.format_closed_at(@close.closed_at)}
-              <span :if={@close.closed_by_user}>by {@close.closed_by_user.name}</span>
-            </p>
-            <p
-              :if={@staff_shift_ended?}
-              class="staff-shift-close-timed-out"
-              id="staff-shift-close-timed-out"
-            >
-              Your staff shift has ended (Time Out). You are still signed in — log out when you are done.
-            </p>
-            <p class="staff-shift-close-seal-note">
-              These are the numbers sealed when this shift was closed.
-            </p>
+            <div class="staff-shift-close-seal">
+              <p class="staff-shift-close-done-badge">Shift closed</p>
+              <p class="staff-shift-close-done-copy" id="staff-shift-close-done-meta">
+                Closed at {Shifts.format_closed_at(@close.closed_at)}
+                <span :if={@close.closed_by_user}>by {@close.closed_by_user.name}</span>
+              </p>
+              <p
+                :if={@staff_shift_ended?}
+                class="staff-shift-close-timed-out"
+                id="staff-shift-close-timed-out"
+              >
+                Your staff shift has ended (Time Out). You are still signed in — log out when you are done.
+              </p>
+              <p class="staff-shift-close-seal-note">
+                These are the numbers sealed when this shift was closed.
+              </p>
+            </div>
 
             <div class="staff-shift-close-cash" id="staff-shift-close-sealed-cash">
               <p class="staff-shift-close-section-label">Cash settled</p>
@@ -495,35 +496,50 @@ defmodule EspresoWeb.StaffShiftCloseLive do
               phx-submit="prepare_close"
               class="staff-shift-close-form"
             >
-              <label class="staff-shift-close-field" id="staff-shift-close-counted-field">
-                <span>Counted drawer cash</span>
-                <div class="staff-shift-close-input-wrap">
-                  <span class="staff-shift-close-currency" aria-hidden="true">₱</span>
-                  <input
-                    type="text"
-                    name="close[counted_cash]"
-                    value={@counted_cash}
-                    inputmode="decimal"
-                    placeholder="0.00"
-                    class="staff-shift-close-input"
-                    aria-describedby="staff-shift-close-counted-hint"
-                  />
-                </div>
-                <span class="staff-shift-close-section-hint" id="staff-shift-close-counted-hint">
-                  Required — actual cash in the drawer at close.
-                </span>
-              </label>
+              <div class="staff-shift-close-entry">
+                <label class="staff-shift-close-field" id="staff-shift-close-counted-field">
+                  <span>Counted drawer cash</span>
+                  <div class="staff-shift-close-input-wrap">
+                    <span class="staff-shift-close-currency" aria-hidden="true">₱</span>
+                    <input
+                      type="text"
+                      name="close[counted_cash]"
+                      value={@counted_cash}
+                      inputmode="decimal"
+                      placeholder="0.00"
+                      class="staff-shift-close-input"
+                      aria-describedby="staff-shift-close-counted-hint"
+                    />
+                  </div>
+                  <span class="staff-shift-close-section-hint" id="staff-shift-close-counted-hint">
+                    Required — actual cash in the drawer at close.
+                  </span>
+                </label>
 
-              <label class="staff-shift-close-field">
-                <span>Notes</span>
-                <textarea
-                  name="close[notes]"
-                  rows="2"
-                  maxlength="500"
-                  placeholder="Optional"
-                  class="staff-shift-close-input staff-shift-close-input--notes"
-                >{@notes}</textarea>
-              </label>
+                <label class="staff-shift-close-field">
+                  <span>Notes</span>
+                  <textarea
+                    name="close[notes]"
+                    rows="2"
+                    maxlength="500"
+                    placeholder="Optional"
+                    class="staff-shift-close-input staff-shift-close-input--notes"
+                  >{@notes}</textarea>
+                </label>
+
+                <p :if={@form_error} class="staff-shift-close-error" id="staff-shift-close-error">
+                  {@form_error}
+                </p>
+
+                <button
+                  :if={!@confirming?}
+                  type="submit"
+                  class="staff-shift-close-submit"
+                  id="staff-shift-close-prepare"
+                >
+                  Record close
+                </button>
+              </div>
 
               <section
                 class="staff-shift-close-panel staff-shift-close-panel--secondary"
@@ -551,19 +567,6 @@ defmodule EspresoWeb.StaffShiftCloseLive do
                 </p>
                 <p class="staff-shift-close-section-hint">Total settled sales recorded today.</p>
               </div>
-
-              <p :if={@form_error} class="staff-shift-close-error" id="staff-shift-close-error">
-                {@form_error}
-              </p>
-
-              <button
-                :if={!@confirming?}
-                type="submit"
-                class="staff-shift-close-submit"
-                id="staff-shift-close-prepare"
-              >
-                Record close
-              </button>
             </form>
           </div>
         <% end %>
