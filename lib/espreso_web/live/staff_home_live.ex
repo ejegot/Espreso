@@ -467,13 +467,13 @@ defmodule EspresoWeb.StaffHomeLive do
         </section>
 
         <section
-          :if={@printer_on_home? and not @owner_dashboard?}
+          :if={@printer_on_home?}
           class="staff-home-printer staff-home-printer--compact"
           id="staff-home-printer"
-          aria-label="Printer"
+          aria-label="Printer and cash drawer"
         >
           <div class="staff-home-printer-copy">
-            <p class="staff-home-today-eyebrow">Printer</p>
+            <p class="staff-home-today-eyebrow">Printer &amp; cash drawer</p>
             <p class="staff-home-today-meta">
               LAN · {Printer.host()}:{Printer.port()}
             </p>
@@ -601,7 +601,7 @@ defmodule EspresoWeb.StaffHomeLive do
     |> assign(:today_visible?, money?)
     |> assign(:popular_products, popular)
     |> assign(:item_payouts, payouts)
-    |> assign(:printer_on_home?, money? and Printer.enabled?())
+    |> assign(:printer_on_home?, Printer.enabled?())
     |> assign(:greeting, staff_greeting(user))
     |> assign(:primary, primary_tiles(user, overview, shop_day_status))
     |> assign(:launch_tools, launch_tools)
