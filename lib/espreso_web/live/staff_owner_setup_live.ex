@@ -63,24 +63,24 @@ defmodule EspresoWeb.StaffOwnerSetupLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="staff-auth-page">
-      <aside class="staff-auth-visual" aria-hidden="true">
-        <img
-          src={~p"/images/coffeespot/atmosphere-interior-01.jpg"}
-          alt=""
-          class="staff-auth-visual-img"
-        />
-        <div class="staff-auth-visual-shade"></div>
-        <figure class="staff-auth-quote">
-          <blockquote>
-            “Set up once. Run the shop with confidence.”
-          </blockquote>
-          <figcaption>Elilai Kafe · Owner setup</figcaption>
-        </figure>
-      </aside>
+    <div class="staff-auth-page staff-auth-page--approved staff-auth-page--float staff-auth-page--lock">
+      <div class="staff-auth-stage">
+        <div class="staff-auth-backdrop" aria-hidden="true">
+          <picture class="staff-auth-backdrop-picture">
+            <source srcset={~p"/images/elilai-kafe/login-kalachuchi.webp"} type="image/webp" />
+            <img
+              src={~p"/images/elilai-kafe/login-kalachuchi.jpg"}
+              alt=""
+              class="staff-auth-backdrop-img"
+              width="1024"
+              height="640"
+              decoding="async"
+            />
+          </picture>
+        </div>
 
-      <main class="staff-auth-panel">
-        <div class="staff-auth-panel-inner">
+        <main class="staff-auth-panel">
+          <div class="staff-auth-panel-inner staff-auth-panel-inner--login">
           <header class="staff-auth-brand">
             <img
               src={~p"/images/elilai-kafe/elilai-kafe-mark.png"}
@@ -163,8 +163,9 @@ defmodule EspresoWeb.StaffOwnerSetupLive do
               Create owner account
             </button>
           </form>
-        </div>
-      </main>
+          </div>
+        </main>
+      </div>
     </div>
     """
   end
