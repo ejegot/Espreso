@@ -1818,6 +1818,8 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
 
     view |> element("#staff-notif-toggle") |> render_click()
     assert has_element?(view, "#staff-notif-panel")
+    assert has_element?(view, "#staff-notif-panel .staff-notif-title", "Notifications")
+    assert has_element?(view, "#staff-notif-panel .staff-notif-sub", "Live order alerts")
     assert has_element?(view, "#staff-notif-list", "New order")
     assert render(view) =~ order.number
 

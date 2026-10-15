@@ -14368,13 +14368,14 @@ html[data-application="elilai-kafe-employee"] {
 
 .staff-notif-title {
   margin: 0;
+  color: #2e3529;
   font-size: 0.98rem;
   font-weight: 800;
 }
 
 .staff-notif-sub {
   margin: 0.12rem 0 0;
-  color: var(--cs-beige, #b0a098);
+  color: #6b705f;
   font-size: 0.72rem;
   font-weight: 600;
 }
@@ -14406,6 +14407,21 @@ html[data-application="elilai-kafe-employee"] {
 .staff-notif-mark:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+@media (max-width: 30rem) {
+  .staff-notif-head {
+    flex-direction: column;
+  }
+
+  .staff-notif-heading {
+    width: 100%;
+  }
+
+  .staff-notif-head-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 .staff-notif-list {
