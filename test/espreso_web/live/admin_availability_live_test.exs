@@ -84,6 +84,35 @@ defmodule EspresoWeb.AdminAvailabilityLiveTest do
     assert Enum.any?(hot_menu.products, &(&1.id == espresso.id))
   end
 
+  test "search filters the availability list by item name", %{
+    conn: conn,
+    manager: manager,
+    espresso: espresso,
+    secret: secret
+  } do
+    {:ok, view, _html} = live(log_in(conn, manager), ~p"/admin/availability")
+
+    assert has_element?(view, "#availability-search-input")
+    assert has_element?(view, "#availability-product-#{espresso.id}")
+    assert has_element?(view, "#availability-product-#{secret.id}")
+
+    view |> form("#availability-search", %{q: "secret"}) |> render_change()
+
+    assert has_element?(view, "#availability-product-#{secret.id}", "Secret Blend")
+    refute has_element?(view, "#availability-product-#{espresso.id}")
+    refute has_element?(view, "#availability-search-empty")
+
+    view |> form("#availability-search", %{q: "zzz"}) |> render_change()
+
+    assert has_element?(view, "#availability-search-empty", "No items match")
+    refute has_element?(view, "#availability-product-#{secret.id}")
+
+    view |> form("#availability-search", %{q: ""}) |> render_change()
+
+    assert has_element?(view, "#availability-product-#{espresso.id}")
+    assert has_element?(view, "#availability-product-#{secret.id}")
+  end
+
   test "manager can add a HOT item from the availability board", %{
     conn: conn,
     manager: manager

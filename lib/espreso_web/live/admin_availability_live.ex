@@ -10,6 +10,7 @@ defmodule EspresoWeb.AdminAvailabilityLive do
      socket
      |> assign(:page_title, "Availability")
      |> assign(:categories, Menu.list_products_for_availability())
+     |> assign(:search, "")
      |> assign(:flash_note, nil)
      |> assign(:adding?, false)
      |> assign(:adding_category?, false)
@@ -24,6 +25,12 @@ defmodule EspresoWeb.AdminAvailabilityLive do
   end
 
   @impl true
+  def handle_event("search", %{"q" => query}, socket) do
+    {:noreply, assign(socket, :search, String.trim(query))}
+  end
+
+  def handle_event("search", _params, socket), do: {:noreply, socket}
+
   def handle_event("toggle", %{"id" => id}, socket) do
     actor = socket.assigns.current_user
     product_id = String.to_integer(id)
@@ -257,8 +264,36 @@ defmodule EspresoWeb.AdminAvailabilityLive do
           </div>
         </header>
 
+        <form
+          id="availability-search"
+          class="staff-availability-search"
+          phx-change="search"
+          phx-submit="search"
+        >
+          <label class="staff-availability-search-label" for="availability-search-input">
+            Search
+          </label>
+          <input
+            type="search"
+            id="availability-search-input"
+            name="q"
+            value={@search}
+            placeholder="Search items"
+            phx-debounce="200"
+            autocomplete="off"
+          />
+        </form>
+
+        <p
+          :if={@search != "" and filtered_categories(@categories, @search) == []}
+          class="staff-availability-empty"
+          id="availability-search-empty"
+        >
+          No items match “{@search}”.
+        </p>
+
         <section
-          :for={category <- @categories}
+          :for={category <- filtered_categories(@categories, @search)}
           class="staff-availability-category"
           id={"availability-category-#{category.name}"}
         >
@@ -582,6 +617,25 @@ defmodule EspresoWeb.AdminAvailabilityLive do
     case add_value(form, :category) do
       category when category in ["COLD", "FRAPPE", "SODA"] -> "16oz price"
       _ -> "Price"
+    end
+  end
+
+  defp filtered_categories(categories, search) do
+    needle = search |> to_string() |> String.trim() |> String.downcase()
+
+    if needle == "" do
+      categories
+    else
+      Enum.flat_map(categories, fn category ->
+        category_match? = String.contains?(String.downcase(category.name), needle)
+
+        products =
+          Enum.filter(category.products, fn product ->
+            category_match? or String.contains?(String.downcase(product.name), needle)
+          end)
+
+        if products == [], do: [], else: [%{category | products: products}]
+      end)
     end
   end
 
