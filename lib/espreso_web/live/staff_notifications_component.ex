@@ -108,7 +108,7 @@ defmodule EspresoWeb.StaffNotificationsComponent do
         aria-label="Notifications"
       >
         <header class="staff-notif-head">
-          <div>
+          <div class="staff-notif-heading">
             <p class="staff-notif-title">Notifications</p>
             <p class="staff-notif-sub">Live order alerts</p>
           </div>
