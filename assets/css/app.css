@@ -12564,6 +12564,46 @@ a.staff-home-card:focus-visible {
   gap: 0.45rem;
 }
 
+.staff-availability-search {
+  margin: 0 0 0.9rem;
+}
+
+.staff-availability-search-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+#staff-availability .staff-availability-search input {
+  width: 100%;
+  min-height: 2.9rem;
+  border: 0;
+  border-radius: 0.95rem;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(57, 67, 49, 0.06);
+  padding: 0.65rem 1rem;
+  color: #2e3529;
+  font: inherit;
+  font-size: 0.98rem;
+  font-weight: 600;
+}
+
+#staff-availability .staff-availability-search input::placeholder {
+  color: #8b877d;
+  font-weight: 600;
+}
+
+#staff-availability .staff-availability-search input:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px #394331;
+}
+
 .staff-availability-add {
   min-height: 2.45rem;
   padding: 0.4rem 0.9rem;
