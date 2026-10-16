@@ -1210,6 +1210,7 @@ defmodule EspresoWeb.StaffPosLive do
                 >
                   <div class="staff-pos-product-card-media" aria-hidden="true">
                     <img
+                      :if={card.img.src}
                       src={card.img.src}
                       alt=""
                       class={["staff-pos-product-img", card.img.packshot? && "is-packshot"]}

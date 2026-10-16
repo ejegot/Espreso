@@ -945,12 +945,13 @@ defmodule Espreso.Menu do
   @pos_thumb_vsn "pos1"
 
   @doc """
-  Public image path for a menu item. Custom tablet photo first, then named
-  CoffeeSpot photos, then a stable category fallback so every card has a photo.
+  Public image path for a product. Custom tablet photos take precedence over
+  named CoffeeSpot photos. Products without either have no image; the string
+  form retains the category fallback for callers that only have a name.
   """
   def product_image(category_name, %{name: name} = product)
       when is_binary(category_name) and is_binary(name) do
-    custom_photo_url(product) || product_image(category_name, name)
+    custom_photo_url(product) || Map.get(@product_images, {category_name, name})
   end
 
   def product_image(category_name, product_name)
@@ -975,15 +976,19 @@ defmodule Espreso.Menu do
   """
   def pos_product_image_meta(category_name, %{name: name} = product)
       when is_binary(category_name) and is_binary(name) do
-    case custom_photo_url(product) do
-      nil -> pos_product_image_meta(category_name, name)
-      url -> %{src: url, packshot?: false}
-    end
+    product
+    |> then(&product_image(category_name, &1))
+    |> pos_product_image_meta_for_image()
   end
 
   def pos_product_image_meta(category_name, product_name)
       when is_binary(category_name) and is_binary(product_name) do
-    full = product_image(category_name, product_name)
+    product_name
+    |> then(&product_image(category_name, &1))
+    |> pos_product_image_meta_for_image()
+  end
+
+  defp pos_product_image_meta_for_image(full) do
     packshot? = packshot_image?(full)
 
     case pos_thumb_url(full) do

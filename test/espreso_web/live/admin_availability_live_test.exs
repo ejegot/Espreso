@@ -113,7 +113,7 @@ defmodule EspresoWeb.AdminAvailabilityLiveTest do
     assert has_element?(view, "#availability-product-#{secret.id}")
   end
 
-  test "manager can add a HOT item from the availability board", %{
+  test "manager can add a HOT item without an image from the availability board", %{
     conn: conn,
     manager: manager
   } do
@@ -140,7 +140,33 @@ defmodule EspresoWeb.AdminAvailabilityLiveTest do
     assert has_element?(view, ".staff-availability-name", "Barako")
 
     hot_menu = Menu.list_menu() |> Enum.find(&(&1.name == "HOT"))
-    assert Enum.any?(hot_menu.products, &(&1.name == "Barako"))
+    product = Enum.find(hot_menu.products, &(&1.name == "Barako"))
+    assert product
+    assert is_nil(Menu.product_image("HOT", product))
+    assert is_nil(Menu.pos_product_image_meta("HOT", product).src)
+
+    {:ok, pos_view, _html} = live(log_in(conn, manager), ~p"/pos")
+    refute has_element?(pos_view, "[phx-value-product-id='#{product.id}'] img")
+
+    {:ok, menu_view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+    refute has_element?(menu_view, "#menu-item-open-#{product.id} img")
+
+    price = List.first(product.product_prices)
+
+    render_hook(menu_view, "restore_cart", %{
+      "cart" => [
+        %{
+          "product_id" => product.id,
+          "name" => product.name,
+          "price" => Decimal.to_string(price.price),
+          "quantity" => 1,
+          "image" => "/images/coffeespot/gen-hot-espresso.png"
+        }
+      ]
+    })
+
+    menu_view |> element("button.brune-icon-bag") |> render_click()
+    refute has_element?(menu_view, ".menu-basket-line-photo")
   end
 
   test "owner can add a FOOD item to a group", %{conn: conn, owner: owner} do
@@ -244,6 +270,20 @@ defmodule EspresoWeb.AdminAvailabilityLiveTest do
     product = Repo.get_by!(Product, name: "Barako Photo")
     assert product.has_custom_photo
     assert Menu.product_image("HOT", product) =~ "/media/products/#{product.id}"
+
+    {:ok, pos_view, _html} = live(log_in(conn, manager), ~p"/pos")
+
+    assert has_element?(
+             pos_view,
+             "[phx-value-product-id='#{product.id}'] img[src^='/media/products/#{product.id}']"
+           )
+
+    {:ok, menu_view, _html} = live(conn, ~p"/menu?stage=menu&category=HOT")
+
+    assert has_element?(
+             menu_view,
+             "#menu-item-open-#{product.id} img[src^='/media/products/#{product.id}']"
+           )
   end
 
   test "owner can add a category then an item in it", %{conn: conn, owner: owner} do
