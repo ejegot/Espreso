@@ -26,7 +26,7 @@ defmodule EspresoWeb.Endpoint do
   plug Plug.Static,
     at: "/",
     from: :espreso,
-    gzip: false,
+    gzip: true,
     only: EspresoWeb.static_paths(),
     only_matching: ["coffeespot-", "elilai-kafe-"]
 
