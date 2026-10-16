@@ -115,6 +115,19 @@ defmodule EspresoWeb.PwaManifestTest do
     end
   end
 
+  test "digested CoffeeSpot manifest files are served", %{conn: conn} do
+    filename =
+      "coffeespot-#{Base.encode16(:crypto.strong_rand_bytes(16), case: :lower)}.webmanifest"
+
+    path = Path.join([:code.priv_dir(:espreso), "static", filename])
+    File.cp!(@customer_manifest_path, path)
+    on_exit(fn -> File.rm(path) end)
+
+    conn = get(conn, "/#{filename}")
+
+    assert response(conn, 200) =~ ~s("name": "CoffeeSpot")
+  end
+
   defp assert_asset_files! do
     assert File.exists?(@logo_path)
     assert File.exists?(@icon_192_path)

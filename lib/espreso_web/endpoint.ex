@@ -27,7 +27,8 @@ defmodule EspresoWeb.Endpoint do
     at: "/",
     from: :espreso,
     gzip: false,
-    only: EspresoWeb.static_paths()
+    only: EspresoWeb.static_paths(),
+    only_matching: ["coffeespot-", "elilai-kafe-"]
 
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.
