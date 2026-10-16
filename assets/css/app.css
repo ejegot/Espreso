@@ -7402,7 +7402,7 @@ a.staff-home-card:focus-visible {
   flex: 0 0 auto;
   border-top: 1px solid rgba(17, 17, 18, 0.08);
   padding-top: 0.85rem;
-  background: #fff;
+  background: var(--elilai-ivory, #f4efe3);
 }
 
 .staff-pos-categories {
@@ -9104,10 +9104,10 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket {
-  padding: 0.7rem 0.85rem 0.85rem;
+  padding: 0.05rem 0.85rem 0.85rem;
   border: 0;
   border-radius: 1.15rem;
-  background: #fff;
+  background: var(--elilai-ivory, #f4efe3);
   box-shadow: 0 10px 28px rgba(57, 67, 49, 0.06);
   min-height: 0;
   overflow: hidden;
@@ -9129,7 +9129,7 @@ a.staff-home-card:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 0.55rem;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-ticket-title {
@@ -9400,7 +9400,7 @@ a.staff-home-card:focus-visible {
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-cart {
-  gap: 0;
+  gap: 0.45rem;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-cart-line {
@@ -9409,14 +9409,14 @@ a.staff-home-card:focus-visible {
   gap: 0.5rem 0.55rem;
   align-items: start;
   padding: 0.55rem 0;
-  border: none;
-  border-bottom: 1px solid color-mix(in srgb, var(--elilai-ink, #2e3529) 8%, transparent);
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--elilai-forest, #394331) 8%, transparent);
   border-radius: 0;
   background: transparent;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-cart-line:last-child {
-  border-bottom: none;
+  border-bottom: 0;
 }
 
 .staff-pos-page.staff-pos-page--cafe .staff-pos-cart-thumb {
@@ -9622,7 +9622,7 @@ a.staff-home-card:focus-visible {
   margin-bottom: -0.85rem;
   padding: 0.65rem 0.85rem 0.85rem;
   border-radius: 0 0 1.15rem 1.15rem;
-  background: #fff;
+  background: var(--elilai-ivory, #f4efe3);
   border-top: 1px solid color-mix(in srgb, var(--elilai-ink, #2e3529) 8%, transparent);
 }
 
@@ -9948,7 +9948,7 @@ a.staff-home-card:focus-visible {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #fff;
+  background: var(--elilai-ivory, #f4efe3);
 }
 
 .staff-pos-page .staff-pos-ticket-head {
@@ -10643,7 +10643,7 @@ a.staff-home-card:focus-visible {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #fff;
+  background: var(--elilai-ivory, #f4efe3);
 }
 
 .staff-pos-page .staff-pos-ticket-head {
@@ -11117,7 +11117,7 @@ a.staff-home-card:focus-visible {
   border-top: 1px solid var(--cs-line);
   padding-top: 0.45rem;
   margin-top: 0.35rem;
-  background: color-mix(in srgb, var(--cs-cream) 55%, #fff);
+  background: var(--elilai-ivory, #f4efe3);
   border-radius: 0 0 0.85rem 0.85rem;
   margin-left: -0.75rem;
   margin-right: -0.75rem;
