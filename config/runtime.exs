@@ -202,7 +202,9 @@ if is_binary(web_push_public) and web_push_public != "" and
   config :espreso, Espreso.CustomerPush,
     adapter: Espreso.CustomerPush.WebPush,
     async: true,
-    subject: System.get_env("WEB_PUSH_SUBJECT") || "https://espreso.fly.dev",
+    subject:
+      System.get_env("WEB_PUSH_SUBJECT") ||
+        "https://#{System.get_env("PHX_HOST") || "example.com"}",
     public_key: web_push_public,
     private_key: web_push_private
 end

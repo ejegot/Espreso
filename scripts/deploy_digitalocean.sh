@@ -4,7 +4,7 @@ set -Eeuo pipefail
 DO_HOST="${DO_HOST:-134.209.110.46}"
 DO_SSH_USER="${DO_SSH_USER:-root}"
 DO_REMOTE_BASE="${DO_REMOTE_BASE:-/opt/espreso}"
-DO_HEALTH_URL="${DO_HEALTH_URL:-http://127.0.0.1/login}"
+DO_HEALTH_URL="${DO_HEALTH_URL:-http://127.0.0.1:4000/login}"
 
 fail() {
   printf 'Deploy failed: %s\n' "$*" >&2
