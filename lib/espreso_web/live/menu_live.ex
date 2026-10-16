@@ -1068,6 +1068,7 @@ defmodule EspresoWeb.MenuLive do
                       >
                         <div class="brune-menu-item-thumb">
                           <img
+                            :if={Menu.product_image(category.name, product)}
                             src={Menu.product_image(category.name, product)}
                             alt={product.name}
                             class="brune-menu-item-photo"
@@ -1190,6 +1191,7 @@ defmodule EspresoWeb.MenuLive do
             </div>
 
             <img
+              :if={Menu.product_image(@detail.category_name, @detail.product)}
               src={Menu.product_image(@detail.category_name, @detail.product)}
               alt={@detail.product.name}
               class="menu-buy-photo"
@@ -1470,6 +1472,7 @@ defmodule EspresoWeb.MenuLive do
                   phx-value-id={product.id}
                 >
                   <img
+                    :if={Menu.product_image(category.name, product)}
                     src={Menu.product_image(category.name, product)}
                     alt=""
                     class="menu-saved-thumb"
@@ -1548,7 +1551,7 @@ defmodule EspresoWeb.MenuLive do
             <ul class="menu-basket-list">
               <li :for={line <- @cart} class="menu-basket-line">
                 <div class="menu-basket-line-visual">
-                  <img src={line.image} alt="" class="menu-basket-line-photo" />
+                  <img :if={line.image} src={line.image} alt="" class="menu-basket-line-photo" />
                 </div>
                 <div class="menu-basket-line-main">
                   <div class="menu-basket-line-top">
@@ -3008,11 +3011,7 @@ defmodule EspresoWeb.MenuLive do
          true <- product.name == name do
       size = normalize_restored_size(Map.get(line, "size") || Map.get(line, :size))
 
-      image =
-        case normalize_restored_image(Map.get(line, "image") || Map.get(line, :image)) do
-          nil -> Menu.product_image(category.name, product)
-          path -> path
-        end
+      image = Menu.product_image(category.name, product)
 
       key =
         case Map.get(line, "key") || Map.get(line, :key) do
@@ -3091,18 +3090,6 @@ defmodule EspresoWeb.MenuLive do
   end
 
   defp normalize_restored_size(_), do: nil
-
-  defp normalize_restored_image(value) when is_binary(value) do
-    trimmed = String.trim(value)
-
-    if String.starts_with?(trimmed, "/images/") do
-      trimmed
-    else
-      nil
-    end
-  end
-
-  defp normalize_restored_image(_), do: nil
 
   defp cart_total(cart) do
     Enum.reduce(cart, Decimal.new(0), fn line, acc ->
