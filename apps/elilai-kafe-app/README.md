@@ -12,7 +12,7 @@ This directory does **not** contain a second frontend. The `www/` folder is only
 
 The shell loads:
 
-`https://espreso.fly.dev/login`
+`https://134-209-110-46.nip.io/login`
 
 over HTTPS. Session cookies, CSRF, LiveView, POS, Orders, and staff flows remain on Phoenix.
 
@@ -82,7 +82,7 @@ npx cap open ios
 - Because `server.url` loads remote Phoenix, `www/js/elilai-native-shell.js` is injected from `MainActivity`
 - SystemBars: Forest chrome with light icons (`style: DARK`); WebView ivory `#F4EFE3`
 - Brand launcher/splash assets from `priv/static/images/elilai-kafe/` (regenerate via `python3 scripts/generate-brand-assets.py`)
-- `allowNavigation` remains `espreso.fly.dev` only
+- `allowNavigation` remains restricted to the configured Phoenix host
 
 ## Shop tablet performance / responsiveness (required)
 
@@ -104,12 +104,12 @@ preserve Pass 3E-4 payment, loyalty, sales attribution, GCash/Maya, and auth rul
 ## Native printer / kaha (APP PASS — LAN ESC/POS)
 
 Tablet talks **directly** to the shop HS-802UL (`192.168.0.87:9100`).
-Phoenix/Fly only builds ESC/POS bytes; it never opens a TCP socket to the printer.
+Phoenix only builds ESC/POS bytes; it never opens a TCP socket to the printer.
 
 - Plugin: `EscPosPrinter` (`send` / `getDefaults`)
 - Injected JS: `window.ElilaiKafePrinter` via `www/js/elilai-native-shell.js`
 - LiveView hook: `ElilaiPrinter` pushes `elilai-printer` jobs and confirms with `elilai_printer_result`
-- Server transport: set `PRINTER_TRANSPORT=native_client` on Fly (do **not** set `PRINTER_HOST` on Fly)
+- Server transport: set `PRINTER_TRANSPORT=native_client` on the production host (do **not** set `PRINTER_HOST` there)
 
 ### Intentionally not in this pass
 

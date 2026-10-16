@@ -7,14 +7,13 @@ import type { CapacitorConfig } from "@capacitor/cli";
  * server.url must be ORIGIN ONLY (no path). Start at /login via appStartPath.
  *
  * Development override (never commit secrets; HTTPS preferred):
- *   ELILAI_KAFE_SERVER_URL=https://espreso.fly.dev npx cap sync
+ *   ELILAI_KAFE_SERVER_URL=https://134-209-110-46.nip.io npx cap sync
  *   ELILAI_KAFE_SERVER_URL=http://192.168.x.x:4000 ELILAI_KAFE_ALLOW_CLEARTEXT=1 npx cap sync
  *
  * Paths in ELILAI_KAFE_SERVER_URL (e.g. …/login) are accepted and split into
  * origin + appStartPath.
  */
-const PRODUCTION_ORIGIN = "https://espreso.fly.dev";
-const PRODUCTION_HOST = "espreso.fly.dev";
+const PRODUCTION_ORIGIN = "https://134-209-110-46.nip.io";
 const DEFAULT_START_PATH = "/login";
 
 const allowCleartext = process.env.ELILAI_KAFE_ALLOW_CLEARTEXT === "1";
@@ -91,20 +90,16 @@ function splitServerTarget(raw: string): {origin: string; startPath: string} {
 }
 
 function buildAllowNavigation(origin: string, cleartext: boolean): string[] {
-  const entries = [PRODUCTION_HOST];
-
-  if (!cleartext) {
-    return entries;
-  }
-
   let parsed: URL;
   try {
     parsed = new URL(origin);
   } catch {
-    return entries;
+    return [];
   }
 
-  if (parsed.protocol !== "http:") {
+  const entries = [parsed.hostname];
+
+  if (!cleartext || parsed.protocol !== "http:") {
     return entries;
   }
 
@@ -113,7 +108,7 @@ function buildAllowNavigation(origin: string, cleartext: boolean): string[] {
   // even if a future build turns legacy bridge off.
   const hostname = parsed.hostname;
   const hostPort = parsed.port ? `${hostname}:${parsed.port}` : hostname;
-  for (const entry of [hostname, hostPort, parsed.origin]) {
+  for (const entry of [hostPort, parsed.origin]) {
     if (!entries.includes(entry)) {
       entries.push(entry);
     }
