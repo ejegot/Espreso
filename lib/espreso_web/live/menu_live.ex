@@ -351,6 +351,19 @@ defmodule EspresoWeb.MenuLive do
     end
   end
 
+  def handle_event("select_signature_temperature", %{"temperature" => temperature}, socket)
+      when temperature in ["HOT", "ICE"] do
+    detail = socket.assigns.detail
+
+    if detail && Menu.signature_product?(detail.product.name) && !socket.assigns.detail_closing? do
+      {:noreply, assign(socket, :detail, %{detail | temperature: temperature})}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("select_signature_temperature", _params, socket), do: {:noreply, socket}
+
   def handle_event("select_size", %{"price-id" => price_id}, socket) do
     detail = socket.assigns.detail
 
@@ -381,10 +394,11 @@ defmodule EspresoWeb.MenuLive do
              product: product,
              category_name: category_name,
              selected_price_id: price_id,
+             temperature: temperature,
              quantity: qty
            } <- detail,
            %{} = price <- Enum.find(product.product_prices, &(&1.id == price_id)) do
-        {:noreply, put_product_in_cart(socket, category_name, product, price, qty)}
+        {:noreply, put_product_in_cart(socket, category_name, product, price, temperature, qty)}
       else
         _ -> {:noreply, socket}
       end
@@ -1200,7 +1214,7 @@ defmodule EspresoWeb.MenuLive do
             />
 
             <span
-              :if={badge = temperature_badge(@detail.category_name)}
+              :if={badge = detail_temperature_badge(@detail)}
               class={"menu-temp-badge menu-temp-badge--detail menu-temp-badge--#{badge.tone}"}
             >
               {badge.label}
@@ -1266,6 +1280,33 @@ defmodule EspresoWeb.MenuLive do
             </p>
 
             <div class="menu-detail-options">
+              <div :if={Menu.signature_product?(@detail.product.name)} class="menu-detail-option">
+                <p class="menu-detail-label">Temperature</p>
+                <div
+                  class="menu-size-pills menu-signature-temperature-options"
+                  role="group"
+                  aria-label="Choose temperature"
+                >
+                  <button
+                    :for={temperature <- ~w(HOT ICE)}
+                    type="button"
+                    class={[
+                      "menu-size-pill",
+                      "menu-signature-temperature-pill",
+                      @detail.temperature == temperature && "menu-size-pill-active"
+                    ]}
+                    phx-click="select_signature_temperature"
+                    phx-value-temperature={temperature}
+                    aria-pressed={to_string(@detail.temperature == temperature)}
+                  >
+                    <span>{temperature}</span>
+                    <span class="menu-signature-temperature-price">
+                      {Menu.format_price(selected_price(@detail).price)}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
               <div :if={detail_multi_size?(@detail)} class="menu-detail-option">
                 <p class="menu-detail-label">{detail_option_label(@detail)}</p>
                 <div class="menu-size-pills" role="group" aria-label={detail_option_label(@detail)}>
@@ -2343,6 +2384,7 @@ defmodule EspresoWeb.MenuLive do
           product: product,
           category_name: category.name,
           selected_price_id: price && price.id,
+          temperature: if(Menu.signature_product?(product.name), do: "HOT"),
           quantity: 1
         }
 
@@ -2356,9 +2398,17 @@ defmodule EspresoWeb.MenuLive do
     end
   end
 
-  defp put_product_in_cart(socket, _category_name, %{available: false}, _price, _qty), do: socket
+  defp put_product_in_cart(
+         socket,
+         _category_name,
+         %{available: false},
+         _price,
+         _temperature,
+         _qty
+       ),
+       do: socket
 
-  defp put_product_in_cart(socket, category_name, product, price, qty) do
+  defp put_product_in_cart(socket, category_name, product, price, temperature, qty) do
     cart =
       add_line(
         socket.assigns.cart,
@@ -2366,7 +2416,8 @@ defmodule EspresoWeb.MenuLive do
         price,
         qty,
         category_name,
-        Menu.product_image(category_name, product)
+        Menu.product_image(category_name, product),
+        temperature
       )
 
     socket =
@@ -2383,9 +2434,9 @@ defmodule EspresoWeb.MenuLive do
     socket
   end
 
-  defp add_line(cart, product, price, quantity, category_name, image) do
-    key = line_key(product.id, price)
-    size = size_label(price)
+  defp add_line(cart, product, price, quantity, category_name, image, temperature) do
+    key = line_key(product.id, price, temperature)
+    size = temperature || size_label(price)
 
     case Enum.find_index(cart, &(&1.key == key)) do
       nil ->
@@ -2410,7 +2461,10 @@ defmodule EspresoWeb.MenuLive do
     end
   end
 
-  defp line_key(product_id, %{id: price_id}), do: "#{product_id}:#{price_id}"
+  defp line_key(product_id, %{id: price_id}, nil), do: "#{product_id}:#{price_id}"
+
+  defp line_key(product_id, %{id: price_id}, temperature),
+    do: "#{product_id}:#{price_id}:#{temperature}"
 
   # Total quantity across all cart lines (not distinct product count).
   defp cart_count(cart), do: Enum.reduce(cart, 0, fn line, acc -> acc + line.quantity end)
@@ -3102,6 +3156,14 @@ defmodule EspresoWeb.MenuLive do
   defp selected_price(%{product: product, selected_price_id: price_id}) do
     Enum.find(product.product_prices, &(&1.id == price_id)) || List.first(product.product_prices)
   end
+
+  defp detail_temperature_badge(%{temperature: temperature})
+       when temperature in ["HOT", "ICE"] do
+    %{label: temperature, tone: if(temperature == "HOT", do: "hot", else: "iced")}
+  end
+
+  defp detail_temperature_badge(%{category_name: category_name}),
+    do: temperature_badge(category_name)
 
   defp card_price_label(product) do
     case product.product_prices do
