@@ -180,7 +180,9 @@ defmodule EspresoWeb.StaffCashOutLive do
       <main class="staff-cash-out" id="staff-cash-out">
         <header class="staff-cash-out-head">
           <p class="staff-cash-out-scope" id="staff-cash-out-scope">
-            Record money taken from the cash drawer for legitimate shop expenses. This is not a sale.
+            Record expenses paid directly from the cash drawer. For purchases paid from the petty-cash box, use <.link navigate={
+              ~p"/staff/petty-cash"
+            }>Petty cash</.link>. This is not a sale.
           </p>
         </header>
 

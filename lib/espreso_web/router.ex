@@ -139,6 +139,7 @@ defmodule EspresoWeb.Router do
     live_session :cash_out,
       on_mount: [{EspresoWeb.StaffAuth, :ensure_can_cash_out}] do
       live "/staff/cash-out", StaffCashOutLive
+      live "/staff/petty-cash", StaffPettyCashLive
     end
 
     live_session :reports,

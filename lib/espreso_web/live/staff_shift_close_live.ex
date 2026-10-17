@@ -5,6 +5,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
   alias Espreso.CashOuts
   alias Espreso.Menu
   alias Espreso.Orders
+  alias Espreso.PettyCash
   alias Espreso.Printer
   alias Espreso.Shifts
   alias Espreso.StaffShifts
@@ -31,7 +32,9 @@ defmodule EspresoWeb.StaffShiftCloseLive do
       {:noreply,
        socket
        |> assign(:counted_cash, Map.get(params, "counted_cash", ""))
+       |> assign(:petty_cash_counted, Map.get(params, "petty_cash_counted", ""))
        |> assign(:notes, Map.get(params, "notes", ""))
+       |> assign(:petty_cash_notes, Map.get(params, "petty_cash_notes", ""))
        |> assign(:confirming?, false)
        |> assign(:form_error, nil)}
     end
@@ -43,20 +46,65 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     else
       counted = Map.get(params, "counted_cash", "") |> to_string() |> String.trim()
 
-      if counted == "" do
-        {:noreply,
-         socket
-         |> assign(:counted_cash, counted)
-         |> assign(:notes, Map.get(params, "notes", ""))
-         |> assign(:confirming?, false)
-         |> assign(:form_error, "Enter the actual cash in the drawer.")}
-      else
-        {:noreply,
-         socket
-         |> assign(:counted_cash, counted)
-         |> assign(:notes, Map.get(params, "notes", ""))
-         |> assign(:confirming?, true)
-         |> assign(:form_error, nil)}
+      petty_counted =
+        Map.get(params, "petty_cash_counted", "") |> to_string() |> String.trim()
+
+      petty_notes = Map.get(params, "petty_cash_notes", "") |> to_string() |> String.trim()
+
+      cond do
+        counted == "" ->
+          {:noreply,
+           socket
+           |> assign(:counted_cash, counted)
+           |> assign(:petty_cash_counted, petty_counted)
+           |> assign(:notes, Map.get(params, "notes", ""))
+           |> assign(:petty_cash_notes, petty_notes)
+           |> assign(:confirming?, false)
+           |> assign(:form_error, "Enter the actual cash in the drawer.")}
+
+        petty_counted == "" ->
+          {:noreply,
+           socket
+           |> assign(:counted_cash, counted)
+           |> assign(:petty_cash_counted, petty_counted)
+           |> assign(:notes, Map.get(params, "notes", ""))
+           |> assign(:petty_cash_notes, petty_notes)
+           |> assign(:confirming?, false)
+           |> assign(:form_error, "Count the petty cash before recording the close.")}
+
+        is_nil(parse_display_decimal(petty_counted)) ->
+          {:noreply,
+           socket
+           |> assign(:counted_cash, counted)
+           |> assign(:petty_cash_counted, petty_counted)
+           |> assign(:notes, Map.get(params, "notes", ""))
+           |> assign(:petty_cash_notes, petty_notes)
+           |> assign(:confirming?, false)
+           |> assign(:form_error, "Enter a valid non-negative petty-cash count.")}
+
+        petty_cash_variance(petty_counted, socket.assigns.petty_cash_expected) != nil and
+          not Decimal.equal?(
+            petty_cash_variance(petty_counted, socket.assigns.petty_cash_expected),
+            0
+          ) and petty_notes == "" ->
+          {:noreply,
+           socket
+           |> assign(:counted_cash, counted)
+           |> assign(:petty_cash_counted, petty_counted)
+           |> assign(:notes, Map.get(params, "notes", ""))
+           |> assign(:petty_cash_notes, petty_notes)
+           |> assign(:confirming?, false)
+           |> assign(:form_error, "Add a reason when petty cash is over or short.")}
+
+        true ->
+          {:noreply,
+           socket
+           |> assign(:counted_cash, counted)
+           |> assign(:petty_cash_counted, petty_counted)
+           |> assign(:notes, Map.get(params, "notes", ""))
+           |> assign(:petty_cash_notes, petty_notes)
+           |> assign(:confirming?, true)
+           |> assign(:form_error, nil)}
       end
     end
   end
@@ -71,7 +119,9 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     else
       params = %{
         "counted_cash" => socket.assigns.counted_cash,
-        "notes" => socket.assigns.notes
+        "notes" => socket.assigns.notes,
+        "petty_cash_counted" => socket.assigns.petty_cash_counted,
+        "petty_cash_notes" => socket.assigns.petty_cash_notes
       }
 
       case Shifts.record_close(socket.assigns.current_user, params) do
@@ -125,6 +175,12 @@ defmodule EspresoWeb.StaffShiftCloseLive do
            socket
            |> assign(:confirming?, false)
            |> assign(:form_error, "Enter the actual cash in the drawer.")}
+
+        {:error, :petty_cash_notes_required} ->
+          {:noreply,
+           socket
+           |> assign(:confirming?, false)
+           |> assign(:form_error, "Add a reason when petty cash is over or short.")}
 
         {:error, %Ecto.Changeset{} = changeset} ->
           {:noreply,
@@ -209,8 +265,22 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     snapshot_rows = closed_via_rows(assigns[:close])
     snapshot_cash = snapshot_cash_total(assigns[:close])
     opening_cash = assigns[:opening_cash_amount]
-    expected_cash = assigns[:expected_cash]
+    petty_transfer = petty_cash_transfer(assigns[:petty_cash_counted], assigns[:petty_cash_total])
+
+    expected_cash =
+      Shifts.expected_drawer_cash(
+        opening_cash,
+        Shifts.cash_sales_total(assigns[:breakdown]),
+        assigns[:cash_out_total],
+        petty_transfer
+      )
+
     live_variance = live_variance(assigns[:counted_cash], expected_cash)
+
+    petty_cash_variance =
+      petty_cash_variance(assigns[:petty_cash_counted], assigns[:petty_cash_expected])
+
+    petty_cash_transfer_preview = petty_cash_transfer_preview(assigns[:petty_cash_counted])
 
     assigns =
       assigns
@@ -221,6 +291,8 @@ defmodule EspresoWeb.StaffShiftCloseLive do
       |> assign(:opening_cash, opening_cash)
       |> assign(:expected_cash, expected_cash)
       |> assign(:live_variance, live_variance)
+      |> assign(:petty_cash_variance, petty_cash_variance)
+      |> assign(:petty_cash_transfer_preview, petty_cash_transfer_preview)
 
     ~H"""
     <.staff_shell current={:close} current_user={@current_user} page_title="Close shift" chrome={:bar}>
@@ -259,7 +331,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
               <% @block_reason == :not_on_shift -> %>
                 You need an open staff shift to close the shop. Log in again if your shift already ended.
               <% true -> %>
-                Review today’s settled sales, enter the cash physically counted in the drawer, then seal the day.
+                Count petty cash first, move the amount shown between the petty box and drawer, then count the drawer and seal the day.
                 System paid totals are settled sales — not a physical cash target.
             <% end %>
           </p>
@@ -338,6 +410,34 @@ defmodule EspresoWeb.StaffShiftCloseLive do
               </p>
               <p class="staff-shift-close-section-hint" id="staff-shift-close-sealed-variance">
                 {variance_copy(@close.variance)}
+              </p>
+            </div>
+
+            <div
+              :if={!is_nil(@close.petty_cash_counted)}
+              class="staff-shift-close-counted-display"
+              id="staff-shift-close-sealed-petty-cash"
+            >
+              <p class="staff-shift-close-section-label">Petty cash</p>
+              <p class="staff-shift-close-section-hint">
+                Counted before refill {drawer_money(@close.petty_cash_counted)} · expected before refill {drawer_money(
+                  @close.petty_cash_expected
+                )}
+              </p>
+              <p class="staff-shift-close-cash-value" id="staff-shift-close-sealed-petty-transfer">
+                <%= if Decimal.compare(@close.petty_cash_transfer || Decimal.new("0"), 0) == :gt do %>
+                  Refilled from drawer {Menu.format_price(@close.petty_cash_transfer)}
+                <% else %>
+                  Returned to drawer {Menu.format_price(
+                    Decimal.abs(@close.petty_cash_transfer || Decimal.new("0"))
+                  )}
+                <% end %>
+              </p>
+              <p
+                :if={@close.petty_cash_variance && !Decimal.equal?(@close.petty_cash_variance, 0)}
+                class="staff-shift-close-section-hint"
+              >
+                {variance_copy(@close.petty_cash_variance)} · {@close.petty_cash_notes}
               </p>
             </div>
 
@@ -434,6 +534,37 @@ defmodule EspresoWeb.StaffShiftCloseLive do
 
             <section
               :if={!@blocked?}
+              class="staff-shift-close-cash-outs"
+              id="staff-shift-close-petty-cash"
+              aria-label="Petty cash purchases"
+            >
+              <p class="staff-shift-close-section-label">Petty-cash purchases</p>
+              <p class="staff-shift-close-cash-value" id="staff-shift-close-petty-cash-total">
+                {Menu.format_price(@petty_cash_total)}
+              </p>
+              <p class="staff-shift-close-section-hint">
+                Paid from the separate float. Refill is recorded as a drawer transfer, not another expense.
+              </p>
+              <ul
+                :if={@petty_cash_entries != []}
+                class="staff-shift-close-cash-out-list"
+                id="staff-shift-close-petty-cash-list"
+              >
+                <li :for={entry <- @petty_cash_entries} class="staff-shift-close-cash-out-row">
+                  <span class="staff-shift-close-cash-out-amount">
+                    {Menu.format_price(entry.amount)}
+                  </span>
+                  <span class="staff-shift-close-cash-out-category">{entry.category}</span>
+                  <span class="staff-shift-close-cash-out-note">{entry.note}</span>
+                </li>
+              </ul>
+              <p :if={@petty_cash_entries == []} class="staff-shift-close-section-hint">
+                No petty-cash purchases recorded today.
+              </p>
+            </section>
+
+            <section
+              :if={!@blocked?}
               class="staff-shift-close-cash"
               id="staff-shift-close-cash"
               aria-label="Cash settled"
@@ -490,7 +621,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
                 Opening cash was not recorded. Expected uses ₱0 opening.
               </p>
               <p :if={!@missing_opening?} class="staff-shift-close-section-hint">
-                Opening {Menu.format_price(@opening_cash)} + cash sales − cash outs.
+                Opening {Menu.format_price(@opening_cash)} + cash sales − drawer Cash Outs − petty-cash refill.
               </p>
             </section>
 
@@ -502,6 +633,39 @@ defmodule EspresoWeb.StaffShiftCloseLive do
               class="staff-shift-close-form"
             >
               <div class="staff-shift-close-entry">
+                <label class="staff-shift-close-field" id="staff-shift-close-petty-counted-field">
+                  <span>Count petty cash before refill</span>
+                  <div class="staff-shift-close-input-wrap">
+                    <span class="staff-shift-close-currency" aria-hidden="true">₱</span>
+                    <input
+                      type="text"
+                      name="close[petty_cash_counted]"
+                      value={@petty_cash_counted}
+                      inputmode="decimal"
+                      placeholder="0.00"
+                      class="staff-shift-close-input"
+                      aria-describedby="staff-shift-close-petty-counted-hint"
+                    />
+                  </div>
+                  <span
+                    class="staff-shift-close-section-hint"
+                    id="staff-shift-close-petty-counted-hint"
+                  >
+                    Expected {Menu.format_price(@petty_cash_expected)}. {@petty_cash_transfer_preview}
+                  </span>
+                </label>
+
+                <label class="staff-shift-close-field">
+                  <span>Petty-cash difference reason</span>
+                  <textarea
+                    name="close[petty_cash_notes]"
+                    rows="2"
+                    maxlength="500"
+                    placeholder="Required only if counted petty cash differs from expected"
+                    class="staff-shift-close-input staff-shift-close-input--notes"
+                  >{@petty_cash_notes}</textarea>
+                </label>
+
                 <label class="staff-shift-close-field" id="staff-shift-close-counted-field">
                   <span>Counted drawer cash</span>
                   <div class="staff-shift-close-input-wrap">
@@ -517,7 +681,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
                     />
                   </div>
                   <span class="staff-shift-close-section-hint" id="staff-shift-close-counted-hint">
-                    Required — actual cash in the drawer at close.
+                    Required — count after completing the petty-cash transfer above.
                   </span>
                 </label>
 
@@ -701,7 +865,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
           <div class="staff-confirm-dialog">
             <p class="staff-confirm-dialog-title">Record today’s close?</p>
             <p class="staff-confirm-dialog-copy">
-              This will seal today’s recorded paid sales and save the cash count you entered.
+              This will seal today’s sales and cash counts. Complete the petty-cash transfer shown above before confirming.
               <span :if={barista?(@current_user)}>
                 Your staff shift will also end (Time Out).
               </span>
@@ -710,6 +874,11 @@ defmodule EspresoWeb.StaffShiftCloseLive do
               Counted drawer cash · ₱{@counted_cash} · expected {Menu.format_price(@expected_cash)} · {variance_copy(
                 @live_variance
               )}
+            </p>
+            <p class="staff-confirm-dialog-meta" id="staff-shift-close-confirm-petty-cash">
+              Petty cash counted · ₱{@petty_cash_counted} · expected before refill {Menu.format_price(
+                @petty_cash_expected
+              )} · {@petty_cash_transfer_preview}
             </p>
             <div class="staff-confirm-dialog-actions">
               <button
@@ -746,6 +915,13 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     cash_outs = CashOuts.list_recorded_for_shop_date(shop_date)
     cash_out_total = CashOuts.total_for_shop_date(shop_date)
 
+    petty_cash_entries =
+      PettyCash.list_for_shop_date(shop_date)
+      |> Enum.filter(&(&1.status == "recorded"))
+
+    petty_cash_total = PettyCash.total_for_shop_date(shop_date)
+    petty_cash_expected = Decimal.sub(PettyCash.float(), petty_cash_total) |> Decimal.round(2)
+
     {blocked?, block_reason, other_names, staff_shift_ended?} =
       cond do
         already_closed? ->
@@ -774,7 +950,14 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     shop_open = Shifts.get_open_for_date(shop_date)
     opening_cash_amount = shop_open && shop_open.opening_cash
     cash_sales = Shifts.cash_sales_total(breakdown)
-    expected_cash = Shifts.expected_drawer_cash(opening_cash_amount, cash_sales, cash_out_total)
+
+    expected_cash =
+      Shifts.expected_drawer_cash(
+        opening_cash_amount,
+        cash_sales,
+        cash_out_total,
+        petty_cash_total
+      )
 
     socket
     |> assign(:page_title, "Close shift")
@@ -788,13 +971,18 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     |> assign(:staff_shift_ended?, staff_shift_ended?)
     |> assign(:cash_outs, cash_outs)
     |> assign(:cash_out_total, cash_out_total)
+    |> assign(:petty_cash_entries, petty_cash_entries)
+    |> assign(:petty_cash_total, petty_cash_total)
+    |> assign(:petty_cash_expected, petty_cash_expected)
     |> assign(:shop_open, shop_open)
     |> assign(:opening_cash_amount, opening_cash_amount)
     |> assign(:expected_cash, expected_cash)
     |> assign(:missing_opening?, is_nil(shop_open))
     |> assign(:printer_note, nil)
     |> assign(:counted_cash, "")
+    |> assign(:petty_cash_counted, "")
     |> assign(:notes, "")
+    |> assign(:petty_cash_notes, "")
     |> assign(:confirming?, false)
     |> assign(:form_error, nil)
     |> reset_close_history()
@@ -953,6 +1141,55 @@ defmodule EspresoWeb.StaffShiftCloseLive do
       Shifts.drawer_variance(counted, expected_cash)
     end
   end
+
+  defp petty_cash_variance(counted_value, expected_cash) do
+    case parse_display_decimal(counted_value) do
+      %Decimal{} = counted -> Shifts.drawer_variance(counted, expected_cash)
+      _ -> nil
+    end
+  end
+
+  defp petty_cash_transfer(counted_value, total_expenses) do
+    case parse_display_decimal(counted_value) do
+      %Decimal{} = counted ->
+        Decimal.sub(PettyCash.float(), counted) |> Decimal.round(2)
+
+      _ ->
+        Decimal.round(total_expenses || Decimal.new("0"), 2)
+    end
+  end
+
+  defp petty_cash_transfer_preview(counted_value) do
+    case parse_display_decimal(counted_value) do
+      %Decimal{} = counted ->
+        transfer = Decimal.sub(PettyCash.float(), counted) |> Decimal.round(2)
+
+        case Decimal.compare(transfer, 0) do
+          :gt -> "Move #{Menu.format_price(transfer)} from drawer to petty cash."
+          :lt -> "Return #{Menu.format_price(Decimal.abs(transfer))} from petty cash to drawer."
+          :eq -> "No drawer transfer needed."
+        end
+
+      _ ->
+        "The system calculates the transfer after you enter the count."
+    end
+  end
+
+  defp parse_display_decimal(value) when is_binary(value) do
+    case Decimal.parse(String.trim(value)) do
+      {decimal, ""} ->
+        if Decimal.compare(decimal, 0) == :lt, do: nil, else: Decimal.round(decimal, 2)
+
+      _ ->
+        nil
+    end
+  end
+
+  defp parse_display_decimal(%Decimal{} = decimal) do
+    if Decimal.compare(decimal, 0) == :lt, do: nil, else: Decimal.round(decimal, 2)
+  end
+
+  defp parse_display_decimal(_), do: nil
 
   defp variance_copy(nil), do: "Enter counted cash to see over/short."
 

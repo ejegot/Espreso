@@ -16,6 +16,7 @@ defmodule Espreso.Shifts do
   alias Espreso.Accounts.User
   alias Espreso.CashOuts
   alias Espreso.Orders
+  alias Espreso.PettyCash
   alias Espreso.Repo
   alias Espreso.Shifts.ShopDayOpen
   alias Espreso.Shifts.ShiftClose
@@ -273,10 +274,13 @@ defmodule Espreso.Shifts do
 
   Missing opening cash is treated as ₱0 so close still works, with a visible gap.
   """
-  def expected_drawer_cash(opening_cash, cash_sales, cash_out_total) do
+  def expected_drawer_cash(opening_cash, cash_sales, cash_out_total, petty_cash_transfer \\ 0) do
     Decimal.sub(
       Decimal.add(decimalize_money(opening_cash), decimalize_money(cash_sales)),
-      decimalize_money(cash_out_total)
+      Decimal.add(
+        decimalize_money(cash_out_total),
+        decimalize_money(petty_cash_transfer)
+      )
     )
     |> Decimal.round(2)
   end
@@ -362,6 +366,14 @@ defmodule Espreso.Shifts do
 
     notes = normalize_notes(Map.get(attrs, :notes) || Map.get(attrs, "notes"))
 
+    petty_cash_counted =
+      parse_optional_decimal(
+        Map.get(attrs, :petty_cash_counted) || Map.get(attrs, "petty_cash_counted")
+      )
+
+    petty_cash_notes =
+      normalize_notes(Map.get(attrs, :petty_cash_notes) || Map.get(attrs, "petty_cash_notes"))
+
     if is_nil(counted_cash) do
       {:error, :counted_cash_required}
     else
@@ -385,7 +397,30 @@ defmodule Espreso.Shifts do
           opening_cash = opening && opening.opening_cash
           cash_sales = cash_sales_total(breakdown)
           cash_out_total = CashOuts.total_for_shop_date(shop_date)
-          expected_cash = expected_drawer_cash(opening_cash, cash_sales, cash_out_total)
+          petty_cash_expenses = PettyCash.total_for_shop_date(shop_date)
+
+          petty_cash_expected =
+            Decimal.sub(PettyCash.float(), petty_cash_expenses) |> Decimal.round(2)
+
+          counted_petty_cash = petty_cash_counted || petty_cash_expected
+          petty_cash_variance = drawer_variance(counted_petty_cash, petty_cash_expected)
+
+          petty_cash_transfer =
+            Decimal.sub(PettyCash.float(), counted_petty_cash) |> Decimal.round(2)
+
+          if petty_cash_counted && not Decimal.equal?(petty_cash_variance, 0) &&
+               is_nil(petty_cash_notes) do
+            Repo.rollback(:petty_cash_notes_required)
+          end
+
+          expected_cash =
+            expected_drawer_cash(
+              opening_cash,
+              cash_sales,
+              cash_out_total,
+              petty_cash_transfer
+            )
+
           variance = drawer_variance(counted_cash, expected_cash)
 
           close =
@@ -400,6 +435,11 @@ defmodule Espreso.Shifts do
               expected_cash: expected_cash,
               variance: variance,
               notes: notes,
+              petty_cash_counted: counted_petty_cash,
+              petty_cash_expected: petty_cash_expected,
+              petty_cash_variance: petty_cash_variance,
+              petty_cash_transfer: petty_cash_transfer,
+              petty_cash_notes: petty_cash_notes,
               closed_by_user_id: user.id,
               closed_at: closed_at,
               tenant_id: user.tenant_id,
@@ -436,6 +476,7 @@ defmodule Espreso.Shifts do
         {:error, :already_closed} -> {:error, :already_closed}
         {:error, :other_staff_active} -> {:error, :other_staff_active}
         {:error, :not_on_shift} -> {:error, :not_on_shift}
+        {:error, :petty_cash_notes_required} -> {:error, :petty_cash_notes_required}
         {:error, %Ecto.Changeset{} = changeset} -> {:error, changeset}
         {:error, reason} -> {:error, reason}
       end
