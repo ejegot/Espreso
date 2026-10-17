@@ -17099,7 +17099,13 @@ body:has(.staff-nav-drawer.is-open) {
 }
 
 .staff-app.staff-app--bar > .staff-pos-rail.staff-pos-rail--bar .staff-pos-rail-hop-badge {
-  border-color: var(--elilai-forest, #394331);
+  border-color: #fff;
+  background: #fff;
+  color: var(--elilai-forest, #394331);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 28%);
+  font-size: 0.68rem;
+  min-width: 1.3rem;
+  height: 1.3rem;
 }
 
 .staff-app.staff-app--bar > .staff-pos-rail.staff-pos-rail--bar .staff-account-panel,
