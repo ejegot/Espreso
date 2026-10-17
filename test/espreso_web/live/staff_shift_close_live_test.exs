@@ -6,6 +6,7 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
   alias Espreso.Accounts
   alias Espreso.Menu
   alias Espreso.Orders
+  alias Espreso.PettyCash
   alias Espreso.Repo
   alias Espreso.Shifts
   alias Espreso.StaffShifts
@@ -62,7 +63,9 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     refute has_element?(view, "#staff-shift-close-timed-out")
 
     view
-    |> form("#staff-shift-close-form", %{close: %{counted_cash: "80", notes: "Balanced"}})
+    |> form("#staff-shift-close-form", %{
+      close: %{counted_cash: "80", petty_cash_counted: "500", notes: "Balanced"}
+    })
     |> render_submit()
 
     assert has_element?(view, "#staff-shift-close-confirm", "Record today’s close?")
@@ -115,6 +118,49 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     assert StaffShifts.list_shifts_for_user(manager.id) == []
   end
 
+  @tag :without_shop_open
+  test "closing refills petty cash from the drawer without double-counting the purchase", %{
+    conn: conn,
+    manager: manager
+  } do
+    assert {:ok, _open} = Shifts.record_open(manager, %{opening_cash: "500"})
+
+    assert {:ok, _entry} =
+             PettyCash.create_entry(manager, %{
+               amount: "50",
+               category: "Ingredients",
+               note: "Bag of ice"
+             })
+
+    opening = Shifts.get_open_for_date(Espreso.Orders.shop_date_today()).opening_cash
+    drawer_count = Decimal.sub(opening, Decimal.new("50"))
+
+    {:ok, view, _html} = live(conn, ~p"/staff/close")
+
+    assert has_element?(view, "#staff-shift-close-petty-cash-total", "₱50")
+    assert has_element?(view, "#staff-shift-close-petty-cash-list", "Bag of ice")
+
+    view
+    |> form("#staff-shift-close-form", %{
+      close: %{
+        counted_cash: Decimal.to_string(drawer_count),
+        petty_cash_counted: "450",
+        petty_cash_notes: ""
+      }
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#staff-shift-close-confirm-petty-cash", "Move ₱50 from drawer")
+
+    view |> element("#staff-shift-close-submit") |> render_click()
+
+    assert has_element?(view, "#staff-shift-close-sealed-petty-transfer")
+
+    close = Shifts.get_todays_close()
+    assert Decimal.equal?(close.expected_cash, drawer_count)
+    assert Decimal.equal?(close.petty_cash_transfer, Decimal.new("50"))
+  end
+
   test "closed state shows sealed snapshot not later live totals", %{conn: conn, manager: manager} do
     {:ok, order} =
       Orders.create_order(
@@ -161,7 +207,9 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     {:ok, view, _html} = live(conn, ~p"/staff/close")
 
     view
-    |> form("#staff-shift-close-form", %{close: %{counted_cash: "", notes: ""}})
+    |> form("#staff-shift-close-form", %{
+      close: %{counted_cash: "", petty_cash_counted: "500", notes: ""}
+    })
     |> render_submit()
 
     refute has_element?(view, "#staff-shift-close-confirm")
@@ -190,7 +238,9 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     refute has_element?(view, "#staff-shift-close-blocked")
 
     view
-    |> form("#staff-shift-close-form", %{close: %{counted_cash: "40", notes: ""}})
+    |> form("#staff-shift-close-form", %{
+      close: %{counted_cash: "40", petty_cash_counted: "500", notes: ""}
+    })
     |> render_submit()
 
     assert has_element?(view, "#staff-shift-close-confirm", "Your staff shift will also end")

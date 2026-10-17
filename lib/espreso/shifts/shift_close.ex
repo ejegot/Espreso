@@ -14,6 +14,11 @@ defmodule Espreso.Shifts.ShiftClose do
     field :expected_cash, :decimal
     field :variance, :decimal
     field :notes, :string
+    field :petty_cash_counted, :decimal
+    field :petty_cash_expected, :decimal
+    field :petty_cash_variance, :decimal
+    field :petty_cash_transfer, :decimal
+    field :petty_cash_notes, :string
     field :closed_at, :utc_datetime
 
     belongs_to :closed_by_user, User
@@ -35,6 +40,11 @@ defmodule Espreso.Shifts.ShiftClose do
       :expected_cash,
       :variance,
       :notes,
+      :petty_cash_counted,
+      :petty_cash_expected,
+      :petty_cash_variance,
+      :petty_cash_transfer,
+      :petty_cash_notes,
       :closed_by_user_id,
       :closed_at,
       :tenant_id,
@@ -50,11 +60,13 @@ defmodule Espreso.Shifts.ShiftClose do
     ])
     |> validate_number(:system_count, greater_than_or_equal_to: 0)
     |> validate_length(:notes, max: 500)
+    |> validate_length(:petty_cash_notes, max: 500)
     |> Espreso.Tenancy.put_ids()
     |> unique_constraint(:shop_date, name: :shift_closes_branch_id_shop_date_index)
     |> foreign_key_constraint(:closed_by_user_id)
     |> foreign_key_constraint(:tenant_id)
     |> foreign_key_constraint(:branch_id)
     |> validate_number(:counted_cash, greater_than_or_equal_to: 0)
+    |> validate_number(:petty_cash_counted, greater_than_or_equal_to: 0)
   end
 end

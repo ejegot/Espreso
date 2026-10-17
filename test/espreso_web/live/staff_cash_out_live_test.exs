@@ -50,6 +50,7 @@ defmodule EspresoWeb.StaffCashOutLiveTest do
 
     refute has_element?(view, "#staff-cash-out-blocked")
     assert has_element?(view, "#staff-cash-out-form")
+    assert has_element?(view, "#staff-cash-out-scope a[href='/staff/petty-cash']", "Petty cash")
 
     view |> element("#staff-cash-out-category-trigger") |> render_click()
     assert has_element?(view, "#staff-cash-out-category-list")
@@ -129,10 +130,13 @@ defmodule EspresoWeb.StaffCashOutLiveTest do
     {:ok, barista_home, _} = live(log_in(conn, barista), ~p"/staff")
     refute has_element?(barista_home, "#staff-home-cash-out")
     assert has_element?(barista_home, "#staff-nav-cash_out", "Cash Out")
+    assert has_element?(barista_home, "#staff-nav-petty_cash", "Petty cash")
+    assert has_element?(barista_home, "#staff-nav-petty_cash svg.hero-wallet")
 
     {:ok, manager_home, _} = live(log_in(conn, manager), ~p"/staff")
     refute has_element?(manager_home, "#staff-home-cash-out")
     assert has_element?(manager_home, "#staff-nav-cash_out", "Cash Out")
+    assert has_element?(manager_home, "#staff-nav-petty_cash", "Petty cash")
   end
 
   test "Close Shift shows Cash Out total and details", %{conn: conn, manager: manager} do

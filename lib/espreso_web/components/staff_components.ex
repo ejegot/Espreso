@@ -441,6 +441,14 @@ defmodule EspresoWeb.StaffComponents do
         show?: Espreso.CashOuts.can_access?(user)
       },
       %{
+        key: :petty_cash,
+        label: "Petty cash",
+        icon: "hero-wallet",
+        path: ~p"/staff/petty-cash",
+        group: :shift,
+        show?: Espreso.PettyCash.can_access?(user)
+      },
+      %{
         key: :open_shop,
         label: "Open shop",
         icon: "hero-lock-open",
