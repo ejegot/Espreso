@@ -148,12 +148,29 @@ defmodule EspresoWeb.MenuLiveTest do
     assert has_element?(view, "#menu-detail")
     assert has_element?(view, "#menu-detail-title", "Signature Tablea")
     assert has_element?(view, "#menu-detail .menu-detail-price", "₱169")
+    assert has_element?(view, "#menu-detail .menu-temp-badge--hot", "HOT")
+    assert has_element?(view, "button[phx-value-temperature='HOT'][aria-pressed='true']", "₱169")
+    assert has_element?(view, "button[phx-value-temperature='ICE'][aria-pressed='false']", "₱169")
 
     assert has_element?(
              view,
              "#menu-detail .menu-detail-description",
              "Rich local cacao, our signature blend"
            )
+
+    view
+    |> element("button[phx-value-temperature='ICE']")
+    |> render_click()
+
+    assert has_element?(view, "#menu-detail .menu-temp-badge--iced", "ICE")
+    assert has_element?(view, "button[phx-value-temperature='ICE'][aria-pressed='true']")
+
+    view |> element("button.menu-buy-now", "Add to Cart") |> render_click()
+    view |> element("button.brune-icon-bag") |> render_click()
+
+    assert has_element?(view, ".menu-basket-line-name", "Signature Tablea")
+    assert has_element?(view, ".menu-basket-line-size", "ICE")
+    assert has_element?(view, ".menu-basket-line-price", "₱169")
   end
 
   test "/menu shows only one Signature Tablea featured card and omits it from HOT list", %{

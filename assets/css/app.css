@@ -25955,6 +25955,19 @@ html:not(.page-is-loading) .brune-top {
   font-size: 0.9rem;
 }
 
+.menu-live-root .menu-signature-temperature-pill {
+  display: grid;
+  flex: 1 1 0;
+  gap: 0.15rem;
+  min-width: 0;
+  text-align: center;
+}
+
+.menu-live-root .menu-signature-temperature-price {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 .menu-live-root .menu-size-pill-active {
   border-color: #f85020;
   background: color-mix(in srgb, #f85020 14%, #fff);
