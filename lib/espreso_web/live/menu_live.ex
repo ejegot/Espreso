@@ -624,6 +624,8 @@ defmodule EspresoWeb.MenuLive do
             class="menu-qr-landing-photo"
             width="573"
             height="1024"
+            fetchpriority="high"
+            decoding="async"
           />
         </div>
         <div class="menu-qr-landing-scrim" aria-hidden="true"></div>

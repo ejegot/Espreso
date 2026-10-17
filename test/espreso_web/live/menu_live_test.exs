@@ -41,6 +41,9 @@ defmodule EspresoWeb.MenuLiveTest do
     {:ok, view, html} = live(conn, ~p"/menu")
 
     assert html =~ "CoffeeSpot"
+    assert html =~ ~s(rel="preload" as="style")
+    assert html =~ ~s(media="print" onload="this.media=&#39;all&#39;")
+    assert html =~ "<noscript>"
     assert has_element?(view, "#menu-landing")
     assert has_element?(view, "#menu-landing.menu-qr-landing--poster")
     assert has_element?(view, ".menu-qr-landing-top-brand", "CoffeeSpot")
@@ -61,6 +64,8 @@ defmodule EspresoWeb.MenuLiveTest do
              view,
              ~s(.menu-qr-landing-photo[src="/images/coffeespot/landing-latte-paddle.jpg"])
            )
+
+    assert html =~ ~s(fetchpriority="high" decoding="async")
 
     refute has_element?(view, "#menu-landing-carousel")
     refute has_element?(view, "#menu-landing-slide-welcome")
