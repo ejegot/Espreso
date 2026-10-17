@@ -14,6 +14,8 @@ defmodule EspresoWeb.StaffOwnerSetupLiveTest do
 
     {:ok, view, html} = live(conn, ~p"/setup")
     assert html =~ "Owner setup"
+    assert has_element?(view, ".staff-auth-logo-picture")
+    assert has_element?(view, ".staff-auth-wordmark", "ELILAI KAFE")
     assert has_element?(view, "#owner-setup-form")
     assert has_element?(view, "#owner-setup-name")
     assert has_element?(view, "#owner-setup-pin")
