@@ -4465,6 +4465,26 @@ body:has(.menu-page-locked) {
   color: var(--staff-auth-frost-text, #f4efe3);
 }
 
+.staff-auth-page--lock .staff-owner-setup-form .staff-auth-field input {
+  border-color: rgba(244, 239, 227, 0.85);
+  background: rgba(244, 239, 227, 0.94);
+  color: #1e251c;
+  caret-color: #1e251c;
+}
+
+.staff-auth-page--lock .staff-owner-setup-form .staff-auth-field input::placeholder {
+  color: #687064;
+  opacity: 1;
+}
+
+.staff-auth-page--lock .staff-owner-setup-form .staff-auth-field input:focus {
+  border-color: #f4efe3;
+  background: #fffef9;
+  color: #1e251c;
+  outline: 2px solid rgba(244, 239, 227, 0.8);
+  outline-offset: 2px;
+}
+
 @media (min-width: 860px) {
   .staff-auth-page--approved.staff-auth-page--lock .staff-auth-stage {
     display: flex;
