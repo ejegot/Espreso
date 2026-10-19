@@ -112,7 +112,11 @@ defmodule EspresoWeb.StaffOwnerSetupLive do
               {msg}
             </p>
 
-            <form id="owner-setup-form" phx-submit="save" class="staff-auth-form-v2">
+            <form
+              id="owner-setup-form"
+              phx-submit="save"
+              class="staff-auth-form-v2 staff-owner-setup-form"
+            >
               <label class="staff-auth-field">
                 <span>Full name</span>
                 <input

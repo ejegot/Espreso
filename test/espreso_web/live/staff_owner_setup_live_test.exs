@@ -16,7 +16,7 @@ defmodule EspresoWeb.StaffOwnerSetupLiveTest do
     assert html =~ "Owner setup"
     assert has_element?(view, ".staff-auth-logo-picture")
     assert has_element?(view, ".staff-auth-wordmark", "ELILAI KAFE")
-    assert has_element?(view, "#owner-setup-form")
+    assert has_element?(view, "#owner-setup-form.staff-owner-setup-form")
     assert has_element?(view, "#owner-setup-name")
     assert has_element?(view, "#owner-setup-pin")
     assert has_element?(view, "#owner-setup-pin-confirmation")
