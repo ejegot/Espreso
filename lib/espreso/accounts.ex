@@ -59,6 +59,7 @@ defmodule Espreso.Accounts do
   def register_self(_attrs), do: {:error, :registration_closed}
 
   @bootstrap_lock_key 8_505_301_441
+  @pin_lock_namespace 8_505_302
 
   @doc """
   Creates the first Owner when no users exist yet.
@@ -369,6 +370,20 @@ defmodule Espreso.Accounts do
   end
 
   @doc """
+  Returns whether the current tenant has any active PIN-enabled staff accounts.
+  """
+  def any_staff_pin_configured? do
+    User
+    |> Tenancy.scope_to_tenant()
+    |> where(
+      [u],
+      u.active == true and u.role in ^@staff_roster_roles and not is_nil(u.pin_hash) and
+        u.pin_hash != ""
+    )
+    |> Repo.exists?()
+  end
+
+  @doc """
   Returns whether the user has a PIN configured.
   """
   def pin_set?(%User{pin_hash: pin_hash}) when is_binary(pin_hash) and pin_hash != "",
@@ -377,13 +392,43 @@ defmodule Espreso.Accounts do
   def pin_set?(_), do: false
 
   @doc """
-  Sets a 4–6 digit PIN for a user. Hashes with Pbkdf2.
+  Sets a unique 4–6 digit PIN for a user. Hashes with Pbkdf2.
+
+  PIN uniqueness is scoped to the tenant and serialized with an advisory lock.
   """
   def set_pin(%User{} = user, pin) when is_binary(pin) do
     with :ok <- validate_pin_format(pin) do
-      user
-      |> Ecto.Changeset.change(%{pin_hash: Pbkdf2.hash_pwd_salt(pin)})
-      |> Repo.update()
+      Repo.transaction(fn ->
+        Repo.query!("SELECT pg_advisory_xact_lock($1, $2)", [
+          @pin_lock_namespace,
+          user.tenant_id
+        ])
+
+        duplicate? =
+          User
+          |> where(
+            [u],
+            u.tenant_id == ^user.tenant_id and u.id != ^user.id and not is_nil(u.pin_hash) and
+              u.pin_hash != ""
+          )
+          |> Repo.all()
+          |> Enum.any?(fn other -> Pbkdf2.verify_pass(pin, other.pin_hash) end)
+
+        if duplicate? do
+          Repo.rollback(:pin_already_in_use)
+        else
+          case user
+               |> Ecto.Changeset.change(%{pin_hash: Pbkdf2.hash_pwd_salt(pin)})
+               |> Repo.update() do
+            {:ok, updated} -> updated
+            {:error, changeset} -> Repo.rollback(changeset)
+          end
+        end
+      end)
+      |> case do
+        {:ok, %User{} = updated} -> {:ok, updated}
+        {:error, reason} -> {:error, reason}
+      end
     end
   end
 
@@ -457,6 +502,47 @@ defmodule Espreso.Accounts do
   end
 
   def verify_pin(_, _), do: {:error, :invalid_pin}
+
+  @doc """
+  Verifies a PIN against the active PIN-enabled staff in the current tenant.
+
+  PIN-only login requires exactly one matching account. Every candidate hash is
+  checked before deciding, so the match position does not reveal staff order.
+  """
+  def verify_staff_pin(pin) when is_binary(pin) do
+    case validate_pin_format(pin) do
+      :ok ->
+        users =
+          User
+          |> Tenancy.scope_to_tenant()
+          |> where(
+            [u],
+            u.active == true and u.role in ^@staff_roster_roles and not is_nil(u.pin_hash) and
+              u.pin_hash != ""
+          )
+          |> order_by([u], asc: u.id)
+          |> Repo.all()
+
+        if users == [], do: Pbkdf2.no_user_verify()
+
+        matches =
+          Enum.reduce(users, [], fn user, matches ->
+            if Pbkdf2.verify_pass(pin, user.pin_hash), do: [user | matches], else: matches
+          end)
+
+        case matches do
+          [user] -> {:ok, user}
+          [] -> {:error, :invalid_pin}
+          _ -> {:error, :ambiguous_pin}
+        end
+
+      {:error, _} ->
+        Pbkdf2.no_user_verify()
+        {:error, :invalid_pin}
+    end
+  end
+
+  def verify_staff_pin(_), do: {:error, :invalid_pin}
 
   defp validate_pin_format(pin) do
     if Regex.match?(@pin_pattern, pin) do

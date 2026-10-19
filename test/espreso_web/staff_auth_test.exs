@@ -698,6 +698,21 @@ defmodule EspresoWeb.StaffAuthTest do
     assert redirected_to(conn) == ~p"/staff"
   end
 
+  test "pin-only login identifies staff without a submitted user id", %{
+    conn: conn,
+    barista: barista,
+    manager: manager
+  } do
+    assert {:ok, _} = Accounts.set_pin(barista, "4321")
+    assert {:ok, _} = Accounts.set_pin(manager, "5678")
+
+    logged_in = post(conn, ~p"/session/pin", %{"pin" => "5678"})
+
+    assert redirected_to(logged_in) == ~p"/staff"
+    assert get_session(logged_in, :user_id) == manager.id
+    assert Phoenix.Flash.get(logged_in.assigns.flash, :info) == "Welcome back, #{manager.name}."
+  end
+
   test "invalid pin login returns to login", %{conn: conn, barista: barista} do
     assert {:ok, _} = Accounts.set_pin(barista, "4321")
 
@@ -752,8 +767,12 @@ defmodule EspresoWeb.StaffAuthTest do
            )
 
     assert has_element?(view, "#staff-pin-login")
-    assert has_element?(view, "#staff-roster-search")
     assert has_element?(view, "#staff-pin-local[phx-hook='StaffPinPad']")
+    assert has_element?(view, "#staff-pin-local[data-pin-ready='true']")
+    assert has_element?(view, "#staff-pin-form input[name='pin'][data-pin-input]")
+    refute has_element?(view, "#staff-roster-search")
+    refute has_element?(view, "#staff-pin-form input[name='user_id']")
+    refute has_element?(view, "#staff-pin-selected")
     assert has_element?(view, "#staff-auth-account-recovery", "Account recovery")
     refute has_element?(view, ".staff-auth-register")
     refute html =~ ~r/href=\"\/register\"/
@@ -770,66 +789,10 @@ defmodule EspresoWeb.StaffAuthTest do
     refute html =~ "Owner / manager email login"
     refute has_element?(view, "select[name='role']")
     refute has_element?(view, "#staff-login-form")
-
-    view |> element("#staff-roster-search") |> render_change(%{"q" => ""})
-
-    assert has_element?(
-             view,
-             "#staff-roster-dropdown #staff-pin-user-#{barista.id}",
-             barista.name
-           )
-
     assert has_element?(view, "#staff-pin-form button.staff-auth-submit--shift", "Sign in")
-  end
-
-  test "staff login search filters roster and empty search copy", %{
-    conn: conn,
-    barista: barista,
-    manager: manager
-  } do
-    assert {:ok, _} = Accounts.set_pin(barista, "4321")
-    assert {:ok, _} = Accounts.set_pin(manager, "5678")
-
-    {:ok, view, _html} = live(conn, ~p"/login")
-
-    view |> element("#staff-roster-search") |> render_change(%{"q" => ""})
-
-    assert has_element?(view, "#staff-roster-dropdown #staff-pin-user-#{barista.id}")
-    assert has_element?(view, "#staff-roster-dropdown #staff-pin-user-#{manager.id}")
-
-    view
-    |> element("#staff-roster-search")
-    |> render_change(%{"q" => barista.name})
-
-    assert has_element?(view, "#staff-roster-dropdown #staff-pin-user-#{barista.id}")
-    refute has_element?(view, "#staff-roster-dropdown #staff-pin-user-#{manager.id}")
-
-    html =
-      view
-      |> element("#staff-roster-search")
-      |> render_change(%{"q" => "zzz-no-match"})
-
-    assert html =~ "No matching team members."
-  end
-
-  test "staff pin login selects user and prepares client pin pad", %{conn: conn, barista: barista} do
-    assert {:ok, _} = Accounts.set_pin(barista, "4321")
-
-    {:ok, view, _html} = live(conn, ~p"/login")
-
-    view |> element("#staff-roster-search") |> render_change(%{"q" => ""})
-    view |> element("#staff-pin-user-#{barista.id}") |> render_click()
-
-    assert has_element?(view, "#staff-pin-selected", barista.name)
-    assert has_element?(view, "#staff-pin-enter-hint", "Enter your PIN.")
-    assert has_element?(view, "#staff-pin-local[data-pin-ready='true']")
-    assert has_element?(view, "#staff-pin-local[data-staff-id='#{barista.id}']")
-    assert has_element?(view, "#staff-pin-form input[name='user_id'][value='#{barista.id}']")
-    assert has_element?(view, "#staff-pin-local input[name='pin']")
     assert has_element?(view, "button[data-pin-key='1']")
     assert has_element?(view, "button[data-pin-action='clear']")
     assert has_element?(view, "button[data-pin-action='backspace']")
-    assert has_element?(view, "#staff-pin-form button.staff-auth-submit--shift[data-pin-submit]")
     refute has_element?(view, "button[phx-click='pin_digit']")
   end
 

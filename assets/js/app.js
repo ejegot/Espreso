@@ -586,8 +586,6 @@ Hooks.StaffPinPad = {
     this.submit =
       this.el.querySelector("[data-pin-submit]") ||
       (this.form && this.form.querySelector("[data-pin-submit]"))
-    this.staffId = this.el.dataset.staffId || ""
-
     this.onClick = (event) => {
       const target = event.target.closest("[data-pin-key], [data-pin-action]")
       if (!target || !this.el.contains(target) || target.disabled) return
@@ -619,11 +617,6 @@ Hooks.StaffPinPad = {
   },
 
   updated() {
-    const nextStaffId = this.el.dataset.staffId || ""
-    if (nextStaffId !== this.staffId) {
-      this.staffId = nextStaffId
-      this.clearPin()
-    }
     this.submit =
       this.el.querySelector("[data-pin-submit]") ||
       (this.form && this.form.querySelector("[data-pin-submit]"))

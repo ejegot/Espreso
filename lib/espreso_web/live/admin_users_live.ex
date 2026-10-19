@@ -199,6 +199,10 @@ defmodule EspresoWeb.AdminUsersLive do
       {:error, :invalid_pin_format} ->
         {:noreply, assign(socket, :flash_note, "PIN must be 4–6 digits.")}
 
+      {:error, :pin_already_in_use} ->
+        {:noreply,
+         assign(socket, :flash_note, "That PIN is already assigned. Choose a unique PIN.")}
+
       {:error, _} ->
         {:noreply, assign(socket, :flash_note, "Could not set PIN.")}
     end

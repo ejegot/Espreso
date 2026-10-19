@@ -76,9 +76,55 @@ defmodule EspresoWeb.UserSessionController do
     end
   end
 
+  def create_pin(conn, %{"pin" => pin} = params) when is_binary(pin) do
+    pin = String.trim(pin)
+    login_path = login_path(params)
+    ip = ClientIP.from_conn(conn)
+
+    cond do
+      pin == "" ->
+        conn
+        |> put_flash(:error, "Enter your PIN.")
+        |> redirect(to: login_path)
+
+      true ->
+        case PinAttemptLimiter.check(nil, ip) do
+          {:error, :rate_limited} ->
+            conn
+            |> put_flash(:error, "Too many attempts. Please wait a moment before trying again.")
+            |> redirect(to: login_path)
+
+          :ok ->
+            case Accounts.verify_staff_pin(pin) do
+              {:ok, user} ->
+                if tenant_ok?(user, params) do
+                  PinAttemptLimiter.record_success(nil, ip)
+
+                  conn
+                  |> put_flash(:info, "Welcome back, #{user.name}.")
+                  |> StaffAuth.log_in_user(user, %{})
+                else
+                  PinAttemptLimiter.record_failure(nil, ip)
+
+                  conn
+                  |> put_flash(:error, "Incorrect PIN. Try again.")
+                  |> redirect(to: login_path)
+                end
+
+              {:error, _} ->
+                PinAttemptLimiter.record_failure(nil, ip)
+
+                conn
+                |> put_flash(:error, "Incorrect PIN. Try again.")
+                |> redirect(to: login_path)
+            end
+        end
+    end
+  end
+
   def create_pin(conn, params) do
     conn
-    |> put_flash(:error, "Select your name first.")
+    |> put_flash(:error, "Enter your PIN.")
     |> redirect(to: login_path(params))
   end
 
