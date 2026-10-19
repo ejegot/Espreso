@@ -469,10 +469,23 @@ defmodule Espreso.AccountsTest do
     assert verified.id == user.id
     assert {:ok, verified_again} = Accounts.verify_pin(to_string(user.id), "1234")
     assert verified_again.id == user.id
+    assert {:ok, identified} = Accounts.verify_staff_pin("1234")
+    assert identified.id == user.id
 
     assert {:error, :invalid_pin} = Accounts.verify_pin(with_pin, "9999")
+    assert {:error, :invalid_pin} = Accounts.verify_staff_pin("9999")
     assert {:error, :invalid_pin_format} = Accounts.set_pin(with_pin, "12")
     assert {:error, :invalid_pin_format} = Accounts.set_pin(with_pin, "1234567")
+
+    {:ok, other} =
+      Accounts.register_user(%{
+        name: "Another Staff",
+        email: "another.pin@coffeespot.local",
+        password: "password123",
+        role: "barista"
+      })
+
+    assert {:error, :pin_already_in_use} = Accounts.set_pin(other, "1234")
 
     assert {:ok, cleared} = Accounts.clear_pin(with_pin)
     refute Accounts.pin_set?(cleared)

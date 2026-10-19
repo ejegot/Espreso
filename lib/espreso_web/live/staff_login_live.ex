@@ -24,19 +24,16 @@ defmodule EspresoWeb.StaffLoginLive do
   end
 
   defp mount_login(socket, tenant) do
-    roster = Accounts.list_staff_for_pin_login()
+    pin_login_available? = Accounts.any_staff_pin_configured?()
 
-    if is_nil(tenant) and roster == [] and Accounts.needs_initial_owner_setup?() do
+    if is_nil(tenant) and not pin_login_available? and Accounts.needs_initial_owner_setup?() do
       {:ok, push_navigate(socket, to: ~p"/setup")}
     else
       {:ok,
        socket
        |> assign(:page_title, login_page_title(tenant))
        |> assign(:login_mode, :pin)
-       |> assign(:roster, roster)
-       |> assign(:roster_query, "")
-       |> assign(:roster_open, false)
-       |> assign(:selected_staff, nil)
+       |> assign(:pin_login_available?, pin_login_available?)
        |> assign(:pin_max, @pin_max)
        |> assign(:pin_display, @pin_display)
        |> assign(:show_password?, false)
@@ -50,55 +47,11 @@ defmodule EspresoWeb.StaffLoginLive do
 
   @impl true
   def handle_event("show_pin_login", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:login_mode, :pin)
-     |> assign(:selected_staff, nil)
-     |> assign(:roster_query, "")
-     |> assign(:roster_open, false)}
+    {:noreply, assign(socket, :login_mode, :pin)}
   end
 
   def handle_event("show_email_login", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:login_mode, :email)
-     |> assign(:selected_staff, nil)
-     |> assign(:roster_query, "")
-     |> assign(:roster_open, false)}
-  end
-
-  def handle_event("open_roster", _params, socket) do
-    {:noreply, assign(socket, :roster_open, true)}
-  end
-
-  def handle_event("close_roster", _params, socket) do
-    {:noreply, assign(socket, :roster_open, false)}
-  end
-
-  def handle_event("search_staff", %{"q" => query}, socket) do
-    selected =
-      if socket.assigns.selected_staff &&
-           String.trim(query) != socket.assigns.selected_staff.name do
-        nil
-      else
-        socket.assigns.selected_staff
-      end
-
-    {:noreply,
-     socket
-     |> assign(:roster_query, query)
-     |> assign(:roster_open, true)
-     |> assign(:selected_staff, selected)}
-  end
-
-  def handle_event("select_staff", %{"id" => id}, socket) do
-    staff = Enum.find(socket.assigns.roster, &(to_string(&1.id) == id))
-
-    {:noreply,
-     socket
-     |> assign(:selected_staff, staff)
-     |> assign(:roster_query, staff.name)
-     |> assign(:roster_open, false)}
+    {:noreply, assign(socket, :login_mode, :email)}
   end
 
   def handle_event("toggle_password", _params, socket) do
@@ -107,17 +60,6 @@ defmodule EspresoWeb.StaffLoginLive do
 
   @impl true
   def render(assigns) do
-    filtered_roster = filter_roster(assigns.roster, assigns.roster_query)
-
-    assigns =
-      assigns
-      |> assign(:filtered_roster, filtered_roster)
-      |> assign(:pin_ready?, not is_nil(assigns.selected_staff))
-      |> assign(
-        :selected_staff_id,
-        if(assigns.selected_staff, do: to_string(assigns.selected_staff.id), else: "")
-      )
-
     ~H"""
     <div class={[
       "staff-auth-page staff-auth-page--approved staff-auth-page--float staff-auth-page--lock",
@@ -180,103 +122,15 @@ defmodule EspresoWeb.StaffLoginLive do
             </p>
 
             <div :if={@login_mode == :pin} id="staff-pin-login" class="staff-pin-login">
-              <p :if={@roster == []} class="staff-pin-empty" id="staff-pin-roster-empty">
+              <p :if={!@pin_login_available?} class="staff-pin-empty" id="staff-pin-roster-empty">
                 No PINs configured. Ask an owner to set staff PINs.
               </p>
 
-              <div :if={@roster != []} class="staff-pin-shell">
-                <div class="staff-pin-picker" phx-click-away="close_roster">
-                  <label class="staff-pin-search" for="staff-roster-search">
-                    <span class="staff-pin-search-icon" aria-hidden="true">
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="18"
-                        height="18"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="1.7"
-                      >
-                        <circle cx="12" cy="8" r="3.25" />
-                        <path
-                          d="M5.5 19.25c1.6-3.1 4-4.65 6.5-4.65s4.9 1.55 6.5 4.65"
-                          stroke-linecap="round"
-                        />
-                      </svg>
-                    </span>
-                    <input
-                      id="staff-roster-search"
-                      type="search"
-                      name="q"
-                      value={@roster_query}
-                      placeholder="Search or select staff member"
-                      phx-focus="open_roster"
-                      phx-change="search_staff"
-                      phx-debounce="100"
-                      autocomplete="off"
-                      autocorrect="off"
-                      spellcheck="false"
-                      inputmode="search"
-                      aria-expanded={to_string(@roster_open)}
-                      aria-controls="staff-roster-dropdown"
-                      aria-autocomplete="list"
-                      aria-label="Search or select staff member"
-                      role="combobox"
-                    />
-                    <span class="staff-pin-search-chevron" aria-hidden="true">
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="18"
-                        height="18"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                      >
-                        <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
-                      </svg>
-                    </span>
-                  </label>
-
-                  <div
-                    :if={@roster_open}
-                    class="staff-pin-dropdown"
-                    id="staff-roster-dropdown"
-                    role="listbox"
-                    aria-label="Team members"
-                  >
-                    <p :if={@filtered_roster == []} class="staff-pin-dropdown-empty">
-                      No matching team members.
-                    </p>
-                    <button
-                      :for={member <- @filtered_roster}
-                      type="button"
-                      class={[
-                        "staff-pin-dropdown-option",
-                        @selected_staff && @selected_staff.id == member.id && "is-selected"
-                      ]}
-                      id={"staff-pin-user-#{member.id}"}
-                      phx-click="select_staff"
-                      phx-value-id={member.id}
-                      role="option"
-                      aria-selected={to_string(@selected_staff && @selected_staff.id == member.id)}
-                    >
-                      <span class="staff-pin-grid-avatar" aria-hidden="true">
-                        {staff_initials(member.name)}
-                      </span>
-                      <span class="staff-pin-dropdown-copy">
-                        <span class="staff-pin-dropdown-name">{member.name}</span>
-                      </span>
-                    </button>
-                  </div>
-
-                  <p :if={@selected_staff} class="staff-pin-selected-meta" id="staff-pin-selected">
-                    Selected <strong>{@selected_staff.name}</strong>
-                  </p>
-                </div>
-
+              <div :if={@pin_login_available?} class="staff-pin-shell">
                 <form
                   action={~p"/session/pin"}
                   method="post"
-                  class={["staff-pin-form", !@pin_ready? && "staff-pin-form--locked"]}
+                  class="staff-pin-form"
                   id="staff-pin-form"
                 >
                   <input
@@ -285,19 +139,7 @@ defmodule EspresoWeb.StaffLoginLive do
                     value={Plug.CSRFProtection.get_csrf_token()}
                   />
                   <input :if={@tenant_slug} type="hidden" name="tenant_slug" value={@tenant_slug} />
-                  <input
-                    :if={@selected_staff}
-                    type="hidden"
-                    name="user_id"
-                    value={@selected_staff.id}
-                  />
-
-                  <p :if={!@pin_ready?} class="sr-only" id="staff-pin-select-hint">
-                    Select your name first.
-                  </p>
-                  <p :if={@pin_ready?} class="sr-only" id="staff-pin-enter-hint">
-                    Enter your PIN.
-                  </p>
+                  <p class="sr-only" id="staff-pin-enter-hint">Enter your PIN to sign in.</p>
 
                   <div
                     id="staff-pin-local"
@@ -306,8 +148,7 @@ defmodule EspresoWeb.StaffLoginLive do
                     phx-update="ignore"
                     data-pin-max={@pin_max}
                     data-pin-display={@pin_display}
-                    data-pin-ready={to_string(@pin_ready?)}
-                    data-staff-id={@selected_staff_id}
+                    data-pin-ready="true"
                   >
                     <input type="hidden" name="pin" value="" data-pin-input autocomplete="off" />
 
@@ -332,7 +173,6 @@ defmodule EspresoWeb.StaffLoginLive do
                         class="staff-pin-key"
                         data-pin-key={digit}
                         aria-label={"Digit #{digit}"}
-                        disabled={!@pin_ready?}
                       >
                         {digit}
                       </button>
@@ -341,7 +181,6 @@ defmodule EspresoWeb.StaffLoginLive do
                         class="staff-pin-key staff-pin-key--icon"
                         data-pin-action="backspace"
                         aria-label="Backspace"
-                        disabled={!@pin_ready?}
                       >
                         ⌫
                       </button>
@@ -350,7 +189,6 @@ defmodule EspresoWeb.StaffLoginLive do
                         class="staff-pin-key"
                         data-pin-key="0"
                         aria-label="Digit 0"
-                        disabled={!@pin_ready?}
                       >
                         0
                       </button>
@@ -359,7 +197,6 @@ defmodule EspresoWeb.StaffLoginLive do
                         class="staff-pin-key staff-pin-key--muted"
                         data-pin-action="clear"
                         aria-label="Clear PIN"
-                        disabled={!@pin_ready?}
                       >
                         Clear
                       </button>
@@ -372,7 +209,7 @@ defmodule EspresoWeb.StaffLoginLive do
                       class="staff-auth-submit staff-auth-submit--shift"
                       id="staff-pin-submit"
                       data-pin-submit
-                      disabled={!@pin_ready?}
+                      disabled
                     >
                       Sign in
                     </button>
@@ -492,27 +329,4 @@ defmodule EspresoWeb.StaffLoginLive do
 
   defp login_subtitle(:pin), do: "Please login to your account"
   defp login_subtitle(:email), do: "Use email and password if you cannot sign in with a PIN."
-
-  defp filter_roster(roster, query) when is_binary(query) do
-    needle =
-      query
-      |> String.trim()
-      |> String.downcase()
-
-    if needle == "" do
-      roster
-    else
-      Enum.filter(roster, fn member ->
-        String.contains?(String.downcase(member.name), needle)
-      end)
-    end
-  end
-
-  defp staff_initials(name) when is_binary(name) do
-    name
-    |> String.split(~r/\s+/, trim: true)
-    |> Enum.take(2)
-    |> Enum.map_join("", &String.first/1)
-    |> String.upcase()
-  end
 end

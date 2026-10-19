@@ -22,7 +22,7 @@ defmodule Espreso.Auth.PinAttemptLimiter do
   @cleanup_interval_ms :timer.minutes(5)
   @stale_grace_ms :timer.minutes(30)
 
-  @type user_id :: integer() | String.t()
+  @type user_id :: integer() | String.t() | nil
   @type ip :: String.t() | nil
   @type check_result :: :ok | {:error, :rate_limited}
 
@@ -79,12 +79,12 @@ defmodule Espreso.Auth.PinAttemptLimiter do
 
   @impl true
   def handle_call({:check, user_id, ip, now}, _from, state) do
-    maybe_expire_user(state.table, user_id, now)
+    if user_id, do: maybe_expire_user(state.table, user_id, now)
     maybe_expire_ip(state.table, ip, now)
 
     result =
       cond do
-        user_blocked?(state.table, user_id, now) -> {:error, :rate_limited}
+        user_id && user_blocked?(state.table, user_id, now) -> {:error, :rate_limited}
         ip_blocked?(state.table, ip, now) -> {:error, :rate_limited}
         true -> :ok
       end
@@ -93,17 +93,17 @@ defmodule Espreso.Auth.PinAttemptLimiter do
   end
 
   def handle_call({:record_failure, user_id, ip, now}, _from, state) do
-    maybe_expire_user(state.table, user_id, now)
+    if user_id, do: maybe_expire_user(state.table, user_id, now)
     maybe_expire_ip(state.table, ip, now)
 
-    record_user_failure(state.table, user_id, now)
+    if user_id, do: record_user_failure(state.table, user_id, now)
     record_ip_failure(state.table, ip, now)
 
     {:reply, :ok, state}
   end
 
   def handle_call({:record_success, user_id, ip, now}, _from, state) do
-    :ets.delete(state.table, {:user, user_id})
+    if user_id, do: :ets.delete(state.table, {:user, user_id})
     # IP window intentionally retained — successful login must not erase spray budget.
     maybe_expire_ip(state.table, ip, now)
     {:reply, :ok, state}
