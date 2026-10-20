@@ -8,11 +8,12 @@ defmodule EspresoWeb.StaffShopOpenLive do
   alias Espreso.Shifts
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(params, _session, socket) do
     user = socket.assigns.current_user
+    return_to = if params["return_to"] == "pos", do: "pos", else: nil
 
     if Shifts.can_access_open?(user) do
-      {:ok, assign_open_state(socket), layout: false}
+      {:ok, socket |> assign(:return_to, return_to) |> assign_open_state(), layout: false}
     else
       {:ok,
        socket
@@ -35,10 +36,15 @@ defmodule EspresoWeb.StaffShopOpenLive do
     else
       case Shifts.record_open(socket.assigns.current_user, params) do
         {:ok, open} ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Opening cash recorded · #{Menu.format_price(open.opening_cash)}")
-           |> assign_open_state()}
+          socket =
+            socket
+            |> put_flash(:info, "Opening cash recorded · #{Menu.format_price(open.opening_cash)}")
+
+          if socket.assigns.return_to == "pos" do
+            {:noreply, redirect(socket, to: ~p"/pos")}
+          else
+            {:noreply, assign_open_state(socket)}
+          end
 
         {:error, :already_open} ->
           {:noreply, assign_open_state(socket)}

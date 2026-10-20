@@ -1101,6 +1101,19 @@ defmodule EspresoWeb.StaffPosLive do
     >
       <div class="staff-pos-page staff-pos-shell-root staff-pos-page--cafe">
         <.shop_day_sales_banner status={@shop_day_status} id="staff-pos-shop-day" />
+        <div
+          :if={@shop_day_status == :not_open}
+          class="staff-pos-open-shop-wrap"
+          id="staff-pos-open-shop-wrap"
+        >
+          <a
+            href="/staff/open?return_to=pos"
+            class="staff-home-shop-open-action"
+            id="staff-pos-open-shop"
+          >
+            Open Shop
+          </a>
+        </div>
         <main class="staff-pos-main">
           <p :if={@error} class="staff-pos-flash" id="pos-error">{@error}</p>
 
