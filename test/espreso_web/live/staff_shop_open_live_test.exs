@@ -67,4 +67,19 @@ defmodule EspresoWeb.StaffShopOpenLiveTest do
     {:ok, view, _html} = live(barista_conn, ~p"/staff/open")
     assert has_element?(view, "#staff-shop-open-submit", "Record opening cash")
   end
+
+  test "returns to POS after opening shop from POS", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/staff/open?return_to=pos")
+
+    assert has_element?(view, "#staff-shop-open-form")
+
+    result =
+      view
+      |> form("#staff-shop-open-form", %{open: %{opening_cash: "350"}})
+      |> render_submit()
+
+    assert {:error, {:redirect, %{to: "/pos"}}} = result
+
+    assert Shifts.shop_day_status() == :open
+  end
 end
