@@ -5,7 +5,7 @@ defmodule EspresoWeb.StaffLoginLive do
   alias Espreso.Tenancy
 
   @pin_max 6
-  @pin_display 4
+  @pin_display 6
 
   @impl true
   def mount(%{"tenant_slug" => slug}, _session, socket) do
