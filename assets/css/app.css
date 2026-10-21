@@ -2903,7 +2903,8 @@ body:has(.menu-page-locked) {
 
 .staff-auth-page--approved .staff-auth-error,
 .staff-auth-page--approved .staff-auth-info {
-  margin-top: 0.45rem;
+  width: min(100%, 16.5rem);
+  margin: 0.45rem auto 0;
 }
 
 .staff-auth-page--approved .staff-pin-search {
@@ -3041,13 +3042,27 @@ body:has(.menu-page-locked) {
   color: #fff;
 }
 
+/* PIN login: keep the disabled button muted until PIN entry starts. */
+.staff-auth-page--approved #staff-pin-submit:disabled {
+  background: var(--staff-auth-forest);
+  opacity: 0.45;
+}
+
+/* Once PIN entry starts, make the button clearly visible. */
+.staff-auth-page--approved #staff-pin-submit:not(:disabled) {
+  background: #394331;
+  opacity: 1;
+  color: #fff;
+}
+
 /* Locked stack: Sign in → Account recovery → Register (no scroll) */
 .staff-auth-page--approved .staff-auth-actions {
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: clamp(0.5rem, 1.35dvh, 0.85rem);
-  width: 100%;
+  width: min(100%, 16.5rem);
+  margin-inline: auto;
   margin-top: clamp(0.5rem, 1.5dvh, 0.85rem);
   padding-top: 0;
   position: relative;
@@ -4068,6 +4083,13 @@ body:has(.menu-page-locked) {
     width: min(100%, 21rem);
   }
 
+  .staff-auth-page--approved .staff-auth-error,
+  .staff-auth-page--approved .staff-auth-info,
+  .staff-auth-page--approved .staff-auth-actions {
+    width: min(100%, 21rem);
+    margin-inline: auto;
+  }
+
   .staff-auth-page--approved .staff-pin-key {
     aspect-ratio: auto;
     height: 3.35rem;
@@ -4135,6 +4157,13 @@ body:has(.menu-page-locked) {
   .staff-auth-page--approved .staff-pin-pad {
     gap: 0.4rem 0.55rem;
     width: min(100%, 19.5rem);
+  }
+
+  .staff-auth-page--approved .staff-auth-error,
+  .staff-auth-page--approved .staff-auth-info,
+  .staff-auth-page--approved .staff-auth-actions {
+    width: min(100%, 19.5rem);
+    margin-inline: auto;
   }
 
   .staff-auth-page--approved .staff-pin-key {
