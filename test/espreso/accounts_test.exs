@@ -492,6 +492,64 @@ defmodule Espreso.AccountsTest do
     assert {:error, :pin_not_set} = Accounts.verify_pin(cleared, "1234")
   end
 
+  test "owner can create staff with a PIN instead of a password" do
+    {:ok, owner} =
+      Accounts.register_user(%{
+        name: "Owner PIN Creation",
+        email: "owner.pin.creation@coffeespot.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    assert {:ok, staff} =
+             Accounts.create_user_as(owner, %{
+               "name" => "New PIN Staff",
+               "email" => "new.pin.staff@coffeespot.local",
+               "pin" => "4826",
+               "pin_confirmation" => "4826",
+               "role" => "barista"
+             })
+
+    assert staff.role == "barista"
+    assert Accounts.pin_set?(staff)
+    assert {:ok, verified} = Accounts.verify_pin(staff, "4826")
+    assert verified.id == staff.id
+
+    assert {:error, :invalid_credentials} =
+             Accounts.authenticate_user(staff.email, "password123")
+  end
+
+  test "creating staff with an invalid or mismatched PIN does not create an account" do
+    {:ok, owner} =
+      Accounts.register_user(%{
+        name: "Owner PIN Validation",
+        email: "owner.pin.validation@coffeespot.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    assert {:error, :pin_mismatch} =
+             Accounts.create_user_as(owner, %{
+               "name" => "Mismatch Staff",
+               "email" => "mismatch.staff@coffeespot.local",
+               "pin" => "4826",
+               "pin_confirmation" => "1234",
+               "role" => "barista"
+             })
+
+    assert {:error, :invalid_pin_format} =
+             Accounts.create_user_as(owner, %{
+               "name" => "Invalid PIN Staff",
+               "email" => "invalid.pin.staff@coffeespot.local",
+               "pin" => "12",
+               "pin_confirmation" => "12",
+               "role" => "barista"
+             })
+
+    assert Accounts.get_user_by_email("mismatch.staff@coffeespot.local") == nil
+    assert Accounts.get_user_by_email("invalid.pin.staff@coffeespot.local") == nil
+  end
+
   test "inactive user cannot verify pin" do
     {:ok, user} =
       Accounts.register_user(%{

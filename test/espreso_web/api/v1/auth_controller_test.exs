@@ -150,12 +150,12 @@ defmodule EspresoWeb.Api.V1.AuthControllerTest do
     active = register_staff!("Pin Active", "pin.active2@coffeespot.local", "barista")
     inactive = register_staff!("Pin Inactive", "pin.inactive2@coffeespot.local", "barista")
     {:ok, _} = Accounts.set_pin(active, "4321")
-    {:ok, _} = Accounts.set_pin(inactive, "4321")
+    {:ok, _} = Accounts.set_pin(inactive, "5678")
     {:ok, _} = Accounts.update_user(inactive, %{active: false})
 
     no_pin = register_staff!("Pin None", "pin.none@coffeespot.local", "barista")
 
-    for {user, pin} <- [{inactive, "4321"}, {no_pin, "4321"}, {active, "9999"}] do
+    for {user, pin} <- [{inactive, "5678"}, {no_pin, "4321"}, {active, "9999"}] do
       resp =
         build_conn()
         |> put_req_header("content-type", "application/json")
