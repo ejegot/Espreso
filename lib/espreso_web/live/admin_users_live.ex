@@ -52,6 +52,24 @@ defmodule EspresoWeb.AdminUsersLive do
       {:error, :unauthorized} ->
         {:noreply, assign(socket, :flash_note, "You don’t have permission to manage users.")}
 
+      {:error, :pin_mismatch} ->
+        {:noreply,
+         socket
+         |> assign(:adding?, true)
+         |> assign(:flash_note, "PINs do not match. Please try again.")}
+
+      {:error, :invalid_pin_format} ->
+        {:noreply,
+         socket
+         |> assign(:adding?, true)
+         |> assign(:flash_note, "Staff PIN must be 4–6 digits.")}
+
+      {:error, :pin_already_in_use} ->
+        {:noreply,
+         socket
+         |> assign(:adding?, true)
+         |> assign(:flash_note, "That PIN is already assigned to another user.")}
+
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply,
          socket
@@ -343,7 +361,13 @@ defmodule EspresoWeb.AdminUsersLive do
             <.form for={@form} id="admin-user-form" phx-submit="save" class="staff-team-form">
               <.input field={@form[:name]} type="text" label="Name" required />
               <.input field={@form[:email]} type="email" label="Email" required />
-              <.input field={@form[:password]} type="password" label="Password" required />
+              <.input field={@form[:pin]} type="password" label="Staff PIN" required />
+              <.input
+                field={@form[:pin_confirmation]}
+                type="password"
+                label="Confirm Staff PIN"
+                required
+              />
               <.input field={@form[:role]} type="select" label="Role" options={role_options()} />
               <div class="staff-confirm-dialog-actions">
                 <button

@@ -67,7 +67,8 @@ defmodule EspresoWeb.AdminUsersLiveTest do
       user: %{
         name: "Kai",
         email: "kai.adminusers@test.local",
-        password: "password123",
+        pin: "4321",
+        pin_confirmation: "4321",
         role: "manager"
       }
     })
@@ -76,6 +77,10 @@ defmodule EspresoWeb.AdminUsersLiveTest do
     assert has_element?(view, "#staff-team-note", "Staff account created.")
     assert has_element?(view, "#staff-team-roster", "Kai")
     assert has_element?(view, "#staff-team-roster", "Manager")
+    created_user = Espreso.Accounts.get_user_by_email("kai.adminusers@test.local")
+    assert created_user.role == "manager"
+    assert Espreso.Accounts.pin_set?(created_user)
+    assert Espreso.Accounts.verify_pin(created_user, "4321")
     refute has_element?(view, "#staff-team-add")
   end
 

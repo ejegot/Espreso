@@ -174,7 +174,41 @@ defmodule Espreso.Accounts do
   """
   def create_user_as(%User{} = actor, attrs) do
     with :ok <- Authorization.authorize(actor, :user_management) do
-      register_user(attrs)
+      if not is_nil(attr(attrs, :pin)) do
+        create_user_with_pin(attrs)
+      else
+        register_user(attrs)
+      end
+    end
+  end
+
+  defp create_user_with_pin(attrs) do
+    pin = attrs |> attr(:pin) |> to_string_trim()
+    confirm = attrs |> attr(:pin_confirmation) |> to_string_trim()
+
+    with :ok <- validate_pin_confirmation(pin, confirm),
+         :ok <- validate_pin_format(pin) do
+      user_attrs =
+        attrs
+        |> Map.drop([:pin, "pin", :pin_confirmation, "pin_confirmation"])
+        |> Map.put("password", bootstrap_placeholder_password())
+
+      Repo.transaction(fn ->
+        case register_user(user_attrs) do
+          {:ok, user} ->
+            case set_pin_in_transaction(user, pin) do
+              {:ok, updated} -> updated
+              {:error, reason} -> Repo.rollback(reason)
+            end
+
+          {:error, reason} ->
+            Repo.rollback(reason)
+        end
+      end)
+      |> case do
+        {:ok, %User{} = user} -> {:ok, user}
+        {:error, reason} -> {:error, reason}
+      end
     end
   end
 
@@ -399,36 +433,40 @@ defmodule Espreso.Accounts do
   def set_pin(%User{} = user, pin) when is_binary(pin) do
     with :ok <- validate_pin_format(pin) do
       Repo.transaction(fn ->
-        Repo.query!("SELECT pg_advisory_xact_lock($1, $2)", [
-          @pin_lock_namespace,
-          user.tenant_id
-        ])
-
-        duplicate? =
-          User
-          |> where(
-            [u],
-            u.tenant_id == ^user.tenant_id and u.id != ^user.id and not is_nil(u.pin_hash) and
-              u.pin_hash != ""
-          )
-          |> Repo.all()
-          |> Enum.any?(fn other -> Pbkdf2.verify_pass(pin, other.pin_hash) end)
-
-        if duplicate? do
-          Repo.rollback(:pin_already_in_use)
-        else
-          case user
-               |> Ecto.Changeset.change(%{pin_hash: Pbkdf2.hash_pwd_salt(pin)})
-               |> Repo.update() do
-            {:ok, updated} -> updated
-            {:error, changeset} -> Repo.rollback(changeset)
-          end
+        case set_pin_in_transaction(user, pin) do
+          {:ok, updated} -> updated
+          {:error, reason} -> Repo.rollback(reason)
         end
       end)
       |> case do
         {:ok, %User{} = updated} -> {:ok, updated}
         {:error, reason} -> {:error, reason}
       end
+    end
+  end
+
+  defp set_pin_in_transaction(%User{} = user, pin) do
+    Repo.query!("SELECT pg_advisory_xact_lock($1, $2)", [
+      @pin_lock_namespace,
+      user.tenant_id
+    ])
+
+    duplicate? =
+      User
+      |> where(
+        [u],
+        u.tenant_id == ^user.tenant_id and u.id != ^user.id and not is_nil(u.pin_hash) and
+          u.pin_hash != ""
+      )
+      |> Repo.all()
+      |> Enum.any?(fn other -> Pbkdf2.verify_pass(pin, other.pin_hash) end)
+
+    if duplicate? do
+      {:error, :pin_already_in_use}
+    else
+      user
+      |> Ecto.Changeset.change(%{pin_hash: Pbkdf2.hash_pwd_salt(pin)})
+      |> Repo.update()
     end
   end
 
