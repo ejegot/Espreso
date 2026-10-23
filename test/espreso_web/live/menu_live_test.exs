@@ -1073,6 +1073,8 @@ defmodule EspresoWeb.MenuLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/menu")
     view = enter_menu_browse(view)
+
+    view |> element("#menu-craving-chip-ALL") |> render_click()
     html = render(view)
 
     assert has_element?(view, "#category-COLD")

@@ -101,10 +101,9 @@ defmodule Espreso.OrdersStaffSalesTest do
       settled_at = ~U[2026-09-10 02:30:00Z]
       set_settled_at!(paid, settled_at)
 
-      assert Orders.sales_summary_for_staff_shift(shift_b) == %{
-               order_count: 1,
-               total: Decimal.new("120")
-             }
+      summary_b = Orders.sales_summary_for_staff_shift(shift_b)
+      assert summary_b.order_count == 1
+      assert Decimal.equal?(summary_b.total, Decimal.new("120"))
 
       assert Orders.sales_summary_for_staff_shift(shift_a) == %{
                order_count: 0,
@@ -130,10 +129,9 @@ defmodule Espreso.OrdersStaffSalesTest do
 
       create_paid_pos!(employee_a, settled_at: started, price: "100")
 
-      assert Orders.sales_summary_for_staff_shift(shift) == %{
-               order_count: 1,
-               total: Decimal.new("100")
-             }
+      summary = Orders.sales_summary_for_staff_shift(shift)
+      assert summary.order_count == 1
+      assert Decimal.equal?(summary.total, Decimal.new("100"))
     end
 
     test "excludes settlement after Time Out", %{employee_a: employee_a} do
@@ -168,10 +166,9 @@ defmodule Espreso.OrdersStaffSalesTest do
 
       create_paid_pos!(employee_a, settled_at: ~U[2026-09-10 13:00:00Z], price: "250")
 
-      assert Orders.sales_summary_for_staff_shift(shift) == %{
-               order_count: 1,
-               total: Decimal.new("250")
-             }
+      summary = Orders.sales_summary_for_staff_shift(shift)
+      assert summary.order_count == 1
+      assert Decimal.equal?(summary.total, Decimal.new("250"))
     end
 
     test "excludes customer-originated paid orders", %{employee_a: employee_a} do
@@ -273,15 +270,13 @@ defmodule Espreso.OrdersStaffSalesTest do
       create_paid_pos!(employee_a, settled_at: ~U[2026-09-10 02:00:00Z], price: "100")
       create_paid_pos!(employee_a, settled_at: ~U[2026-09-10 06:00:00Z], price: "200")
 
-      assert Orders.sales_summary_for_staff_shift(morning) == %{
-               order_count: 1,
-               total: Decimal.new("100")
-             }
+      morning_summary = Orders.sales_summary_for_staff_shift(morning)
+      assert morning_summary.order_count == 1
+      assert Decimal.equal?(morning_summary.total, Decimal.new("100"))
 
-      assert Orders.sales_summary_for_staff_shift(afternoon) == %{
-               order_count: 1,
-               total: Decimal.new("200")
-             }
+      afternoon_summary = Orders.sales_summary_for_staff_shift(afternoon)
+      assert afternoon_summary.order_count == 1
+      assert Decimal.equal?(afternoon_summary.total, Decimal.new("200"))
     end
 
     test "auto-close handoff attributes sale at boundary to new shift only", %{
@@ -298,10 +293,9 @@ defmodule Espreso.OrdersStaffSalesTest do
                total: Decimal.new("0")
              }
 
-      assert Orders.sales_summary_for_staff_shift(new_shift) == %{
-               order_count: 1,
-               total: Decimal.new("175")
-             }
+      new_summary = Orders.sales_summary_for_staff_shift(new_shift)
+      assert new_summary.order_count == 1
+      assert Decimal.equal?(new_summary.total, Decimal.new("175"))
     end
 
     test "excludes orders settled by a different employee", %{
@@ -376,10 +370,9 @@ defmodule Espreso.OrdersStaffSalesTest do
 
       set_settled_at!(customer_paid, ~U[2026-09-10 05:00:00Z])
 
-      assert Orders.sales_summary_for_staff_shift(shift) == %{
-               order_count: 2,
-               total: Decimal.new("150")
-             }
+      summary = Orders.sales_summary_for_staff_shift(shift)
+      assert summary.order_count == 2
+      assert Decimal.equal?(summary.total, Decimal.new("150"))
     end
 
     test "sales window ends at shift_close timestamp; later settlements excluded", %{
@@ -393,10 +386,9 @@ defmodule Espreso.OrdersStaffSalesTest do
       create_paid_pos!(employee_a, settled_at: closed_at, price: "50")
       create_paid_pos!(employee_a, settled_at: ~U[2026-09-10 10:00:01Z], price: "999")
 
-      assert Orders.sales_summary_for_staff_shift(shift) == %{
-               order_count: 1,
-               total: Decimal.new("100")
-             }
+      summary = Orders.sales_summary_for_staff_shift(shift)
+      assert summary.order_count == 1
+      assert Decimal.equal?(summary.total, Decimal.new("100"))
     end
   end
 

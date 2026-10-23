@@ -1953,9 +1953,12 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     view |> element("#mark-paid-modal-gcash") |> render_click()
 
     assert [bytes] = Task.await(printer_task, 2_000)
-    assert bytes =~ "KITCHEN"
-    assert bytes =~ order.number
-    refute bytes =~ "TOTAL"
+    # Kitchen ticket should be non-empty and contain KITCHEN header
+    assert byte_size(bytes) > 0
+    assert :binary.match(bytes, "KITCHEN") != :nomatch
+    assert :binary.match(bytes, order.number) != :nomatch
+    # Should not contain total (kitchen ticket only)
+    assert :binary.match(bytes, "TOTAL") == :nomatch
     refute bytes == drawer_kick_bytes()
     assert has_element?(view, "#orders-flash", "Kitchen ticket printed.")
     assert Repo.get!(Espreso.Orders.Order, order.id).payment_status == "paid"
@@ -2011,7 +2014,9 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
     confirm_cash_exact(view)
 
     assert [receipt_bytes] = Task.await(receipt_task, 2_000)
-    assert receipt_bytes =~ order.number
+    assert is_binary(receipt_bytes)
+    assert byte_size(receipt_bytes) > 0
+    assert :binary.match(receipt_bytes, order.number) != :nomatch
 
     recovery = live_assigns(view).mark_paid_recoveries[order.id]
     assert recovery.phase == :drawer
@@ -2579,9 +2584,10 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
         bytes =
           Enum.map(1..connection_count, fn _ ->
             {:ok, socket} = :gen_tcp.accept(listener, 1_500)
-            {:ok, bytes} = :gen_tcp.recv(socket, 0, 1_500)
+            # Receive all data from the socket in a loop
+            all_bytes = recv_all(socket, [], 1_500)
             :gen_tcp.close(socket)
-            bytes
+            IO.iodata_to_binary(all_bytes)
           end)
 
         :gen_tcp.close(listener)
@@ -2589,6 +2595,20 @@ defmodule EspresoWeb.StaffOrdersLiveTest do
       end)
 
     {port, task}
+  end
+
+  # Helper to receive all data from a socket until closed or timed out.
+  defp recv_all(socket, acc, timeout) do
+    case :gen_tcp.recv(socket, 0, timeout) do
+      {:ok, data} ->
+        recv_all(socket, [data | acc], timeout)
+
+      {:error, :closed} ->
+        Enum.reverse(acc)
+
+      {:error, _reason} ->
+        Enum.reverse(acc)
+    end
   end
 
   defp drawer_kick_bytes, do: Printer.drawer_bytes()

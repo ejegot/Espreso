@@ -131,7 +131,7 @@ defmodule EspresoWeb.StaffCashOutLiveTest do
     refute has_element?(barista_home, "#staff-home-cash-out")
     assert has_element?(barista_home, "#staff-nav-cash_out", "Cash Out")
     assert has_element?(barista_home, "#staff-nav-petty_cash", "Petty cash")
-    assert has_element?(barista_home, "#staff-nav-petty_cash svg.hero-wallet")
+    assert has_element?(barista_home, "#staff-nav-petty_cash .hero-wallet")
 
     {:ok, manager_home, _} = live(log_in(conn, manager), ~p"/staff")
     refute has_element?(manager_home, "#staff-home-cash-out")

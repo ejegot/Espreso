@@ -121,6 +121,17 @@ if config_env() == :prod do
     config :espreso, public_menu_url: "https://#{host}/menu"
   end
 
+  # LiveView origin checking: allow PHX_HOST and any additional allowed origins.
+  # Formats: "https://example.com", "//another.com:888", "//*.wildcard.com"
+  # ALLOWED_ORIGINS can be comma-separated full origin strings (e.g. "https://elilaikafe.devs.surf,https://other.com").
+  allowed_origins =
+    ["https://#{host}"] ++
+      (System.get_env("ALLOWED_ORIGINS")
+       |> then(fn val -> if is_binary(val) and byte_size(val) > 0, do: val, else: "" end)
+       |> String.split(",")
+       |> Enum.map(&String.trim/1)
+       |> Enum.reject(&(&1 == "")))
+
   config :espreso, EspresoWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
@@ -131,7 +142,8 @@ if config_env() == :prod do
       ip: {0, 0, 0, 0, 0, 0, 0, 0},
       port: port
     ],
-    secret_key_base: secret_key_base
+    secret_key_base: secret_key_base,
+    check_origin: allowed_origins
 
   config :espreso, Espreso.Accounts.Token, signing_secret: secret_key_base
   #

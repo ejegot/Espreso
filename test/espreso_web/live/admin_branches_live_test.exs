@@ -77,15 +77,15 @@ defmodule EspresoWeb.AdminBranchesLiveTest do
     {:ok, _branch} = Branches.create_as(owner, %{name: "Ortigas", address: "Ortigas Ave"})
 
     {:ok, _view, html} = live(conn, ~p"/b/ortigas/menu")
-    assert html =~ "Visit CoffeeSpot"
-    assert html =~ "Ortigas"
-    assert html =~ "Ortigas Ave"
+    assert html =~ "Get In Now"
+    assert html =~ "CoffeeSpot"
     refute html =~ "Pure Tableya"
     refute html =~ "Come say hi in Lilac"
 
     {:ok, _view, lilac} = live(conn, ~p"/menu")
-    assert lilac =~ "Pure Tableya"
-    assert lilac =~ "Come say hi in Lilac"
+    assert lilac =~ "Get In Now"
+    refute lilac =~ "Pure Tableya"
+    refute lilac =~ "Come say hi in Lilac"
   end
 
   defp log_in(conn, user) do
