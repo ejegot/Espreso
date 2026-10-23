@@ -158,12 +158,6 @@ defmodule EspresoWeb.StaffLoginLive do
                       aria-label="PIN entry"
                       data-pin-display
                     >
-                      <span
-                        :for={index <- 1..@pin_display}
-                        class="staff-pin-dot"
-                        data-pin-dot
-                        data-index={index}
-                      />
                     </div>
 
                     <div class="staff-pin-pad" aria-label="PIN keypad" data-pin-pad>

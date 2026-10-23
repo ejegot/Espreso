@@ -580,7 +580,7 @@ Hooks.StaffPinPad = {
   mounted() {
     this.pin = ""
     this.input = this.el.querySelector("[data-pin-input]")
-    this.dots = Array.from(this.el.querySelectorAll("[data-pin-dot]"))
+    this.dotContainer = this.el.querySelector("[data-pin-display]")
     this.keys = Array.from(this.el.querySelectorAll("[data-pin-key], [data-pin-action]"))
     this.form = this.el.closest("form")
     this.submit =
@@ -671,13 +671,24 @@ Hooks.StaffPinPad = {
   render() {
     if (this.input) this.input.value = this.pin
 
-    const filledCount =
-      this.pin.length >= this.pinDisplay() ? this.pinDisplay() : this.pin.length
+    // Dynamically create/remove dots based on PIN length
+    if (this.dotContainer) {
+      const currentDots = this.dotContainer.querySelectorAll("[data-pin-dot]").length
+      const neededDots = this.pin.length
 
-    this.dots.forEach((dot) => {
-      const index = Number(dot.dataset.index || 0)
-      dot.classList.toggle("is-filled", index > 0 && index <= filledCount)
-    })
+      // Add dots if needed
+      while (this.dotContainer.children.length < neededDots) {
+        const dot = document.createElement("span")
+        dot.className = "staff-pin-dot is-filled"
+        dot.setAttribute("data-pin-dot", "")
+        this.dotContainer.appendChild(dot)
+      }
+
+      // Remove dots if needed
+      while (this.dotContainer.children.length > neededDots) {
+        this.dotContainer.removeChild(this.dotContainer.lastChild)
+      }
+    }
 
     this.syncReady()
   }
