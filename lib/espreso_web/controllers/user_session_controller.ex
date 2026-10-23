@@ -163,7 +163,9 @@ defmodule EspresoWeb.UserSessionController do
         end
 
       _ ->
-        Tenancy.coffeespot_tenant?(user.tenant_id)
+        # Allow owners to login without tenant restriction
+        # Staff/other roles must be CoffeeSpot tenant
+        user.role == :owner or Tenancy.coffeespot_tenant?(user.tenant_id)
     end
   end
 
