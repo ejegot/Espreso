@@ -97,7 +97,7 @@ defmodule EspresoWeb.AdminSettingsLiveTest do
     assert saved.hours_lines == ["Mon–Sun · 9:00 AM – 9:00 PM", "Holiday hours on Instagram"]
   end
 
-  test "owner can save payment mode and QR paths", %{conn: conn, owner: owner} do
+  test "owner can save payment mode and Maya QR path", %{conn: conn, owner: owner} do
     {:ok, view, _html} = live(log_in(conn, owner), ~p"/admin/settings")
 
     assert has_element?(view, "#admin-settings-form")
@@ -115,7 +115,6 @@ defmodule EspresoWeb.AdminSettingsLiveTest do
         facebook_url: "https://www.facebook.com/profile.php?id=61572602608495",
         tiktok_url: "https://www.tiktok.com/@coffeespotlilac_",
         payments_mode: "qrph_manual",
-        gcash_qrph_path: "/images/gcash-qrph.png",
         maya_qrph_path: "/images/maya-qrph.png"
       }
     })
@@ -125,8 +124,33 @@ defmodule EspresoWeb.AdminSettingsLiveTest do
 
     saved = BusinessSettings.get()
     assert saved.payments_mode == "qrph_manual"
-    assert saved.gcash_qrph_path == "/images/gcash-qrph.png"
     assert saved.maya_qrph_path == "/images/maya-qrph.png"
+  end
+
+  test "owner can upload a GCash QR image", %{conn: conn, owner: owner} do
+    {:ok, view, _html} = live(log_in(conn, owner), ~p"/admin/settings")
+    png = tiny_png()
+
+    upload =
+      file_input(view, "#admin-settings-form", :gcash_qr, [
+        %{name: "gcash.png", content: png, type: "image/png"}
+      ])
+
+    render_upload(upload, "gcash.png")
+    view |> element("#gcash-qr-upload button") |> render_click()
+
+    assert has_element?(view, "#settings-flash", "GCash QR uploaded successfully.")
+
+    saved = BusinessSettings.get_gcash_qr()
+    assert saved.content_type == "image/png"
+    assert saved.data == png
+    assert has_element?(view, "#gcash-qr-upload img[alt='Current GCash QR']")
+  end
+
+  defp tiny_png do
+    Base.decode64!(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+    )
   end
 
   defp log_in(conn, user) do

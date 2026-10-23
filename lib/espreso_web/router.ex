@@ -91,6 +91,10 @@ defmodule EspresoWeb.Router do
     live "/about", AboutLive
     live "/contact", ContactLive
     get "/media/products/:id", ProductPhotoController, :show
+    get "/media/business/gcash-qr", BusinessGcashQrController, :show
+    get "/media/business/gcash-qr/t/:tenant_slug", BusinessGcashQrController, :show
+    get "/media/business/gcash-qr/t/:tenant_slug/b/:branch_slug", BusinessGcashQrController, :show
+    get "/b/:branch_slug/media/business/gcash-qr", BusinessGcashQrController, :show
   end
 
   scope "/", EspresoWeb do
