@@ -6,9 +6,20 @@ defmodule EspresoWeb.AdminSettingsLive do
   @impl true
   def mount(_params, _session, socket) do
     settings = BusinessSettings.get()
+    gcash_qr = BusinessSettings.get_gcash_qr()
+
+    upload_socket =
+      allow_upload(
+        socket,
+        :gcash_qr,
+        accept: ~w(.jpg .jpeg .png .webp),
+        max_entries: 1,
+        max_file_size: 2_000_000
+      )
 
     {:ok,
-     socket
+     upload_socket
+     |> assign(:gcash_qr, gcash_qr)
      |> assign(:page_title, "Business settings")
      |> assign(:settings, settings)
      |> assign(:form, to_form(BusinessSettings.change(settings), as: :settings))
@@ -32,6 +43,34 @@ defmodule EspresoWeb.AdminSettingsLive do
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign(socket, :form, to_form(changeset, as: :settings))}
+    end
+  end
+
+  @impl true
+  def handle_event("upload_gcash_qr", _params, socket) do
+    actor = socket.assigns.current_user
+
+    results =
+      consume_uploaded_entries(socket, :gcash_qr, fn %{path: path}, entry ->
+        with {:ok, binary} <- File.read(path),
+             {:ok, qr} <-
+               BusinessSettings.save_gcash_qr_as(actor, binary, entry.client_type) do
+          {:ok, {:ok, qr}}
+        else
+          {:error, reason} -> {:ok, {:error, reason}}
+        end
+      end)
+
+    case results do
+      [{:ok, %Espreso.BusinessSettings.GcashQr{} = qr}] ->
+        {:noreply,
+         socket
+         |> assign(:gcash_qr, qr)
+         |> assign(:flash_note, "GCash QR uploaded successfully.")}
+
+      _ ->
+        {:noreply,
+         assign(socket, :flash_note, "GCash QR upload failed. Check the image and try again.")}
     end
   end
 
@@ -92,9 +131,7 @@ defmodule EspresoWeb.AdminSettingsLive do
           >
             <h2 class="staff-settings-card-title" id="settings-payments-title">Payments</h2>
             <p class="staff-settings-card-note">
-              Counter-only hides online pay on the menu. QRPh manual shows GCash/Maya QR codes — upload images to
-              <code>priv/static</code>
-              and enter their public paths below.
+              Counter-only hides online pay on the menu. QRPh manual enables GCash/Maya QR payments. Upload the GCash QR image here; the Maya QR image path remains configurable below.
             </p>
             <.input
               field={@form[:payments_mode]}
@@ -102,12 +139,30 @@ defmodule EspresoWeb.AdminSettingsLive do
               label="Payments mode"
               options={payments_mode_options()}
             />
-            <.input
-              field={@form[:gcash_qrph_path]}
-              type="text"
-              label="GCash QRPh image path"
-              placeholder="/images/gcash-qrph.png"
-            />
+            <div id="gcash-qr-upload">
+              <label for="gcash-qr-file">GCash QR image</label>
+              <img
+                :if={@gcash_qr}
+                src={"/media/business/gcash-qr?v=#{DateTime.to_unix(@gcash_qr.updated_at)}"}
+                alt="Current GCash QR"
+                style="display:block;max-width:240px;max-height:240px;object-fit:contain"
+              />
+              <p :if={!@gcash_qr} class="staff-settings-card-note">
+                No uploaded GCash QR yet. The existing image path will remain in use until you upload one.
+              </p>
+              <div phx-feedback-for="gcash_qr">
+                <.live_file_input upload={@uploads.gcash_qr} id="gcash-qr-file" />
+                <p :for={entry <- @uploads.gcash_qr.entries}>
+                  {entry.client_name}
+                  <span :for={err <- upload_errors(@uploads.gcash_qr, entry)}>
+                    {upload_error_message(err)}
+                  </span>
+                </p>
+                <button type="button" phx-click="upload_gcash_qr" class="staff-settings-save-btn">
+                  Upload GCash QR
+                </button>
+              </div>
+            </div>
             <.input
               field={@form[:maya_qrph_path]}
               type="text"
@@ -126,6 +181,10 @@ defmodule EspresoWeb.AdminSettingsLive do
     </.staff_shell>
     """
   end
+
+  defp upload_error_message(:too_large), do: "Image must be 2 MB or smaller."
+  defp upload_error_message(:not_accepted), do: "Use JPG, PNG, or WebP."
+  defp upload_error_message(_), do: "Invalid image."
 
   defp payments_mode_options do
     [

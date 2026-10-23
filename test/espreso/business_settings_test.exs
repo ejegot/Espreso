@@ -118,6 +118,54 @@ defmodule Espreso.BusinessSettingsTest do
     assert errors_on(changeset).payments_mode
   end
 
+  test "only owners can upload a GCash QR image" do
+    manager = register!("Manager", "manager.gcash@test.local", "manager")
+    staff = register!("Staff", "staff.gcash@test.local", "barista")
+
+    png =
+      Base.decode64!(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+      )
+
+    assert {:error, :unauthorized} = BusinessSettings.save_gcash_qr_as(manager, png, "image/png")
+    assert {:error, :unauthorized} = BusinessSettings.save_gcash_qr_as(staff, png, "image/png")
+  end
+
+  test "GCash QR images are isolated by branch" do
+    owner = register!("Owner", "owner.gcash.branch@test.local", "owner")
+
+    png =
+      Base.decode64!(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+      )
+
+    original_ids = Espreso.Tenancy.coffeespot_lilac_ids()
+
+    assert {:ok, _} = BusinessSettings.save_gcash_qr_as(owner, png, "image/png")
+    original_qr = BusinessSettings.get_gcash_qr()
+
+    {:ok, branch} =
+      Espreso.Tenancy.Branches.create_as(owner, %{name: "GCash QR Test Branch"})
+
+    Espreso.Tenancy.put_context(%{tenant_id: branch.tenant_id, branch_id: branch.id})
+    assert BusinessSettings.get_gcash_qr() == nil
+    assert {:ok, _} = BusinessSettings.save_gcash_qr_as(owner, png <> "branch", "image/png")
+    assert BusinessSettings.get_gcash_qr().branch_id == branch.id
+
+    Espreso.Tenancy.put_context(original_ids)
+    assert BusinessSettings.get_gcash_qr().id == original_qr.id
+  end
+
+  test "rejects invalid GCash QR image data" do
+    owner = register!("Owner", "owner.gcash.invalid@test.local", "owner")
+
+    assert {:error, :invalid_photo} =
+             BusinessSettings.save_gcash_qr_as(owner, "not an image", "image/png")
+
+    assert {:error, :invalid_photo} =
+             BusinessSettings.save_gcash_qr_as(owner, String.duplicate("x", 40), "image/gif")
+  end
+
   defp payment_attrs(overrides \\ %{}) do
     Map.merge(
       %{

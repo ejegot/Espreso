@@ -6,6 +6,7 @@ defmodule Espreso.BusinessSettings do
   alias Espreso.Accounts.Authorization
   alias Espreso.Accounts.User
   alias Espreso.BusinessSettings.Setting
+  alias Espreso.BusinessSettings.GcashQr
   alias Espreso.Repo
   alias Espreso.Tenancy
 
@@ -89,10 +90,17 @@ defmodule Espreso.BusinessSettings do
   """
   def payment_config do
     setting = get()
+    gcash_qr = get_gcash_qr()
+
+    gcash_qrph_path =
+      case gcash_qr do
+        nil -> setting.gcash_qrph_path
+        qr -> "/media/business/gcash-qr?v=#{DateTime.to_unix(qr.updated_at)}"
+      end
 
     %{
       payments_mode: setting.payments_mode || "counter_only",
-      gcash_qrph_path: setting.gcash_qrph_path,
+      gcash_qrph_path: gcash_qrph_path,
       maya_qrph_path: setting.maya_qrph_path
     }
   end
@@ -117,6 +125,68 @@ defmodule Espreso.BusinessSettings do
       |> Repo.update()
     end
   end
+
+  @gcash_qr_max_bytes 2_000_000
+  @gcash_qr_types ["image/jpeg", "image/png", "image/webp"]
+
+  def get_gcash_qr do
+    Repo.get_by(GcashQr, branch_id: Tenancy.current_branch_id())
+  end
+
+  def save_gcash_qr_as(%User{} = actor, binary, content_type)
+      when is_binary(binary) and is_binary(content_type) do
+    with :ok <- Authorization.authorize(actor, :business_settings),
+         :ok <- validate_gcash_qr(binary, content_type) do
+      branch_id = Tenancy.current_branch_id()
+      attrs = %{branch_id: branch_id, data: binary, content_type: content_type}
+
+      case get_gcash_qr() do
+        nil ->
+          %GcashQr{}
+          |> GcashQr.changeset(attrs)
+          |> Repo.insert()
+
+        qr ->
+          qr
+          |> GcashQr.changeset(attrs)
+          |> Repo.update()
+      end
+    end
+  end
+
+  def save_gcash_qr_as(_, _, _), do: {:error, :invalid_photo}
+
+  defp validate_gcash_qr(binary, content_type) do
+    cond do
+      content_type not in @gcash_qr_types ->
+        {:error, :invalid_photo}
+
+      byte_size(binary) > @gcash_qr_max_bytes ->
+        {:error, :photo_too_large}
+
+      byte_size(binary) < 32 ->
+        {:error, :invalid_photo}
+
+      not valid_gcash_qr_signature?(binary, content_type) ->
+        {:error, :invalid_photo}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp valid_gcash_qr_signature?(<<137, 80, 78, 71, 13, 10, 26, 10, _::binary>>, "image/png"),
+    do: true
+
+  defp valid_gcash_qr_signature?(<<255, 216, 255, _::binary>>, "image/jpeg"), do: true
+
+  defp valid_gcash_qr_signature?(
+         <<"RIFF", _size::little-32, "WEBP", _::binary>>,
+         "image/webp"
+       ),
+       do: true
+
+  defp valid_gcash_qr_signature?(_, _), do: false
 
   defp with_hours_text(%Setting{} = setting) do
     %{setting | hours_text: Enum.join(setting.hours_lines || [], "\n")}
