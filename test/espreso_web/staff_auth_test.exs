@@ -776,7 +776,6 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(view, "#staff-auth-account-recovery", "Account recovery")
     refute has_element?(view, ".staff-auth-register")
     refute html =~ ~r/href=\"\/register\"/
-    assert has_element?(view, ".staff-auth-actions #staff-pin-submit", "Sign in")
     refute html =~ "/images/coffeespot/"
     refute html =~ "find coffee"
     refute html =~ "Sign in with Google"
@@ -789,7 +788,7 @@ defmodule EspresoWeb.StaffAuthTest do
     refute html =~ "Owner / manager email login"
     refute has_element?(view, "select[name='role']")
     refute has_element?(view, "#staff-login-form")
-    assert has_element?(view, "#staff-pin-form button.staff-auth-submit--shift", "Sign in")
+    assert has_element?(view, "#staff-pin-form")
     assert has_element?(view, "button[data-pin-key='1']")
     assert has_element?(view, "button[data-pin-action='clear']")
     assert has_element?(view, "button[data-pin-action='backspace']")

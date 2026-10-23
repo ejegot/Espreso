@@ -360,7 +360,6 @@ defmodule EspresoWeb.AdminUsersLive do
             <p class="staff-confirm-dialog-copy">Create a Staff, Manager, or Owner account.</p>
             <.form for={@form} id="admin-user-form" phx-submit="save" class="staff-team-form">
               <.input field={@form[:name]} type="text" label="Name" required />
-              <.input field={@form[:email]} type="email" label="Email" required />
               <.input field={@form[:pin]} type="password" label="Staff PIN" required />
               <.input
                 field={@form[:pin_confirmation]}

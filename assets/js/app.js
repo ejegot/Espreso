@@ -638,7 +638,7 @@ Hooks.StaffPinPad = {
   },
 
   pinDisplay() {
-    return Number(this.el.dataset.pinDisplay || 4)
+    return this.pinMax() // Show all dots up to max
   },
 
   appendDigit(digit) {
@@ -646,6 +646,11 @@ Hooks.StaffPinPad = {
     if (this.pin.length >= this.pinMax()) return
     this.pin += digit
     this.render()
+    
+    // Auto-submit once PIN reaches max length
+    if (this.pin.length >= this.pinMax() && this.form) {
+      this.form.submit()
+    }
   },
 
   backspace() {

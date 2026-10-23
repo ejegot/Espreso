@@ -50,6 +50,12 @@ defmodule Espreso.Accounts do
     |> Repo.insert()
   end
 
+  def register_staff(attrs) do
+    %User{}
+    |> User.staff_registration_changeset(attrs)
+    |> Repo.insert()
+  end
+
   @doc """
   Public self-registration is permanently closed.
 
@@ -194,7 +200,7 @@ defmodule Espreso.Accounts do
         |> Map.put("password", bootstrap_placeholder_password())
 
       Repo.transaction(fn ->
-        case register_user(user_attrs) do
+        case register_staff(user_attrs) do
           {:ok, user} ->
             case set_pin_in_transaction(user, pin) do
               {:ok, updated} -> updated
