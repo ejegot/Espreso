@@ -39,6 +39,25 @@ defmodule Espreso.Accounts.User do
     |> maybe_hash_password(opts)
   end
 
+  def staff_registration_changeset(user, attrs, opts \\ []) do
+    user
+    |> cast(attrs, [:name, :email, :password, :role, :active, :tenant_id, :branch_id])
+    |> update_change(:name, &String.trim/1)
+    |> validate_required([:name, :role])
+    |> validate_length(:name, min: 2, max: 80)
+    |> validate_inclusion(:role, @roles)
+    |> auto_generate_email_from_name()
+    |> update_change(:email, &normalize_email/1)
+    |> validate_format(:email, ~r/^[^\s]+@[^\s]+$/, message: "must be a valid email")
+    |> unique_constraint(:email)
+    |> Espreso.Tenancy.put_ids()
+    |> foreign_key_constraint(:tenant_id)
+    |> foreign_key_constraint(:branch_id)
+    |> maybe_clear_blank_password()
+    |> maybe_validate_password(opts)
+    |> maybe_hash_password(opts)
+  end
+
   def update_changeset(user, attrs, opts \\ []) do
     user
     |> cast(attrs, [:name, :email, :password, :role, :active])
@@ -113,5 +132,26 @@ defmodule Espreso.Accounts.User do
 
   defp normalize_email(email) when is_binary(email) do
     email |> String.trim() |> String.downcase()
+  end
+
+  defp auto_generate_email_from_name(changeset) do
+    case get_change(changeset, :email) do
+      email when email in [nil, ""] ->
+        case get_change(changeset, :name) do
+          name when is_binary(name) ->
+            sanitized =
+              name
+              |> String.downcase()
+              |> String.replace(~r/[^a-z0-9]/, "")
+
+            put_change(changeset, :email, "#{sanitized}@espreso.local")
+
+          _ ->
+            changeset
+        end
+
+      _ ->
+        changeset
+    end
   end
 end
