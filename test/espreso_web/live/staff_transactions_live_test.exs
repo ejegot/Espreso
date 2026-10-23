@@ -154,7 +154,10 @@ defmodule EspresoWeb.StaffTransactionsLiveTest do
     refute has_element?(view, "#transaction-reprint-modal")
 
     receipt = Task.await(printer_task, 2_000)
-    assert receipt =~ order.number
+    assert is_binary(receipt)
+    assert byte_size(receipt) > 0
+    assert :binary.match(receipt, order.number) != :nomatch
+    # Reprint mode must not contain the drawer-kick command.
     assert :binary.match(receipt, <<0x1B, 0x70>>) == :nomatch
   end
 
@@ -462,12 +465,25 @@ defmodule EspresoWeb.StaffTransactionsLiveTest do
     task =
       Task.async(fn ->
         {:ok, socket} = :gen_tcp.accept(listener, 1_500)
-        {:ok, bytes} = :gen_tcp.recv(socket, 0, 1_500)
+        all_bytes = recv_all(socket, [], 1_500)
         :gen_tcp.close(socket)
         :gen_tcp.close(listener)
-        bytes
+        IO.iodata_to_binary(all_bytes)
       end)
 
     {port, task}
+  end
+
+  defp recv_all(socket, acc, timeout) do
+    case :gen_tcp.recv(socket, 0, timeout) do
+      {:ok, data} ->
+        recv_all(socket, [data | acc], timeout)
+
+      {:error, :closed} ->
+        Enum.reverse(acc)
+
+      {:error, _reason} ->
+        Enum.reverse(acc)
+    end
   end
 end

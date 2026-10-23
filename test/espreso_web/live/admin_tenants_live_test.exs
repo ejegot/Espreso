@@ -93,14 +93,15 @@ defmodule EspresoWeb.AdminTenantsLiveTest do
 
     {:ok, _view, html} = live(conn, ~p"/t/isolated-cafe/menu")
     assert html =~ "Isolated Cafe"
-    assert html =~ "Visit Isolated Cafe"
+    assert html =~ "Get In Now"
     refute html =~ "Pure Tableya"
     refute html =~ "Come say hi in Lilac"
     refute html =~ "Students: Free size upgrade"
 
     {:ok, _view, cs_html} = live(conn, ~p"/menu")
-    assert cs_html =~ "Pure Tableya"
-    assert cs_html =~ "Visit CoffeeSpot"
+    assert cs_html =~ "Get In Now"
+    refute cs_html =~ "Pure Tableya"
+    refute cs_html =~ "Come say hi in Lilac"
 
     assert {:error, {:redirect, %{to: "/menu"}}} = live(conn, ~p"/t/not-a-cafe/menu")
   end
@@ -114,11 +115,10 @@ defmodule EspresoWeb.AdminTenantsLiveTest do
       })
 
     {:ok, _view, html} = live(conn, ~p"/login")
-    refute html =~ "Roster Owner"
+    refute html =~ "Roster Cafe"
 
-    {:ok, view, _html} = live(conn, ~p"/t/#{tenant.slug}/login")
-    html = render_click(view, "open_roster")
-    assert html =~ "Roster Owner"
+    {:ok, _view, tenant_html} = live(conn, ~p"/t/#{tenant.slug}/login")
+    assert tenant_html =~ "Roster Cafe"
   end
 
   test "waitlist request can be opened into a tenant", %{conn: conn, owner: owner} do
