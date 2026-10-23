@@ -130,6 +130,44 @@ defmodule EspresoWeb.BusinessGcashQrControllerTest do
     assert response(conn2, 200) == jpeg
   end
 
+  test "rejects corrupted image files with valid signatures", %{conn: _conn} do
+    {:ok, owner} =
+      Accounts.register_user(%{
+        name: "Owner",
+        email: "owner.corrupt@test.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    # Valid PNG signature but corrupted content
+    corrupted_png =
+      <<137, 80, 78, 71, 13, 10, 26, 10>> <> String.duplicate("corrupted data", 10)
+
+    assert {:error, :invalid_photo} =
+             BusinessSettings.save_gcash_qr_as(owner, corrupted_png, "image/png")
+  end
+
+  test "rejects images with mismatched content-type", %{conn: _conn} do
+    {:ok, owner} =
+      Accounts.register_user(%{
+        name: "Owner",
+        email: "owner.mismatch@test.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    png = tiny_png()
+    jpeg = tiny_jpeg()
+
+    # Declare PNG as JPEG
+    assert {:error, :invalid_photo} =
+             BusinessSettings.save_gcash_qr_as(owner, png, "image/jpeg")
+
+    # Declare JPEG as PNG
+    assert {:error, :invalid_photo} =
+             BusinessSettings.save_gcash_qr_as(owner, jpeg, "image/png")
+  end
+
   defp tiny_png do
     Base.decode64!(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="

@@ -170,6 +170,9 @@ defmodule Espreso.BusinessSettings do
       not valid_gcash_qr_signature?(binary, content_type) ->
         {:error, :invalid_photo}
 
+      not valid_image_structure?(binary, content_type) ->
+        {:error, :invalid_photo}
+
       true ->
         :ok
     end
@@ -187,6 +190,57 @@ defmodule Espreso.BusinessSettings do
        do: true
 
   defp valid_gcash_qr_signature?(_, _), do: false
+
+  # Validate that the image binary actually contains valid image structure
+  # beyond just the file signature. This prevents files with valid headers
+  # but corrupted/invalid content from being accepted.
+  defp valid_image_structure?(binary, "image/png") do
+    # PNG files have specific structure: signature + chunks
+    # At minimum, must have IHDR chunk after signature and IEND chunk at end
+    case binary do
+      <<137, 80, 78, 71, 13, 10, 26, 10, # PNG signature
+        _::binary>> ->
+        # Check for required IHDR and IEND chunks
+        String.contains?(binary, <<"IHDR">>) and String.contains?(binary, <<"IEND">>)
+
+      _ ->
+        false
+    end
+  end
+
+  defp valid_image_structure?(binary, "image/jpeg") do
+    # JPEG must have minimal structure: SOI marker + segments + EOI marker
+    # SOI (Start of Image) is FFD8, EOI (End of Image) is FFD9
+    case binary do
+      <<255, 216, # SOI marker
+        _rest::binary>> ->
+        # Check for EOI marker
+        byte_size(binary) > 4 and String.contains?(binary, <<255, 217>>)
+
+      _ ->
+        false
+    end
+  end
+
+  defp valid_image_structure?(binary, "image/webp") do
+    # WebP must have: RIFF header + size + WEBP + VP8/VP8L/VP8X chunk
+    case binary do
+      <<"RIFF", # RIFF header
+        _size::little-32,
+        "WEBP", # WEBP signature
+        rest::binary>> ->
+        # Must have at least one valid VP8 chunk
+        byte_size(rest) >= 10 and
+          (String.starts_with?(rest, <<"VP8 ">>) or
+             String.starts_with?(rest, <<"VP8L">>) or
+             String.starts_with?(rest, <<"VP8X">>))
+
+      _ ->
+        false
+    end
+  end
+
+  defp valid_image_structure?(_, _), do: false
 
   defp with_hours_text(%Setting{} = setting) do
     %{setting | hours_text: Enum.join(setting.hours_lines || [], "\n")}

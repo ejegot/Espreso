@@ -166,6 +166,74 @@ defmodule Espreso.BusinessSettingsTest do
              BusinessSettings.save_gcash_qr_as(owner, String.duplicate("x", 40), "image/gif")
   end
 
+  test "rejects files with valid PNG signature but corrupted content" do
+    owner = register!("Owner", "owner.gcash.corrupt.png@test.local", "owner")
+
+    # Valid PNG header but truncated/corrupted content
+    corrupted_png =
+      <<137, 80, 78, 71, 13, 10, 26, 10>> <> String.duplicate("corrupted data", 10)
+
+    assert {:error, :invalid_photo} =
+             BusinessSettings.save_gcash_qr_as(owner, corrupted_png, "image/png")
+  end
+
+  test "rejects files with valid JPEG signature but corrupted content" do
+    owner = register!("Owner", "owner.gcash.corrupt.jpeg@test.local", "owner")
+
+    # Valid JPEG header but truncated/corrupted content
+    corrupted_jpeg = <<255, 216, 255>> <> String.duplicate("not real jpeg", 10)
+
+    assert {:error, :invalid_photo} =
+             BusinessSettings.save_gcash_qr_as(owner, corrupted_jpeg, "image/jpeg")
+  end
+
+  test "rejects files with mismatched content-type and actual image type" do
+    owner = register!("Owner", "owner.gcash.mismatch@test.local", "owner")
+
+    # Use a valid PNG but declare it as JPEG
+    png = tiny_png()
+
+    assert {:error, :invalid_photo} =
+             BusinessSettings.save_gcash_qr_as(owner, png, "image/jpeg")
+
+    # Use a valid JPEG but declare it as PNG
+    jpeg = tiny_jpeg()
+
+    assert {:error, :invalid_photo} =
+             BusinessSettings.save_gcash_qr_as(owner, jpeg, "image/png")
+  end
+
+  test "accepts valid PNG images" do
+    owner = register!("Owner", "owner.gcash.valid.png@test.local", "owner")
+    png = tiny_png()
+
+    assert {:ok, qr} = BusinessSettings.save_gcash_qr_as(owner, png, "image/png")
+    assert qr.content_type == "image/png"
+    assert qr.data == png
+  end
+
+  test "accepts valid JPEG images" do
+    owner = register!("Owner", "owner.gcash.valid.jpeg@test.local", "owner")
+    jpeg = tiny_jpeg()
+
+    assert {:ok, qr} = BusinessSettings.save_gcash_qr_as(owner, jpeg, "image/jpeg")
+    assert qr.content_type == "image/jpeg"
+    assert qr.data == jpeg
+  end
+
+  defp tiny_png do
+    Base.decode64!(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+    )
+  end
+
+  defp tiny_jpeg do
+    # Minimal valid JPEG
+    Base.decode64!(
+      "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8VAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCwAA8A/9k="
+    )
+  end
+
   defp payment_attrs(overrides \\ %{}) do
     Map.merge(
       %{
