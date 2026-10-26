@@ -580,12 +580,9 @@ Hooks.StaffPinPad = {
   mounted() {
     this.pin = ""
     this.input = this.el.querySelector("[data-pin-input]")
-    this.dotContainer = this.el.querySelector("[data-pin-display]")
+    this.dotContainer = this.el.querySelector("[data-pin-dot-container]")
     this.keys = Array.from(this.el.querySelectorAll("[data-pin-key], [data-pin-action]"))
     this.form = this.el.closest("form")
-    this.submit =
-      this.el.querySelector("[data-pin-submit]") ||
-      (this.form && this.form.querySelector("[data-pin-submit]"))
     this.onClick = (event) => {
       const target = event.target.closest("[data-pin-key], [data-pin-action]")
       if (!target || !this.el.contains(target) || target.disabled) return
@@ -601,32 +598,19 @@ Hooks.StaffPinPad = {
       else if (action === "clear") this.clearPin()
     }
 
-    this.onSubmit = () => {
-      if (this.submit) {
-        this.submit.disabled = true
-        this.submit.setAttribute("aria-busy", "true")
-        this.submit.classList.add("is-loading")
-      }
-    }
-
     this.el.addEventListener("click", this.onClick)
-    if (this.form) this.form.addEventListener("submit", this.onSubmit)
 
     this.syncReady()
     this.render()
   },
 
   updated() {
-    this.submit =
-      this.el.querySelector("[data-pin-submit]") ||
-      (this.form && this.form.querySelector("[data-pin-submit]"))
     this.syncReady()
     this.render()
   },
 
   destroyed() {
     this.el.removeEventListener("click", this.onClick)
-    if (this.form && this.onSubmit) this.form.removeEventListener("submit", this.onSubmit)
   },
 
   isReady() {
@@ -637,10 +621,6 @@ Hooks.StaffPinPad = {
     return Number(this.el.dataset.pinMax || 6)
   },
 
-  pinDisplay() {
-    return this.pinMax() // Show all dots up to max
-  },
-
   appendDigit(digit) {
     if (!/^\d$/.test(digit)) return
     if (this.pin.length >= this.pinMax()) return
@@ -649,7 +629,7 @@ Hooks.StaffPinPad = {
     
     // Auto-submit once PIN reaches max length
     if (this.pin.length >= this.pinMax() && this.form) {
-      this.form.submit()
+      this.form.requestSubmit()
     }
   },
 
@@ -668,9 +648,6 @@ Hooks.StaffPinPad = {
     this.keys.forEach((key) => {
       key.disabled = !ready
     })
-    if (this.submit && this.submit.getAttribute("aria-busy") !== "true") {
-      this.submit.disabled = !(ready && this.pin.length >= 4)
-    }
   },
 
   render() {

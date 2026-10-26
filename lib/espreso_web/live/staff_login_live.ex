@@ -156,7 +156,7 @@ defmodule EspresoWeb.StaffLoginLive do
                       class="staff-pin-display"
                       aria-live="polite"
                       aria-label="PIN entry"
-                      data-pin-display
+                      data-pin-dot-container
                     >
                     </div>
 
@@ -195,18 +195,6 @@ defmodule EspresoWeb.StaffLoginLive do
                         Clear
                       </button>
                     </div>
-                  </div>
-
-                  <div class="staff-auth-actions">
-                    <button
-                      type="submit"
-                      class="staff-auth-submit staff-auth-submit--shift"
-                      id="staff-pin-submit"
-                      data-pin-submit
-                      disabled
-                    >
-                      Sign in
-                    </button>
                   </div>
                 </form>
               </div>
