@@ -68,7 +68,7 @@ rollback() {
 }
 trap rollback EXIT
 
-docker build -t "$image" "$release_dir"
+docker build --no-cache -t "$image" "$release_dir"
 docker inspect espreso >/dev/null
 docker inspect espreso --format '{{range .Config.Env}}{{println .}}{{end}}' > "$env_file"
 chmod 600 "$env_file"
