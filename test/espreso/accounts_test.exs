@@ -616,4 +616,52 @@ defmodule Espreso.AccountsTest do
     assert Enum.all?(roster, &match?(%{id: _, name: _, role: _}, &1))
     refute Enum.any?(roster, &Map.has_key?(&1, :pin_hash))
   end
+
+  test "owner PIN login works across tenants while staff PIN login stays tenant-scoped" do
+    alias Espreso.Tenancy
+
+    {:ok, owner} =
+      Accounts.register_user(%{
+        name: "Other Tenant Owner",
+        email: "other-owner-#{System.unique_integer([:positive])}@test.local",
+        password: "password123",
+        role: "owner"
+      })
+
+    {:ok, owner} = Accounts.set_pin(owner, "6384")
+
+    tenant =
+      Tenancy.insert_tenant!(%{
+        name: "Other Cafe",
+        slug: "other-cafe-#{System.unique_integer([:positive])}",
+        guest_brand_name: "Other Cafe"
+      })
+
+    branch =
+      Tenancy.insert_branch!(tenant, %{
+        name: "Main",
+        slug: "main",
+        code: "ot#{System.unique_integer([:positive])}",
+        main: true
+      })
+
+    Tenancy.put_context(%{tenant_id: tenant.id, branch_id: branch.id})
+
+    assert {:ok, found_owner} = Accounts.verify_staff_pin("6384")
+    assert found_owner.id == owner.id
+
+    {:ok, staff} =
+      Accounts.register_user(%{
+        name: "Other Tenant Barista",
+        email: "other-barista-#{System.unique_integer([:positive])}@test.local",
+        password: "password123",
+        role: "barista"
+      })
+
+    {:ok, _staff} = Accounts.set_pin(staff, "7492")
+
+    Tenancy.put_lilac_context()
+
+    assert {:error, :invalid_pin} = Accounts.verify_staff_pin("7492")
+  end
 end

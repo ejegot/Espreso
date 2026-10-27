@@ -556,13 +556,15 @@ defmodule Espreso.Accounts do
   def verify_staff_pin(pin) when is_binary(pin) do
     case validate_pin_format(pin) do
       :ok ->
+        current_tenant_id = Tenancy.current_tenant_id()
+
         users =
           User
-          |> Tenancy.scope_to_tenant()
           |> where(
             [u],
             u.active == true and u.role in ^@staff_roster_roles and not is_nil(u.pin_hash) and
-              u.pin_hash != ""
+              u.pin_hash != "" and
+              (u.role == "owner" or u.tenant_id == ^current_tenant_id)
           )
           |> order_by([u], asc: u.id)
           |> Repo.all()
