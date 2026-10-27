@@ -82,6 +82,7 @@ docker run -d \
   --restart unless-stopped \
   --user 0:0 \
   --env-file "$env_file" \
+  --env PHX_HOST=elilaikafe.devs.surf \
   "$image" >/dev/null
 
 for attempt in $(seq 1 30); do
