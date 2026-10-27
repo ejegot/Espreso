@@ -2961,8 +2961,40 @@ defmodule EspresoWeb.StaffPosLiveTest do
   test "POS is locked until opening cash", %{conn: conn, barista: barista} do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
-    assert has_element?(view, "#staff-pos-shop-day", "Opening cash required")
-    assert has_element?(view, "#staff-pos-open-shop", "Open Shop")
-    assert has_element?(view, "#pos-place-order[disabled]")
+    # Modal should be visible when shop not open
+    assert has_element?(view, "#staff-pos-open-shop-modal", "Opening Cash")
+    assert has_element?(view, "#staff-pos-open-shop-form")
+    # POS interface should not be visible yet
+    refute has_element?(view, "#staff-pos-shop-day")
+    refute has_element?(view, "#pos-place-order")
+  end
+
+  @tag :without_shop_open
+  test "opening cash modal accepts input and records open", %{conn: conn, barista: barista} do
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    assert has_element?(view, "#staff-pos-open-shop-modal")
+
+    # Validate - update input without error
+    view
+    |> form("#staff-pos-open-shop-form", %{open: %{opening_cash: ""}})
+    |> render_change()
+
+    # Submit empty - should show error
+    view
+    |> form("#staff-pos-open-shop-form", %{open: %{opening_cash: ""}})
+    |> render_submit()
+
+    assert has_element?(view, "#staff-pos-open-shop-error", "Enter the opening cash")
+
+    # Submit valid amount - modal closes, POS becomes available
+    view
+    |> form("#staff-pos-open-shop-form", %{open: %{opening_cash: "500"}})
+    |> render_submit()
+
+    # Modal should be gone, POS interface should be visible
+    refute has_element?(view, "#staff-pos-open-shop-modal")
+    assert has_element?(view, "#pos-catalog")
+    assert has_element?(view, "#pos-order-form")
   end
 end

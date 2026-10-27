@@ -85,6 +85,8 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:pubsub_reload_timer, nil)
      |> assign(:pubsub_reload_token, nil)
      |> assign(:orders_new_count, Orders.new_lane_count())
+     |> assign(:opening_cash, "")
+     |> assign(:open_shop_form_error, nil)
      |> assign_shop_day()
      |> reset_pos_product_stream(), layout: false}
   end
@@ -180,6 +182,69 @@ defmodule EspresoWeb.StaffPosLive do
              "close_order_review"
            ] do
     {:noreply, socket}
+  end
+
+  def handle_event("pos_validate_open", %{"open" => params}, socket) do
+    {:noreply,
+     socket
+     |> assign(:opening_cash, Map.get(params, "opening_cash", ""))
+     |> assign(:open_shop_form_error, nil)}
+  end
+
+  def handle_event("pos_set_opening_cash", %{"amount" => amount}, socket) do
+    case amount do
+      "exact" ->
+        {:noreply, assign(socket, :opening_cash, "")}
+
+      amount_str ->
+        {:noreply, assign(socket, :opening_cash, amount_str)}
+    end
+  end
+
+  def handle_event("pos_close_open_modal", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:opening_cash, "")
+     |> assign(:open_shop_form_error, nil)}
+  end
+
+  def handle_event("pos_record_open", %{"open" => params}, socket) do
+    case Shifts.record_open(socket.assigns.current_user, params) do
+      {:ok, _open} ->
+        socket =
+          socket
+          |> put_flash(
+            :info,
+            "Opening cash recorded · #{Menu.format_price(Map.get(params, "opening_cash"))}"
+          )
+          |> assign_shop_day()
+          |> assign(:opening_cash, "")
+          |> assign(:open_shop_form_error, nil)
+
+        {:noreply, socket}
+
+      {:error, :opening_cash_required} ->
+        {:noreply, assign(socket, :open_shop_form_error, "Enter the opening cash in the drawer.")}
+
+      {:error, :already_open} ->
+        {:noreply,
+         socket
+         |> assign_shop_day()
+         |> assign(:opening_cash, "")
+         |> assign(:open_shop_form_error, nil)}
+
+      {:error, :already_closed} ->
+        {:noreply, assign(socket, :open_shop_form_error, "This shop day is already closed.")}
+
+      {:error, %Ecto.Changeset{}} ->
+        {:noreply, assign(socket, :open_shop_form_error, "Enter a valid opening cash amount.")}
+
+      {:error, :unauthorized} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "You don't have access to open the shop day.")
+         |> assign_shop_day()}
+    end
   end
 
   def handle_event("select_category", %{"name" => name}, socket) when name != "ALL" do
@@ -1092,801 +1157,916 @@ defmodule EspresoWeb.StaffPosLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.staff_shell
-      current={:pos}
-      current_user={@current_user}
-      page_title="POS"
-      chrome={:bar}
-      orders_badge_count={@orders_new_count}
+    <div
+      :if={@shop_day_status == :not_open}
+      class="staff-pos-open-shop-wrap"
+      id="staff-pos-open-shop-wrap"
     >
-      <div class="staff-pos-page staff-pos-shell-root staff-pos-page--cafe">
-        <.shop_day_sales_banner status={@shop_day_status} id="staff-pos-shop-day" />
-        <div
-          :if={@shop_day_status == :not_open}
-          class="staff-pos-open-shop-wrap"
-          id="staff-pos-open-shop-wrap"
-        >
-          <a
-            href="/staff/open?return_to=pos"
-            class="staff-home-shop-open-action"
-            id="staff-pos-open-shop"
+      <div class="staff-pos-open-shop-modal" id="staff-pos-open-shop-modal">
+        <div class="staff-pos-open-shop-header">
+          <div class="staff-pos-open-shop-label">Opening Cash</div>
+          <button
+            type="button"
+            class="staff-pos-open-shop-close"
+            phx-click="pos_close_open_modal"
+            id="staff-pos-open-shop-close"
           >
-            Open Shop
-          </a>
+            ×
+          </button>
         </div>
-        <main class="staff-pos-main">
-          <p :if={@error} class="staff-pos-flash" id="pos-error">{@error}</p>
 
-          <div class="staff-pos-layout staff-pos-layout--cafe">
-            <section class="staff-pos-catalog" id="pos-catalog">
-              <div class="staff-pos-catalog-toolbar">
-                <header class="staff-pos-catalog-head">
-                  <h2 class="staff-pos-catalog-title" id="pos-catalog-title">
-                    Categories
-                  </h2>
-                  <div class="staff-pos-catalog-head-tools">
-                    <form
-                      class="staff-pos-search"
-                      id="pos-search"
-                      phx-change="search"
-                      phx-submit="search"
+        <form
+          id="staff-pos-open-shop-form"
+          phx-change="pos_validate_open"
+          phx-submit="pos_record_open"
+          class="staff-pos-open-shop-form"
+        >
+          <div class="staff-pos-open-shop-amount-section">
+            <div class="staff-pos-open-shop-amount-label">Cash amount</div>
+            <div class="staff-pos-open-shop-amount-display" id="staff-pos-open-shop-amount">
+              <span class="staff-pos-open-shop-amount-currency">₱</span>
+              <span class="staff-pos-open-shop-amount-value">{@opening_cash || "0.00"}</span>
+            </div>
+            <div class="staff-pos-open-shop-amount-hint">
+              Enter cash amount or select a quick amount.
+            </div>
+          </div>
+
+          <div class="staff-pos-open-shop-quick-buttons">
+            <button
+              type="button"
+              class="staff-pos-open-shop-quick-btn staff-pos-open-shop-quick-exact"
+              phx-click="pos_set_opening_cash"
+              phx-value-amount="exact"
+              id="staff-pos-open-shop-exact"
+            >
+              Exact
+            </button>
+            <button
+              type="button"
+              class="staff-pos-open-shop-quick-btn"
+              phx-click="pos_set_opening_cash"
+              phx-value-amount="500"
+              id="staff-pos-open-shop-500"
+            >
+              ₱500
+            </button>
+            <button
+              type="button"
+              class="staff-pos-open-shop-quick-btn"
+              phx-click="pos_set_opening_cash"
+              phx-value-amount="1000"
+              id="staff-pos-open-shop-1000"
+            >
+              ₱1,000
+            </button>
+            <button
+              type="button"
+              class="staff-pos-open-shop-quick-btn"
+              phx-click="pos_set_opening_cash"
+              phx-value-amount="2000"
+              id="staff-pos-open-shop-2000"
+            >
+              ₱2,000
+            </button>
+          </div>
+
+          <div class="staff-pos-open-shop-input-section">
+            <input
+              type="text"
+              name="open[opening_cash]"
+              value={@opening_cash}
+              inputmode="decimal"
+              placeholder="Enter opening cash amount"
+              class="staff-pos-open-shop-input"
+              id="staff-pos-open-shop-cash"
+              autofocus
+            />
+          </div>
+
+          <p
+            :if={@open_shop_form_error}
+            class="staff-pos-open-shop-error"
+            id="staff-pos-open-shop-error"
+          >
+            {@open_shop_form_error}
+          </p>
+
+          <div class="staff-pos-open-shop-buttons">
+            <button type="submit" class="staff-pos-open-shop-confirm" id="staff-pos-open-shop-submit">
+              Confirm Opening
+            </button>
+            <button
+              type="button"
+              class="staff-pos-open-shop-cancel"
+              phx-click="pos_close_open_modal"
+              id="staff-pos-open-shop-cancel"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div :if={@shop_day_status == :open}>
+      <.staff_shell
+        current={:pos}
+        current_user={@current_user}
+        page_title="POS"
+        chrome={:bar}
+        orders_badge_count={@orders_new_count}
+      >
+        <div class="staff-pos-page staff-pos-shell-root staff-pos-page--cafe">
+          <.shop_day_sales_banner status={@shop_day_status} id="staff-pos-shop-day" />
+          <main class="staff-pos-main">
+            <p :if={@error} class="staff-pos-flash" id="pos-error">{@error}</p>
+
+            <div class="staff-pos-layout staff-pos-layout--cafe">
+              <section class="staff-pos-catalog" id="pos-catalog">
+                <div class="staff-pos-catalog-toolbar">
+                  <header class="staff-pos-catalog-head">
+                    <h2 class="staff-pos-catalog-title" id="pos-catalog-title">
+                      Categories
+                    </h2>
+                    <div class="staff-pos-catalog-head-tools">
+                      <form
+                        class="staff-pos-search"
+                        id="pos-search"
+                        phx-change="search"
+                        phx-submit="search"
+                      >
+                        <label class="staff-pos-search-label" for="pos-search-input">Search</label>
+                        <div class="staff-pos-search-row">
+                          <input
+                            type="search"
+                            class="staff-pos-search-input"
+                            id="pos-search-input"
+                            name="q"
+                            value={@search}
+                            placeholder="Search menu"
+                            autocomplete="off"
+                            phx-debounce="200"
+                          />
+                          <button
+                            :if={String.trim(@search) != ""}
+                            type="button"
+                            class="staff-pos-search-clear"
+                            id="pos-search-clear"
+                            phx-click="clear_search"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </form>
+                      <span class="staff-pos-catalog-count" id="pos-catalog-count">
+                        {catalog_items_label(
+                          length(
+                            visible_product_entries(
+                              @categories,
+                              @selected_category,
+                              @menu_filter,
+                              @search
+                            )
+                          )
+                        )}
+                      </span>
+                    </div>
+                  </header>
+
+                  <nav
+                    class="staff-pos-categories staff-pos-categories--pills"
+                    aria-label="Categories"
+                  >
+                    <button
+                      :for={chip <- pos_category_chips(@categories)}
+                      type="button"
+                      class={[
+                        "staff-pos-category",
+                        chip_active?(chip, @selected_category, @menu_filter) && "is-active"
+                      ]}
+                      phx-click={chip.event}
+                      phx-value-name={chip[:name]}
+                      phx-value-filter={chip[:filter]}
+                      id={"pos-category-#{chip.key}"}
                     >
-                      <label class="staff-pos-search-label" for="pos-search-input">Search</label>
-                      <div class="staff-pos-search-row">
-                        <input
-                          type="search"
-                          class="staff-pos-search-input"
-                          id="pos-search-input"
-                          name="q"
-                          value={@search}
-                          placeholder="Search menu"
-                          autocomplete="off"
-                          phx-debounce="200"
-                        />
+                      <span class="staff-pos-category-label">{chip.label}</span>
+                    </button>
+                  </nav>
+                </div>
+
+                <div
+                  class="staff-pos-products staff-pos-products--rows"
+                  id="pos-products"
+                  phx-update="stream"
+                >
+                  <article
+                    :for={{dom_id, card} <- @streams.pos_products}
+                    class={[
+                      "staff-pos-product-card",
+                      card.added? && "is-added",
+                      not card.product.available && "is-unavailable"
+                    ]}
+                    id={dom_id}
+                    role={if(card.product.available, do: "button")}
+                    tabindex={if(card.product.available, do: "0")}
+                    phx-click={card.product.available && "add_to_cart"}
+                    phx-value-product-id={card.product.available && card.product.id}
+                    aria-disabled={if(not card.product.available, do: "true")}
+                    aria-label={
+                      cond do
+                        not card.product.available ->
+                          "#{card.product.name}, Unavailable"
+
+                        card.added? ->
+                          "Added #{card.product.name}"
+
+                        length(card.product.product_prices) > 1 ->
+                          "Choose #{pos_option_word(card.product)} for #{card.product.name}"
+
+                        true ->
+                          "Add #{card.product.name}"
+                      end
+                    }
+                  >
+                    <div class="staff-pos-product-card-media" aria-hidden="true">
+                      <img
+                        :if={card.img.src}
+                        src={card.img.src}
+                        alt=""
+                        class={["staff-pos-product-img", card.img.packshot? && "is-packshot"]}
+                        loading={if card.index < 6, do: "eager", else: "lazy"}
+                        fetchpriority={if card.index < 4, do: "high", else: "low"}
+                      />
+                      <span
+                        :if={Menu.signature_product?(card.product.name)}
+                        class="staff-pos-signature-badge"
+                      >
+                        ✦ SIGNATURE
+                      </span>
+                      <span :if={not card.product.available} class="staff-pos-unavailable-badge">
+                        Unavailable
+                      </span>
+                    </div>
+                    <div class="staff-pos-product-card-body">
+                      <h3 class="staff-pos-product-name">{card.product.name}</h3>
+                      <p
+                        :if={length(card.product.product_prices) > 1}
+                        class="staff-pos-product-size-hint"
+                      >
+                        {Enum.map_join(
+                          pos_size_prices(card.product.product_prices),
+                          " · ",
+                          &size_label(&1.size)
+                        )}
+                      </p>
+                      <p class="staff-pos-product-price">
+                        {price_label(card.product)}
+                      </p>
+                    </div>
+                  </article>
+                </div>
+                <p
+                  :if={
+                    visible_product_entries(
+                      @categories,
+                      @selected_category,
+                      @menu_filter,
+                      @search
+                    ) == []
+                  }
+                  class="staff-empty"
+                  id="pos-products-empty"
+                >
+                  <%= if String.trim(@search) != "" do %>
+                    No products match “{@search}”.
+                  <% else %>
+                    No products in this category.
+                  <% end %>
+                </p>
+              </section>
+
+              <aside
+                class={["staff-pos-ticket", @cart == [] && !@last_order && "is-empty"]}
+                id="pos-ticket"
+              >
+                <div
+                  :if={@place_flash}
+                  class="staff-pos-place-flash"
+                  id="pos-place-flash"
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  <span>{@place_flash}</span>
+                  <button
+                    type="button"
+                    class="staff-pos-place-flash-orders"
+                    id="pos-view-order"
+                    phx-click="open_order_review"
+                  >
+                    View Order
+                  </button>
+                  <button
+                    type="button"
+                    class="staff-pos-place-flash-dismiss"
+                    id="pos-place-flash-dismiss"
+                    phx-click="dismiss_place_flash"
+                    aria-label="Dismiss"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <%= if @last_order do %>
+                  <div
+                    class={[
+                      "staff-pos-success",
+                      @print_failed? && "is-error",
+                      !@print_failed? && "is-success"
+                    ]}
+                    id="pos-confirmation"
+                  >
+                    <div class="staff-pos-success-head">
+                      <div class="staff-pos-success-badge" aria-hidden="true">
+                        {if @print_failed?, do: "!", else: "✓"}
+                      </div>
+                      <p class="staff-pos-success-eyebrow">
+                        {if @print_failed?,
+                          do: "Print failed · order saved",
+                          else: "Order saved"}
+                      </p>
+                    </div>
+                    <p class="staff-order-number">{@last_order.number}</p>
+                    <p class="staff-order-meta">
+                      {Orders.status_label(@last_order.status)} · {@last_order.customer_name} · {Orders.payment_label(
+                        @last_order
+                      )}
+                    </p>
+                    <p
+                      :if={Orders.split_payments?(@last_order)}
+                      class="staff-order-meta"
+                      id="pos-split-breakdown"
+                    >
+                      {split_amount_summary(@last_order)}
+                    </p>
+                    <p :if={@ticket_loyalty_note} class="staff-order-meta" id="pos-loyalty-note">
+                      {@ticket_loyalty_note}
+                    </p>
+                    <p :if={@last_cash_change} class="staff-order-meta" id="pos-cash-change">
+                      Cash received {Menu.format_price(@last_cash_change.tendered)} · Change {Menu.format_price(
+                        @last_cash_change.change
+                      )}
+                    </p>
+                    <p
+                      :if={@print_note}
+                      class={["staff-pos-success-note", @print_note_error? && "is-error"]}
+                      id="pos-print-note"
+                    >
+                      {@print_note}
+                    </p>
+                    <div class="staff-pos-success-actions">
+                      <button
+                        :if={Printer.enabled?() and @print_failed?}
+                        type="button"
+                        class="staff-pos-place"
+                        id="pos-retry-print"
+                        phx-click="reprint_receipt"
+                        phx-value-token={@print_retry_token}
+                        phx-disable-with="Retrying…"
+                      >
+                        Retry print
+                      </button>
+                      <div :if={Printer.enabled?()} class="staff-pos-success-secondary">
                         <button
-                          :if={String.trim(@search) != ""}
                           type="button"
-                          class="staff-pos-search-clear"
-                          id="pos-search-clear"
-                          phx-click="clear_search"
+                          class="staff-pos-mini"
+                          id="pos-print-kitchen"
+                          phx-click="print_kitchen"
                         >
-                          Clear
+                          Kitchen
+                        </button>
+                        <button
+                          :if={
+                            Printer.enabled?() and
+                              Printer.cash_like?(@last_order.paid_via || "cash")
+                          }
+                          type="button"
+                          class="staff-pos-mini"
+                          id="pos-open-kaha"
+                          phx-click="open_drawer"
+                        >
+                          Drawer
                         </button>
                       </div>
-                    </form>
-                    <span class="staff-pos-catalog-count" id="pos-catalog-count">
-                      {catalog_items_label(
-                        length(
-                          visible_product_entries(
-                            @categories,
-                            @selected_category,
-                            @menu_filter,
-                            @search
-                          )
-                        )
-                      )}
-                    </span>
+                      <button
+                        type="button"
+                        class="staff-pos-place"
+                        id="pos-new-order"
+                        phx-click="new_order"
+                      >
+                        Clear Ticket
+                      </button>
+                      <button
+                        type="button"
+                        class="staff-pos-view-orders"
+                        id="pos-confirmation-view-order"
+                        phx-click="open_order_review"
+                      >
+                        View Order
+                      </button>
+                    </div>
                   </div>
-                </header>
-
-                <nav class="staff-pos-categories staff-pos-categories--pills" aria-label="Categories">
-                  <button
-                    :for={chip <- pos_category_chips(@categories)}
-                    type="button"
-                    class={[
-                      "staff-pos-category",
-                      chip_active?(chip, @selected_category, @menu_filter) && "is-active"
-                    ]}
-                    phx-click={chip.event}
-                    phx-value-name={chip[:name]}
-                    phx-value-filter={chip[:filter]}
-                    id={"pos-category-#{chip.key}"}
-                  >
-                    <span class="staff-pos-category-label">{chip.label}</span>
-                  </button>
-                </nav>
-              </div>
-
-              <div
-                class="staff-pos-products staff-pos-products--rows"
-                id="pos-products"
-                phx-update="stream"
-              >
-                <article
-                  :for={{dom_id, card} <- @streams.pos_products}
-                  class={[
-                    "staff-pos-product-card",
-                    card.added? && "is-added",
-                    not card.product.available && "is-unavailable"
-                  ]}
-                  id={dom_id}
-                  role={if(card.product.available, do: "button")}
-                  tabindex={if(card.product.available, do: "0")}
-                  phx-click={card.product.available && "add_to_cart"}
-                  phx-value-product-id={card.product.available && card.product.id}
-                  aria-disabled={if(not card.product.available, do: "true")}
-                  aria-label={
-                    cond do
-                      not card.product.available ->
-                        "#{card.product.name}, Unavailable"
-
-                      card.added? ->
-                        "Added #{card.product.name}"
-
-                      length(card.product.product_prices) > 1 ->
-                        "Choose #{pos_option_word(card.product)} for #{card.product.name}"
-
-                      true ->
-                        "Add #{card.product.name}"
-                    end
-                  }
-                >
-                  <div class="staff-pos-product-card-media" aria-hidden="true">
-                    <img
-                      :if={card.img.src}
-                      src={card.img.src}
-                      alt=""
-                      class={["staff-pos-product-img", card.img.packshot? && "is-packshot"]}
-                      loading={if card.index < 6, do: "eager", else: "lazy"}
-                      fetchpriority={if card.index < 4, do: "high", else: "low"}
-                    />
-                    <span
-                      :if={Menu.signature_product?(card.product.name)}
-                      class="staff-pos-signature-badge"
-                    >
-                      ✦ SIGNATURE
-                    </span>
-                    <span :if={not card.product.available} class="staff-pos-unavailable-badge">
-                      Unavailable
-                    </span>
-                  </div>
-                  <div class="staff-pos-product-card-body">
-                    <h3 class="staff-pos-product-name">{card.product.name}</h3>
-                    <p
-                      :if={length(card.product.product_prices) > 1}
-                      class="staff-pos-product-size-hint"
-                    >
-                      {Enum.map_join(
-                        pos_size_prices(card.product.product_prices),
-                        " · ",
-                        &size_label(&1.size)
-                      )}
-                    </p>
-                    <p class="staff-pos-product-price">
-                      {price_label(card.product)}
-                    </p>
-                  </div>
-                </article>
-              </div>
-              <p
-                :if={
-                  visible_product_entries(
-                    @categories,
-                    @selected_category,
-                    @menu_filter,
-                    @search
-                  ) == []
-                }
-                class="staff-empty"
-                id="pos-products-empty"
-              >
-                <%= if String.trim(@search) != "" do %>
-                  No products match “{@search}”.
                 <% else %>
-                  No products in this category.
-                <% end %>
-              </p>
-            </section>
-
-            <aside
-              class={["staff-pos-ticket", @cart == [] && !@last_order && "is-empty"]}
-              id="pos-ticket"
-            >
-              <div
-                :if={@place_flash}
-                class="staff-pos-place-flash"
-                id="pos-place-flash"
-                role="status"
-                aria-live="polite"
-                aria-atomic="true"
-              >
-                <span>{@place_flash}</span>
-                <button
-                  type="button"
-                  class="staff-pos-place-flash-orders"
-                  id="pos-view-order"
-                  phx-click="open_order_review"
-                >
-                  View Order
-                </button>
-                <button
-                  type="button"
-                  class="staff-pos-place-flash-dismiss"
-                  id="pos-place-flash-dismiss"
-                  phx-click="dismiss_place_flash"
-                  aria-label="Dismiss"
-                >
-                  ×
-                </button>
-              </div>
-
-              <%= if @last_order do %>
-                <div
-                  class={[
-                    "staff-pos-success",
-                    @print_failed? && "is-error",
-                    !@print_failed? && "is-success"
-                  ]}
-                  id="pos-confirmation"
-                >
-                  <div class="staff-pos-success-head">
-                    <div class="staff-pos-success-badge" aria-hidden="true">
-                      {if @print_failed?, do: "!", else: "✓"}
-                    </div>
-                    <p class="staff-pos-success-eyebrow">
-                      {if @print_failed?,
-                        do: "Print failed · order saved",
-                        else: "Order saved"}
-                    </p>
-                  </div>
-                  <p class="staff-order-number">{@last_order.number}</p>
-                  <p class="staff-order-meta">
-                    {Orders.status_label(@last_order.status)} · {@last_order.customer_name} · {Orders.payment_label(
-                      @last_order
-                    )}
-                  </p>
-                  <p
-                    :if={Orders.split_payments?(@last_order)}
-                    class="staff-order-meta"
-                    id="pos-split-breakdown"
-                  >
-                    {split_amount_summary(@last_order)}
-                  </p>
-                  <p :if={@ticket_loyalty_note} class="staff-order-meta" id="pos-loyalty-note">
-                    {@ticket_loyalty_note}
-                  </p>
-                  <p :if={@last_cash_change} class="staff-order-meta" id="pos-cash-change">
-                    Cash received {Menu.format_price(@last_cash_change.tendered)} · Change {Menu.format_price(
-                      @last_cash_change.change
-                    )}
-                  </p>
-                  <p
-                    :if={@print_note}
-                    class={["staff-pos-success-note", @print_note_error? && "is-error"]}
-                    id="pos-print-note"
-                  >
-                    {@print_note}
-                  </p>
-                  <div class="staff-pos-success-actions">
-                    <button
-                      :if={Printer.enabled?() and @print_failed?}
-                      type="button"
-                      class="staff-pos-place"
-                      id="pos-retry-print"
-                      phx-click="reprint_receipt"
-                      phx-value-token={@print_retry_token}
-                      phx-disable-with="Retrying…"
-                    >
-                      Retry print
-                    </button>
-                    <div :if={Printer.enabled?()} class="staff-pos-success-secondary">
-                      <button
-                        type="button"
-                        class="staff-pos-mini"
-                        id="pos-print-kitchen"
-                        phx-click="print_kitchen"
-                      >
-                        Kitchen
-                      </button>
-                      <button
-                        :if={
-                          Printer.enabled?() and
-                            Printer.cash_like?(@last_order.paid_via || "cash")
-                        }
-                        type="button"
-                        class="staff-pos-mini"
-                        id="pos-open-kaha"
-                        phx-click="open_drawer"
-                      >
-                        Drawer
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      class="staff-pos-place"
-                      id="pos-new-order"
-                      phx-click="new_order"
-                    >
-                      Clear Ticket
-                    </button>
-                    <button
-                      type="button"
-                      class="staff-pos-view-orders"
-                      id="pos-confirmation-view-order"
-                      phx-click="open_order_review"
-                    >
-                      View Order
-                    </button>
-                  </div>
-                </div>
-              <% else %>
-                <form class="staff-pos-order-form" id="pos-order-form" phx-submit="place_order">
-                  <input
-                    :if={not @ticket_extras_open?}
-                    type="hidden"
-                    name="customer_name"
-                    value={@customer_name}
-                  />
-                  <input :if={not @ticket_extras_open?} type="hidden" name="notes" value={@notes} />
-                  <div class="staff-pos-ticket-scroll">
-                    <div class="staff-pos-ticket-head">
-                      <div class="staff-pos-ticket-title-row">
-                        <div class="staff-pos-ticket-title">
-                          <h2>Cart</h2>
-                          <span
-                            :if={cart_item_count(@cart) > 0}
-                            class="staff-pos-cart-count"
-                            id="pos-cart-count"
-                          >
-                            {cart_count_label(cart_item_count(@cart))}
-                          </span>
-                        </div>
-                        <div class="staff-pos-ticket-title-actions">
-                          <button
-                            type="button"
-                            class={[
-                              "staff-pos-ticket-extras-toggle",
-                              ticket_extras_applied?(assigns) && "is-applied",
-                              @ticket_extras_open? && "is-open"
-                            ]}
-                            id="pos-ticket-extras-toggle"
-                            phx-click="toggle_ticket_extras"
-                            aria-expanded={to_string(@ticket_extras_open?)}
-                            aria-controls="pos-ticket-extras-modal"
-                            aria-haspopup="dialog"
-                          >
-                            <span class="staff-pos-ticket-extras-toggle-label">
-                              {ticket_extras_summary(assigns)}
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            id="pos-loyalty-entry"
-                            class={[
-                              "staff-pos-ticket-extra",
-                              "staff-pos-loyalty-entry",
-                              @loyalty_open? && "is-active",
-                              @loyalty_customer && "is-linked",
-                              @loyalty_customer &&
-                                @loyalty_customer.points_balance >= Loyalty.redeem_cost() &&
-                                "is-ready",
-                              loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer) &&
-                                "is-attention"
-                            ]}
-                            phx-click="open_loyalty"
-                            aria-expanded={to_string(@loyalty_open?)}
-                            aria-controls="pos-loyalty-modal"
-                            aria-haspopup="dialog"
-                          >
-                            <span class="staff-pos-ticket-extras-toggle-label">
-                              {loyalty_entry_label(@loyalty_customer, @loyalty_phone)}
-                            </span>
-                          </button>
-                          <button
-                            :if={@cart != []}
-                            type="button"
-                            class="staff-pos-clear-ticket"
-                            id="pos-clear-ticket"
-                            phx-click="clear_ticket"
-                          >
-                            Clear Ticket
-                          </button>
-                        </div>
-                      </div>
-
-                      <p class="staff-pos-section-label">Order type</p>
-                      <div class="staff-pos-ticket-controls">
-                        <div
-                          class="staff-pos-fulfillment staff-pos-fulfillment--pills"
-                          id="pos-fulfillment"
-                          role="radiogroup"
-                          aria-label="Order type"
-                        >
-                          <button
-                            type="button"
-                            class={["staff-pos-fulfill-chip", @fulfillment == :dine_in && "is-active"]}
-                            id="pos-fulfillment-dine-in"
-                            phx-click="set_fulfillment"
-                            phx-value-fulfillment="dine_in"
-                            aria-pressed={to_string(@fulfillment == :dine_in)}
-                          >
-                            Dine In
-                          </button>
-                          <button
-                            type="button"
-                            class={["staff-pos-fulfill-chip", @fulfillment == :pickup && "is-active"]}
-                            id="pos-fulfillment-pickup"
-                            phx-click="set_fulfillment"
-                            phx-value-fulfillment="pickup"
-                            aria-pressed={to_string(@fulfillment == :pickup)}
-                          >
-                            Take Out
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div :if={@cart_undo} class="staff-pos-cart-undo" id="pos-cart-undo" role="status">
-                      <span>{cart_undo_label(@cart_undo)}</span>
-                      <button type="button" id="pos-cart-undo-action" phx-click="undo_cart">
-                        Undo
-                      </button>
-                    </div>
-
-                    <div class="staff-pos-ticket-body">
-                      <p :if={@cart == []} class="staff-empty" id="pos-cart-empty">No items yet.</p>
-
-                      <ul class="staff-pos-cart" id="pos-cart-lines">
-                        <li
-                          :for={line <- @cart}
-                          class="staff-pos-cart-line"
-                          id={"pos-line-#{line.key}"}
-                        >
-                          <div class="staff-pos-cart-thumb" aria-hidden="true">
-                            <img
-                              :if={line[:image]}
-                              src={line.image}
-                              alt=""
-                              class="staff-pos-cart-thumb-img"
-                              loading="lazy"
-                            />
-                          </div>
-                          <div class="staff-pos-cart-main">
-                            <div class="staff-pos-cart-copy">
-                              <p class="staff-pos-cart-name">{line.name}</p>
-                              <div class="staff-pos-cart-meta">
-                                <%= if length(cart_variant_options(@categories, line)) > 1 do %>
-                                  <button
-                                    type="button"
-                                    class="staff-pos-cart-variant-trigger"
-                                    id={"pos-cart-variant-trigger-#{line.key}"}
-                                    phx-click="toggle_cart_variant"
-                                    phx-value-key={line.key}
-                                    aria-expanded={to_string(@variant_editor_key == line.key)}
-                                    aria-controls={"pos-cart-variant-chooser-#{line.key}"}
-                                    aria-label={"Change #{line.name} size, currently #{size_label(line.size)}"}
-                                  >
-                                    {size_label(line.size)} <span aria-hidden="true">▾</span>
-                                  </button>
-                                <% else %>
-                                  <p class="staff-pos-cart-size">{size_label(line.size)}</p>
-                                <% end %>
-                                <p
-                                  :if={meta = Orders.temperature_meta(line[:category])}
-                                  class={"staff-pos-cart-temp is-#{meta.tone}"}
-                                >
-                                  {meta.label}
-                                </p>
-                              </div>
-                            </div>
-                            <div class="staff-pos-cart-pricing">
-                              <p class="staff-pos-cart-amount">
-                                {Menu.format_price(Decimal.mult(line.price, line.quantity))}
-                              </p>
-                              <div class="staff-pos-cart-actions">
-                                <div class="staff-pos-qty-controls">
-                                  <button
-                                    type="button"
-                                    class="staff-pos-qty-btn"
-                                    phx-click="dec"
-                                    phx-value-key={line.key}
-                                    aria-label={"Decrease #{line.name}"}
-                                  >
-                                    −
-                                  </button>
-                                  <span class="staff-pos-qty">{line.quantity}</span>
-                                  <button
-                                    type="button"
-                                    class="staff-pos-qty-btn staff-pos-qty-btn--plus"
-                                    phx-click="inc"
-                                    phx-value-key={line.key}
-                                    aria-label={"Increase #{line.name}"}
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                                <button
-                                  type="button"
-                                  class="staff-pos-remove"
-                                  phx-click="remove"
-                                  phx-value-key={line.key}
-                                  aria-label={"Remove #{line.name}"}
-                                  title="Remove"
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            </div>
-                            <div
-                              :if={@variant_editor_key == line.key}
-                              class="staff-pos-cart-variant-chooser"
-                              id={"pos-cart-variant-chooser-#{line.key}"}
-                              role="group"
-                              aria-label={"Choose size for #{line.name}"}
+                  <form class="staff-pos-order-form" id="pos-order-form" phx-submit="place_order">
+                    <input
+                      :if={not @ticket_extras_open?}
+                      type="hidden"
+                      name="customer_name"
+                      value={@customer_name}
+                    />
+                    <input :if={not @ticket_extras_open?} type="hidden" name="notes" value={@notes} />
+                    <div class="staff-pos-ticket-scroll">
+                      <div class="staff-pos-ticket-head">
+                        <div class="staff-pos-ticket-title-row">
+                          <div class="staff-pos-ticket-title">
+                            <h2>Cart</h2>
+                            <span
+                              :if={cart_item_count(@cart) > 0}
+                              class="staff-pos-cart-count"
+                              id="pos-cart-count"
                             >
-                              <button
-                                :for={price <- cart_variant_options(@categories, line)}
-                                type="button"
-                                class={[
-                                  "staff-pos-cart-variant-option",
-                                  price.id == line.price_id && "is-active"
-                                ]}
-                                id={"pos-cart-variant-#{line.key}-#{price.id}"}
-                                phx-click="change_cart_variant"
-                                phx-value-key={line.key}
-                                phx-value-price-id={price.id}
-                                aria-pressed={to_string(price.id == line.price_id)}
-                              >
-                                {size_label(price.size)} · {Menu.format_price(price.price)}
-                              </button>
-                            </div>
+                              {cart_count_label(cart_item_count(@cart))}
+                            </span>
                           </div>
-                        </li>
-                      </ul>
-                    </div>
+                          <div class="staff-pos-ticket-title-actions">
+                            <button
+                              type="button"
+                              class={[
+                                "staff-pos-ticket-extras-toggle",
+                                ticket_extras_applied?(assigns) && "is-applied",
+                                @ticket_extras_open? && "is-open"
+                              ]}
+                              id="pos-ticket-extras-toggle"
+                              phx-click="toggle_ticket_extras"
+                              aria-expanded={to_string(@ticket_extras_open?)}
+                              aria-controls="pos-ticket-extras-modal"
+                              aria-haspopup="dialog"
+                            >
+                              <span class="staff-pos-ticket-extras-toggle-label">
+                                {ticket_extras_summary(assigns)}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              id="pos-loyalty-entry"
+                              class={[
+                                "staff-pos-ticket-extra",
+                                "staff-pos-loyalty-entry",
+                                @loyalty_open? && "is-active",
+                                @loyalty_customer && "is-linked",
+                                @loyalty_customer &&
+                                  @loyalty_customer.points_balance >= Loyalty.redeem_cost() &&
+                                  "is-ready",
+                                loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer) &&
+                                  "is-attention"
+                              ]}
+                              phx-click="open_loyalty"
+                              aria-expanded={to_string(@loyalty_open?)}
+                              aria-controls="pos-loyalty-modal"
+                              aria-haspopup="dialog"
+                            >
+                              <span class="staff-pos-ticket-extras-toggle-label">
+                                {loyalty_entry_label(@loyalty_customer, @loyalty_phone)}
+                              </span>
+                            </button>
+                            <button
+                              :if={@cart != []}
+                              type="button"
+                              class="staff-pos-clear-ticket"
+                              id="pos-clear-ticket"
+                              phx-click="clear_ticket"
+                            >
+                              Clear Ticket
+                            </button>
+                          </div>
+                        </div>
 
-                    <div class="staff-pos-ticket-footer">
-                      <div class="staff-pos-totals">
-                        <div
-                          :if={Orders.Discount.applied?(ticket_quote(assigns))}
-                          class="staff-pos-total-row"
-                        >
-                          <span>Subtotal</span>
-                          <span id="pos-subtotal">
-                            {Menu.format_price(ticket_quote(assigns).subtotal)}
-                          </span>
-                        </div>
-                        <div
-                          :if={Orders.Discount.applied?(ticket_quote(assigns))}
-                          class="staff-pos-total-row"
-                          id="pos-discount-row"
-                        >
-                          <span>{ticket_quote(assigns).label}</span>
-                          <span id="pos-discount-amount">
-                            −{Menu.format_price(ticket_quote(assigns).amount)}
-                          </span>
-                        </div>
-                        <div class="staff-pos-total-row staff-pos-total-row--grand">
-                          <span>Total</span>
-                          <span id="pos-total">{Menu.format_price(ticket_due(assigns))}</span>
+                        <p class="staff-pos-section-label">Order type</p>
+                        <div class="staff-pos-ticket-controls">
+                          <div
+                            class="staff-pos-fulfillment staff-pos-fulfillment--pills"
+                            id="pos-fulfillment"
+                            role="radiogroup"
+                            aria-label="Order type"
+                          >
+                            <button
+                              type="button"
+                              class={[
+                                "staff-pos-fulfill-chip",
+                                @fulfillment == :dine_in && "is-active"
+                              ]}
+                              id="pos-fulfillment-dine-in"
+                              phx-click="set_fulfillment"
+                              phx-value-fulfillment="dine_in"
+                              aria-pressed={to_string(@fulfillment == :dine_in)}
+                            >
+                              Dine In
+                            </button>
+                            <button
+                              type="button"
+                              class={[
+                                "staff-pos-fulfill-chip",
+                                @fulfillment == :pickup && "is-active"
+                              ]}
+                              id="pos-fulfillment-pickup"
+                              phx-click="set_fulfillment"
+                              phx-value-fulfillment="pickup"
+                              aria-pressed={to_string(@fulfillment == :pickup)}
+                            >
+                              Take Out
+                            </button>
+                          </div>
                         </div>
                       </div>
 
                       <div
-                        class={[
-                          "staff-pos-payment staff-pos-tender staff-pos-tender--methods",
-                          @payment_methods_open? && "is-open"
-                        ]}
-                        id="pos-payment-methods"
-                        phx-click-away="close_payment_methods"
+                        :if={@cart_undo}
+                        class="staff-pos-cart-undo"
+                        id="pos-cart-undo"
+                        role="status"
                       >
-                        <div
-                          class={["staff-pos-pay-menu", @payment_methods_open? && "is-open"]}
-                          id="pos-payment-method-menu"
-                          role="listbox"
-                          aria-label="Payment method"
-                          aria-hidden={to_string(!@payment_methods_open?)}
-                        >
-                          <button
-                            type="button"
-                            class={[
-                              "staff-pos-pay-chip",
-                              @payment_choice == :paid and @paid_via == "cash" && "is-active"
-                            ]}
-                            id="pos-pay-cash"
-                            phx-click="set_payment_method"
-                            phx-value-method="cash"
-                            role="option"
-                            aria-selected={
-                              to_string(@payment_choice == :paid and @paid_via == "cash")
-                            }
+                        <span>{cart_undo_label(@cart_undo)}</span>
+                        <button type="button" id="pos-cart-undo-action" phx-click="undo_cart">
+                          Undo
+                        </button>
+                      </div>
+
+                      <div class="staff-pos-ticket-body">
+                        <p :if={@cart == []} class="staff-empty" id="pos-cart-empty">No items yet.</p>
+
+                        <ul class="staff-pos-cart" id="pos-cart-lines">
+                          <li
+                            :for={line <- @cart}
+                            class="staff-pos-cart-line"
+                            id={"pos-line-#{line.key}"}
                           >
-                            Cash
-                          </button>
-                          <button
-                            type="button"
-                            class={[
-                              "staff-pos-pay-chip",
-                              @payment_choice == :paid and @paid_via == "gcash" && "is-active"
-                            ]}
-                            id="pos-pay-gcash"
-                            phx-click="set_payment_method"
-                            phx-value-method="gcash"
-                            role="option"
-                            aria-selected={
-                              to_string(@payment_choice == :paid and @paid_via == "gcash")
-                            }
-                            aria-describedby={
-                              if @payment_choice == :paid and @paid_via == "gcash",
-                                do: "pos-wallet-confirmation-cue",
-                                else: nil
-                            }
+                            <div class="staff-pos-cart-thumb" aria-hidden="true">
+                              <img
+                                :if={line[:image]}
+                                src={line.image}
+                                alt=""
+                                class="staff-pos-cart-thumb-img"
+                                loading="lazy"
+                              />
+                            </div>
+                            <div class="staff-pos-cart-main">
+                              <div class="staff-pos-cart-copy">
+                                <p class="staff-pos-cart-name">{line.name}</p>
+                                <div class="staff-pos-cart-meta">
+                                  <%= if length(cart_variant_options(@categories, line)) > 1 do %>
+                                    <button
+                                      type="button"
+                                      class="staff-pos-cart-variant-trigger"
+                                      id={"pos-cart-variant-trigger-#{line.key}"}
+                                      phx-click="toggle_cart_variant"
+                                      phx-value-key={line.key}
+                                      aria-expanded={to_string(@variant_editor_key == line.key)}
+                                      aria-controls={"pos-cart-variant-chooser-#{line.key}"}
+                                      aria-label={"Change #{line.name} size, currently #{size_label(line.size)}"}
+                                    >
+                                      {size_label(line.size)} <span aria-hidden="true">▾</span>
+                                    </button>
+                                  <% else %>
+                                    <p class="staff-pos-cart-size">{size_label(line.size)}</p>
+                                  <% end %>
+                                  <p
+                                    :if={meta = Orders.temperature_meta(line[:category])}
+                                    class={"staff-pos-cart-temp is-#{meta.tone}"}
+                                  >
+                                    {meta.label}
+                                  </p>
+                                </div>
+                              </div>
+                              <div class="staff-pos-cart-pricing">
+                                <p class="staff-pos-cart-amount">
+                                  {Menu.format_price(Decimal.mult(line.price, line.quantity))}
+                                </p>
+                                <div class="staff-pos-cart-actions">
+                                  <div class="staff-pos-qty-controls">
+                                    <button
+                                      type="button"
+                                      class="staff-pos-qty-btn"
+                                      phx-click="dec"
+                                      phx-value-key={line.key}
+                                      aria-label={"Decrease #{line.name}"}
+                                    >
+                                      −
+                                    </button>
+                                    <span class="staff-pos-qty">{line.quantity}</span>
+                                    <button
+                                      type="button"
+                                      class="staff-pos-qty-btn staff-pos-qty-btn--plus"
+                                      phx-click="inc"
+                                      phx-value-key={line.key}
+                                      aria-label={"Increase #{line.name}"}
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    class="staff-pos-remove"
+                                    phx-click="remove"
+                                    phx-value-key={line.key}
+                                    aria-label={"Remove #{line.name}"}
+                                    title="Remove"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              </div>
+                              <div
+                                :if={@variant_editor_key == line.key}
+                                class="staff-pos-cart-variant-chooser"
+                                id={"pos-cart-variant-chooser-#{line.key}"}
+                                role="group"
+                                aria-label={"Choose size for #{line.name}"}
+                              >
+                                <button
+                                  :for={price <- cart_variant_options(@categories, line)}
+                                  type="button"
+                                  class={[
+                                    "staff-pos-cart-variant-option",
+                                    price.id == line.price_id && "is-active"
+                                  ]}
+                                  id={"pos-cart-variant-#{line.key}-#{price.id}"}
+                                  phx-click="change_cart_variant"
+                                  phx-value-key={line.key}
+                                  phx-value-price-id={price.id}
+                                  aria-pressed={to_string(price.id == line.price_id)}
+                                >
+                                  {size_label(price.size)} · {Menu.format_price(price.price)}
+                                </button>
+                              </div>
+                            </div>
+                          </li>
+                        </ul>
+                      </div>
+
+                      <div class="staff-pos-ticket-footer">
+                        <div class="staff-pos-totals">
+                          <div
+                            :if={Orders.Discount.applied?(ticket_quote(assigns))}
+                            class="staff-pos-total-row"
                           >
-                            GCash
-                          </button>
-                          <button
-                            type="button"
-                            class={[
-                              "staff-pos-pay-chip",
-                              @payment_choice == :paid and @paid_via == "maya" && "is-active"
-                            ]}
-                            id="pos-pay-maya"
-                            phx-click="set_payment_method"
-                            phx-value-method="maya"
-                            role="option"
-                            aria-selected={
-                              to_string(@payment_choice == :paid and @paid_via == "maya")
-                            }
-                            aria-describedby={
-                              if @payment_choice == :paid and @paid_via == "maya",
-                                do: "pos-wallet-confirmation-cue",
-                                else: nil
-                            }
+                            <span>Subtotal</span>
+                            <span id="pos-subtotal">
+                              {Menu.format_price(ticket_quote(assigns).subtotal)}
+                            </span>
+                          </div>
+                          <div
+                            :if={Orders.Discount.applied?(ticket_quote(assigns))}
+                            class="staff-pos-total-row"
+                            id="pos-discount-row"
                           >
-                            Maya
-                          </button>
-                          <button
-                            type="button"
-                            class={[
-                              "staff-pos-pay-chip",
-                              @payment_choice == :paid and @paid_via == "split" && "is-active"
-                            ]}
-                            id="pos-pay-split"
-                            phx-click="set_payment_method"
-                            phx-value-method="split"
-                            role="option"
-                            aria-selected={
-                              to_string(@payment_choice == :paid and @paid_via == "split")
-                            }
-                          >
-                            Split
-                          </button>
+                            <span>{ticket_quote(assigns).label}</span>
+                            <span id="pos-discount-amount">
+                              −{Menu.format_price(ticket_quote(assigns).amount)}
+                            </span>
+                          </div>
+                          <div class="staff-pos-total-row staff-pos-total-row--grand">
+                            <span>Total</span>
+                            <span id="pos-total">{Menu.format_price(ticket_due(assigns))}</span>
+                          </div>
                         </div>
 
-                        <p
-                          :if={split_summary(assigns)}
-                          class="staff-pos-payment-cue"
-                          id="pos-split-summary"
+                        <div
+                          class={[
+                            "staff-pos-payment staff-pos-tender staff-pos-tender--methods",
+                            @payment_methods_open? && "is-open"
+                          ]}
+                          id="pos-payment-methods"
+                          phx-click-away="close_payment_methods"
                         >
-                          {split_summary(assigns)}
-                        </p>
-
-                        <p
-                          :if={@payment_choice == :paid and @paid_via in ["gcash", "maya"]}
-                          class="staff-pos-payment-cue"
-                          id="pos-wallet-confirmation-cue"
-                        >
-                          Confirm payment was received before processing.
-                        </p>
-
-                        <p
-                          :if={@submission_error}
-                          class="staff-pos-flash"
-                          id="pos-submission-error"
-                          role="alert"
-                        >
-                          {@submission_error}
-                        </p>
-
-                        <div class="staff-pos-place-split">
-                          <button
-                            type="submit"
-                            class={[
-                              "staff-pos-place",
-                              (@shop_day_status != :open or @cart == [] or @placing_order? or
-                                 loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)) &&
-                                "is-disabled"
-                            ]}
-                            id="pos-place-order"
-                            disabled={
-                              @shop_day_status != :open or @cart == [] or @placing_order? or
-                                loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)
-                            }
+                          <div
+                            class={["staff-pos-pay-menu", @payment_methods_open? && "is-open"]}
+                            id="pos-payment-method-menu"
+                            role="listbox"
+                            aria-label="Payment method"
+                            aria-hidden={to_string(!@payment_methods_open?)}
                           >
-                            <span id="pos-payment-method-label">
-                              {place_order_label(@payment_choice, @paid_via)}
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            class={[
-                              "staff-pos-place-menu",
-                              (@shop_day_status != :open or @placing_order?) && "is-disabled"
-                            ]}
-                            id="pos-payment-method"
-                            phx-click="toggle_payment_methods"
-                            disabled={@shop_day_status != :open or @placing_order?}
-                            aria-expanded={to_string(@payment_methods_open?)}
-                            aria-controls="pos-payment-method-menu"
-                            aria-haspopup="listbox"
-                            aria-label={"Change payment method, #{payment_method_label(@paid_via)} selected"}
+                            <button
+                              type="button"
+                              class={[
+                                "staff-pos-pay-chip",
+                                @payment_choice == :paid and @paid_via == "cash" && "is-active"
+                              ]}
+                              id="pos-pay-cash"
+                              phx-click="set_payment_method"
+                              phx-value-method="cash"
+                              role="option"
+                              aria-selected={
+                                to_string(@payment_choice == :paid and @paid_via == "cash")
+                              }
+                            >
+                              Cash
+                            </button>
+                            <button
+                              type="button"
+                              class={[
+                                "staff-pos-pay-chip",
+                                @payment_choice == :paid and @paid_via == "gcash" && "is-active"
+                              ]}
+                              id="pos-pay-gcash"
+                              phx-click="set_payment_method"
+                              phx-value-method="gcash"
+                              role="option"
+                              aria-selected={
+                                to_string(@payment_choice == :paid and @paid_via == "gcash")
+                              }
+                              aria-describedby={
+                                if @payment_choice == :paid and @paid_via == "gcash",
+                                  do: "pos-wallet-confirmation-cue",
+                                  else: nil
+                              }
+                            >
+                              GCash
+                            </button>
+                            <button
+                              type="button"
+                              class={[
+                                "staff-pos-pay-chip",
+                                @payment_choice == :paid and @paid_via == "maya" && "is-active"
+                              ]}
+                              id="pos-pay-maya"
+                              phx-click="set_payment_method"
+                              phx-value-method="maya"
+                              role="option"
+                              aria-selected={
+                                to_string(@payment_choice == :paid and @paid_via == "maya")
+                              }
+                              aria-describedby={
+                                if @payment_choice == :paid and @paid_via == "maya",
+                                  do: "pos-wallet-confirmation-cue",
+                                  else: nil
+                              }
+                            >
+                              Maya
+                            </button>
+                            <button
+                              type="button"
+                              class={[
+                                "staff-pos-pay-chip",
+                                @payment_choice == :paid and @paid_via == "split" && "is-active"
+                              ]}
+                              id="pos-pay-split"
+                              phx-click="set_payment_method"
+                              phx-value-method="split"
+                              role="option"
+                              aria-selected={
+                                to_string(@payment_choice == :paid and @paid_via == "split")
+                              }
+                            >
+                              Split
+                            </button>
+                          </div>
+
+                          <p
+                            :if={split_summary(assigns)}
+                            class="staff-pos-payment-cue"
+                            id="pos-split-summary"
                           >
-                            <span class="staff-pos-pay-trigger-chevron" aria-hidden="true"></span>
-                          </button>
+                            {split_summary(assigns)}
+                          </p>
+
+                          <p
+                            :if={@payment_choice == :paid and @paid_via in ["gcash", "maya"]}
+                            class="staff-pos-payment-cue"
+                            id="pos-wallet-confirmation-cue"
+                          >
+                            Confirm payment was received before processing.
+                          </p>
+
+                          <p
+                            :if={@submission_error}
+                            class="staff-pos-flash"
+                            id="pos-submission-error"
+                            role="alert"
+                          >
+                            {@submission_error}
+                          </p>
+
+                          <div class="staff-pos-place-split">
+                            <button
+                              type="submit"
+                              class={[
+                                "staff-pos-place",
+                                (@shop_day_status != :open or @cart == [] or @placing_order? or
+                                   loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)) &&
+                                  "is-disabled"
+                              ]}
+                              id="pos-place-order"
+                              disabled={
+                                @shop_day_status != :open or @cart == [] or @placing_order? or
+                                  loyalty_phone_unresolved?(@loyalty_phone, @loyalty_customer)
+                              }
+                            >
+                              <span id="pos-payment-method-label">
+                                {place_order_label(@payment_choice, @paid_via)}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              class={[
+                                "staff-pos-place-menu",
+                                (@shop_day_status != :open or @placing_order?) && "is-disabled"
+                              ]}
+                              id="pos-payment-method"
+                              phx-click="toggle_payment_methods"
+                              disabled={@shop_day_status != :open or @placing_order?}
+                              aria-expanded={to_string(@payment_methods_open?)}
+                              aria-controls="pos-payment-method-menu"
+                              aria-haspopup="listbox"
+                              aria-label={"Change payment method, #{payment_method_label(@paid_via)} selected"}
+                            >
+                              <span class="staff-pos-pay-trigger-chevron" aria-hidden="true"></span>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                  <.ticket_extras_modal
-                    :if={@ticket_extras_open?}
-                    customer_name={@customer_name}
-                    notes={@notes}
-                    loyalty_open?={@loyalty_open?}
-                    loyalty_customer={@loyalty_customer}
-                    loyalty_phone={@loyalty_phone}
-                    discount_kind={@discount_kind}
-                    discount_peso={@discount_peso}
-                    current_user={@current_user}
-                  />
-                </form>
-              <% end %>
-            </aside>
-          </div>
-        </main>
+                    <.ticket_extras_modal
+                      :if={@ticket_extras_open?}
+                      customer_name={@customer_name}
+                      notes={@notes}
+                      loyalty_open?={@loyalty_open?}
+                      loyalty_customer={@loyalty_customer}
+                      loyalty_phone={@loyalty_phone}
+                      discount_kind={@discount_kind}
+                      discount_peso={@discount_peso}
+                      current_user={@current_user}
+                    />
+                  </form>
+                <% end %>
+              </aside>
+            </div>
+          </main>
 
-        <.cash_tender_modal
-          :if={@cash_tender_open?}
-          cart={@cart}
-          cash_tendered={@cash_tendered}
-          cash_tender_error={@cash_tender_error}
-          cash_tender_token={@cash_tender_token}
-          placing_order?={@placing_order?}
-          discount_kind={@discount_kind}
-          discount_peso={@discount_peso}
-          cash_tender_purpose={@cash_tender_purpose}
-          cash_tender_total={@cash_tender_total}
-          split_open?={@split_open?}
-          split_cash={@split_cash}
-          paid_via={@paid_via}
-        />
+          <.cash_tender_modal
+            :if={@cash_tender_open?}
+            cart={@cart}
+            cash_tendered={@cash_tendered}
+            cash_tender_error={@cash_tender_error}
+            cash_tender_token={@cash_tender_token}
+            placing_order?={@placing_order?}
+            discount_kind={@discount_kind}
+            discount_peso={@discount_peso}
+            cash_tender_purpose={@cash_tender_purpose}
+            cash_tender_total={@cash_tender_total}
+            split_open?={@split_open?}
+            split_cash={@split_cash}
+            paid_via={@paid_via}
+          />
 
-        <.split_tender_modal
-          :if={@split_open? and not @cash_tender_open?}
-          cart={@cart}
-          split_cash={@split_cash}
-          split_wallet={@split_wallet}
-          split_error={@split_error}
-          cash_tendered={@cash_tendered}
-          placing_order?={@placing_order?}
-          redeeming?={@redeeming?}
-          cash_tender_purpose={@cash_tender_purpose}
-          redeem_quote={@redeem_quote}
-          discount_kind={@discount_kind}
-          discount_peso={@discount_peso}
-        />
+          <.split_tender_modal
+            :if={@split_open? and not @cash_tender_open?}
+            cart={@cart}
+            split_cash={@split_cash}
+            split_wallet={@split_wallet}
+            split_error={@split_error}
+            cash_tendered={@cash_tendered}
+            placing_order?={@placing_order?}
+            redeeming?={@redeeming?}
+            cash_tender_purpose={@cash_tender_purpose}
+            redeem_quote={@redeem_quote}
+            discount_kind={@discount_kind}
+            discount_peso={@discount_peso}
+          />
 
-        <.loyalty_modal
-          :if={@loyalty_open? and not @cash_tender_open? and not @split_open?}
-          redeem_open?={@redeem_open?}
-          loyalty_phone={@loyalty_phone}
-          loyalty_customer={@loyalty_customer}
-          loyalty_error={@loyalty_error}
-          redeem_category={@redeem_category}
-          redeem_price_id={@redeem_price_id}
-          redeem_quote={@redeem_quote}
-          redeem_error={@redeem_error}
-          redeeming?={@redeeming?}
-        />
+          <.loyalty_modal
+            :if={@loyalty_open? and not @cash_tender_open? and not @split_open?}
+            redeem_open?={@redeem_open?}
+            loyalty_phone={@loyalty_phone}
+            loyalty_customer={@loyalty_customer}
+            loyalty_error={@loyalty_error}
+            redeem_category={@redeem_category}
+            redeem_price_id={@redeem_price_id}
+            redeem_quote={@redeem_quote}
+            redeem_error={@redeem_error}
+            redeeming?={@redeeming?}
+          />
 
-        <%= if product =
+          <%= if product =
                  not @cash_tender_open? and not @split_open? and
                    size_picker_product(@categories, @size_picker_product_id) do %>
-          <.size_picker product={product} />
-        <% end %>
+            <.size_picker product={product} />
+          <% end %>
 
-        <.order_review :if={@review_open? and @review_order} order={@review_order} />
-      </div>
-    </.staff_shell>
+          <.order_review :if={@review_open? and @review_order} order={@review_order} />
+        </div>
+      </.staff_shell>
+    </div>
     """
   end
 
