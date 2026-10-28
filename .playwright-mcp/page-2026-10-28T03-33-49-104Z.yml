@@ -1,0 +1,57 @@
+- generic [ref=f25e34]:
+  - banner "Staff" [ref=f25e35]:
+    - generic [ref=f25e36]:
+      - button "Open navigation menu" [ref=f25e37] [cursor=pointer]:
+        - generic [ref=f25e39]: Menu
+      - link "Elilai Kafe Home" [ref=f25e40] [cursor=pointer]:
+        - /url: /staff
+        - generic [ref=f25e42]: Elilai Kafe
+    - heading "POS" [level=1] [ref=f25e43]
+    - generic [ref=f25e44]:
+      - paragraph [ref=f25e45]: Lilac
+      - link "Orders" [ref=f25e46] [cursor=pointer]:
+        - /url: /orders
+      - button "Owner Owner" [ref=f25e50] [cursor=pointer]:
+        - generic [aria-hidden] [ref=f25e51]: O
+        - generic [ref=f25e52]:
+          - generic [ref=f25e53]: Owner
+          - generic [ref=f25e54]: Owner
+  - main [ref=f25e58]:
+    - generic [ref=f25e59]:
+      - generic [ref=f25e61]:
+        - generic [ref=f25e62]:
+          - heading "Categories" [level=2] [ref=f25e63]
+          - generic [ref=f25e64]:
+            - generic [ref=f25e65]:
+              - generic [ref=f25e66]: Search
+              - searchbox "Search" [ref=f25e68]
+            - generic [ref=f25e69]: 12 items
+        - navigation "Categories" [ref=f25e70]:
+          - button "Hot coffee" [ref=f25e71] [cursor=pointer]
+          - button "Iced coffee" [ref=f25e73] [cursor=pointer]
+          - button "Frappe" [ref=f25e75] [cursor=pointer]
+          - button "Soda" [ref=f25e77] [cursor=pointer]
+          - button "Food" [ref=f25e79] [cursor=pointer]
+          - button "Matcha" [ref=f25e81] [cursor=pointer]
+          - button "Sweets" [ref=f25e83] [cursor=pointer]
+      - complementary [ref=f25e86]:
+        - generic [ref=f25e88]:
+          - generic [ref=f25e89]:
+            - generic [ref=f25e90]:
+              - heading "Cart" [level=2] [ref=f25e92]
+              - generic [ref=f25e93]:
+                - button "Walk-in" [ref=f25e94] [cursor=pointer]
+                - button "Loyalty" [ref=f25e96] [cursor=pointer]
+            - radiogroup "Order type" [ref=f25e99]:
+              - button "Dine In" [ref=f25e100] [cursor=pointer]
+              - button "Take Out" [pressed] [ref=f25e101] [cursor=pointer]
+          - generic [ref=f25e102]:
+            - paragraph [ref=f25e103]: No items yet.
+            - list
+          - generic [ref=f25e104]:
+            - generic [ref=f25e106]:
+              - generic [ref=f25e107]: Total
+              - generic [ref=f25e108]: ₱0
+            - generic [ref=f25e110]:
+              - button "Process Cash Order" [disabled] [ref=f25e111]
+              - button "Change payment method, Cash selected" [ref=f25e112] [cursor=pointer]

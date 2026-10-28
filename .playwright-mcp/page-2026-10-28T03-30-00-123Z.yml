@@ -1,0 +1,185 @@
+- generic [ref=f11e3]:
+  - banner "Staff" [ref=f11e4]:
+    - generic [ref=f11e5]:
+      - button "Open navigation menu" [ref=f11e6] [cursor=pointer]:
+        - generic [ref=f11e8]: Menu
+      - link "Elilai Kafe Home" [ref=f11e9] [cursor=pointer]:
+        - /url: /staff
+        - generic [ref=f11e11]: Elilai Kafe
+    - heading "Close shift" [level=1] [ref=f11e12]
+    - generic [ref=f11e13]:
+      - paragraph [ref=f11e14]: Lilac
+      - button "Notifications" [ref=f11e16] [cursor=pointer]
+      - button "Owner Owner" [ref=f11e22] [cursor=pointer]:
+        - generic [aria-hidden] [ref=f11e23]: O
+        - generic [ref=f11e24]:
+          - generic [ref=f11e25]: Owner
+          - generic [ref=f11e26]: Owner
+  - generic [ref=f11e29]:
+    - complementary "Owner" [ref=f11e30]:
+      - generic [ref=f11e31]:
+        - navigation [ref=f11e32]:
+          - region "Counter" [ref=f11e33]:
+            - paragraph: Counter
+            - link "Home" [ref=f11e34] [cursor=pointer]:
+              - /url: /staff
+            - link "Orders" [ref=f11e36] [cursor=pointer]:
+              - /url: /orders
+            - link "POS" [ref=f11e38] [cursor=pointer]:
+              - /url: /pos
+          - region "Service" [ref=f11e40]:
+            - paragraph: Service
+            - link "Transactions" [ref=f11e41] [cursor=pointer]:
+              - /url: /transactions
+            - link "Customers" [ref=f11e43] [cursor=pointer]:
+              - /url: /customers
+          - region "Shift" [ref=f11e45]:
+            - paragraph: Shift
+            - link "Cash Out" [ref=f11e46] [cursor=pointer]:
+              - /url: /staff/cash-out
+            - link "Petty cash" [ref=f11e48] [cursor=pointer]:
+              - /url: /staff/petty-cash
+            - link "Open shop" [ref=f11e50] [cursor=pointer]:
+              - /url: /staff/open
+            - link "Close shift" [ref=f11e52] [cursor=pointer]:
+              - /url: /staff/close
+            - link "Staff attendance" [ref=f11e54] [cursor=pointer]:
+              - /url: /staff/attendance
+          - region "Manage" [ref=f11e56]:
+            - paragraph: Manage
+            - link "Reports" [ref=f11e57] [cursor=pointer]:
+              - /url: /staff/reports
+            - link "Availability" [ref=f11e59] [cursor=pointer]:
+              - /url: /admin/availability
+            - link "Staff" [ref=f11e61] [cursor=pointer]:
+              - /url: /admin/users
+            - link "Branches" [ref=f11e63] [cursor=pointer]:
+              - /url: /admin/branches
+            - link "Tenants" [ref=f11e65] [cursor=pointer]:
+              - /url: /admin/tenants
+            - link "Settings" [ref=f11e67] [cursor=pointer]:
+              - /url: /admin/settings
+        - link "Log out" [ref=f11e70] [cursor=pointer]:
+          - /url: /logout
+    - main [ref=f11e73]:
+      - generic [ref=f11e74]:
+        - paragraph [ref=f11e75]:
+          - generic [ref=f11e76]: Open
+          - generic [ref=f11e77]: Oct 28
+        - paragraph [ref=f11e78]: Count petty cash first, move the amount shown between the petty box and drawer, then count the drawer and seal the day. System paid totals are settled sales — not a physical cash target.
+      - generic [ref=f11e79]:
+        - region "Petty cash purchases" [ref=f11e80]:
+          - paragraph [ref=f11e81]: Petty-cash purchases
+          - paragraph [ref=f11e82]: ₱0
+          - paragraph [ref=f11e83]: Paid from the separate float. Refill is recorded as a drawer transfer, not another expense.
+          - paragraph [ref=f11e84]: No petty-cash purchases recorded today.
+        - region "Cash settled" [ref=f11e85]:
+          - paragraph [ref=f11e86]: Cash settled
+          - paragraph [ref=f11e87]: ₱1,014
+          - paragraph [ref=f11e88]: Cash payments recorded as paid today.
+        - region "Cash outs" [ref=f11e89]:
+          - paragraph [ref=f11e90]: Cash Outs
+          - paragraph [ref=f11e91]: ₱0
+          - paragraph [ref=f11e92]: Drawer withdrawals recorded today (non-voided).
+          - paragraph [ref=f11e93]: No Cash Outs recorded today.
+        - region "Drawer expected" [ref=f11e94]:
+          - paragraph [ref=f11e95]: Expected drawer
+          - paragraph [ref=f11e96]: ₱1,514
+          - paragraph [ref=f11e97]: Opening ₱500 + cash sales − drawer Cash Outs − petty-cash refill.
+        - generic [ref=f11e98]:
+          - generic [ref=f11e99]:
+            - generic [ref=f11e100]:
+              - generic [ref=f11e101]: Count petty cash before refill
+              - generic [ref=f11e102]:
+                - generic [aria-hidden] [ref=f11e103]: ₱
+                - textbox "Count petty cash before refill Expected ₱500. The system calculates the transfer after you enter the count." [ref=f11e104]:
+                  - /placeholder: "0.00"
+              - generic [ref=f11e105]: Expected ₱500. The system calculates the transfer after you enter the count.
+            - generic [ref=f11e106]:
+              - generic [ref=f11e107]: Petty-cash difference reason
+              - textbox "Petty-cash difference reason" [ref=f11e108]:
+                - /placeholder: Required only if counted petty cash differs from expected
+            - generic [ref=f11e109]:
+              - generic [ref=f11e110]: Counted drawer cash
+              - generic [ref=f11e111]:
+                - generic [aria-hidden] [ref=f11e112]: ₱
+                - textbox "Counted drawer cash Required — count after completing the petty-cash transfer above." [ref=f11e113]:
+                  - /placeholder: "0.00"
+              - generic [ref=f11e114]: Required — count after completing the petty-cash transfer above.
+            - generic [ref=f11e115]:
+              - generic [ref=f11e116]: Notes
+              - textbox "Notes" [ref=f11e117]:
+                - /placeholder: Optional
+            - button "Record close" [ref=f11e118] [cursor=pointer]
+          - region "Payment methods" [ref=f11e119]:
+            - paragraph [ref=f11e120]: Payment methods
+            - list [ref=f11e121]:
+              - listitem [ref=f11e122]:
+                - generic [ref=f11e123]: Cash
+                - generic [ref=f11e124]: ₱1,014
+                - generic [ref=f11e125]: "4"
+              - listitem [ref=f11e126]:
+                - generic [ref=f11e127]: GCash
+                - generic [ref=f11e128]: ₱428
+                - generic [ref=f11e129]: "1"
+              - listitem [ref=f11e130]:
+                - generic [ref=f11e131]: Maya
+                - generic [ref=f11e132]: ₱0
+                - generic [ref=f11e133]: "0"
+              - listitem [ref=f11e134]:
+                - generic [ref=f11e135]: Counter
+                - generic [ref=f11e136]: ₱0
+                - generic [ref=f11e137]: "0"
+              - listitem [ref=f11e138]:
+                - generic [ref=f11e139]: PayMongo
+                - generic [ref=f11e140]: ₱0
+                - generic [ref=f11e141]: "0"
+          - region "Staff shift sales" [ref=f11e142]:
+            - paragraph [ref=f11e143]: Staff shift sales
+            - list [ref=f11e144]:
+              - listitem [ref=f11e145]:
+                - generic [ref=f11e146]:
+                  - generic [ref=f11e147]: Ana Reyes
+                  - generic [ref=f11e148]: 11:52 PM - 10:32 AM
+                - generic [ref=f11e149]:
+                  - generic [ref=f11e150]: ₱320
+                  - generic [ref=f11e151]: (1 orders)
+              - listitem [ref=f11e152]:
+                - generic [ref=f11e153]:
+                  - generic [ref=f11e154]: Marco Santos
+                  - generic [ref=f11e155]: 10:35 AM - 10:37 AM
+                - generic [ref=f11e156]:
+                  - generic [ref=f11e157]: ₱428
+                  - generic [ref=f11e158]: (1 orders)
+              - listitem [ref=f11e159]:
+                - generic [ref=f11e160]:
+                  - generic [ref=f11e161]: Ana Reyes
+                  - generic [ref=f11e162]: 10:44 AM - 10:46 AM
+                - generic [ref=f11e163]:
+                  - generic [ref=f11e164]: ₱0
+                  - generic [ref=f11e165]: (0 orders)
+              - listitem [ref=f11e166]:
+                - generic [ref=f11e167]:
+                  - generic [ref=f11e168]: Marco Santos
+                  - generic [ref=f11e169]: 10:49 AM - 11:10 AM
+                - generic [ref=f11e170]:
+                  - generic [ref=f11e171]: ₱75
+                  - generic [ref=f11e172]: (1 orders)
+              - listitem [ref=f11e173]:
+                - generic [ref=f11e174]:
+                  - generic [ref=f11e175]: Marco Santos
+                  - generic [ref=f11e176]: 11:13 AM - 11:13 AM
+                - generic [ref=f11e177]:
+                  - generic [ref=f11e178]: ₱195
+                  - generic [ref=f11e179]: (1 orders)
+          - generic "System paid" [ref=f11e180]:
+            - paragraph [ref=f11e181]: System paid
+            - paragraph [ref=f11e182]: ₱1,442 (5 orders)
+            - paragraph [ref=f11e183]: Total settled sales recorded today.
+      - region "Close history" [ref=f11e184]:
+        - generic [ref=f11e185]:
+          - paragraph [ref=f11e186]: Close history
+          - paragraph [ref=f11e187]: Sealed shop-day snapshots, newest first.
+        - generic [ref=f11e188]:
+          - strong [ref=f11e189]: No previous closes yet.
+          - paragraph [ref=f11e190]: Past Close Shift seals will appear here.

@@ -1,0 +1,8 @@
+- generic [ref=f25e4]:
+  - generic [ref=f25e5]: 🔒
+  - heading "Shop is Closed" [level=2] [ref=f25e6]
+  - paragraph [ref=f25e7]: The shop day has been closed. No new orders can be placed.
+  - generic [ref=f25e8]:
+    - button "🔓 Open Shop Again" [ref=f25e9] [cursor=pointer]
+    - link "Back to Staff Menu" [ref=f25e10] [cursor=pointer]:
+      - /url: /staff
