@@ -68,6 +68,7 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:ticket_extras_open?, false)
      |> assign(:discount_kind, "none")
      |> assign(:discount_peso, "")
+     |> assign(:discount_target_key, nil)
      |> assign(:discount_open?, false)
      |> assign(:placing_order?, false)
      |> assign(:cart_undo, nil)
@@ -460,6 +461,62 @@ defmodule EspresoWeb.StaffPosLive do
     {:noreply, remove_cart_line(socket, key)}
   end
 
+  def handle_event("set_item_discount", %{"key" => key, "kind" => kind}, socket)
+      when kind in ["none", "senior", "pwd", "staff", "peso"] do
+    cond do
+      not is_nil(socket.assigns.redeem_quote) ->
+        {:noreply, assign(socket, :submission_error, "Clear the loyalty redeem first.")}
+
+      kind != "none" and Orders.Discount.applied?(ticket_quote(socket.assigns)) ->
+        {:noreply, assign(socket, :submission_error, "Clear the ticket discount first.")}
+
+      true ->
+        cart =
+          Enum.map(socket.assigns.cart, fn line ->
+            if line.key == key do
+              %{line | item_discount_kind: kind, item_discount_peso: ""}
+            else
+              line
+            end
+          end)
+
+        {:noreply,
+         socket
+         |> assign(:cart, cart)
+         |> assign(:submission_error, nil)}
+    end
+  end
+
+  def handle_event("set_item_discount_peso", params, socket) do
+    key =
+      Map.get(params, "key") ||
+        socket.assigns[:discount_target_key] ||
+        (List.first(socket.assigns.cart) && List.first(socket.assigns.cart).key)
+
+    amount = Map.get(params, "discount_peso") || Map.get(params, "amount") || ""
+
+    if Orders.Discount.can_peso?(socket.assigns.current_user) and
+         is_nil(socket.assigns.redeem_quote) and
+         not Orders.Discount.applied?(ticket_quote(socket.assigns)) and
+         Enum.any?(socket.assigns.cart, &(&1.key == key)) do
+      cart =
+        Enum.map(socket.assigns.cart, fn line ->
+          if line.key == key do
+            %{line | item_discount_kind: "peso", item_discount_peso: String.trim(amount)}
+          else
+            line
+          end
+        end)
+
+      {:noreply,
+       socket
+       |> assign(:cart, cart)
+       |> assign(:submission_error, nil)}
+    else
+      {:noreply, socket}
+    end
+  end
+
   def handle_event("clear_ticket", _params, %{assigns: %{cart: []}} = socket) do
     {:noreply, socket}
   end
@@ -550,26 +607,49 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:discount_open?, true)}
   end
 
+  def handle_event("set_discount_target", %{"key" => key}, socket) do
+    if Enum.any?(socket.assigns.cart, &(&1.key == key)) do
+      {:noreply, assign(socket, :discount_target_key, key)}
+    else
+      {:noreply, socket}
+    end
+  end
+
   def handle_event("set_discount", %{"kind" => kind}, socket)
       when kind in ["none", "senior", "pwd", "staff", "peso"] do
+    key = socket.assigns[:discount_target_key]
+    can_apply? = not is_nil(key) and Enum.any?(socket.assigns.cart, &(&1.key == key))
+
     cond do
-      redeem_blocks_discount?(socket) ->
+      not is_nil(socket.assigns.redeem_quote) and kind != "none" ->
         {:noreply, assign(socket, :submission_error, "Clear the loyalty redeem first.")}
 
       kind == "peso" and not Orders.Discount.can_peso?(socket.assigns.current_user) ->
         {:noreply, socket}
 
+      kind != "none" and not can_apply? ->
+        {:noreply, assign(socket, :submission_error, "Choose an item first.")}
+
       true ->
-        extras_open? = kind == "peso"
+        cart =
+          Enum.map(socket.assigns.cart, fn line ->
+            if line.key == key do
+              %{
+                line
+                | item_discount_kind: kind,
+                  item_discount_peso:
+                    if(kind == "peso", do: line[:item_discount_peso] || "", else: "")
+              }
+            else
+              line
+            end
+          end)
 
         {:noreply,
          socket
-         |> assign(:discount_kind, kind)
-         |> assign(:discount_open?, extras_open?)
-         |> assign(:ticket_extras_open?, extras_open?)
-         |> then(fn socket ->
-           if kind == "peso", do: socket, else: assign(socket, :discount_peso, "")
-         end)
+         |> assign(:cart, cart)
+         |> assign(:discount_kind, "none")
+         |> assign(:discount_peso, "")
          |> assign(:submission_error, nil)}
     end
   end
@@ -579,12 +659,25 @@ defmodule EspresoWeb.StaffPosLive do
   def handle_event("set_discount_peso", params, socket) do
     amount = Map.get(params, "discount_peso") || Map.get(params, "amount") || ""
 
-    if Orders.Discount.can_peso?(socket.assigns.current_user) do
-      {:noreply,
-       socket
-       |> assign(:discount_kind, "peso")
-       |> assign(:discount_peso, String.trim(to_string(amount)))
-       |> assign(:submission_error, nil)}
+    key = socket.assigns[:discount_target_key]
+
+    if Orders.Discount.can_peso?(socket.assigns.current_user) and
+         is_nil(socket.assigns.redeem_quote) and
+         Enum.any?(socket.assigns.cart, &(&1.key == key)) do
+      cart =
+        Enum.map(socket.assigns.cart, fn line ->
+          if line.key == key do
+            %{
+              line
+              | item_discount_kind: "peso",
+                item_discount_peso: String.trim(to_string(amount))
+            }
+          else
+            line
+          end
+        end)
+
+      {:noreply, assign(socket, :cart, cart) |> assign(:submission_error, nil)}
     else
       {:noreply, socket}
     end
@@ -1742,7 +1835,7 @@ defmodule EspresoWeb.StaffPosLive do
 
                         <ul class="staff-pos-cart" id="pos-cart-lines">
                           <li
-                            :for={line <- @cart}
+                            :for={line <- assigns[:cart] || []}
                             class="staff-pos-cart-line"
                             id={"pos-line-#{line.key}"}
                           >
@@ -1852,22 +1945,34 @@ defmodule EspresoWeb.StaffPosLive do
                       <div class="staff-pos-ticket-footer">
                         <div class="staff-pos-totals">
                           <div
-                            :if={Orders.Discount.applied?(ticket_quote(assigns))}
+                            :if={
+                              Orders.Discount.applied?(ticket_quote(assigns)) or
+                                has_item_discount?(@cart)
+                            }
                             class="staff-pos-total-row"
                           >
                             <span>Subtotal</span>
                             <span id="pos-subtotal">
-                              {Menu.format_price(ticket_quote(assigns).subtotal)}
+                              {Menu.format_price(cart_total(@cart))}
                             </span>
                           </div>
                           <div
-                            :if={Orders.Discount.applied?(ticket_quote(assigns))}
+                            :if={
+                              Orders.Discount.applied?(ticket_quote(assigns)) or
+                                has_item_discount?(@cart)
+                            }
                             class="staff-pos-total-row"
                             id="pos-discount-row"
                           >
-                            <span>{ticket_quote(assigns).label}</span>
+                            <span>
+                              {if has_item_discount?(@cart),
+                                do: "Item discount",
+                                else: ticket_quote(assigns).label}
+                            </span>
                             <span id="pos-discount-amount">
-                              −{Menu.format_price(ticket_quote(assigns).amount)}
+                              −{Menu.format_price(
+                                Decimal.add(item_discount_total(@cart), ticket_quote(assigns).amount)
+                              )}
                             </span>
                           </div>
                           <div class="staff-pos-total-row staff-pos-total-row--grand">
@@ -2040,6 +2145,8 @@ defmodule EspresoWeb.StaffPosLive do
                       loyalty_phone={@loyalty_phone}
                       discount_kind={@discount_kind}
                       discount_peso={@discount_peso}
+                      cart={@cart}
+                      discount_target_key={@discount_target_key}
                       current_user={@current_user}
                     />
                   </form>
@@ -2185,31 +2292,68 @@ defmodule EspresoWeb.StaffPosLive do
         </label>
 
         <div class="staff-pos-discount-panel" id="pos-discount-panel">
-          <span class="staff-pos-field-label">Discount</span>
+          <span class="staff-pos-field-label">Item discount (one unit)</span>
+          <label class="staff-pos-field" for="pos-discount-target">
+            <span class="staff-pos-field-label">Choose item</span>
+            <select
+              id="pos-discount-target"
+              class="staff-pos-field-input"
+              name="key"
+              phx-change="set_discount_target"
+            >
+              <option value="">Choose an item</option>
+              <option
+                :for={line <- @cart}
+                value={line.key}
+                selected={
+                  line.key ==
+                    (@discount_target_key ||
+                       (List.first(@cart) && List.first(@cart).key))
+                }
+              >
+                {line.name} · Qty {line.quantity}
+              </option>
+            </select>
+          </label>
 
           <button
             type="button"
-            class={["staff-pos-discount-chip", @discount_kind == "senior" && "is-active"]}
+            class={[
+              "staff-pos-discount-chip",
+              selected_item_discount(@cart, @discount_target_key) == "senior" &&
+                "is-active"
+            ]}
             id="pos-discount-senior"
-            phx-click="set_discount"
+            phx-click="set_item_discount"
+            phx-value-key={@discount_target_key || (List.first(@cart) && List.first(@cart).key)}
             phx-value-kind="senior"
           >
             Senior 20%
           </button>
           <button
             type="button"
-            class={["staff-pos-discount-chip", @discount_kind == "pwd" && "is-active"]}
+            class={[
+              "staff-pos-discount-chip",
+              selected_item_discount(@cart, @discount_target_key) == "pwd" &&
+                "is-active"
+            ]}
             id="pos-discount-pwd"
-            phx-click="set_discount"
+            phx-click="set_item_discount"
+            phx-value-key={@discount_target_key || (List.first(@cart) && List.first(@cart).key)}
             phx-value-kind="pwd"
           >
             PWD 20%
           </button>
           <button
             type="button"
-            class={["staff-pos-discount-chip", @discount_kind == "staff" && "is-active"]}
+            class={[
+              "staff-pos-discount-chip",
+              selected_item_discount(@cart, @discount_target_key) == "staff" &&
+                "is-active"
+            ]}
             id="pos-discount-staff"
-            phx-click="set_discount"
+            phx-click="set_item_discount"
+            phx-value-key={@discount_target_key || (List.first(@cart) && List.first(@cart).key)}
             phx-value-kind="staff"
           >
             Staff 20%
@@ -2217,9 +2361,14 @@ defmodule EspresoWeb.StaffPosLive do
           <button
             :if={Orders.Discount.can_peso?(@current_user)}
             type="button"
-            class={["staff-pos-discount-chip", @discount_kind == "peso" && "is-active"]}
+            class={[
+              "staff-pos-discount-chip",
+              selected_item_discount(@cart, @discount_target_key) == "peso" &&
+                "is-active"
+            ]}
             id="pos-discount-peso"
-            phx-click="set_discount"
+            phx-click="set_item_discount"
+            phx-value-key={@discount_target_key || (List.first(@cart) && List.first(@cart).key)}
             phx-value-kind="peso"
           >
             ₱ off
@@ -2228,13 +2377,17 @@ defmodule EspresoWeb.StaffPosLive do
             type="button"
             class="staff-pos-discount-chip"
             id="pos-discount-clear"
-            phx-click="set_discount"
+            phx-click="set_item_discount"
+            phx-value-key={@discount_target_key || (List.first(@cart) && List.first(@cart).key)}
             phx-value-kind="none"
           >
             Clear
           </button>
           <label
-            :if={Orders.Discount.can_peso?(@current_user) and @discount_kind == "peso"}
+            :if={
+              Orders.Discount.can_peso?(@current_user) and
+                selected_item_discount(@cart, @discount_target_key) == "peso"
+            }
             class="staff-pos-discount-peso"
             for="pos-discount-peso-amount"
           >
@@ -2243,9 +2396,10 @@ defmodule EspresoWeb.StaffPosLive do
               id="pos-discount-peso-amount"
               type="text"
               inputmode="decimal"
-              name="discount_peso"
-              value={@discount_peso}
-              phx-change="set_discount_peso"
+              name="amount"
+              phx-value-key={@discount_target_key || (List.first(@cart) && List.first(@cart).key)}
+              value={selected_item_discount_peso(@cart, @discount_target_key)}
+              phx-change="set_item_discount_peso"
               phx-debounce="150"
               placeholder="0"
               autocomplete="off"
@@ -3159,7 +3313,9 @@ defmodule EspresoWeb.StaffPosLive do
                   size: line.size,
                   category: line[:category],
                   quantity: line.quantity,
-                  price: line.price
+                  price: line.price,
+                  item_discount_kind: line[:item_discount_kind] || "none",
+                  item_discount_peso: line[:item_discount_peso] || ""
                 }
               end)
 
@@ -3836,7 +3992,9 @@ defmodule EspresoWeb.StaffPosLive do
               category: category_name,
               price: price.price,
               quantity: quantity,
-              image: image
+              image: image,
+              item_discount_kind: "none",
+              item_discount_peso: ""
             }
           ]
 
@@ -3983,25 +4141,67 @@ defmodule EspresoWeb.StaffPosLive do
 
   defp parse_positive_id(_value), do: :error
 
+  defp selected_item_discount(cart, key) do
+    case Enum.find(cart, &(&1.key == key)) || List.first(cart) do
+      nil -> "none"
+      line -> line[:item_discount_kind] || "none"
+    end
+  end
+
+  defp selected_item_discount_peso(cart, key) do
+    case Enum.find(cart, &(&1.key == key)) || List.first(cart) do
+      nil -> ""
+      line -> line[:item_discount_peso] || ""
+    end
+  end
+
   defp cart_total(cart) do
     Enum.reduce(cart, Decimal.new(0), fn line, acc ->
       Decimal.add(acc, Decimal.mult(line.price, line.quantity))
     end)
   end
 
+  defp item_discount_total(cart) do
+    Enum.reduce(cart, Decimal.new(0), fn line, acc ->
+      kind = line[:item_discount_kind] || "none"
+      peso = line[:item_discount_peso]
+
+      amount =
+        case Orders.Discount.quote_item(line.price, kind, peso) do
+          {:ok, quote} when line.quantity > 0 -> quote.amount
+          _ -> Decimal.new(0)
+        end
+
+      Decimal.add(acc, amount)
+    end)
+  end
+
+  defp ticket_subtotal(assigns),
+    do: Decimal.sub(cart_total(assigns.cart), item_discount_total(assigns.cart))
+
+  defp has_item_discount?(cart) do
+    Enum.any?(cart, fn line -> (line[:item_discount_kind] || "none") != "none" end)
+  end
+
   defp ticket_quote(assigns) do
+    subtotal = ticket_subtotal(assigns)
     kind = assigns[:discount_kind] || "none"
 
-    case Orders.Discount.quote(cart_total(assigns.cart), kind, assigns[:discount_peso]) do
-      {:ok, quote} -> quote
-      {:error, _} -> Orders.Discount.none(cart_total(assigns.cart))
+    if has_item_discount?(assigns.cart) do
+      Orders.Discount.none(subtotal)
+    else
+      case Orders.Discount.quote(subtotal, kind, assigns[:discount_peso]) do
+        {:ok, quote} -> quote
+        {:error, _} -> Orders.Discount.none(subtotal)
+      end
     end
   end
 
   defp ticket_due(assigns), do: ticket_quote(assigns).due
 
   defp discount_blocks_redeem?(socket) do
-    Orders.Discount.applied?(ticket_quote(socket.assigns))
+    Orders.Discount.applied?(ticket_quote(socket.assigns)) or
+      has_item_discount?(socket.assigns.cart)
   end
 
   defp redeem_blocks_discount?(socket) do

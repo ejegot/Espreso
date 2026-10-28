@@ -2177,8 +2177,11 @@ defmodule EspresoWeb.StaffPosLiveTest do
     view |> form("#pos-cash-tender-form") |> render_submit()
 
     [order] = placed_orders()
-    assert order.discount_kind == "senior"
-    assert Decimal.equal?(order.discount_amount, Decimal.new("15"))
+    assert order.discount_kind == "none"
+    [item] = order.items
+    assert item.item_discount_kind == "senior"
+    assert item.item_discount_quantity == 1
+    assert Decimal.equal?(item.item_discount_amount, Decimal.new("15"))
     assert Decimal.equal?(order.total, Decimal.new("60"))
   end
 
@@ -2207,8 +2210,11 @@ defmodule EspresoWeb.StaffPosLiveTest do
     submit_order(manager_view)
 
     [order] = placed_orders()
-    assert order.discount_kind == "peso"
-    assert Decimal.equal?(order.discount_amount, Decimal.new("10"))
+    assert order.discount_kind == "none"
+    [item] = order.items
+    assert item.item_discount_kind == "peso"
+    assert item.item_discount_quantity == 1
+    assert Decimal.equal?(item.item_discount_amount, Decimal.new("10"))
     assert Decimal.equal?(order.total, Decimal.new("65"))
   end
 

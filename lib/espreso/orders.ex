@@ -130,14 +130,17 @@ defmodule Espreso.Orders do
          payment_intent,
          source
        ) do
-    subtotal =
-      Enum.reduce(lines, Decimal.new(0), fn line, acc ->
-        Decimal.add(acc, Decimal.mult(line.price, line.quantity))
-      end)
-
-    with {:ok, discount} <- Discount.from_order_attrs(attrs, subtotal, source),
+    with {:ok, lines} <- item_discount_lines(lines, attrs, source),
+         {:ok, lines, subtotal, item_discount_total} <- quote_item_discount_lines(lines),
+         {:ok, discount} <- Discount.from_order_attrs(attrs, subtotal, source),
+         :ok <- reject_item_order_discount_stack(lines, discount),
          :ok <- reject_discount_loyalty_stack(discount, attrs),
-         total <- discount.due,
+         :ok <- reject_item_discount_loyalty_stack(lines, attrs),
+         total <-
+           if(Decimal.compare(item_discount_total, 0) == :gt,
+             do: subtotal,
+             else: discount.due
+           ),
          {:ok, splits} <-
            prepare_payment_splits(attrs, total, payment_method, payment_status),
          paid_via <- primary_paid_via(paid_via, splits),
@@ -205,7 +208,7 @@ defmodule Espreso.Orders do
           Enum.map(lines, fn line ->
             qty = line.quantity
             unit = line.price
-            line_total = Decimal.mult(unit, qty)
+            line_total = Map.get(line, :computed_line_total, Decimal.mult(unit, qty))
 
             %OrderItem{}
             |> OrderItem.changeset(%{
@@ -216,7 +219,11 @@ defmodule Espreso.Orders do
               item_owner: snapshot_line_item_owner(line, snapshots),
               quantity: qty,
               unit_price: unit,
-              line_total: line_total
+              line_total: line_total,
+              item_discount_kind: Map.get(line, :item_discount_kind, "none"),
+              item_discount_label: Map.get(line, :item_discount_label),
+              item_discount_amount: Map.get(line, :item_discount_amount, Decimal.new("0")),
+              item_discount_quantity: Map.get(line, :item_discount_quantity, 0)
             })
             |> repo.insert!()
           end)
@@ -250,6 +257,128 @@ defmodule Espreso.Orders do
         {:error, _step, reason, _} ->
           {:error, reason}
       end
+    end
+  end
+
+  defp item_discount_lines(lines, attrs, source) do
+    if source != "pos" do
+      {:ok, Enum.map(lines, &Map.drop(&1, [:item_discount_kind, :item_discount_peso]))}
+    else
+      user_id = Map.get(attrs, :settled_by_user_id) || Map.get(attrs, "settled_by_user_id")
+      user = if is_integer(user_id), do: Repo.get(User, user_id), else: nil
+
+      Enum.reduce_while(lines, {:ok, []}, fn line, {:ok, acc} ->
+        kind =
+          Map.get(line, :item_discount_kind) ||
+            Map.get(line, "item_discount_kind") || "none"
+
+        peso =
+          Map.get(line, :item_discount_peso) ||
+            Map.get(line, "item_discount_peso")
+
+        cond do
+          kind == "none" ->
+            {:cont, {:ok, [line | acc]}}
+
+          kind not in (Discount.percent_kinds() ++ ["peso"]) ->
+            {:halt, {:error, :invalid_item_discount}}
+
+          kind == "peso" and not Discount.can_peso?(user) ->
+            {:halt, {:error, :unauthorized_item_discount}}
+
+          true ->
+            {:cont,
+             {:ok,
+              [
+                Map.put(line, :item_discount_kind, kind)
+                |> Map.put(:item_discount_peso, peso)
+                | acc
+              ]}}
+        end
+      end)
+      |> case do
+        {:ok, normalized} -> {:ok, Enum.reverse(normalized)}
+        error -> error
+      end
+    end
+  end
+
+  defp quote_item_discount_lines(lines) do
+    Enum.reduce_while(lines, {:ok, [], Decimal.new("0"), Decimal.new("0")}, fn line,
+                                                                               {:ok, acc,
+                                                                                subtotal,
+                                                                                discounts} ->
+      base_total = Decimal.mult(line.price, line.quantity)
+      kind = Map.get(line, :item_discount_kind, "none")
+
+      case kind do
+        kind when kind in ["senior", "pwd", "staff", "peso"] ->
+          with {:ok, quote} <-
+                 Discount.quote_item(line.price, kind, Map.get(line, :item_discount_peso)),
+               true <- Decimal.compare(quote.amount, 0) == :gt do
+            adjusted = Decimal.sub(base_total, quote.amount) |> Decimal.round(2)
+
+            normalized =
+              line
+              |> Map.put(:item_discount_label, quote.label)
+              |> Map.put(:item_discount_amount, quote.amount)
+              |> Map.put(:item_discount_quantity, 1)
+              |> Map.put(:computed_line_total, adjusted)
+
+            {:cont,
+             {:ok, [normalized | acc], Decimal.add(subtotal, adjusted),
+              Decimal.add(discounts, quote.amount)}}
+          else
+            _ -> {:halt, {:error, :invalid_item_discount}}
+          end
+
+        _ ->
+          normalized =
+            line
+            |> Map.put(:item_discount_label, nil)
+            |> Map.put(:item_discount_amount, Decimal.new("0"))
+            |> Map.put(:item_discount_quantity, 0)
+            |> Map.put(:computed_line_total, base_total)
+
+          {:cont, {:ok, [normalized | acc], Decimal.add(subtotal, base_total), discounts}}
+      end
+    end)
+    |> case do
+      {:ok, normalized, subtotal, discounts} ->
+        {:ok, Enum.reverse(normalized), subtotal, discounts}
+
+      error ->
+        error
+    end
+  end
+
+  defp reject_item_order_discount_stack(lines, discount) do
+    item_discount? =
+      Enum.any?(lines, fn line ->
+        Map.get(line, :item_discount_kind, "none") not in [nil, "none"]
+      end)
+
+    if item_discount? and Discount.applied?(discount) do
+      {:error, :item_order_discount_conflict}
+    else
+      :ok
+    end
+  end
+
+  defp reject_item_discount_loyalty_stack(lines, attrs) do
+    item_discount? =
+      Enum.any?(lines, fn line ->
+        Map.get(line, :item_discount_kind, "none") not in [nil, "none"]
+      end)
+
+    loyalty =
+      Map.get(attrs, :loyalty_free_amount_centavos) ||
+        Map.get(attrs, "loyalty_free_amount_centavos") || 0
+
+    if item_discount? and Loyalty.to_centavos(loyalty) > 0 do
+      {:error, :discount_loyalty_conflict}
+    else
+      :ok
     end
   end
 
