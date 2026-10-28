@@ -140,6 +140,11 @@ defmodule EspresoWeb.Router do
       live "/staff/close", StaffShiftCloseLive
     end
 
+    live_session :close_my_shift,
+      on_mount: [{EspresoWeb.StaffAuth, :ensure_barista}] do
+      live "/staff/close-my-shift", StaffCloseMyShiftLive
+    end
+
     live_session :cash_out,
       on_mount: [{EspresoWeb.StaffAuth, :ensure_can_cash_out}] do
       live "/staff/cash-out", StaffCashOutLive

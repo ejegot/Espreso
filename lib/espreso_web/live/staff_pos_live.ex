@@ -87,6 +87,7 @@ defmodule EspresoWeb.StaffPosLive do
      |> assign(:orders_new_count, Orders.new_lane_count())
      |> assign(:opening_cash, "")
      |> assign(:open_shop_form_error, nil)
+     |> assign(:opening_modal_visible?, false)
      |> assign_shop_day()
      |> reset_pos_product_stream(), layout: false}
   end
@@ -205,7 +206,12 @@ defmodule EspresoWeb.StaffPosLive do
     {:noreply,
      socket
      |> assign(:opening_cash, "")
-     |> assign(:open_shop_form_error, nil)}
+     |> assign(:open_shop_form_error, nil)
+     |> assign(:opening_modal_visible?, false)}
+  end
+
+  def handle_event("pos_show_open_modal", _params, socket) do
+    {:noreply, assign(socket, :opening_modal_visible?, true)}
   end
 
   def handle_event("pos_record_open", %{"open" => params}, socket) do
@@ -220,6 +226,7 @@ defmodule EspresoWeb.StaffPosLive do
           |> assign_shop_day()
           |> assign(:opening_cash, "")
           |> assign(:open_shop_form_error, nil)
+          |> assign(:opening_modal_visible?, false)
 
         {:noreply, socket}
 
@@ -231,7 +238,8 @@ defmodule EspresoWeb.StaffPosLive do
          socket
          |> assign_shop_day()
          |> assign(:opening_cash, "")
-         |> assign(:open_shop_form_error, nil)}
+         |> assign(:open_shop_form_error, nil)
+         |> assign(:opening_modal_visible?, false)}
 
       {:error, :already_closed} ->
         {:noreply, assign(socket, :open_shop_form_error, "This shop day is already closed.")}
@@ -1157,8 +1165,26 @@ defmodule EspresoWeb.StaffPosLive do
   @impl true
   def render(assigns) do
     ~H"""
+    <!-- Button overlay when shop is not open -->
     <div
-      :if={@shop_day_status == :not_open}
+      :if={@shop_day_status == :not_open && !@opening_modal_visible?}
+      class="staff-pos-open-shop-button-overlay"
+      id="staff-pos-open-shop-button-overlay"
+    >
+      <button
+        type="button"
+        class="staff-pos-open-shop-button"
+        phx-click="pos_show_open_modal"
+        id="staff-pos-open-shop-button"
+      >
+        <span class="staff-pos-open-shop-button-icon">🔓</span>
+        <span class="staff-pos-open-shop-button-text">Open Shop</span>
+      </button>
+    </div>
+
+    <!-- Modal - shown only when flag is true -->
+    <div
+      :if={@shop_day_status == :not_open && @opening_modal_visible?}
       class="staff-pos-open-shop-wrap"
       id="staff-pos-open-shop-wrap"
     >
@@ -2066,6 +2092,20 @@ defmodule EspresoWeb.StaffPosLive do
           <.order_review :if={@review_open? and @review_order} order={@review_order} />
         </div>
       </.staff_shell>
+    </div>
+
+    <div :if={@shop_day_status == :closed} class="staff-pos-closed-wrap">
+      <div class="staff-pos-closed-message">
+        <div class="staff-pos-closed-icon">🔒</div>
+        <h2 class="staff-pos-closed-title">Shop is Closed</h2>
+        <p class="staff-pos-closed-text">
+          The shop day has been closed. No new orders can be placed.
+        </p>
+        <p class="staff-pos-closed-subtext">
+          Please contact your manager to reopen the shop.
+        </p>
+        <a href="/staff" class="staff-pos-closed-link">Back to Staff Menu</a>
+      </div>
     </div>
     """
   end

@@ -465,6 +465,14 @@ defmodule EspresoWeb.StaffComponents do
         show?: Espreso.Shifts.can_access_close?(user)
       },
       %{
+        key: :close_my_shift,
+        label: "Close my shift",
+        icon: "hero-arrow-right-start-on-rectangle",
+        path: ~p"/staff/close-my-shift",
+        group: :shift,
+        show?: user.role == "barista" && user.active
+      },
+      %{
         key: :attendance,
         label: "Staff attendance",
         icon: "hero-user-group",

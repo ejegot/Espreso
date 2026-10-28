@@ -31569,6 +31569,56 @@ html:has(.menu-page--glass),
   color: #faf7f4;
 }
 
+/* Staff POS - Open Shop Button Overlay */
+.staff-pos-open-shop-button-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1rem;
+  z-index: 500;
+}
+
+.staff-pos-open-shop-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem 3rem;
+  background: #fff;
+  border: none;
+  border-radius: 1rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #000;
+  transition: all 0.2s ease;
+}
+
+.staff-pos-open-shop-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+}
+
+.staff-pos-open-shop-button:active {
+  transform: translateY(0);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.staff-pos-open-shop-button-icon {
+  font-size: 3rem;
+}
+
+.staff-pos-open-shop-button-text {
+  font-size: 1.25rem;
+}
+
 /* Staff POS - Open Shop Modal */
 .staff-pos-open-shop-wrap {
   position: fixed;
@@ -31804,4 +31854,228 @@ html:has(.menu-page--glass),
 .staff-pos-open-shop-cancel:active {
   background: #f0ede8;
 }
+
+/* Close My Shift page */
+.staff-close-my-shift-main {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.close-my-shift-form {
+  position: relative;
+}
+
+.close-my-shift-complete {
+  animation: fadeIn 0.3s ease-in;
+}
+
+.close-my-shift-complete-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.close-my-shift-content {
+  padding: 1rem 0;
+}
+
+.confirm-dialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.confirm-dialog-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+
+.confirm-dialog-content {
+  position: relative;
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  max-width: 32rem;
+  width: 100%;
+  padding: 1.5rem;
+  z-index: 1001;
+}
+
+.confirm-dialog-header {
+  margin-bottom: 1rem;
+}
+
+.confirm-dialog-body {
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.btn {
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  border: none;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+}
+
+.btn-primary {
+  background: #3d5a3d;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #2d4a2d;
+}
+
+.btn-secondary {
+  background: #ddd;
+  color: #333;
+}
+
+.btn-secondary:hover {
+  background: #ccc;
+}
+
+/* POS closed state */
+.staff-pos-closed-wrap {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f5f5f5 0%, #efefef 100%);
+}
+
+.staff-pos-closed-message {
+  text-align: center;
+  padding: 40px 20px;
+  max-width: 400px;
+}
+
+.staff-pos-closed-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+}
+
+.staff-pos-closed-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 12px 0;
+}
+
+.staff-pos-closed-text {
+  font-size: 16px;
+  color: #666;
+  margin: 0 0 8px 0;
+  line-height: 1.5;
+}
+
+.staff-pos-closed-subtext {
+  font-size: 14px;
+  color: #999;
+  margin: 0 0 24px 0;
+}
+
+.staff-pos-closed-link {
+  display: inline-block;
+  padding: 12px 24px;
+  background-color: #3d5a3d;
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.staff-pos-closed-link:hover {
+  background-color: #2d4a2d;
+}
+
+/* Staff shift sales breakdown */
+.staff-shift-sales-breakdown {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.staff-shift-sales-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.staff-shift-sales-row:last-child {
+  border-bottom: none;
+}
+
+.staff-shift-sales-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.staff-shift-sales-name {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.staff-shift-sales-time {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.staff-shift-sales-totals {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.staff-shift-sales-total {
+  font-weight: 600;
+  color: #3d5a3d;
+  font-size: 14px;
+}
+
+.staff-shift-sales-count {
+  font-size: 12px;
+  color: #999;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 

@@ -9,6 +9,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
   alias Espreso.Printer
   alias Espreso.Shifts
   alias Espreso.StaffShifts
+  alias Espreso.Repo
 
   @impl true
   def mount(_params, _session, socket) do
@@ -724,6 +725,29 @@ defmodule EspresoWeb.StaffShiftCloseLive do
                 </ul>
               </section>
 
+              <%= if !Enum.empty?(@staff_shift_summaries) do %>
+                <section
+                  class="staff-shift-close-panel staff-shift-close-panel--secondary"
+                  aria-label="Staff shift sales"
+                >
+                  <p class="staff-shift-close-section-label">Staff shift sales</p>
+                  <ul class="staff-shift-sales-breakdown">
+                    <li :for={shift <- @staff_shift_summaries} class="staff-shift-sales-row">
+                      <div class="staff-shift-sales-info">
+                        <span class="staff-shift-sales-name">{shift.staff_name}</span>
+                        <span class="staff-shift-sales-time">
+                          {format_shift_time(shift.started_at)} - {format_shift_time(shift.ended_at)}
+                        </span>
+                      </div>
+                      <div class="staff-shift-sales-totals">
+                        <span class="staff-shift-sales-total">{Menu.format_price(shift.total)}</span>
+                        <span class="staff-shift-sales-count">({shift.order_count} orders)</span>
+                      </div>
+                    </li>
+                  </ul>
+                </section>
+              <% end %>
+
               <div
                 class="staff-shift-close-system"
                 id="staff-shift-close-system"
@@ -922,6 +946,27 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     petty_cash_total = PettyCash.total_for_shop_date(shop_date)
     petty_cash_expected = Decimal.sub(PettyCash.float(), petty_cash_total) |> Decimal.round(2)
 
+    # Get per-staff shift sales summary
+    staff_shifts = StaffShifts.list_shifts_for_shop_day(shop_date)
+
+    staff_shift_summaries =
+      staff_shifts
+      |> Enum.map(fn shift ->
+        sales = Orders.sales_summary_for_staff_shift(shift)
+        staff_member = Repo.get(User, shift.user_id)
+
+        %{
+          id: shift.id,
+          user_id: shift.user_id,
+          staff_name: (staff_member && staff_member.name) || "Unknown",
+          started_at: shift.started_at,
+          ended_at: shift.ended_at,
+          order_count: sales.order_count,
+          total: sales.total
+        }
+      end)
+      |> Enum.sort_by(& &1.started_at)
+
     {blocked?, block_reason, other_names, staff_shift_ended?} =
       cond do
         already_closed? ->
@@ -971,6 +1016,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     |> assign(:staff_shift_ended?, staff_shift_ended?)
     |> assign(:cash_outs, cash_outs)
     |> assign(:cash_out_total, cash_out_total)
+    |> assign(:staff_shift_summaries, staff_shift_summaries)
     |> assign(:petty_cash_entries, petty_cash_entries)
     |> assign(:petty_cash_total, petty_cash_total)
     |> assign(:petty_cash_expected, petty_cash_expected)
@@ -1207,4 +1253,11 @@ defmodule EspresoWeb.StaffShiftCloseLive do
 
   defp drawer_money(nil), do: "—"
   defp drawer_money(amount), do: Menu.format_price(amount)
+
+  defp format_shift_time(%DateTime{} = dt) do
+    manila = DateTime.add(dt, 8 * 60 * 60, :second)
+    Calendar.strftime(manila, "%I:%M %p") |> String.trim_leading("0")
+  end
+
+  defp format_shift_time(nil), do: "—"
 end
