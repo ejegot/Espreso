@@ -50,6 +50,25 @@ defmodule Espreso.Orders.Discount do
 
   def quote(subtotal, _kind, _peso), do: {:ok, none(subtotal)}
 
+  def quote_item(unit_price, kind, peso \\ nil)
+
+  def quote_item(unit_price, kind, _peso) when kind in @percent_kinds do
+    subtotal = money(unit_price)
+    amount = percent_off(subtotal)
+    {:ok, pack(kind, label(kind), amount, subtotal)}
+  end
+
+  def quote_item(unit_price, "peso", peso) do
+    subtotal = money(unit_price)
+
+    case parse_peso(peso) do
+      {:ok, off} -> {:ok, pack("peso", "₱ off", min_money(off, subtotal), subtotal)}
+      :error -> {:error, :invalid_discount}
+    end
+  end
+
+  def quote_item(unit_price, _kind, _peso), do: {:ok, none(unit_price)}
+
   def from_order_attrs(_attrs, subtotal, source) when source != "pos",
     do: {:ok, none(subtotal)}
 
