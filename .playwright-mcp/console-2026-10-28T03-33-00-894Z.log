@@ -1,0 +1,7 @@
+[     156ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:4000/pos:0
+[     190ms] [LOG] phx-GOKUDAKgQdw6AHBh mount:  -  {0: , 1: , 2: , 3: Object, s: Array(5), t: POS} @ http://localhost:4000/assets/app.js:1821
+[   14084ms] [LOG] phx-GOKUDAKgQdw6AHBh update:  -  {0: , 1: Object, 2: , 3: } @ http://localhost:4000/assets/app.js:1821
+[   36921ms] [LOG] phx-GOKUDAKgQdw6AHBh update:  -  {1: Object, 2: } @ http://localhost:4000/assets/app.js:1821
+[   47208ms] [LOG] phx-GOKUDAKgQdw6AHBh update:  -  {0: , 1: , 2: Object, c: Object} @ http://localhost:4000/assets/app.js:1821
+[  729643ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:4000/pos:0
+[  729661ms] [LOG] phx-GOKUtck2KuTFmgEi mount:  -  {0: Object, c: Object, s: Array(2), t: POS} @ http://localhost:4000/assets/app.js?v=owner-dash-72:1821

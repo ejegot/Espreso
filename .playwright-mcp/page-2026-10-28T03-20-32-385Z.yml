@@ -1,0 +1,214 @@
+- generic [ref=f3e3]:
+  - banner "Staff" [ref=f3e4]:
+    - generic [ref=f3e5]:
+      - button "Open navigation menu" [ref=f3e6] [cursor=pointer]:
+        - generic [ref=f3e8]: Menu
+      - link "Elilai Kafe Home" [ref=f3e9] [cursor=pointer]:
+        - /url: /staff
+        - generic [ref=f3e11]: Elilai Kafe
+    - heading "Close shift" [level=1] [ref=f3e12]
+    - generic [ref=f3e13]:
+      - paragraph [ref=f3e14]: Lilac
+      - button "Notifications" [ref=f3e16] [cursor=pointer]
+      - button "Owner Owner" [ref=f3e22] [cursor=pointer]:
+        - generic [aria-hidden] [ref=f3e23]: O
+        - generic [ref=f3e24]:
+          - generic [ref=f3e25]: Owner
+          - generic [ref=f3e26]: Owner
+  - generic [ref=f3e29]:
+    - complementary "Owner" [ref=f3e30]:
+      - generic [ref=f3e31]:
+        - navigation [ref=f3e32]:
+          - region "Counter" [ref=f3e33]:
+            - paragraph: Counter
+            - link "Home" [ref=f3e34] [cursor=pointer]:
+              - /url: /staff
+            - link "Orders" [ref=f3e36] [cursor=pointer]:
+              - /url: /orders
+            - link "POS" [ref=f3e38] [cursor=pointer]:
+              - /url: /pos
+          - region "Service" [ref=f3e40]:
+            - paragraph: Service
+            - link "Transactions" [ref=f3e41] [cursor=pointer]:
+              - /url: /transactions
+            - link "Customers" [ref=f3e43] [cursor=pointer]:
+              - /url: /customers
+          - region "Shift" [ref=f3e45]:
+            - paragraph: Shift
+            - link "Cash Out" [ref=f3e46] [cursor=pointer]:
+              - /url: /staff/cash-out
+            - link "Petty cash" [ref=f3e48] [cursor=pointer]:
+              - /url: /staff/petty-cash
+            - link "Open shop" [ref=f3e50] [cursor=pointer]:
+              - /url: /staff/open
+            - link "Close shift" [ref=f3e52] [cursor=pointer]:
+              - /url: /staff/close
+            - link "Staff attendance" [ref=f3e54] [cursor=pointer]:
+              - /url: /staff/attendance
+          - region "Manage" [ref=f3e56]:
+            - paragraph: Manage
+            - link "Reports" [ref=f3e57] [cursor=pointer]:
+              - /url: /staff/reports
+            - link "Availability" [ref=f3e59] [cursor=pointer]:
+              - /url: /admin/availability
+            - link "Staff" [ref=f3e61] [cursor=pointer]:
+              - /url: /admin/users
+            - link "Branches" [ref=f3e63] [cursor=pointer]:
+              - /url: /admin/branches
+            - link "Tenants" [ref=f3e65] [cursor=pointer]:
+              - /url: /admin/tenants
+            - link "Settings" [ref=f3e67] [cursor=pointer]:
+              - /url: /admin/settings
+        - link "Log out" [ref=f3e70] [cursor=pointer]:
+          - /url: /logout
+    - main [ref=f3e73]:
+      - generic [ref=f3e74]:
+        - paragraph [ref=f3e75]:
+          - generic [ref=f3e76]: Open
+          - generic [ref=f3e77]: Oct 28
+        - paragraph [ref=f3e78]: Count petty cash first, move the amount shown between the petty box and drawer, then count the drawer and seal the day. System paid totals are settled sales — not a physical cash target.
+      - generic [ref=f3e79]:
+        - region "Petty cash purchases" [ref=f3e80]:
+          - paragraph [ref=f3e81]: Petty-cash purchases
+          - paragraph [ref=f3e82]: ₱0
+          - paragraph [ref=f3e83]: Paid from the separate float. Refill is recorded as a drawer transfer, not another expense.
+          - paragraph [ref=f3e84]: No petty-cash purchases recorded today.
+        - region "Cash settled" [ref=f3e85]:
+          - paragraph [ref=f3e86]: Cash settled
+          - paragraph [ref=f3e87]: ₱1,014
+          - paragraph [ref=f3e88]: Cash payments recorded as paid today.
+        - region "Cash outs" [ref=f3e89]:
+          - paragraph [ref=f3e90]: Cash Outs
+          - paragraph [ref=f3e91]: ₱0
+          - paragraph [ref=f3e92]: Drawer withdrawals recorded today (non-voided).
+          - paragraph [ref=f3e93]: No Cash Outs recorded today.
+        - region "Drawer expected" [ref=f3e94]:
+          - paragraph [ref=f3e95]: Expected drawer
+          - paragraph [ref=f3e96]: ₱1,514
+          - paragraph [ref=f3e97]: Opening ₱500 + cash sales − drawer Cash Outs − petty-cash refill.
+        - generic [ref=f3e98]:
+          - generic [ref=f3e99]:
+            - generic [ref=f3e100]:
+              - generic [ref=f3e101]: Count petty cash before refill
+              - generic [ref=f3e102]:
+                - generic [aria-hidden] [ref=f3e103]: ₱
+                - textbox "Count petty cash before refill Expected ₱500. No drawer transfer needed." [ref=f3e191]:
+                  - /placeholder: "0.00"
+                  - text: "500"
+              - generic [ref=f3e105]: Expected ₱500. No drawer transfer needed.
+            - generic [ref=f3e106]:
+              - generic [ref=f3e107]: Petty-cash difference reason
+              - textbox "Petty-cash difference reason" [ref=f3e108]:
+                - /placeholder: Required only if counted petty cash differs from expected
+            - generic [ref=f3e109]:
+              - generic [ref=f3e110]: Counted drawer cash
+              - generic [ref=f3e111]:
+                - generic [aria-hidden] [ref=f3e112]: ₱
+                - textbox "Counted drawer cash Required — count after completing the petty-cash transfer above." [ref=f3e113]:
+                  - /placeholder: "0.00"
+                  - text: "1514"
+              - generic [ref=f3e114]: Required — count after completing the petty-cash transfer above.
+            - generic [ref=f3e115]:
+              - generic [ref=f3e116]: Notes
+              - textbox "Notes" [ref=f3e117]:
+                - /placeholder: Optional
+          - region "Payment methods" [ref=f3e119]:
+            - paragraph [ref=f3e120]: Payment methods
+            - list [ref=f3e121]:
+              - listitem [ref=f3e122]:
+                - generic [ref=f3e123]: Cash
+                - generic [ref=f3e124]: ₱1,014
+                - generic [ref=f3e125]: "4"
+              - listitem [ref=f3e126]:
+                - generic [ref=f3e127]: GCash
+                - generic [ref=f3e128]: ₱428
+                - generic [ref=f3e129]: "1"
+              - listitem [ref=f3e130]:
+                - generic [ref=f3e131]: Maya
+                - generic [ref=f3e132]: ₱0
+                - generic [ref=f3e133]: "0"
+              - listitem [ref=f3e134]:
+                - generic [ref=f3e135]: Counter
+                - generic [ref=f3e136]: ₱0
+                - generic [ref=f3e137]: "0"
+              - listitem [ref=f3e138]:
+                - generic [ref=f3e139]: PayMongo
+                - generic [ref=f3e140]: ₱0
+                - generic [ref=f3e141]: "0"
+          - region "Staff shift sales" [ref=f3e142]:
+            - paragraph [ref=f3e143]: Staff shift sales
+            - list [ref=f3e144]:
+              - listitem [ref=f3e145]:
+                - generic [ref=f3e146]:
+                  - generic [ref=f3e147]: Ana Reyes
+                  - generic [ref=f3e148]: 11:52 PM - 10:32 AM
+                - generic [ref=f3e149]:
+                  - generic [ref=f3e150]: ₱320
+                  - generic [ref=f3e151]: (1 orders)
+              - listitem [ref=f3e152]:
+                - generic [ref=f3e153]:
+                  - generic [ref=f3e154]: Marco Santos
+                  - generic [ref=f3e155]: 10:35 AM - 10:37 AM
+                - generic [ref=f3e156]:
+                  - generic [ref=f3e157]: ₱428
+                  - generic [ref=f3e158]: (1 orders)
+              - listitem [ref=f3e159]:
+                - generic [ref=f3e160]:
+                  - generic [ref=f3e161]: Ana Reyes
+                  - generic [ref=f3e162]: 10:44 AM - 10:46 AM
+                - generic [ref=f3e163]:
+                  - generic [ref=f3e164]: ₱0
+                  - generic [ref=f3e165]: (0 orders)
+              - listitem [ref=f3e166]:
+                - generic [ref=f3e167]:
+                  - generic [ref=f3e168]: Marco Santos
+                  - generic [ref=f3e169]: 10:49 AM - 11:10 AM
+                - generic [ref=f3e170]:
+                  - generic [ref=f3e171]: ₱75
+                  - generic [ref=f3e172]: (1 orders)
+              - listitem [ref=f3e173]:
+                - generic [ref=f3e174]:
+                  - generic [ref=f3e175]: Marco Santos
+                  - generic [ref=f3e176]: 11:13 AM - 11:13 AM
+                - generic [ref=f3e177]:
+                  - generic [ref=f3e178]: ₱195
+                  - generic [ref=f3e179]: (1 orders)
+          - generic "System paid" [ref=f3e180]:
+            - paragraph [ref=f3e181]: System paid
+            - paragraph [ref=f3e182]: ₱1,442 (5 orders)
+            - paragraph [ref=f3e183]: Total settled sales recorded today.
+      - region "Close history" [ref=f3e184]:
+        - generic [ref=f3e185]:
+          - paragraph [ref=f3e186]: Close history
+          - paragraph [ref=f3e187]: Sealed shop-day snapshots, newest first.
+        - generic [ref=f3e188]:
+          - strong [ref=f3e189]: No previous closes yet.
+          - paragraph [ref=f3e190]: Past Close Shift seals will appear here.
+      - dialog [ref=f3e194]:
+        - generic [active] [ref=f3e197]:
+          - button "close" [ref=f3e199] [cursor=pointer]
+          - generic [ref=f3e202]:
+            - paragraph [ref=f3e203]: 🔐 Close Shop?
+            - paragraph [ref=f3e204]: This will seal today's sales and cash counts.
+            - generic [ref=f3e205]:
+              - generic [ref=f3e206]:
+                - generic [ref=f3e207]: Drawer Cash
+                - generic [ref=f3e208]:
+                  - generic [ref=f3e209]: "Counted:"
+                  - generic [ref=f3e210]: ₱1514
+                - generic [ref=f3e211]:
+                  - generic [ref=f3e212]: "Expected:"
+                  - generic [ref=f3e213]: ₱1,514
+                - generic [ref=f3e214]: Even with expected
+              - generic [ref=f3e216]:
+                - generic [ref=f3e217]: Petty Cash
+                - generic [ref=f3e218]:
+                  - generic [ref=f3e219]: "Counted:"
+                  - generic [ref=f3e220]: ₱500
+                - generic [ref=f3e221]:
+                  - generic [ref=f3e222]: "Expected:"
+                  - generic [ref=f3e223]: ₱500
+                - generic [ref=f3e224]: No drawer transfer needed.
+            - generic [ref=f3e226]:
+              - button "Confirm Seal" [ref=f3e227] [cursor=pointer]
+              - button "Cancel" [ref=f3e228] [cursor=pointer]

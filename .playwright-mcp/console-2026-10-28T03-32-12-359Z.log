@@ -1,0 +1,6 @@
+[     117ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:4000/staff/close:0
+[     217ms] [LOG] phx-GOKUALST5fo6APEC mount:  -  {0: Object, c: Object, s: Array(2), t: Close shift} @ http://localhost:4000/assets/app.js:1821
+[    3880ms] [LOG] phx-GOKUALST5fo6APEC update:  -  {0: Object} @ http://localhost:4000/assets/app.js:1821
+[    3899ms] [LOG] phx-GOKUALST5fo6APEC update:  -  {0: Object} @ http://localhost:4000/assets/app.js:1821
+[    9701ms] [LOG] phx-GOKUALST5fo6APEC update:  -  {0: Object} @ http://localhost:4000/assets/app.js:1821
+[   13635ms] [LOG] phx-GOKUALST5fo6APEC update:  -  {0: Object} @ http://localhost:4000/assets/app.js:1821

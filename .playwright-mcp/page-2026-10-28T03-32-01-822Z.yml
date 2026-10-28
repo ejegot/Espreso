@@ -1,0 +1,118 @@
+- generic [ref=f21e4]:
+  - banner "Staff" [ref=f21e5]:
+    - generic [ref=f21e6]:
+      - button "Open navigation menu" [ref=f21e7] [cursor=pointer]:
+        - generic [ref=f21e9]: Menu
+      - link "Elilai Kafe Home" [ref=f21e10] [cursor=pointer]:
+        - /url: /staff
+        - generic [ref=f21e12]: Elilai Kafe
+    - heading "POS" [level=1] [ref=f21e13]
+    - generic [ref=f21e14]:
+      - paragraph [ref=f21e15]: Lilac
+      - link "Orders" [ref=f21e16] [cursor=pointer]:
+        - /url: /orders
+      - button "Owner Owner" [ref=f21e20] [cursor=pointer]:
+        - generic [aria-hidden] [ref=f21e21]: O
+        - generic [ref=f21e22]:
+          - generic [ref=f21e23]: Owner
+          - generic [ref=f21e24]: Owner
+  - main [ref=f21e28]:
+    - generic [ref=f21e29]:
+      - generic [ref=f21e30]:
+        - generic [ref=f21e31]:
+          - generic [ref=f21e32]:
+            - heading "Categories" [level=2] [ref=f21e33]
+            - generic [ref=f21e34]:
+              - generic [ref=f21e35]:
+                - generic [ref=f21e36]: Search
+                - searchbox "Search" [ref=f21e38]
+              - generic [ref=f21e39]: 12 items
+          - navigation "Categories" [ref=f21e40]:
+            - button "Hot coffee" [ref=f21e41] [cursor=pointer]
+            - button "Iced coffee" [ref=f21e43] [cursor=pointer]
+            - button "Frappe" [ref=f21e45] [cursor=pointer]
+            - button "Soda" [ref=f21e47] [cursor=pointer]
+            - button "Food" [ref=f21e49] [cursor=pointer]
+            - button "Matcha" [ref=f21e51] [cursor=pointer]
+            - button "Sweets" [ref=f21e53] [cursor=pointer]
+        - generic [ref=f21e55]:
+          - button "Add Espresso" [ref=f21e56] [cursor=pointer]:
+            - generic [ref=f21e58]:
+              - heading "Espresso" [level=3] [ref=f21e59]
+              - paragraph [ref=f21e60]: ₱75
+          - button "Add Double Espresso" [ref=f21e61] [cursor=pointer]:
+            - generic [ref=f21e63]:
+              - heading "Double Espresso" [level=3] [ref=f21e64]
+              - paragraph [ref=f21e65]: ₱85
+          - button "Choose size for Americano" [ref=f21e66] [cursor=pointer]:
+            - generic [ref=f21e68]:
+              - heading "Americano" [level=3] [ref=f21e69]
+              - paragraph [ref=f21e70]: 8oz · 12oz
+              - paragraph [ref=f21e71]: ₱110
+          - button "Choose size for Café Latte" [ref=f21e72] [cursor=pointer]:
+            - generic [ref=f21e74]:
+              - heading "Café Latte" [level=3] [ref=f21e75]
+              - paragraph [ref=f21e76]: 8oz · 12oz
+              - paragraph [ref=f21e77]: ₱150
+          - button "Choose size for Cappuccino" [ref=f21e78] [cursor=pointer]:
+            - generic [ref=f21e80]:
+              - heading "Cappuccino" [level=3] [ref=f21e81]
+              - paragraph [ref=f21e82]: 8oz · 12oz
+              - paragraph [ref=f21e83]: ₱160
+          - button "Choose size for Spanish Latte" [ref=f21e84] [cursor=pointer]:
+            - generic [ref=f21e86]:
+              - heading "Spanish Latte" [level=3] [ref=f21e87]
+              - paragraph [ref=f21e88]: 8oz · 12oz
+              - paragraph [ref=f21e89]: ₱160
+          - button "Choose size for Mocha Latte" [ref=f21e90] [cursor=pointer]:
+            - generic [ref=f21e92]:
+              - heading "Mocha Latte" [level=3] [ref=f21e93]
+              - paragraph [ref=f21e94]: 8oz · 12oz
+              - paragraph [ref=f21e95]: ₱160
+          - button "Choose size for Caramel Macchiato" [ref=f21e96] [cursor=pointer]:
+            - generic [ref=f21e98]:
+              - heading "Caramel Macchiato" [level=3] [ref=f21e99]
+              - paragraph [ref=f21e100]: 8oz · 12oz
+              - paragraph [ref=f21e101]: ₱160
+          - button "Choose size for Butter Scotch" [ref=f21e102] [cursor=pointer]:
+            - generic [ref=f21e104]:
+              - heading "Butter Scotch" [level=3] [ref=f21e105]
+              - paragraph [ref=f21e106]: 8oz · 12oz
+              - paragraph [ref=f21e107]: ₱160
+          - button "Choose size for Matcha Latte" [ref=f21e108] [cursor=pointer]:
+            - generic [ref=f21e110]:
+              - heading "Matcha Latte" [level=3] [ref=f21e111]
+              - paragraph [ref=f21e112]: 8oz · 12oz
+              - paragraph [ref=f21e113]: ₱160
+          - button "Choose size for Hot Belagio Chocolate" [ref=f21e114] [cursor=pointer]:
+            - generic [ref=f21e116]:
+              - heading "Hot Belagio Chocolate" [level=3] [ref=f21e117]
+              - paragraph [ref=f21e118]: 8oz · 12oz
+              - paragraph [ref=f21e119]: ₱160
+          - button "Add Signature Tablea" [ref=f21e120] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f21e121]:
+              - generic: ✦ SIGNATURE
+            - generic [ref=f21e122]:
+              - heading "Signature Tablea" [level=3] [ref=f21e123]
+              - paragraph [ref=f21e124]: ₱169
+      - complementary [ref=f21e125]:
+        - generic [ref=f21e127]:
+          - generic [ref=f21e128]:
+            - generic [ref=f21e129]:
+              - heading "Cart" [level=2] [ref=f21e131]
+              - generic [ref=f21e132]:
+                - button "Walk-in" [ref=f21e133] [cursor=pointer]
+                - button "Loyalty" [ref=f21e135] [cursor=pointer]
+            - radiogroup "Order type" [ref=f21e138]:
+              - button "Dine In" [ref=f21e139] [cursor=pointer]
+              - button "Take Out" [pressed] [ref=f21e140] [cursor=pointer]
+          - generic [ref=f21e141]:
+            - paragraph [ref=f21e142]: No items yet.
+            - list
+          - generic [ref=f21e143]:
+            - generic [ref=f21e145]:
+              - generic [ref=f21e146]: Total
+              - generic [ref=f21e147]: ₱0
+            - generic [ref=f21e149]:
+              - button "Process Cash Order" [disabled] [ref=f21e150]
+              - button "Change payment method, Cash selected" [ref=f21e151] [cursor=pointer]
