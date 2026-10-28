@@ -1,3 +1,0 @@
-[     227ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:4000/pos:0
-[     249ms] [LOG] phx-GOKTY3odnadZf9Di mount:  -  {0: , 1: , 2: , 3: Object, s: Array(5), t: POS} @ http://localhost:4000/assets/app.js:1821
-[   30527ms] [LOG] phx-GOKTY3odnadZf9Di update:  -  {0: , 1: , 2: Object, 3: , c: Object} @ http://localhost:4000/assets/app.js:1821
