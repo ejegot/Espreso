@@ -41,12 +41,15 @@ defmodule Espreso.Orders.Order do
     field :discount_amount, :decimal, default: Decimal.new("0")
     field :refunded_at, :utc_datetime
     field :refund_reason, :string
+    field :duplicate_voided_at, :utc_datetime
+    field :duplicate_void_reason, :string
 
     has_many :items, OrderItem
     has_many :payment_splits, PaymentSplit
     has_many :push_subscriptions, Espreso.CustomerPush.Subscription
     belongs_to :settled_by_user, User
     belongs_to :refunded_by_user, User
+    belongs_to :duplicate_voided_by_user, User
     belongs_to :customer, Customer
     belongs_to :tenant, Espreso.Tenancy.Tenant
     belongs_to :branch, Espreso.Tenancy.Branch
@@ -93,6 +96,9 @@ defmodule Espreso.Orders.Order do
       :refunded_at,
       :refunded_by_user_id,
       :refund_reason,
+      :duplicate_voided_at,
+      :duplicate_voided_by_user_id,
+      :duplicate_void_reason,
       :tenant_id,
       :branch_id
     ])
@@ -129,7 +135,9 @@ defmodule Espreso.Orders.Order do
     |> foreign_key_constraint(:settled_by_user_id)
     |> foreign_key_constraint(:customer_id)
     |> foreign_key_constraint(:refunded_by_user_id)
+    |> foreign_key_constraint(:duplicate_voided_by_user_id)
     |> validate_length(:refund_reason, max: 500)
+    |> validate_length(:duplicate_void_reason, max: 500)
     |> check_constraint(:loyalty_free_amount_centavos,
       name: :orders_loyalty_free_amount_nonnegative
     )

@@ -674,8 +674,8 @@ defmodule Espreso.Orders do
       query =
         from(o in branch_scope(Order),
           where:
-            o.payment_status == "paid" and not is_nil(o.settled_at) and
-              o.settled_at >= ^from_start and o.settled_at < ^to_end,
+            o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
+              not is_nil(o.settled_at) and o.settled_at >= ^from_start and o.settled_at < ^to_end,
           order_by: [asc: o.settled_at, asc: o.id],
           preload: [:items, :settled_by_user, :payment_splits]
         )
@@ -706,8 +706,9 @@ defmodule Espreso.Orders do
     query =
       from(o in branch_scope(Order),
         where:
-          o.payment_status == "paid" and o.source == "pos" and
-            o.settled_by_user_id == ^shift.user_id and not is_nil(o.settled_at) and
+          o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
+            o.source == "pos" and o.settled_by_user_id == ^shift.user_id and
+            not is_nil(o.settled_at) and
             o.settled_at >= ^shift.started_at
       )
 
@@ -738,8 +739,8 @@ defmodule Espreso.Orders do
     query =
       from(o in branch_scope(Order),
         where:
-          o.payment_status == "paid" and not is_nil(o.settled_at) and
-            o.settled_at >= ^day_start and o.settled_at < ^day_end
+          o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
+            not is_nil(o.settled_at) and o.settled_at >= ^day_start and o.settled_at < ^day_end
       )
       |> filter_transaction_search(normalized.search)
       |> filter_transaction_value(:paid_via, normalized.payment)
@@ -1030,7 +1031,9 @@ defmodule Espreso.Orders do
 
     orders =
       from(o in branch_scope(Order),
-        where: o.payment_status == "paid" and o.settled_at >= ^today_start,
+        where:
+          o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
+            o.settled_at >= ^today_start,
         preload: :payment_splits
       )
       |> Repo.all()
@@ -1049,8 +1052,8 @@ defmodule Espreso.Orders do
     orders =
       from(o in branch_scope(Order),
         where:
-          o.payment_status == "paid" and not is_nil(o.settled_at) and
-            o.settled_at >= ^day_start and o.settled_at < ^day_end,
+          o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
+            not is_nil(o.settled_at) and o.settled_at >= ^day_start and o.settled_at < ^day_end,
         preload: :payment_splits
       )
       |> Repo.all()
@@ -1138,7 +1141,11 @@ defmodule Espreso.Orders do
 
     paid_period =
       branch_scope(Order)
-      |> where([o], o.payment_status == "paid" and o.settled_at >= ^period_start)
+      |> where(
+        [o],
+        o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
+          o.settled_at >= ^period_start
+      )
 
     total = Repo.aggregate(paid_period, :sum, :total) || Decimal.new("0")
     count = Repo.aggregate(paid_period, :count, :id)
@@ -1162,8 +1169,8 @@ defmodule Espreso.Orders do
     rows =
       from(o in branch_scope(Order),
         where:
-          o.payment_status == "paid" and not is_nil(o.settled_at) and
-            o.settled_at >= ^period_start,
+          o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
+            not is_nil(o.settled_at) and o.settled_at >= ^period_start,
         select: {o.settled_at, o.total}
       )
       |> Repo.all()
@@ -1304,8 +1311,8 @@ defmodule Espreso.Orders do
       from(i in OrderItem,
         join: o in assoc(i, :order),
         where:
-          o.payment_status == "paid" and not is_nil(o.settled_at) and
-            o.settled_at >= ^from_start and o.settled_at < ^to_end and
+          o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
+            not is_nil(o.settled_at) and o.settled_at >= ^from_start and o.settled_at < ^to_end and
             o.branch_id == ^Tenancy.current_branch_id(),
         group_by: [i.name, i.item_owner],
         select: %{
@@ -1582,6 +1589,73 @@ defmodule Espreso.Orders do
         end
     end
   end
+
+  @doc """
+  Marks a paid order as a duplicate receipt without refunding or changing payment history.
+
+  Managers and owners only. The reason and acting user are stored for audit.
+  """
+  def void_duplicate_order(%Order{id: id}, %User{} = user, reason) when is_integer(id) do
+    if Authorization.can?(user, :reports) do
+      reason = if is_binary(reason), do: String.trim(reason), else: ""
+
+      cond do
+        String.length(reason) < 1 or String.length(reason) > 500 ->
+          {:error, :duplicate_void_reason_required}
+
+        true ->
+          now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+          {count, _} =
+            from(o in branch_scope(Order),
+              where:
+                o.id == ^id and o.payment_status == "paid" and
+                  is_nil(o.duplicate_voided_at) and is_nil(o.refunded_at)
+            )
+            |> Repo.update_all(
+              set: [
+                duplicate_voided_at: now,
+                duplicate_voided_by_user_id: user.id,
+                duplicate_void_reason: reason,
+                updated_at: now
+              ]
+            )
+
+          case count do
+            1 ->
+              order =
+                branch_scope(Order)
+                |> where([o], o.id == ^id)
+                |> preload([:items, :payment_splits, :duplicate_voided_by_user])
+                |> Repo.one()
+
+              broadcast({:ok, order})
+
+            0 ->
+              case branch_scope(Order)
+                   |> where([o], o.id == ^id)
+                   |> Repo.one() do
+                nil ->
+                  {:error, :not_found}
+
+                %Order{duplicate_voided_at: timestamp} when not is_nil(timestamp) ->
+                  {:error, :already_voided_duplicate}
+
+                %Order{payment_status: status} when status != "paid" ->
+                  {:error, :not_paid}
+
+                _ ->
+                  {:error, :not_voidable}
+              end
+          end
+      end
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  def void_duplicate_order(%Order{id: id}, _user, _reason) when not is_integer(id),
+    do: {:error, :not_found}
 
   @doc """
   Abandons an unpaid online order that has an attached PayMongo checkout session.

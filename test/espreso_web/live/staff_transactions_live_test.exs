@@ -161,6 +161,58 @@ defmodule EspresoWeb.StaffTransactionsLiveTest do
     assert :binary.match(receipt, <<0x1B, 0x70>>) == :nomatch
   end
 
+  test "manager can void a duplicate receipt with a reason and preserve payment history", %{
+    conn: conn,
+    barista: barista,
+    manager: manager
+  } do
+    order = paid_order!("Duplicate Receipt", barista)
+    {:ok, view, _html} = live(log_in(conn, manager), ~p"/transactions")
+
+    view |> element("#transaction-#{order.id}") |> render_click()
+    assert has_element?(view, "#transaction-open-duplicate-void", "Void Duplicate")
+
+    view |> element("#transaction-open-duplicate-void") |> render_click()
+    assert has_element?(view, "#transaction-duplicate-void-modal", order.number)
+
+    view
+    |> form("#transaction-duplicate-void-modal form", %{"reason" => "Accidental duplicate"})
+    |> render_submit()
+
+    assert has_element?(view, "#transactions-action-note", "marked as a duplicate")
+    refute has_element?(view, "#transaction-#{order.id}")
+
+    stored = Orders.get_transaction(order.id)
+    assert stored.payment_status == "paid"
+    assert is_nil(stored.refunded_at)
+    assert stored.duplicate_voided_by_user_id == manager.id
+    assert stored.duplicate_void_reason == "Accidental duplicate"
+    assert %DateTime{} = stored.duplicate_voided_at
+
+    assert has_element?(view, "#transactions-summary", "0 receipts")
+    assert has_element?(view, "#transactions-summary", "₱0")
+  end
+
+  test "barista cannot open or submit duplicate void actions", %{
+    conn: conn,
+    barista: barista
+  } do
+    order = paid_order!("Protected Receipt", barista)
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/transactions")
+
+    view |> element("#transaction-#{order.id}") |> render_click()
+    refute has_element?(view, "#transaction-open-duplicate-void")
+
+    render_click(view, "open_duplicate_void", %{"id" => Integer.to_string(order.id)})
+    assert has_element?(view, "#transactions-action-note", "not authorized")
+
+    render_submit(view, "confirm_duplicate_void", %{"reason" => "Attempted by barista"})
+    stored = Orders.get_transaction(order.id)
+    assert is_nil(stored.duplicate_voided_at)
+    assert is_nil(stored.duplicate_voided_by_user_id)
+    assert is_nil(stored.duplicate_void_reason)
+  end
+
   test "guest cannot access transaction history", %{conn: conn} do
     assert {:error, {:redirect, %{to: "/login"}}} = live(conn, ~p"/transactions")
   end

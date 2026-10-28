@@ -25,6 +25,8 @@ defmodule EspresoWeb.StaffTransactionsLive do
      |> assign(:open_filter, nil)
      |> assign(:reprint_transaction, nil)
      |> assign(:reprint_permit, nil)
+     |> assign(:duplicate_void_transaction, nil)
+     |> assign(:duplicate_void_reason, "")
      |> assign(:action_note, nil)
      |> assign(:pubsub_reload_timer, nil)
      |> assign(:pubsub_reload_token, nil)
@@ -132,6 +134,86 @@ defmodule EspresoWeb.StaffTransactionsLive do
   end
 
   def handle_event("cancel_reprint", _params, socket), do: {:noreply, close_reprint(socket)}
+
+  def handle_event("open_duplicate_void", %{"id" => id}, socket) do
+    user = socket.assigns.current_user
+
+    with true <- Authorization.can?(user, :reports),
+         %Order{} = selected <- socket.assigns.selected_transaction,
+         true <- Integer.to_string(selected.id) == id,
+         %Order{} = order <- Orders.get_transaction(selected.id),
+         true <- is_nil(order.duplicate_voided_at),
+         true <- is_nil(order.refunded_at) do
+      {:noreply,
+       socket
+       |> assign(:duplicate_void_transaction, order)
+       |> assign(:duplicate_void_reason, "")
+       |> assign(:action_note, nil)
+       |> close_reprint()}
+    else
+      false ->
+        {:noreply,
+         assign(socket, :action_note, "You are not authorized to void duplicate receipts.")}
+
+      _ ->
+        {:noreply,
+         assign(socket, :action_note, "This receipt is no longer eligible for duplicate voiding.")}
+    end
+  end
+
+  def handle_event("open_duplicate_void", _params, socket) do
+    {:noreply, assign(socket, :action_note, "You are not authorized to void duplicate receipts.")}
+  end
+
+  def handle_event("change_duplicate_void_reason", %{"reason" => reason}, socket) do
+    {:noreply, assign(socket, :duplicate_void_reason, reason)}
+  end
+
+  def handle_event("cancel_duplicate_void", _params, socket) do
+    {:noreply, close_duplicate_void(socket)}
+  end
+
+  def handle_event("confirm_duplicate_void", %{"reason" => reason}, socket) do
+    user = socket.assigns.current_user
+
+    with true <- Authorization.can?(user, :reports),
+         %Order{} = pending <- socket.assigns.duplicate_void_transaction,
+         %Order{} = order <- Orders.get_transaction(pending.id),
+         {:ok, voided} <- Orders.void_duplicate_order(order, user, reason) do
+      {:noreply,
+       socket
+       |> close_duplicate_void()
+       |> assign(:selected_transaction, nil)
+       |> assign(
+         :action_note,
+         "Receipt #{voided.number} marked as a duplicate. Payment history was preserved."
+       )
+       |> load_transactions(socket.assigns.filters)}
+    else
+      {:error, :duplicate_void_reason_required} ->
+        {:noreply,
+         assign(socket, :action_note, "Enter a reason (at least one non-space character).")}
+
+      {:error, :already_voided_duplicate} ->
+        {:noreply,
+         socket
+         |> close_duplicate_void()
+         |> assign(:action_note, "This receipt was already marked as a duplicate.")}
+
+      _ ->
+        {:noreply,
+         socket
+         |> close_duplicate_void()
+         |> assign(:action_note, "Unable to void this receipt. Refresh and verify its status.")}
+    end
+  end
+
+  def handle_event("confirm_duplicate_void", _params, socket) do
+    {:noreply,
+     socket
+     |> close_duplicate_void()
+     |> assign(:action_note, "A reason is required before voiding a duplicate receipt.")}
+  end
 
   def handle_event("confirm_reprint", _params, socket) do
     with %Order{} = order <- socket.assigns.reprint_transaction,
@@ -378,6 +460,27 @@ defmodule EspresoWeb.StaffTransactionsLive do
                   <dt>Customer</dt>
                   <dd>{@selected_transaction.customer_name || "Walk-in"}</dd>
                 </div>
+                <div :if={
+                  @show_totals? and is_nil(@selected_transaction.duplicate_voided_at) and
+                    is_nil(@selected_transaction.refunded_at)
+                }>
+                  <dt>Duplicate receipt</dt>
+                  <dd>
+                    <button
+                      type="button"
+                      class="staff-transaction-void-duplicate"
+                      id="transaction-open-duplicate-void"
+                      phx-click="open_duplicate_void"
+                      phx-value-id={@selected_transaction.id}
+                    >
+                      Void Duplicate
+                    </button>
+                  </dd>
+                </div>
+                <div :if={@selected_transaction.duplicate_voided_at}>
+                  <dt>Receipt status</dt>
+                  <dd>Voided as duplicate</dd>
+                </div>
                 <div>
                   <dt>Order status</dt>
                   <dd>{Orders.status_label(@selected_transaction.status)}</dd>
@@ -422,6 +525,67 @@ defmodule EspresoWeb.StaffTransactionsLive do
                 View on Orders
               </.link>
             </div>
+          </section>
+        </div>
+
+        <div
+          :if={@duplicate_void_transaction}
+          class="staff-transaction-modal-layer"
+          id="transaction-duplicate-void-modal"
+        >
+          <button
+            type="button"
+            class="staff-transaction-modal-scrim"
+            phx-click="cancel_duplicate_void"
+            aria-label="Cancel duplicate void"
+          >
+          </button>
+          <section
+            class="staff-transaction-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="transaction-duplicate-void-title"
+          >
+            <p class="staff-transactions-eyebrow">Manager action</p>
+            <h3 id="transaction-duplicate-void-title">
+              Void duplicate {@duplicate_void_transaction.number}?
+            </h3>
+            <p>
+              This marks the receipt as a duplicate and removes it from active paid totals.
+              It does not refund the payment or erase payment history.
+            </p>
+            <.form
+              for={%{}}
+              phx-change="change_duplicate_void_reason"
+              phx-submit="confirm_duplicate_void"
+            >
+              <label for="transaction-duplicate-void-reason">Reason (required)</label>
+              <textarea
+                id="transaction-duplicate-void-reason"
+                name="reason"
+                rows="3"
+                maxlength="500"
+                required
+                phx-debounce="300"
+                placeholder="Explain why this receipt is a duplicate"
+              >{@duplicate_void_reason}</textarea>
+              <div>
+                <button
+                  type="button"
+                  id="transaction-cancel-duplicate-void"
+                  phx-click="cancel_duplicate_void"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  id="transaction-confirm-duplicate-void"
+                  disabled={String.trim(@duplicate_void_reason) == ""}
+                >
+                  Confirm Void Duplicate
+                </button>
+              </div>
+            </.form>
           </section>
         </div>
 
@@ -568,6 +732,12 @@ defmodule EspresoWeb.StaffTransactionsLive do
     socket
     |> close_reprint()
     |> assign(:action_note, "Reprint request could not be completed. No receipt was sent.")
+  end
+
+  defp close_duplicate_void(socket) do
+    socket
+    |> assign(:duplicate_void_transaction, nil)
+    |> assign(:duplicate_void_reason, "")
   end
 
   defp close_reprint(socket) do
