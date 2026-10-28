@@ -2961,17 +2961,31 @@ defmodule EspresoWeb.StaffPosLiveTest do
   test "POS is locked until opening cash", %{conn: conn, barista: barista} do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
 
-    # Modal should be visible when shop not open
-    assert has_element?(view, "#staff-pos-open-shop-modal", "Opening Cash")
-    assert has_element?(view, "#staff-pos-open-shop-form")
+    # Button should be visible when shop not open
+    assert has_element?(view, "#staff-pos-open-shop-button-overlay")
+    assert has_element?(view, "#staff-pos-open-shop-button", "Open Shop")
+    # Modal should not be visible yet
+    refute has_element?(view, "#staff-pos-open-shop-modal")
     # POS interface should not be visible yet
     refute has_element?(view, "#staff-pos-shop-day")
     refute has_element?(view, "#pos-place-order")
+
+    # Click the button to show modal
+    view |> element("#staff-pos-open-shop-button") |> render_click()
+
+    # Now modal should be visible
+    assert has_element?(view, "#staff-pos-open-shop-modal", "Opening Cash")
+    assert has_element?(view, "#staff-pos-open-shop-form")
   end
 
   @tag :without_shop_open
   test "opening cash modal accepts input and records open", %{conn: conn, barista: barista} do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+
+    assert has_element?(view, "#staff-pos-open-shop-button-overlay")
+
+    # Click button to show modal
+    view |> element("#staff-pos-open-shop-button") |> render_click()
 
     assert has_element?(view, "#staff-pos-open-shop-modal")
 
