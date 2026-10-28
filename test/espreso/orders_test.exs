@@ -3,7 +3,8 @@ defmodule Espreso.OrdersTest do
 
   import Ecto.Query
 
-  alias Espreso.{Accounts, Orders}
+  alias Espreso.{Accounts, Customers, Orders}
+  alias Espreso.Loyalty.LedgerEntry
   alias Espreso.Menu.{Category, Product, ProductPrice}
   alias Espreso.Orders.Order
   alias Espreso.Repo
@@ -1114,6 +1115,7 @@ defmodule Espreso.OrdersTest do
   end
 
   test "create_order rejects unavailable products and creates nothing" do
+    alias Espreso.Loyalty.LedgerEntry
     alias Espreso.Menu.{Category, Product, ProductPrice}
     alias Espreso.Repo
 
@@ -1201,6 +1203,7 @@ defmodule Espreso.OrdersTest do
   end
 
   test "POS create_order rejects changed, missing, and foreign product prices atomically" do
+    alias Espreso.Loyalty.LedgerEntry
     alias Espreso.Menu.{Category, Product, ProductPrice}
 
     category =
@@ -2592,6 +2595,89 @@ defmodule Espreso.OrdersTest do
            )
 
     assert {:error, :already_refunded} = Orders.refund_paid_order(refunded, manager, "Again")
+  end
+
+  test "manager can void a duplicate receipt without changing payment history or loyalty ledger" do
+    {:ok, manager} =
+      Accounts.register_user(%{
+        name: "Duplicate Mgr",
+        email: "duplicate-mgr-#{System.unique_integer([:positive])}@test.local",
+        password: "password123",
+        role: "manager"
+      })
+
+    {:ok, barista} =
+      Accounts.register_user(%{
+        name: "Duplicate Bar",
+        email: "duplicate-bar-#{System.unique_integer([:positive])}@test.local",
+        password: "password123",
+        role: "barista"
+      })
+
+    {:ok, customer} =
+      Customers.find_or_create_by_phone(
+        "0917#{System.unique_integer([:positive]) |> Integer.mod(10_000_000) |> Integer.to_string() |> String.pad_leading(7, "0")}",
+        %{name: "Duplicate Customer"}
+      )
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("200")}],
+        %{
+          customer_name: customer.name,
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_status: :paid,
+          paid_via: "cash",
+          source: :pos,
+          customer_id: customer.id,
+          skip_authoritative_prices: true
+        }
+      )
+
+    customer_before = Repo.get!(Espreso.Customers.Customer, customer.id)
+
+    ledger_before =
+      LedgerEntry
+      |> where([e], e.order_id == ^order.id)
+      |> Repo.all()
+
+    assert {:ok, paid} = Orders.mark_paid(order, paid_via: "cash")
+    original_settled_at = paid.settled_at
+
+    assert {:error, :unauthorized} =
+             Orders.void_duplicate_order(paid, barista, "Duplicate receipt")
+
+    assert {:error, :duplicate_void_reason_required} =
+             Orders.void_duplicate_order(paid, manager, "  ")
+
+    assert {:ok, voided} = Orders.void_duplicate_order(paid, manager, "Duplicate receipt")
+    assert voided.payment_status == "paid"
+    assert voided.status == paid.status
+    assert voided.settled_at == original_settled_at
+    assert is_nil(voided.refunded_at)
+    assert voided.duplicate_voided_by_user_id == manager.id
+    assert voided.duplicate_void_reason == "Duplicate receipt"
+    assert %DateTime{} = voided.duplicate_voided_at
+
+    assert {:error, :already_voided_duplicate} =
+             Orders.void_duplicate_order(voided, manager, "Again")
+
+    customer_after = Repo.get!(Espreso.Customers.Customer, customer.id)
+
+    ledger_after =
+      LedgerEntry
+      |> where([e], e.order_id == ^order.id)
+      |> Repo.all()
+
+    assert customer_after.points_balance == customer_before.points_balance
+    assert customer_after.spend_remainder_centavos == customer_before.spend_remainder_centavos
+
+    assert Enum.map(ledger_after, &{&1.id, &1.kind, &1.points, &1.qualifying_amount_centavos}) ==
+             Enum.map(ledger_before, &{&1.id, &1.kind, &1.points, &1.qualifying_amount_centavos})
+
+    assert Orders.get_transaction(voided.id) != nil
+    assert Decimal.equal?(Orders.todays_paid_breakdown().total, Decimal.new("0"))
   end
 
   defp insert_category!(name) do

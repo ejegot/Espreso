@@ -50,6 +50,10 @@ defmodule Espreso.Loyalty do
   `:already_paid` retries, POS create-already-paid, and reconciler sweeps.
   No-ops when `customer_id` is nil.
   """
+  def earn_for_paid_order(%Order{duplicate_voided_at: timestamp})
+      when not is_nil(timestamp),
+      do: {:error, :duplicate_voided}
+
   def earn_for_paid_order(%Order{payment_status: "paid"} = order) do
     case invoke_earn_barrier() do
       {:error, reason} ->
@@ -70,6 +74,10 @@ defmodule Espreso.Loyalty do
   @doc """
   True when a paid customer order still has no earn ledger row.
   """
+  def earn_pending?(%Order{duplicate_voided_at: timestamp})
+      when not is_nil(timestamp),
+      do: false
+
   def earn_pending?(%Order{payment_status: "paid", customer_id: customer_id} = order)
       when is_integer(customer_id) do
     not earn_exists?(Repo, order.id)
@@ -87,6 +95,10 @@ defmodule Espreso.Loyalty do
   - `{:earned, points, balance}` — earn ledger present (`points` from ledger,
     `balance` from the current customer row)
   """
+  def earn_outcome_for_order(%Order{duplicate_voided_at: timestamp})
+      when not is_nil(timestamp),
+      do: :none
+
   def earn_outcome_for_order(%Order{payment_status: "paid", customer_id: customer_id} = order)
       when is_integer(customer_id) do
     case Repo.one(
@@ -121,7 +133,8 @@ defmodule Espreso.Loyalty do
       )
 
     from(o in Order,
-      where: o.payment_status == "paid" and not is_nil(o.customer_id),
+      where:
+        o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and not is_nil(o.customer_id),
       where: o.id not in subquery(earned_order_ids),
       order_by: [asc: o.id],
       limit: ^limit
