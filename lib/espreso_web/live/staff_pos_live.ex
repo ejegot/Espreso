@@ -214,6 +214,19 @@ defmodule EspresoWeb.StaffPosLive do
     {:noreply, assign(socket, :opening_modal_visible?, true)}
   end
 
+  def handle_event("reopen_shop_prompt", _params, socket) do
+    # Clear the closed state and show the open modal
+    Shifts.clear_shop_close()
+
+    socket =
+      socket
+      |> assign_shop_day()
+      |> assign(:opening_modal_visible?, true)
+      |> put_flash(:info, "Shop ready to open. Please enter opening cash.")
+
+    {:noreply, socket}
+  end
+
   def handle_event("pos_record_open", %{"open" => params}, socket) do
     case Shifts.record_open(socket.assigns.current_user, params) do
       {:ok, _open} ->
@@ -1183,11 +1196,7 @@ defmodule EspresoWeb.StaffPosLive do
     </div>
 
     <!-- Modal - shown only when flag is true -->
-    <div
-      :if={@shop_day_status == :not_open && @opening_modal_visible?}
-      class="staff-pos-open-shop-wrap"
-      id="staff-pos-open-shop-wrap"
-    >
+    <div :if={@opening_modal_visible?} class="staff-pos-open-shop-wrap" id="staff-pos-open-shop-wrap">
       <div class="staff-pos-open-shop-modal" id="staff-pos-open-shop-modal">
         <div class="staff-pos-open-shop-header">
           <div class="staff-pos-open-shop-label">Opening Cash</div>
@@ -1295,7 +1304,7 @@ defmodule EspresoWeb.StaffPosLive do
       </div>
     </div>
 
-    <div :if={@shop_day_status == :open}>
+    <div :if={@shop_day_status == :open && !@opening_modal_visible?}>
       <.staff_shell
         current={:pos}
         current_user={@current_user}
@@ -2101,10 +2110,18 @@ defmodule EspresoWeb.StaffPosLive do
         <p class="staff-pos-closed-text">
           The shop day has been closed. No new orders can be placed.
         </p>
-        <p class="staff-pos-closed-subtext">
-          Please contact your manager to reopen the shop.
-        </p>
-        <a href="/staff" class="staff-pos-closed-link">Back to Staff Menu</a>
+
+        <div class="staff-pos-closed-actions">
+          <button
+            type="button"
+            class="staff-pos-closed-open-btn"
+            phx-click="reopen_shop_prompt"
+            id="staff-pos-closed-open-btn"
+          >
+            🔓 Open Shop Again
+          </button>
+          <a href="/staff" class="staff-pos-closed-link">Back to Staff Menu</a>
+        </div>
       </div>
     </div>
     """

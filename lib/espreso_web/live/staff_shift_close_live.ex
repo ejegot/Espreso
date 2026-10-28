@@ -887,23 +887,49 @@ defmodule EspresoWeb.StaffShiftCloseLive do
           on_cancel={JS.push("cancel_confirm")}
         >
           <div class="staff-confirm-dialog">
-            <p class="staff-confirm-dialog-title">Record today’s close?</p>
+            <p class="staff-confirm-dialog-title">🔐 Close Shop?</p>
             <p class="staff-confirm-dialog-copy">
-              This will seal today’s sales and cash counts. Complete the petty-cash transfer shown above before confirming.
-              <span :if={barista?(@current_user)}>
-                Your staff shift will also end (Time Out).
-              </span>
+              This will seal today's sales and cash counts.
             </p>
-            <p class="staff-confirm-dialog-meta" id="staff-shift-close-confirm-cash">
-              Counted drawer cash · ₱{@counted_cash} · expected {Menu.format_price(@expected_cash)} · {variance_copy(
-                @live_variance
-              )}
+
+            <div class="staff-confirm-dialog-sections">
+              <div class="staff-confirm-section">
+                <div class="staff-confirm-section-label">Drawer Cash</div>
+                <div class="staff-confirm-section-values">
+                  <span class="staff-confirm-value-label">Counted:</span>
+                  <span class="staff-confirm-value-amount">₱{@counted_cash}</span>
+                </div>
+                <div class="staff-confirm-section-values">
+                  <span class="staff-confirm-value-label">Expected:</span>
+                  <span class="staff-confirm-value-amount">{Menu.format_price(@expected_cash)}</span>
+                </div>
+                <div class="staff-confirm-section-values" id="staff-shift-close-confirm-cash">
+                  <span class="staff-confirm-variance">{variance_copy(@live_variance)}</span>
+                </div>
+              </div>
+
+              <div class="staff-confirm-section">
+                <div class="staff-confirm-section-label">Petty Cash</div>
+                <div class="staff-confirm-section-values">
+                  <span class="staff-confirm-value-label">Counted:</span>
+                  <span class="staff-confirm-value-amount">₱{@petty_cash_counted}</span>
+                </div>
+                <div class="staff-confirm-section-values">
+                  <span class="staff-confirm-value-label">Expected:</span>
+                  <span class="staff-confirm-value-amount">
+                    {Menu.format_price(@petty_cash_expected)}
+                  </span>
+                </div>
+                <div class="staff-confirm-section-values" id="staff-shift-close-confirm-petty-cash">
+                  <span class="staff-confirm-status">{@petty_cash_transfer_preview}</span>
+                </div>
+              </div>
+            </div>
+
+            <p :if={barista?(@current_user)} class="staff-confirm-dialog-note">
+              ⏱️ Your staff shift will also end (Time Out).
             </p>
-            <p class="staff-confirm-dialog-meta" id="staff-shift-close-confirm-petty-cash">
-              Petty cash counted · ₱{@petty_cash_counted} · expected before refill {Menu.format_price(
-                @petty_cash_expected
-              )} · {@petty_cash_transfer_preview}
-            </p>
+
             <div class="staff-confirm-dialog-actions">
               <button
                 type="button"
@@ -912,7 +938,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
                 phx-click="record_close"
                 phx-disable-with="Recording…"
               >
-                Confirm seal
+                Confirm Seal
               </button>
               <button
                 type="button"

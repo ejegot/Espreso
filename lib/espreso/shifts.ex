@@ -499,6 +499,19 @@ defmodule Espreso.Shifts do
   defp barista?(_), do: false
 
   @doc """
+  Clears today's shop close to allow reopening.
+  Used when staff wants to reopen the shop after closing.
+  """
+  def clear_shop_close do
+    shop_date = Orders.shop_date_today()
+
+    case get_close_for_date(shop_date) do
+      %ShiftClose{id: id} -> Repo.delete(%ShiftClose{id: id})
+      nil -> :ok
+    end
+  end
+
+  @doc """
   Formats a close timestamp in Asia/Manila for staff UI.
   """
   def format_closed_at(%DateTime{} = closed_at) do
