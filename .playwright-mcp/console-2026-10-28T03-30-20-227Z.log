@@ -1,9 +1,0 @@
-[     206ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:4000/pos:0
-[     230ms] [LOG] phx-GOKT5p5Q9aQ6AEtB mount:  -  {0: , 1: , 2: , 3: Object, s: Array(5), t: POS} @ http://localhost:4000/assets/app.js:1821
-[   11771ms] [LOG] phx-GOKT5p5Q9aQ6AEtB update:  -  {0: , 1: , 2: Object, 3: , c: Object} @ http://localhost:4000/assets/app.js:1821
-[   40289ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:4000/pos:0
-[   40432ms] [LOG] phx-GOKT7_Hy6-k6ANti mount:  -  {0: , 1: , 2: Object, 3: , c: Object, s: Array(5), t: POS} @ http://localhost:4000/assets/app.js:1821
-[   50458ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:4000/pos:0
-[   50578ms] [LOG] phx-GOKT8kkuF6o6AO2C mount:  -  {0: , 1: , 2: Object, 3: , c: Object, s: Array(5), t: POS} @ http://localhost:4000/assets/app.js:1821
-[   86871ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:4000/pos:0
-[   86980ms] [LOG] phx-GOKT-sbmxng6AG2h mount:  -  {0: , 1: , 2: Object, 3: , c: Object, s: Array(5), t: POS} @ http://localhost:4000/assets/app.js:1821
