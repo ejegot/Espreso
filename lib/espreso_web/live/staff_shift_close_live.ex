@@ -296,7 +296,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
       |> assign(:petty_cash_transfer_preview, petty_cash_transfer_preview)
 
     ~H"""
-    <.staff_shell current={:close} current_user={@current_user} page_title="Close shift" chrome={:bar}>
+    <.staff_shell current={:close} current_user={@current_user} page_title="Close Shop" chrome={:bar}>
       <main class="staff-home-main staff-shift-close" id="staff-shift-close">
         <header class="staff-shift-close-head">
           <p class="staff-shift-close-scope">
@@ -328,7 +328,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
               <% @already_closed? -> %>
                 Sealed snapshot of today’s settled sales and the drawer cash count that was recorded.
               <% @block_reason == :other_staff_active -> %>
-                Another staff member is still on shift. They need to Time Out before you can Close Shift.
+                Another staff member is still on shift. They need to Time Out before you can Close Shop.
               <% @block_reason == :not_on_shift -> %>
                 You need an open staff shift to close the shop. Log in again if your shift already ended.
               <% true -> %>
@@ -518,7 +518,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
                 <%= if @block_reason == :not_on_shift do %>
                   You need an open staff shift to close the shop. Log in again if your shift already ended.
                 <% else %>
-                  Another staff member is still on shift. They need to Time Out before you can Close Shift.
+                  Another staff member is still on shift. They need to Time Out before you can Close Shop.
                 <% end %>
               </p>
               <ul
@@ -783,7 +783,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
           >
             <strong>No previous closes yet.</strong>
             <p class="staff-shift-close-section-hint">
-              Past Close Shift seals will appear here.
+              Past Close Shop seals will appear here.
             </p>
           </div>
 
@@ -1031,7 +1031,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
       )
 
     socket
-    |> assign(:page_title, "Close shift")
+    |> assign(:page_title, "Close Shop")
     |> assign(:breakdown, breakdown)
     |> assign(:via_rows, Orders.paid_via_rows(breakdown))
     |> assign(:close, close)
@@ -1120,7 +1120,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
 
   defp other_staff_message,
     do:
-      "Another staff member is still on shift. They need to Time Out before you can Close Shift."
+      "Another staff member is still on shift. They need to Time Out before you can Close Shop."
 
   defp close_success_flash(true), do: "Shift close recorded. Your staff shift has ended."
   defp close_success_flash(false), do: "Shift close recorded"

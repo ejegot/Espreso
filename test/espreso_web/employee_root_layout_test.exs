@@ -132,7 +132,7 @@ defmodule EspresoWeb.EmployeeRootLayoutTest do
   defp expected_module("/orders"), do: "Orders"
   defp expected_module("/pos"), do: "POS"
   defp expected_module("/transactions"), do: "Transactions"
-  defp expected_module("/staff/close"), do: "Close shift"
+  defp expected_module("/staff/close"), do: "Close Shop"
   defp expected_module("/admin/availability"), do: "Availability"
   defp expected_module("/admin/users"), do: "Staff"
   defp expected_module("/admin/settings"), do: "Settings"

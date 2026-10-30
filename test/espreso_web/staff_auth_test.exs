@@ -139,7 +139,7 @@ defmodule EspresoWeb.StaffAuthTest do
     assert has_element?(owner_view, "#staff-nav-settings", "Settings")
     assert has_element?(owner_view, "#dashboard-panel-sales", "Total Sales Today")
     assert has_element?(owner_view, "#staff-home-paid-breakdown", "Payment methods")
-    refute has_element?(owner_view, "#staff-home-paid-breakdown a", "Close shift")
+    refute has_element?(owner_view, "#staff-home-paid-breakdown a", "Close Shop")
     refute has_element?(owner_view, "#dashboard-panel-orders")
     refute has_element?(owner_view, "#dashboard-panel-transactions")
     refute has_element?(owner_view, "#dashboard-panel-close-shift")
@@ -477,7 +477,7 @@ defmodule EspresoWeb.StaffAuthTest do
     refute has_element?(barista_view, "#staff-home-cash-out")
     refute has_element?(barista_view, "#staff-home-transactions")
     refute has_element?(barista_view, "#staff-home-customers")
-    assert has_element?(barista_view, "#staff-nav-close", "Close shift")
+    assert has_element?(barista_view, "#staff-nav-close", "Close Shop")
     refute has_element?(barista_view, "#staff-home-shop-status")
     refute has_element?(barista_view, ".staff-home-shortcut-eyebrow")
 
@@ -491,14 +491,14 @@ defmodule EspresoWeb.StaffAuthTest do
     refute has_element?(manager_view, "#staff-home-availability")
     refute has_element?(manager_view, "#staff-home-close")
     refute has_element?(manager_view, "#staff-nav-dashboard")
-    assert has_element?(manager_view, "#staff-nav-close", "Close shift")
+    assert has_element?(manager_view, "#staff-nav-close", "Close Shop")
 
     {:ok, owner_view, _html} = live(log_in(conn, owner), ~p"/staff")
     refute has_element?(owner_view, "#staff-home-staff")
     refute has_element?(owner_view, "#staff-home-settings")
     assert has_element?(owner_view, "#staff-nav-staff", "Staff")
     assert has_element?(owner_view, "#staff-nav-settings", "Settings")
-    assert has_element?(owner_view, "#staff-nav-close", "Close shift")
+    assert has_element?(owner_view, "#staff-nav-close", "Close Shop")
   end
 
   test "orders shell is active for barista with Orders and POS only", %{
@@ -540,7 +540,7 @@ defmodule EspresoWeb.StaffAuthTest do
     refute has_element?(view, "#staff-nav-drawer-group-manage")
     assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-my_shifts", "My shifts")
     assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-cash_out", "Cash Out")
-    assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-close", "Close shift")
+    assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-close", "Close Shop")
     assert has_element?(view, "#staff-nav-drawer-panel #staff-nav-logout", "Log out")
     refute has_element?(view, "#staff-nav-dashboard")
     refute has_element?(view, "#staff-nav-reports")
