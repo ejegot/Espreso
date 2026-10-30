@@ -7,13 +7,13 @@ import type { CapacitorConfig } from "@capacitor/cli";
  * server.url must be ORIGIN ONLY (no path). Start at /login via appStartPath.
  *
  * Development override (never commit secrets; HTTPS preferred):
- *   ELILAI_KAFE_SERVER_URL=https://134-209-110-46.nip.io npx cap sync
+ *   ELILAI_KAFE_SERVER_URL=https://elilaikafe.devs.surf npx cap sync
  *   ELILAI_KAFE_SERVER_URL=http://192.168.x.x:4000 ELILAI_KAFE_ALLOW_CLEARTEXT=1 npx cap sync
  *
  * Paths in ELILAI_KAFE_SERVER_URL (e.g. …/login) are accepted and split into
  * origin + appStartPath.
  */
-const PRODUCTION_ORIGIN = "https://134-209-110-46.nip.io";
+const PRODUCTION_ORIGIN = "https://elilaikafe.devs.surf";
 const DEFAULT_START_PATH = "/login";
 
 const allowCleartext = process.env.ELILAI_KAFE_ALLOW_CLEARTEXT === "1";
