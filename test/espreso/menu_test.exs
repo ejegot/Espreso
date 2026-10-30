@@ -601,6 +601,130 @@ defmodule Espreso.MenuTest do
     end
   end
 
+  describe "update_product_as/3" do
+    test "manager can update a HOT product name and both size prices" do
+      hot = insert_category!("HOT")
+      product = insert_product!(hot, "Old Latte", true, [{"8oz", "120"}, {"12oz", "140"}])
+      manager = register!("Manager", "manager.edititem@test.local", "manager")
+
+      assert {:ok, updated} =
+               Menu.update_product_as(manager, product.id, %{
+                 "name" => "New Latte",
+                 "hot_price_mode" => "sizes",
+                 "price_8oz" => "130",
+                 "price_12oz" => "150"
+               })
+
+      assert updated.name == "New Latte"
+      prices = Map.new(updated.product_prices, &{&1.size, &1.price})
+      assert Decimal.equal?(prices["8oz"], Decimal.new("130"))
+      assert Decimal.equal?(prices["12oz"], Decimal.new("150"))
+      assert updated.available
+    end
+
+    test "owner can update a single-price product" do
+      food = insert_category!("FOOD")
+      product = insert_product!(food, "Old Meal", true, [{nil, "180"}])
+      owner = register!("Owner", "owner.edititem@test.local", "owner")
+
+      assert {:ok, updated} =
+               Menu.update_product_as(owner, product.id, %{
+                 "name" => "New Meal",
+                 "price" => "195"
+               })
+
+      assert updated.name == "New Meal"
+      assert [%{size: nil, price: price}] = updated.product_prices
+      assert Decimal.equal?(price, Decimal.new("195"))
+    end
+
+    test "barista cannot update a product" do
+      hot = insert_category!("HOT")
+      product = insert_product!(hot, "Latte", true, [{nil, "120"}])
+      barista = register!("Staff", "staff.edititem@test.local", "barista")
+
+      assert {:error, :unauthorized} =
+               Menu.update_product_as(barista, product.id, %{
+                 "name" => "Changed Latte",
+                 "hot_price_mode" => "single",
+                 "price" => "130"
+               })
+
+      assert Repo.get!(Product, product.id).name == "Latte"
+    end
+
+    test "rejects duplicate names without changing the product or prices" do
+      hot = insert_category!("HOT")
+      product = insert_product!(hot, "Latte", true, [{nil, "120"}])
+      insert_product!(hot, "Cappuccino", true, [{nil, "130"}])
+      manager = register!("Manager", "manager.dupedit@test.local", "manager")
+
+      assert {:error, :name_taken} =
+               Menu.update_product_as(manager, product.id, %{
+                 "name" => "Cappuccino",
+                 "hot_price_mode" => "single",
+                 "price" => "140"
+               })
+
+      assert Repo.get!(Product, product.id).name == "Latte"
+      [price] = Repo.all(from pp in ProductPrice, where: pp.product_id == ^product.id)
+      assert Decimal.equal?(price.price, Decimal.new("120"))
+    end
+
+    test "invalid price leaves the existing product and prices unchanged" do
+      hot = insert_category!("HOT")
+      product = insert_product!(hot, "Latte", true, [{nil, "120"}])
+      manager = register!("Manager", "manager.invalidedit@test.local", "manager")
+
+      assert {:error, :invalid_price} =
+               Menu.update_product_as(manager, product.id, %{
+                 "name" => "Updated Latte",
+                 "hot_price_mode" => "single",
+                 "price" => "invalid"
+               })
+
+      assert Repo.get!(Product, product.id).name == "Latte"
+      [price] = Repo.all(from pp in ProductPrice, where: pp.product_id == ^product.id)
+      assert Decimal.equal?(price.price, Decimal.new("120"))
+    end
+
+    test "cannot update a product belonging to another branch" do
+      owner = register!("Owner", "owner.crossbranch.edit@test.local", "owner")
+      hot = insert_category!("HOT")
+      product = insert_product!(hot, "Branch Latte", true, [{nil, "120"}])
+      original_ids = Espreso.Tenancy.coffeespot_lilac_ids()
+
+      assert {:ok, branch} =
+               Espreso.Tenancy.Branches.create_as(owner, %{name: "Edit Isolation Test Branch"})
+
+      try do
+        Espreso.Tenancy.put_context(%{tenant_id: branch.tenant_id, branch_id: branch.id})
+
+        assert {:error, :not_found} =
+                 Menu.update_product_as(owner, product.id, %{
+                   "name" => "Changed Latte",
+                   "hot_price_mode" => "single",
+                   "price" => "130"
+                 })
+      after
+        Espreso.Tenancy.put_context(original_ids)
+      end
+
+      assert Repo.get!(Product, product.id).name == "Branch Latte"
+    end
+
+    test "returns not_found for a missing product" do
+      manager = register!("Manager", "manager.missingedit@test.local", "manager")
+
+      assert {:error, :not_found} =
+               Menu.update_product_as(manager, -1, %{
+                 "name" => "Missing",
+                 "hot_price_mode" => "single",
+                 "price" => "100"
+               })
+    end
+  end
+
   defp insert_product!(category, name, available, prices) do
     product =
       %Product{}

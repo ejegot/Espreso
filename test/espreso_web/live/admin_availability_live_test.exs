@@ -84,6 +84,40 @@ defmodule EspresoWeb.AdminAvailabilityLiveTest do
     assert Enum.any?(hot_menu.products, &(&1.id == espresso.id))
   end
 
+  test "manager can edit a product name and price from the availability board", %{
+    conn: conn,
+    manager: manager,
+    espresso: espresso
+  } do
+    {:ok, view, _html} = live(log_in(conn, manager), ~p"/admin/availability")
+
+    assert has_element?(view, "#availability-edit-#{espresso.id}", "Edit")
+    view |> element("#availability-edit-#{espresso.id}") |> render_click()
+
+    assert has_element?(view, "#availability-edit-form")
+    assert has_element?(view, "#availability-edit-modal", "Category: HOT")
+
+    view
+    |> form("#availability-edit-form",
+      item: %{
+        name: "Updated Espresso",
+        hot_price_mode: "single",
+        price: "85"
+      }
+    )
+    |> render_submit()
+
+    assert has_element?(view, "#availability-flash", "Updated Espresso updated.")
+    assert has_element?(view, ".staff-availability-name", "Updated Espresso")
+    refute has_element?(view, "#availability-edit-form")
+
+    updated = Repo.get!(Product, espresso.id)
+    assert updated.name == "Updated Espresso"
+
+    price = Repo.get_by!(ProductPrice, product_id: espresso.id)
+    assert Decimal.equal?(price.price, Decimal.new("85"))
+  end
+
   test "search filters the availability list by item name", %{
     conn: conn,
     manager: manager,

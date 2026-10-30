@@ -369,7 +369,7 @@ defmodule Espreso.Menu do
   def list_products_for_availability do
     Category
     |> Tenancy.scope_to_branch()
-    |> preload(:products)
+    |> preload(products: :product_prices)
     |> Repo.all()
     |> Enum.map(fn category ->
       products =
@@ -442,6 +442,55 @@ defmodule Espreso.Menu do
          {:ok, prices} <- fetch_prices(category, attrs),
          {:ok, item_owner} <- fetch_item_owner(category, attrs) do
       insert_product_with_prices(category, name, menu_group, prices, item_owner)
+    end
+  end
+
+  @doc """
+  Updates a catalog product's name and prices when the actor has `:edit_menu`.
+  """
+  def update_product_as(%User{} = actor, product_id, attrs)
+      when is_integer(product_id) and is_map(attrs) do
+    with :ok <- Authorization.authorize(actor, :edit_menu),
+         %Product{} = product <- get_product_with_category(product_id),
+         {:ok, name} <- fetch_name(attrs),
+         {:ok, prices} <- fetch_prices(product.category, attrs) do
+      changeset = Product.changeset(product, %{name: name})
+
+      Repo.transaction(fn ->
+        case Repo.update(changeset) do
+          {:ok, updated_product} ->
+            Repo.delete_all(
+              from pp in ProductPrice,
+                where: pp.product_id == ^product.id
+            )
+
+            Enum.each(prices, fn {size, price} ->
+              case %ProductPrice{}
+                   |> ProductPrice.changeset(%{
+                     product_id: product.id,
+                     size: size,
+                     price: price
+                   })
+                   |> Repo.insert() do
+                {:ok, _price} -> :ok
+                {:error, _changeset} -> Repo.rollback(:invalid_price)
+              end
+            end)
+
+            Repo.preload(updated_product, [:category, :product_prices])
+
+          {:error, failed} ->
+            Repo.rollback(name_error(failed))
+        end
+      end)
+      |> case do
+        {:ok, updated_product} -> {:ok, updated_product}
+        {:error, reason} -> {:error, reason}
+      end
+    else
+      nil -> {:error, :not_found}
+      {:error, :unauthorized} = error -> error
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -712,7 +761,10 @@ defmodule Espreso.Menu do
   defp fetch_item_owner(_category, _attrs), do: {:ok, nil}
 
   defp get_product_with_category(product_id) do
-    case Repo.get(Product, product_id) do
+    Product
+    |> Tenancy.scope_to_branch()
+    |> Repo.get_by(id: product_id)
+    |> case do
       nil -> nil
       product -> Repo.preload(product, :category)
     end
