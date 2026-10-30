@@ -458,7 +458,7 @@ defmodule EspresoWeb.StaffComponents do
       },
       %{
         key: :close,
-        label: "Close shift",
+        label: "Close Shop",
         icon: "hero-lock-closed",
         path: ~p"/staff/close",
         group: :shift,

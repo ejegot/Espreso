@@ -51,7 +51,7 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
     assert has_element?(manager_view, "#staff-home-drawer", "Cash outs")
     assert has_element?(manager_view, "#staff-home-drawer", "Expected")
     refute has_element?(manager_view, "#staff-home-drawer-variance")
-    assert has_element?(manager_view, "#staff-home-drawer-close", "Close shift")
+    assert has_element?(manager_view, "#staff-home-drawer-close", "Close Shop")
     assert has_element?(manager_view, "#staff-home-pos", "Open POS")
     assert has_element?(manager_view, "#dashboard-panel-sales", "Total Sales Today")
     assert has_element?(manager_view, "#dashboard-kpi-drawer", "Cash in drawer")
@@ -94,7 +94,7 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
     assert has_element?(closed_view, "#staff-home-drawer", "Drawer · sealed")
     assert has_element?(closed_view, "#staff-home-drawer", "Counted")
     assert has_element?(closed_view, "#staff-home-drawer-variance", "Even")
-    assert has_element?(closed_view, "#staff-home-drawer-close", "View close")
+    assert has_element?(closed_view, "#staff-home-drawer-close", "View Close Shop")
     assert has_element?(closed_view, "#staff-home-reports", "View reports")
     refute has_element?(closed_view, "#staff-home-pos")
     refute has_element?(closed_view, "#staff-home-shop-open")
@@ -136,7 +136,7 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
     assert has_element?(view, "#staff-home-pos", "Open POS")
     assert has_element?(view, "#dashboard-panel-top-item", "Americano")
     refute has_element?(view, "#dashboard-panel-reports")
-    refute has_element?(view, "#staff-home-paid-breakdown a", "Close shift")
+    refute has_element?(view, "#staff-home-paid-breakdown a", "Close Shop")
     refute has_element?(view, "#dashboard-panel-transactions")
   end
 

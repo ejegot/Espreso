@@ -826,7 +826,7 @@ defmodule EspresoWeb.StaffHomeLive do
           </li>
         </ul>
         <.link navigate={~p"/staff/close"} class="staff-home-drawer-link" id="staff-home-drawer-close">
-          {if(@drawer_summary.sealed?, do: "View close", else: "Close shift")}
+          {if(@drawer_summary.sealed?, do: "View Close Shop", else: "Close Shop")}
         </.link>
       </div>
     </section>
