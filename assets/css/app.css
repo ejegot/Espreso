@@ -12879,6 +12879,21 @@ a.staff-home-card:focus-visible {
   background: var(--elilai-ivory, #f4efe3);
 }
 
+#staff-availability .staff-availability-edit {
+  min-height: 2.4rem;
+  min-width: 4.75rem;
+  padding: 0.22rem 0.75rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--elilai-ivory, #f4efe3);
+  color: var(--elilai-forest, #394331);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
 #staff-availability .staff-availability-add {
   border: 0;
   border-radius: 999px;

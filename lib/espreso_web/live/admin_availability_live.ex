@@ -14,6 +14,8 @@ defmodule EspresoWeb.AdminAvailabilityLive do
      |> assign(:flash_note, nil)
      |> assign(:adding?, false)
      |> assign(:adding_category?, false)
+     |> assign(:editing_product, nil)
+     |> assign(:edit_form, to_form(%{}, as: :item))
      |> assign(:photo_product, nil)
      |> allow_upload(:photo,
        accept: ~w(.jpg .jpeg .png .webp),
@@ -85,6 +87,61 @@ defmodule EspresoWeb.AdminAvailabilityLive do
 
   def handle_event("close_add", _params, socket) do
     {:noreply, socket |> cancel_photo_uploads() |> assign(:adding?, false)}
+  end
+
+  def handle_event("open_edit", %{"id" => id}, socket) do
+    product = find_product(socket, String.to_integer(id))
+
+    cond do
+      not Authorization.can?(socket.assigns.current_user, :edit_menu) ->
+        {:noreply, assign(socket, :flash_note, "You don’t have permission to edit items.")}
+
+      is_nil(product) ->
+        {:noreply, assign(socket, :flash_note, "Product not found.")}
+
+      true ->
+        product = Espreso.Repo.preload(product, :category)
+
+        {:noreply,
+         socket
+         |> assign(:adding?, false)
+         |> assign(:adding_category?, false)
+         |> assign(:photo_product, nil)
+         |> assign(:editing_product, product)
+         |> assign(:edit_form, to_form(edit_params(product), as: :item))
+         |> assign(:flash_note, nil)}
+    end
+  end
+
+  def handle_event("close_edit", _params, socket) do
+    {:noreply, assign(socket, :editing_product, nil)}
+  end
+
+  def handle_event("validate_edit", %{"item" => params}, socket) do
+    {:noreply, assign(socket, :edit_form, to_form(params, as: :item))}
+  end
+
+  def handle_event("save_edit", %{"item" => params}, socket) do
+    case socket.assigns.editing_product do
+      nil ->
+        {:noreply, assign(socket, :editing_product, nil)}
+
+      product ->
+        case Menu.update_product_as(socket.assigns.current_user, product.id, params) do
+          {:ok, updated} ->
+            {:noreply,
+             socket
+             |> assign(:editing_product, nil)
+             |> assign(:categories, Menu.list_products_for_availability())
+             |> assign(:flash_note, "#{updated.name} updated.")}
+
+          {:error, reason} ->
+            {:noreply,
+             socket
+             |> assign(:edit_form, to_form(params, as: :item))
+             |> assign(:flash_note, edit_error_message(reason))}
+        end
+    end
   end
 
   def handle_event("open_add_category", _params, socket) do
@@ -321,6 +378,16 @@ defmodule EspresoWeb.AdminAvailabilityLive do
                 <button
                   :if={Authorization.can?(@current_user, :edit_menu)}
                   type="button"
+                  class="staff-availability-edit"
+                  phx-click="open_edit"
+                  phx-value-id={product.id}
+                  id={"availability-edit-#{product.id}"}
+                >
+                  Edit
+                </button>
+                <button
+                  :if={Authorization.can?(@current_user, :edit_menu)}
+                  type="button"
                   class="staff-availability-toggle"
                   phx-click="open_photo"
                   phx-value-id={product.id}
@@ -459,6 +526,97 @@ defmodule EspresoWeb.AdminAvailabilityLive do
       </.modal>
 
       <.modal
+        :if={@editing_product}
+        id="availability-edit-modal"
+        show
+        click_away={false}
+        autofocus={false}
+        on_cancel={JS.push("close_edit")}
+      >
+        <section class="staff-availability-add-dialog" id="availability-edit" aria-label="Edit item">
+          <h3 class="staff-confirm-dialog-title">Edit item</h3>
+          <p class="staff-confirm-dialog-copy">
+            Update the name or price for {@editing_product.name}. Category and other settings stay unchanged.
+          </p>
+          <.form
+            for={@edit_form}
+            id="availability-edit-form"
+            phx-change="validate_edit"
+            phx-submit="save_edit"
+            class="staff-team-form"
+          >
+            <p class="staff-availability-state">Category: {@editing_product.category.name}</p>
+            <.input field={@edit_form[:name]} type="text" label="Name" required />
+
+            <.input
+              :if={@editing_product.category.name == "HOT"}
+              field={@edit_form[:hot_price_mode]}
+              type="select"
+              label="Price"
+              options={[{"8oz and 12oz", "sizes"}, {"One price (no size)", "single"}]}
+            />
+
+            <.input
+              :if={show_single_price?(@edit_form) and @editing_product.category.name != "HOT"}
+              field={@edit_form[:price]}
+              type="text"
+              label={price_label(@edit_form)}
+              required
+            />
+            <.input
+              :if={
+                @editing_product.category.name == "HOT" and
+                  add_value(@edit_form, :hot_price_mode) == "single"
+              }
+              field={@edit_form[:price]}
+              type="text"
+              label="Price"
+              required
+            />
+            <.input
+              :if={
+                @editing_product.category.name == "HOT" and
+                  add_value(@edit_form, :hot_price_mode) != "single"
+              }
+              field={@edit_form[:price_8oz]}
+              type="text"
+              label="8oz price"
+              required
+            />
+            <.input
+              :if={
+                @editing_product.category.name == "HOT" and
+                  add_value(@edit_form, :hot_price_mode) != "single"
+              }
+              field={@edit_form[:price_12oz]}
+              type="text"
+              label="12oz price"
+              required
+            />
+
+            <div class="staff-confirm-dialog-actions">
+              <button
+                type="submit"
+                class="staff-team-btn staff-team-btn--primary"
+                id="availability-edit-save"
+                phx-disable-with="Saving…"
+              >
+                Save changes
+              </button>
+              <button
+                type="button"
+                class="staff-team-btn"
+                id="availability-edit-cancel"
+                phx-click="close_edit"
+              >
+                Cancel
+              </button>
+            </div>
+          </.form>
+        </section>
+      </.modal>
+
+      <.modal
         :if={@adding_category?}
         id="availability-add-category-modal"
         show
@@ -578,6 +736,31 @@ defmodule EspresoWeb.AdminAvailabilityLive do
 
   defp assign_category_form(socket) do
     assign(socket, :category_form, to_form(%{"name" => ""}, as: :category))
+  end
+
+  defp edit_params(product) do
+    prices = product.product_prices || []
+    single_price = Enum.find(prices, &is_nil(&1.size))
+    price_8oz = Enum.find(prices, &(&1.size == "8oz"))
+    price_12oz = Enum.find(prices, &(&1.size == "12oz"))
+    price_16oz = Enum.find(prices, &(&1.size == "16oz"))
+
+    %{
+      "category" => product.category.name,
+      "name" => product.name,
+      "hot_price_mode" => if(single_price, do: "single", else: "sizes"),
+      "price" => price_value(single_price || price_16oz),
+      "price_8oz" => price_value(price_8oz),
+      "price_12oz" => price_value(price_12oz)
+    }
+  end
+
+  defp price_value(nil), do: ""
+
+  defp price_value(price) do
+    price.price
+    |> Decimal.normalize()
+    |> Decimal.to_string()
   end
 
   defp blank_add_params do
@@ -702,6 +885,13 @@ defmodule EspresoWeb.AdminAvailabilityLive do
   defp photo_upload_error(:not_accepted), do: "Use a JPEG, PNG, or WebP photo."
   defp photo_upload_error(:too_many_files), do: "One photo only."
   defp photo_upload_error(_), do: "Could not read that photo."
+
+  defp edit_error_message(:unauthorized), do: "You are not authorized to edit products."
+  defp edit_error_message(:name_taken), do: "A product with this name already exists."
+  defp edit_error_message(:invalid_name), do: "Please enter a valid product name."
+  defp edit_error_message(:invalid_price), do: "Please enter valid prices."
+  defp edit_error_message(:not_found), do: "Product not found."
+  defp edit_error_message(_reason), do: "Unable to update product. Please try again."
 
   defp add_error_message(:unauthorized), do: "You don’t have permission to add items."
   defp add_error_message(:name_taken), do: "That name is already on this category."
