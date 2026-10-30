@@ -936,7 +936,12 @@ defmodule Espreso.Orders do
       preparing_count: count_orders(status: ["preparing"]),
       unpaid_active_count:
         count_orders(status: active_statuses, payment_status: @unpaid_payment_statuses),
-      todays_count: count_orders(inserted_at_gte: today_start, exclude_cancelled: true)
+      todays_count:
+        count_orders(
+          inserted_at_gte: today_start,
+          exclude_cancelled: true,
+          exclude_duplicate_voided: true
+        )
     }
   end
 
@@ -1440,6 +1445,13 @@ defmodule Espreso.Orders do
     |> then(fn query ->
       if Keyword.get(opts, :exclude_cancelled, false) do
         where(query, [o], o.status != "cancelled")
+      else
+        query
+      end
+    end)
+    |> then(fn query ->
+      if Keyword.get(opts, :exclude_duplicate_voided, false) do
+        where(query, [o], is_nil(o.duplicate_voided_at))
       else
         query
       end
