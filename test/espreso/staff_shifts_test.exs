@@ -33,18 +33,14 @@ defmodule Espreso.StaffShiftsTest do
       assert StaffShifts.get_open_shift(user) == shift
     end
 
-    test "auto-closes existing open shift and opens a new one", %{user: user} do
+    test "resumes existing open shift instead of creating another", %{user: user} do
       assert {:ok, first} = StaffShifts.open_shift_for_login(user)
-      assert {:ok, second} = StaffShifts.open_shift_for_login(user)
+      assert {:ok, resumed} = StaffShifts.open_shift_for_login(user)
 
-      first = Repo.get!(StaffShift, first.id)
-      assert first.end_reason == "auto_close"
-      assert %DateTime{} = first.ended_at
-      assert is_nil(second.ended_at)
-      assert is_nil(second.end_reason)
-      assert DateTime.compare(second.started_at, first.started_at) in [:gt, :eq]
-      assert DateTime.compare(second.started_at, first.ended_at) in [:gt, :eq]
-      assert StaffShifts.get_open_shift(user).id == second.id
+      assert resumed.id == first.id
+      assert is_nil(resumed.ended_at)
+      assert is_nil(resumed.end_reason)
+      assert StaffShifts.get_open_shift(user).id == first.id
 
       open_count =
         StaffShift
@@ -58,24 +54,7 @@ defmodule Espreso.StaffShiftsTest do
         |> where([s], s.user_id == ^user.id)
         |> Repo.aggregate(:count, :id)
 
-      assert total == 2
-    end
-  end
-
-  describe "close_shift_for_logout/1" do
-    test "closes open shift with logout reason", %{user: user} do
-      assert {:ok, open} = StaffShifts.open_shift_for_login(user)
-      assert {:ok, closed} = StaffShifts.close_shift_for_logout(user.id)
-
-      assert closed.id == open.id
-      assert closed.end_reason == "logout"
-      assert %DateTime{} = closed.ended_at
-      assert is_nil(StaffShifts.get_open_shift(user))
-    end
-
-    test "logout with no open shift is a successful no-op", %{user: user} do
-      assert {:ok, :none} = StaffShifts.close_shift_for_logout(user.id)
-      assert is_nil(StaffShifts.get_open_shift(user))
+      assert total == 1
     end
   end
 

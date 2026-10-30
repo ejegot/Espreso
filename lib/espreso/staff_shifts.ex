@@ -194,15 +194,12 @@ defmodule Espreso.StaffShifts do
   end
 
   @doc """
-  Opens a staff shift for a successful browser login.
-
-  If an open shift already exists, closes it with `end_reason: "auto_close"`
-  and opens a new shift in the same transaction.
+  Opens a staff shift for a successful browser login, or resumes the
+  employee's existing open shift.
 
   Serializes concurrent logins for the same employee by locking the user row
-  (`FOR UPDATE`), then locking any open shift row before close+insert.
-  The partial unique index `staff_shifts_one_open_per_user` remains the
-  database invariant.
+  (`FOR UPDATE`), then locking any existing open shift row. The partial unique
+  index `staff_shifts_one_open_per_user` remains the database invariant.
   """
   def open_shift_for_login(%User{} = user) do
     now = utc_now()
@@ -214,28 +211,20 @@ defmodule Espreso.StaffShifts do
         case get_open_shift_for_update(user.id) do
           %StaffShift{} = open ->
             open
-            |> StaffShift.close_changeset(%{ended_at: now, end_reason: "auto_close"})
-            |> Repo.update()
-            |> case do
-              {:ok, _} -> :ok
-              {:error, changeset} -> Repo.rollback(changeset)
-            end
 
           nil ->
-            :ok
-        end
-
-        %StaffShift{}
-        |> StaffShift.open_changeset(%{
-          user_id: user.id,
-          started_at: now,
-          tenant_id: user.tenant_id,
-          branch_id: user.branch_id
-        })
-        |> Repo.insert()
-        |> case do
-          {:ok, shift} -> shift
-          {:error, changeset} -> Repo.rollback(changeset)
+            %StaffShift{}
+            |> StaffShift.open_changeset(%{
+              user_id: user.id,
+              started_at: now,
+              tenant_id: user.tenant_id,
+              branch_id: user.branch_id
+            })
+            |> Repo.insert()
+            |> case do
+              {:ok, shift} -> shift
+              {:error, changeset} -> Repo.rollback(changeset)
+            end
         end
       end)
 
@@ -243,16 +232,6 @@ defmodule Espreso.StaffShifts do
       {:ok, %StaffShift{} = shift} -> {:ok, shift}
       {:error, reason} -> {:error, reason}
     end
-  end
-
-  @doc """
-  Closes the employee's open staff shift on explicit logout.
-
-  Returns `{:ok, shift}` when a shift was closed, `{:ok, :none}` when there
-  was no open shift.
-  """
-  def close_shift_for_logout(user_id) when is_integer(user_id) do
-    close_open_shift(user_id, utc_now(), "logout")
   end
 
   @doc """

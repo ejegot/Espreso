@@ -40,14 +40,6 @@ defmodule EspresoWeb.StaffAuth do
   end
 
   def log_out_user(conn) do
-    case get_session(conn, :user_id) do
-      nil ->
-        :ok
-
-      user_id ->
-        maybe_close_staff_shift(user_id)
-    end
-
     conn
     |> renew_session()
     |> delete_session(:user_id)
@@ -349,22 +341,6 @@ defmodule EspresoWeb.StaffAuth do
 
   defp maybe_open_staff_shift(%User{}), do: :ok
   defp maybe_open_staff_shift(_), do: :ok
-
-  defp maybe_close_staff_shift(user_id) when is_integer(user_id) do
-    case Accounts.get_user(user_id) do
-      %User{role: "barista"} ->
-        case StaffShifts.close_shift_for_logout(user_id) do
-          {:ok, _} ->
-            :ok
-
-          {:error, reason} ->
-            Logger.error("staff shift close failed for user_id=#{user_id}: #{inspect(reason)}")
-        end
-
-      _ ->
-        :ok
-    end
-  end
 
   defp barista?(%User{role: "barista", active: true}), do: true
   defp barista?(_), do: false

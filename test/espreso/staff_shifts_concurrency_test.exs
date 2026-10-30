@@ -35,6 +35,9 @@ defmodule Espreso.StaffShiftsConcurrencyTest do
 
     assert Enum.all?(results, &match?({:ok, %StaffShift{}}, &1))
 
+    shift_ids = Enum.map(results, fn {:ok, shift} -> shift.id end)
+    assert length(Enum.uniq(shift_ids)) == 1
+
     open_shifts =
       StaffShift
       |> where([s], s.user_id == ^user.id and is_nil(s.ended_at))
@@ -45,16 +48,9 @@ defmodule Espreso.StaffShiftsConcurrencyTest do
     all_shifts =
       StaffShift
       |> where([s], s.user_id == ^user.id)
-      |> order_by([s], asc: s.id)
       |> Repo.all()
 
-    assert length(all_shifts) == 2
-
-    closed = Enum.filter(all_shifts, &(&1.ended_at != nil))
-    open = Enum.filter(all_shifts, &is_nil(&1.ended_at))
-
-    assert length(closed) == 1
-    assert length(open) == 1
-    assert hd(closed).end_reason == "auto_close"
+    assert length(all_shifts) == 1
+    assert hd(all_shifts).id == hd(shift_ids)
   end
 end

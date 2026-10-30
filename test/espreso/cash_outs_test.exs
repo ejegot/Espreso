@@ -81,7 +81,12 @@ defmodule Espreso.CashOutsTest do
 
     test "closed StaffShift is not accepted for barista", %{barista: barista} do
       assert {:ok, _} = StaffShifts.open_shift_for_login(barista)
-      assert {:ok, _} = StaffShifts.close_shift_for_logout(barista.id)
+
+      assert {:ok, _} =
+               StaffShifts.close_shift_for_shift_close(
+                 barista.id,
+                 DateTime.utc_now() |> DateTime.truncate(:second)
+               )
 
       assert {:error, :not_on_shift} =
                CashOuts.create_cash_out(barista, %{amount: "100", category: "Other"})
