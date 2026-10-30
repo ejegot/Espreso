@@ -602,6 +602,7 @@ defmodule EspresoWeb.StaffPosLiveTest do
     |> render_change(%{"notes" => "Less ice"})
 
     view |> element("#pos-discount-senior") |> render_click()
+    view |> element("#pos-ticket-extras-done") |> render_click()
 
     refute has_element?(view, "#pos-ticket-extras")
     assert has_element?(view, "#pos-ticket-extras-toggle", "Liza")
