@@ -2645,6 +2645,8 @@ defmodule Espreso.OrdersTest do
     assert {:ok, paid} = Orders.mark_paid(order, paid_via: "cash")
     original_settled_at = paid.settled_at
 
+    assert Orders.dashboard_overview().todays_count == 1
+
     assert {:error, :unauthorized} =
              Orders.void_duplicate_order(paid, barista, "Duplicate receipt")
 
@@ -2659,6 +2661,7 @@ defmodule Espreso.OrdersTest do
     assert voided.duplicate_voided_by_user_id == manager.id
     assert voided.duplicate_void_reason == "Duplicate receipt"
     assert %DateTime{} = voided.duplicate_voided_at
+    assert Orders.dashboard_overview().todays_count == 0
 
     assert {:error, :already_voided_duplicate} =
              Orders.void_duplicate_order(voided, manager, "Again")
