@@ -1019,7 +1019,7 @@ defmodule EspresoWeb.StaffAuthTest do
       assert shift_count(barista.id) == 0
     end
 
-    test "login with existing open shift auto-closes and opens one new shift", %{
+    test "login with existing open shift resumes the same shift", %{
       conn: conn,
       barista: barista
     } do
@@ -1034,18 +1034,18 @@ defmodule EspresoWeb.StaffAuthTest do
 
       assert redirected_to(conn) == ~p"/staff"
 
-      first = Repo.get!(StaffShift, first.id)
-      assert first.end_reason == "auto_close"
-      assert %DateTime{} = first.ended_at
-
       open = StaffShifts.get_open_shift(barista)
-      assert open.id != first.id
+      assert open.id == first.id
       assert is_nil(open.ended_at)
-      assert shift_count(barista.id) == 2
+      assert is_nil(open.end_reason)
+      assert shift_count(barista.id) == 1
       assert open_shift_count(barista.id) == 1
     end
 
-    test "explicit logout closes open staff shift", %{conn: conn, barista: barista} do
+    test "explicit logout clears session but keeps staff shift open", %{
+      conn: conn,
+      barista: barista
+    } do
       assert {:ok, _} = Accounts.set_pin(barista, "4321")
 
       logged_in =
@@ -1054,21 +1054,18 @@ defmodule EspresoWeb.StaffAuthTest do
           "pin" => "4321"
         })
 
-      assert %StaffShift{} = StaffShifts.get_open_shift(barista)
+      assert %StaffShift{} = open_before = StaffShifts.get_open_shift(barista)
 
       logged_out = delete(recycle(logged_in), ~p"/logout")
       assert redirected_to(logged_out) == ~p"/login"
       assert is_nil(get_session(logged_out, :user_id))
 
-      assert is_nil(StaffShifts.get_open_shift(barista))
-
-      [closed] =
-        StaffShift
-        |> where([s], s.user_id == ^barista.id)
-        |> Repo.all()
-
-      assert closed.end_reason == "logout"
-      assert %DateTime{} = closed.ended_at
+      open_after = StaffShifts.get_open_shift(barista)
+      assert open_after.id == open_before.id
+      assert is_nil(open_after.ended_at)
+      assert is_nil(open_after.end_reason)
+      assert shift_count(barista.id) == 1
+      assert open_shift_count(barista.id) == 1
     end
 
     test "logout with no open shift still succeeds", %{conn: conn, barista: barista} do

@@ -160,11 +160,16 @@ defmodule Espreso.ShiftsTest do
     assert StaffShifts.get_open_shift(a).id == open_a.id
     assert StaffShifts.get_open_shift(b).id == open_b.id
 
-    assert {:ok, _} = StaffShifts.close_shift_for_logout(b.id)
+    assert {:ok, _} =
+             StaffShifts.close_shift_for_shift_close(
+               b.id,
+               DateTime.utc_now() |> DateTime.truncate(:second)
+             )
+
     assert {:ok, close} = Shifts.record_close(a, %{counted_cash: "10"})
     assert close.closed_by_user_id == a.id
     assert Repo.get!(StaffShift, open_a.id).end_reason == "shift_close"
-    assert Repo.get!(StaffShift, open_b.id).end_reason == "logout"
+    assert Repo.get!(StaffShift, open_b.id).end_reason == "shift_close"
   end
 
   test "barista without open StaffShift cannot close" do
