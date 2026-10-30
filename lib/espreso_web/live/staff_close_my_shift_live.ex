@@ -20,7 +20,7 @@ defmodule EspresoWeb.StaffCloseMyShiftLive do
 
         {:ok,
          socket
-         |> assign(:page_title, "Close my shift")
+         |> assign(:page_title, "End My Shift")
          |> assign(:shift, shift)
          |> assign(:sales, sales)
          |> assign(:confirming?, false)
@@ -75,7 +75,7 @@ defmodule EspresoWeb.StaffCloseMyShiftLive do
     <.staff_shell
       current={:close_my_shift}
       current_user={@current_user}
-      page_title="Close my shift"
+      page_title="End My Shift"
       chrome={:bar}
     >
       <main class="staff-close-my-shift-main" id="staff-close-my-shift-desk">
@@ -156,7 +156,7 @@ defmodule EspresoWeb.StaffCloseMyShiftLive do
                       Cancel
                     </button>
                     <button phx-click="close_shift" class="btn btn-primary">
-                      Yes, close my shift
+                      Yes, end my shift
                     </button>
                   </div>
                 </div>
@@ -200,7 +200,7 @@ defmodule EspresoWeb.StaffCloseMyShiftLive do
                   phx-click="confirm_close"
                   class="flex-1 btn btn-primary bg-[#3d5a3d] text-white rounded-lg px-4 py-2 font-medium"
                 >
-                  Close my shift
+                  End My Shift
                 </button>
                 <.link
                   navigate={~p"/staff"}

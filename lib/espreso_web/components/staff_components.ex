@@ -466,7 +466,7 @@ defmodule EspresoWeb.StaffComponents do
       },
       %{
         key: :close_my_shift,
-        label: "Close my shift",
+        label: "End My Shift",
         icon: "hero-arrow-right-start-on-rectangle",
         path: ~p"/staff/close-my-shift",
         group: :shift,

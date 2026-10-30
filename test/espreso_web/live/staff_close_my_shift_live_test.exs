@@ -30,7 +30,7 @@ defmodule EspresoWeb.StaffCloseMyShiftLiveTest do
     %{conn: conn, barista: barista, owner: owner}
   end
 
-  describe "close my shift" do
+  describe "end my shift" do
     test "shows open shift details", %{conn: conn, barista: barista} do
       # Open a shift
       {:ok, _shift} = StaffShifts.open_shift_for_login(barista)
@@ -64,16 +64,16 @@ defmodule EspresoWeb.StaffCloseMyShiftLiveTest do
 
       # Confirm close
       lv
-      |> element("button", "Close my shift")
+      |> element("button", "End My Shift")
       |> render_click()
 
       # Verify button changes to confirmation
       html = render(lv)
-      assert html =~ "Yes, close my shift"
+      assert html =~ "Yes, end my shift"
 
       # Click confirmation
       lv
-      |> element("button", "Yes, close my shift")
+      |> element("button", "Yes, end my shift")
       |> render_click()
 
       # Verify shift is closed in database
@@ -93,11 +93,11 @@ defmodule EspresoWeb.StaffCloseMyShiftLiveTest do
 
       # Close the shift
       lv
-      |> element("button", "Close my shift")
+      |> element("button", "End My Shift")
       |> render_click()
 
       lv
-      |> element("button", "Yes, close my shift")
+      |> element("button", "Yes, end my shift")
       |> render_click()
 
       # Verify duration is shown
@@ -106,7 +106,7 @@ defmodule EspresoWeb.StaffCloseMyShiftLiveTest do
       assert html =~ "Duration:"
     end
 
-    test "owner cannot access close my shift page", %{conn: _conn, owner: owner} do
+    test "owner cannot access end my shift page", %{conn: _conn, owner: owner} do
       # Create a separate conn for the owner
       owner_conn =
         Phoenix.ConnTest.build_conn()
@@ -128,11 +128,11 @@ defmodule EspresoWeb.StaffCloseMyShiftLiveTest do
 
       # Close the shift
       lv
-      |> element("button", "Close my shift")
+      |> element("button", "End My Shift")
       |> render_click()
 
       lv
-      |> element("button", "Yes, close my shift")
+      |> element("button", "Yes, end my shift")
       |> render_click()
 
       # Verify back to home button exists
