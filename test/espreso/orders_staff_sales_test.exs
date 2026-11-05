@@ -390,6 +390,44 @@ defmodule Espreso.OrdersStaffSalesTest do
       assert summary.order_count == 1
       assert Decimal.equal?(summary.total, Decimal.new("100"))
     end
+
+    test "daily summary separates sales across shop dates in an overnight open shift", %{
+      employee_a: employee_a
+    } do
+      yesterday = ~D[2026-09-09]
+      today = ~D[2026-09-10]
+      {_yesterday_start, yesterday_end} = Orders.shop_day_bounds_utc(yesterday)
+      {today_start, _today_end} = Orders.shop_day_bounds_utc(today)
+
+      shift = insert_shift!(employee_a, DateTime.add(yesterday_end, -1800, :second))
+
+      create_paid_pos!(employee_a,
+        settled_at: DateTime.add(yesterday_end, -900, :second),
+        price: "150"
+      )
+
+      create_paid_pos!(employee_a,
+        settled_at: DateTime.add(today_start, 1800, :second),
+        price: "360"
+      )
+
+      yesterday_sales =
+        Orders.sales_summary_for_staff_shift_on_shop_date(shift, yesterday)
+
+      today_sales =
+        Orders.sales_summary_for_staff_shift_on_shop_date(shift, today)
+
+      whole_shift_sales = Orders.sales_summary_for_staff_shift(shift)
+
+      assert yesterday_sales.order_count == 1
+      assert Decimal.equal?(yesterday_sales.total, Decimal.new("150"))
+
+      assert today_sales.order_count == 1
+      assert Decimal.equal?(today_sales.total, Decimal.new("360"))
+
+      assert whole_shift_sales.order_count == 2
+      assert Decimal.equal?(whole_shift_sales.total, Decimal.new("510"))
+    end
   end
 
   defp pos_lines(price) do

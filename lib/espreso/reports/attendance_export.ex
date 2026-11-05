@@ -29,7 +29,7 @@ defmodule Espreso.Reports.AttendanceExport do
           shop_date
           |> StaffShifts.list_shifts_for_shop_day()
           |> Enum.map(fn %StaffShift{} = shift ->
-            sales = Orders.sales_summary_for_staff_shift(shift)
+            sales = Orders.sales_summary_for_staff_shift_on_shop_date(shift, shop_date)
 
             %{
               shop_date: shop_date,

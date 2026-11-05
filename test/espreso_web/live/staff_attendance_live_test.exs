@@ -186,7 +186,12 @@ defmodule EspresoWeb.StaffAttendanceLiveTest do
         DateTime.add(today_start, 5 * 3600, :second)
       )
 
-    sales = Orders.sales_summary_for_staff_shift(Repo.get!(StaffShift, past_shift.id))
+    sales =
+      Orders.sales_summary_for_staff_shift_on_shop_date(
+        Repo.get!(StaffShift, past_shift.id),
+        past
+      )
+
     assert sales.order_count == 1
     assert Decimal.equal?(sales.total, paid.total)
 
@@ -321,6 +326,49 @@ defmodule EspresoWeb.StaffAttendanceLiveTest do
     refute has_element?(view, "#attendance-shift-#{after_day.id}")
   end
 
+  test "attendance shows sales for the selected shop date across an overnight shift", %{
+    conn: conn,
+    manager: manager,
+    worker: worker
+  } do
+    today = Orders.shop_date_today()
+    yesterday = Date.add(today, -1)
+    {_yesterday_start, yesterday_end} = Orders.shop_day_bounds_utc(yesterday)
+    {today_start, _today_end} = Orders.shop_day_bounds_utc(today)
+
+    shift =
+      insert_open_shift!(
+        worker,
+        DateTime.add(yesterday_end, -1800, :second)
+      )
+
+    create_paid_pos!(worker,
+      settled_at: DateTime.add(yesterday_end, -900, :second),
+      price: "150"
+    )
+
+    create_paid_pos!(worker,
+      settled_at: DateTime.add(today_start, 1800, :second),
+      price: "360"
+    )
+
+    {:ok, view, _html} = live(log_in(conn, manager), ~p"/staff/attendance")
+
+    assert has_element?(view, "#attendance-shift-#{shift.id}", "Ana Worker")
+    assert has_element?(view, "#attendance-shift-#{shift.id}", "OPEN")
+    assert has_element?(view, "#attendance-shift-#{shift.id}", "1 order")
+    assert has_element?(view, "#attendance-shift-#{shift.id}", "₱360")
+    refute has_element?(view, "#attendance-shift-#{shift.id}", "₱510")
+
+    render_change(view, "select_date", %{"shop_date" => Date.to_iso8601(yesterday)})
+
+    assert has_element?(view, "#attendance-shift-#{shift.id}", "Ana Worker")
+    assert has_element?(view, "#attendance-shift-#{shift.id}", "OPEN")
+    assert has_element?(view, "#attendance-shift-#{shift.id}", "1 order")
+    assert has_element?(view, "#attendance-shift-#{shift.id}", "₱150")
+    refute has_element?(view, "#attendance-shift-#{shift.id}", "₱510")
+  end
+
   test "renders open and completed shifts with PASS 5C sales", %{
     conn: conn,
     manager: manager,
@@ -343,7 +391,12 @@ defmodule EspresoWeb.StaffAttendanceLiveTest do
       )
 
     zero_sales = Orders.sales_summary_for_staff_shift(Repo.get!(StaffShift, closed.id))
-    open_sales = Orders.sales_summary_for_staff_shift(Repo.get!(StaffShift, open.id))
+
+    open_sales =
+      Orders.sales_summary_for_staff_shift_on_shop_date(
+        Repo.get!(StaffShift, open.id),
+        Orders.shop_date_today()
+      )
 
     assert open_sales.order_count == 1
     assert Decimal.equal?(open_sales.total, paid.total)
@@ -412,8 +465,17 @@ defmodule EspresoWeb.StaffAttendanceLiveTest do
 
     set_settled_at!(customer_paid, DateTime.add(started, 700, :second))
 
-    sales_a = Orders.sales_summary_for_staff_shift(Repo.get!(StaffShift, shift_a.id))
-    sales_b = Orders.sales_summary_for_staff_shift(Repo.get!(StaffShift, shift_b.id))
+    sales_a =
+      Orders.sales_summary_for_staff_shift_on_shop_date(
+        Repo.get!(StaffShift, shift_a.id),
+        Orders.shop_date_today()
+      )
+
+    sales_b =
+      Orders.sales_summary_for_staff_shift_on_shop_date(
+        Repo.get!(StaffShift, shift_b.id),
+        Orders.shop_date_today()
+      )
 
     assert sales_a.order_count == 0
     assert sales_b.order_count == 1

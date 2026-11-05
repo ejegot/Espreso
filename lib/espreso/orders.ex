@@ -703,20 +703,55 @@ defmodule Espreso.Orders do
   orders are excluded via `source != "pos"`.
   """
   def sales_summary_for_staff_shift(%StaffShift{} = shift) do
+    sales_summary_for_staff_shift_between(shift, shift.started_at, shift.ended_at)
+  end
+
+  @doc """
+  Paid POS sales attributed to one staff shift within a Manila shop date.
+
+  The summary is limited to the intersection of the shift window and the
+  selected shop day's UTC boundaries.
+  """
+  def sales_summary_for_staff_shift_on_shop_date(
+        %StaffShift{} = shift,
+        %Date{} = shop_date
+      ) do
+    {day_start, day_end} = shop_day_bounds_utc(shop_date)
+
+    window_start =
+      if DateTime.compare(shift.started_at, day_start) == :gt,
+        do: shift.started_at,
+        else: day_start
+
+    window_end =
+      case shift.ended_at do
+        nil ->
+          day_end
+
+        ended_at ->
+          if DateTime.compare(ended_at, day_end) == :lt, do: ended_at, else: day_end
+      end
+
+    if DateTime.compare(window_start, window_end) == :lt do
+      sales_summary_for_staff_shift_between(shift, window_start, window_end)
+    else
+      %{order_count: 0, total: Decimal.new("0")}
+    end
+  end
+
+  defp sales_summary_for_staff_shift_between(shift, window_start, window_end) do
     query =
       from(o in branch_scope(Order),
         where:
           o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
             o.source == "pos" and o.settled_by_user_id == ^shift.user_id and
-            not is_nil(o.settled_at) and
-            o.settled_at >= ^shift.started_at
+            not is_nil(o.settled_at) and o.settled_at >= ^window_start
       )
 
     query =
-      case shift.ended_at do
-        nil -> query
-        ended_at -> from(o in query, where: o.settled_at < ^ended_at)
-      end
+      if is_nil(window_end),
+        do: query,
+        else: from(o in query, where: o.settled_at < ^window_end)
 
     {count, total} =
       Repo.one(from(o in query, select: {count(o.id), sum(o.total)})) || {0, nil}
