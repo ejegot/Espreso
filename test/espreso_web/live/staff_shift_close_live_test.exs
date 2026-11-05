@@ -1,11 +1,13 @@
 defmodule EspresoWeb.StaffShiftCloseLiveTest do
   use EspresoWeb.ConnCase
 
+  import Ecto.Query
   import Phoenix.LiveViewTest
 
   alias Espreso.Accounts
   alias Espreso.Menu
   alias Espreso.Orders
+  alias Espreso.Orders.Order
   alias Espreso.PettyCash
   alias Espreso.Repo
   alias Espreso.Shifts
@@ -114,6 +116,41 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     assert Decimal.equal?(close.expected_cash, Decimal.new("75"))
     assert Decimal.equal?(close.variance, Decimal.new("5"))
     assert StaffShifts.list_shifts_for_user(manager.id) == []
+  end
+
+  test "staff shift sales at close are scoped to the current shop date", %{conn: conn} do
+    {:ok, barista} =
+      Accounts.register_user(%{
+        name: "Overnight Barista",
+        email: "overnight-close-#{System.unique_integer([:positive])}@test.local",
+        password: "password123",
+        role: "barista"
+      })
+
+    today = Orders.shop_date_today()
+    {today_start, _today_end} = Orders.shop_day_bounds_utc(today)
+    yesterday = Date.add(today, -1)
+    {_, yesterday_end} = Orders.shop_day_bounds_utc(yesterday)
+
+    started_at =
+      DateTime.add(yesterday_end, -1800, :second)
+      |> DateTime.truncate(:second)
+
+    {:ok, _shift} =
+      %StaffShift{}
+      |> StaffShift.open_changeset(%{user_id: barista.id, started_at: started_at})
+      |> Repo.insert()
+
+    create_paid_pos!(barista, DateTime.add(yesterday_end, -900, :second), "150")
+    create_paid_pos!(barista, DateTime.add(today_start, 1800, :second), "360")
+
+    {:ok, view, _html} = live(conn, ~p"/staff/close")
+
+    assert has_element?(view, ".staff-shift-sales-row", "Overnight Barista")
+    assert has_element?(view, ".staff-shift-sales-row", Menu.format_price(Decimal.new("360")))
+    assert has_element?(view, ".staff-shift-sales-row", "1 orders")
+    refute has_element?(view, ".staff-shift-sales-row", Menu.format_price(Decimal.new("510")))
+    refute has_element?(view, ".staff-shift-sales-row", "2 orders")
   end
 
   @tag :without_shop_open
@@ -414,6 +451,60 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
 
     assert {:error, {:redirect, %{to: to}}} = live(inactive_conn, ~p"/staff/close")
     assert to in [~p"/login", ~p"/staff", ~p"/dashboard"]
+  end
+
+
+  defp create_paid_pos!(user, settled_at, amount) do
+    {:ok, order} =
+      Orders.create_order([insert_pos_line!(amount)], %{
+        customer_name: "Walk-in",
+        fulfillment: :pickup,
+        payment_method: :counter,
+        payment_status: :paid,
+        paid_via: "cash",
+        source: :pos,
+        settled_by_user_id: user.id,
+        settlement_source: "pos"
+      })
+
+    Repo.update_all(
+      from(o in Order, where: o.id == ^order.id),
+      set: [settled_at: settled_at]
+    )
+  end
+
+  defp insert_pos_line!(amount) do
+    category =
+      %Menu.Category{}
+      |> Menu.Category.changeset(%{name: "Close-#{System.unique_integer([:positive])}"})
+      |> Repo.insert!()
+
+    product =
+      %Menu.Product{}
+      |> Menu.Product.changeset(%{
+        name: "Drink-#{System.unique_integer([:positive])}",
+        category_id: category.id,
+        available: true
+      })
+      |> Repo.insert!()
+
+    price =
+      %Menu.ProductPrice{}
+      |> Menu.ProductPrice.changeset(%{
+        product_id: product.id,
+        size: nil,
+        price: Decimal.new(amount)
+      })
+      |> Repo.insert!()
+
+    %{
+      product_id: product.id,
+      price_id: price.id,
+      name: product.name,
+      size: price.size,
+      quantity: 1,
+      price: price.price
+    }
   end
 
   defp insert_close_snapshot!(user, shop_date, attrs) do

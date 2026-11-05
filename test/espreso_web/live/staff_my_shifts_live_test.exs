@@ -101,7 +101,12 @@ defmodule EspresoWeb.StaffMyShiftsLiveTest do
         price: "150"
       )
 
-    expected = Orders.sales_summary_for_staff_shift(Repo.get!(StaffShift, open.id))
+    expected =
+      Orders.sales_summary_for_staff_shift_on_shop_date(
+        Repo.get!(StaffShift, open.id),
+        Orders.shop_date_today()
+      )
+
     assert expected.order_count == 1
     assert Decimal.equal?(expected.total, order.total)
 
@@ -112,6 +117,43 @@ defmodule EspresoWeb.StaffMyShiftsLiveTest do
     assert has_element?(view, "#my-shifts-current", Menu.format_price(expected.total))
     refute has_element?(view, "#my-shifts-empty")
     refute has_element?(view, "#my-shift-#{open.id}")
+  end
+
+  test "current open shift shows only sales from today across an overnight shift", %{
+    conn: conn,
+    barista: barista
+  } do
+    today = Orders.shop_date_today()
+    yesterday = Date.add(today, -1)
+    {_yesterday_start, yesterday_end} = Orders.shop_day_bounds_utc(yesterday)
+    {today_start, _today_end} = Orders.shop_day_bounds_utc(today)
+
+    {:ok, shift} =
+      %StaffShift{}
+      |> StaffShift.open_changeset(%{
+        user_id: barista.id,
+        started_at: DateTime.add(yesterday_end, -1800, :second)
+      })
+      |> Repo.insert()
+
+    create_paid_pos!(barista,
+      settled_at: DateTime.add(yesterday_end, -900, :second),
+      price: "150"
+    )
+
+    create_paid_pos!(barista,
+      settled_at: DateTime.add(today_start, 1800, :second),
+      price: "360"
+    )
+
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/staff/shifts")
+
+    assert has_element?(view, "#my-shifts-current", "OPEN")
+    assert has_element?(view, "#my-shifts-current", "1 order")
+    assert has_element?(view, "#my-shifts-current", Menu.format_price(Decimal.new("360")))
+    refute has_element?(view, "#my-shifts-current", "2 orders")
+    refute has_element?(view, "#my-shifts-current", Menu.format_price(Decimal.new("510")))
+    refute has_element?(view, "#my-shift-#{shift.id}")
   end
 
   test "renders completed shifts newest first including zero-sales", %{

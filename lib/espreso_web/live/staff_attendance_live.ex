@@ -220,7 +220,7 @@ defmodule EspresoWeb.StaffAttendanceLive do
     today? = Date.compare(shop_date, today) == :eq
 
     shifts = StaffShifts.list_shifts_for_shop_day(shop_date)
-    entries = Enum.map(shifts, &with_sales/1)
+    entries = Enum.map(shifts, &with_sales(&1, shop_date))
     {working, completed} = Enum.split_with(entries, &is_nil(&1.shift.ended_at))
 
     socket
@@ -242,8 +242,8 @@ defmodule EspresoWeb.StaffAttendanceLive do
 
   defp parse_shop_date(_), do: nil
 
-  defp with_sales(%StaffShift{} = shift) do
-    %{shift: shift, sales: Orders.sales_summary_for_staff_shift(shift)}
+  defp with_sales(%StaffShift{} = shift, shop_date) do
+    %{shift: shift, sales: Orders.sales_summary_for_staff_shift_on_shop_date(shift, shop_date)}
   end
 
   defp employee_name(%StaffShift{user: %{name: name}}) when is_binary(name), do: name

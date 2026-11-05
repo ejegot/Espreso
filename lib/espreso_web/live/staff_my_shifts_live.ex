@@ -118,8 +118,11 @@ defmodule EspresoWeb.StaffMyShiftsLive do
 
     current =
       case StaffShifts.get_open_shift(user.id) do
-        %StaffShift{} = open -> with_sales(open)
-        nil -> nil
+        %StaffShift{} = open ->
+          with_sales_for_shop_date(open, Orders.shop_date_today())
+
+        nil ->
+          nil
       end
 
     %{shifts: shifts, has_next_page: has_next?, next_cursor: next_cursor} =
@@ -154,6 +157,10 @@ defmodule EspresoWeb.StaffMyShiftsLive do
 
   defp with_sales(%StaffShift{} = shift) do
     %{shift: shift, sales: Orders.sales_summary_for_staff_shift(shift)}
+  end
+
+  defp with_sales_for_shop_date(%StaffShift{} = shift, shop_date) do
+    %{shift: shift, sales: Orders.sales_summary_for_staff_shift_on_shop_date(shift, shop_date)}
   end
 
   defp format_orders(1), do: "1 order"

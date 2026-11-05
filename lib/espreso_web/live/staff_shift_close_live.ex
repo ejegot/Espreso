@@ -978,7 +978,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     staff_shift_summaries =
       staff_shifts
       |> Enum.map(fn shift ->
-        sales = Orders.sales_summary_for_staff_shift(shift)
+        sales = Orders.sales_summary_for_staff_shift_on_shop_date(shift, shop_date)
         staff_member = Repo.get(User, shift.user_id)
 
         %{
@@ -1119,8 +1119,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
   end
 
   defp other_staff_message,
-    do:
-      "Another staff member is still on shift. They need to Time Out before you can Close Shop."
+    do: "Another staff member is still on shift. They need to Time Out before you can Close Shop."
 
   defp close_success_flash(true), do: "Shift close recorded. Your staff shift has ended."
   defp close_success_flash(false), do: "Shift close recorded"
