@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-DO_HOST="${DO_HOST:-134.209.110.46}"
+DO_HOST="${DO_HOST:-}"
 DO_SSH_USER="${DO_SSH_USER:-root}"
 DO_REMOTE_BASE="${DO_REMOTE_BASE:-/opt/espreso}"
 DO_HEALTH_URL="${DO_HEALTH_URL:-http://127.0.0.1:4000/login}"
@@ -14,6 +14,8 @@ fail() {
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" ||
   fail "run this command from inside the Espreso repository"
 cd "$repo_root"
+
+[[ -n "$DO_HOST" ]] || fail "set DO_HOST to the new Droplet IP before deploying"
 
 branch="$(git branch --show-current)"
 [[ "$branch" == "main" ]] || fail "switch to main before deploying (current branch: $branch)"
@@ -83,7 +85,7 @@ docker run -d \
   --user 0:0 \
   --env-file "$env_file" \
   --env PHX_HOST=elilaikafe.devs.surf \
-  --env ALLOWED_ORIGINS=https://134-209-110-46.nip.io \
+  --env ALLOWED_ORIGINS=https://elilaikafe.devs.surf \
   "$image" >/dev/null
 
 for attempt in $(seq 1 30); do
