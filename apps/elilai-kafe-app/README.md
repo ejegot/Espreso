@@ -12,7 +12,7 @@ This directory does **not** contain a second frontend. The `www/` folder is only
 
 The shell loads:
 
-`https://134-209-110-46.nip.io/login`
+`https://elilaikafe.devs.surf/login`
 
 over HTTPS. Session cookies, CSRF, LiveView, POS, Orders, and staff flows remain on Phoenix.
 
