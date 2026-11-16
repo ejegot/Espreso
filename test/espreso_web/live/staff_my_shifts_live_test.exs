@@ -321,7 +321,10 @@ defmodule EspresoWeb.StaffMyShiftsLiveTest do
         settlement_source: "pos"
       })
 
-    Repo.update_all(from(o in Order, where: o.id == ^order.id), set: [settled_at: settled_at])
+    Repo.update_all(from(o in Order, where: o.id == ^order.id),
+      set: [settled_at: settled_at, shop_session_id: nil]
+    )
+
     Repo.get!(Order, order.id)
   end
 

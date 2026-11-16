@@ -48,6 +48,7 @@ defmodule Espreso.Orders.Order do
     has_many :payment_splits, PaymentSplit
     has_many :push_subscriptions, Espreso.CustomerPush.Subscription
     belongs_to :settled_by_user, User
+    belongs_to :shop_session, Espreso.Shifts.ShopDayOpen
     belongs_to :refunded_by_user, User
     belongs_to :duplicate_voided_by_user, User
     belongs_to :customer, Customer
@@ -84,6 +85,7 @@ defmodule Espreso.Orders.Order do
       :total,
       :settled_at,
       :settled_by_user_id,
+      :shop_session_id,
       :settlement_source,
       :cash_tendered,
       :change_due,

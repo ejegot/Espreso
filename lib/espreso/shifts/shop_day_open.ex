@@ -1,6 +1,6 @@
 defmodule Espreso.Shifts.ShopDayOpen do
   @moduledoc """
-  One opening-cash record per Manila shop day.
+  Opening cash and state for one shop session.
 
   Separate from barista Time In (`StaffShift`) and from `ShiftClose`.
   """
@@ -15,6 +15,7 @@ defmodule Espreso.Shifts.ShopDayOpen do
     field :opening_cash, :decimal
     field :opened_at, :utc_datetime
     field :notes, :string
+    field :session_active, :boolean
 
     belongs_to :opened_by_user, User
     belongs_to :tenant, Espreso.Tenancy.Tenant
@@ -31,6 +32,7 @@ defmodule Espreso.Shifts.ShopDayOpen do
       :opened_at,
       :opened_by_user_id,
       :notes,
+      :session_active,
       :tenant_id,
       :branch_id
     ])
@@ -38,7 +40,7 @@ defmodule Espreso.Shifts.ShopDayOpen do
     |> validate_number(:opening_cash, greater_than_or_equal_to: 0)
     |> validate_length(:notes, max: 500)
     |> Espreso.Tenancy.put_ids()
-    |> unique_constraint(:shop_date, name: :shop_day_opens_branch_id_shop_date_index)
+    |> unique_constraint(:session_active, name: :shop_day_opens_one_active_session_per_branch)
     |> foreign_key_constraint(:opened_by_user_id)
     |> foreign_key_constraint(:tenant_id)
     |> foreign_key_constraint(:branch_id)

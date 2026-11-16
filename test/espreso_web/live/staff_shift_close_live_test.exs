@@ -118,7 +118,7 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     assert StaffShifts.list_shifts_for_user(manager.id) == []
   end
 
-  test "staff shift sales at close are scoped to the current shop date", %{conn: conn} do
+  test "staff shift sales at close are scoped to the session across midnight", %{conn: conn} do
     {:ok, barista} =
       Accounts.register_user(%{
         name: "Overnight Barista",
@@ -147,10 +147,8 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     {:ok, view, _html} = live(conn, ~p"/staff/close")
 
     assert has_element?(view, ".staff-shift-sales-row", "Overnight Barista")
-    assert has_element?(view, ".staff-shift-sales-row", Menu.format_price(Decimal.new("360")))
-    assert has_element?(view, ".staff-shift-sales-row", "1 orders")
-    refute has_element?(view, ".staff-shift-sales-row", Menu.format_price(Decimal.new("510")))
-    refute has_element?(view, ".staff-shift-sales-row", "2 orders")
+    assert has_element?(view, ".staff-shift-sales-row", Menu.format_price(Decimal.new("510")))
+    assert has_element?(view, ".staff-shift-sales-row", "2 orders")
   end
 
   @tag :without_shop_open
@@ -251,7 +249,7 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     assert has_element?(view, "#staff-shift-close-error", "Enter the actual cash in the drawer.")
   end
 
-  test "last-active barista can access and complete close with Time Out", %{conn: conn} do
+  test "last-active barista can close without ending attendance", %{conn: conn} do
     {:ok, barista} =
       Accounts.register_user(%{
         name: "Mia",
@@ -278,21 +276,21 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     })
     |> render_submit()
 
-    assert has_element?(view, "#staff-shift-close-confirm", "Your staff shift will also end")
+    refute has_element?(view, "#staff-shift-close-confirm", "Your staff shift will also end")
 
     view
     |> element("#staff-shift-close-submit")
     |> render_click()
 
     assert has_element?(view, "#staff-shift-close-status", "Shift closed")
-    assert has_element?(view, "#staff-shift-close-timed-out")
-    assert has_element?(view, "#staff-shift-close-logout", "Log out")
+    refute has_element?(view, "#staff-shift-close-timed-out")
     refute has_element?(view, "#staff-shift-close-done a[href='/dashboard']")
 
     closed = Repo.get!(StaffShift, open.id)
-    assert closed.end_reason == "shift_close"
+    assert is_nil(closed.end_reason)
+    assert is_nil(closed.ended_at)
     assert %Shifts.ShiftClose{} = Shifts.get_todays_close()
-    assert is_nil(StaffShifts.get_open_shift(barista))
+    assert StaffShifts.get_open_shift(barista).id == open.id
   end
 
   test "non-last-active barista sees blocked state", %{conn: conn} do
@@ -452,7 +450,6 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     assert {:error, {:redirect, %{to: to}}} = live(inactive_conn, ~p"/staff/close")
     assert to in [~p"/login", ~p"/staff", ~p"/dashboard"]
   end
-
 
   defp create_paid_pos!(user, settled_at, amount) do
     {:ok, order} =

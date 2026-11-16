@@ -203,7 +203,14 @@ defmodule EspresoWeb.StaffCashOutLiveTest do
         })
 
       if void? do
-        assert {:ok, _} = CashOuts.void_cash_out(cash_out, manager, "Correction")
+        cash_out
+        |> Espreso.CashOuts.CashOut.void_changeset(%{
+          status: "voided",
+          voided_at: DateTime.utc_now() |> DateTime.truncate(:second),
+          voided_by_user_id: manager.id,
+          void_reason: "Correction"
+        })
+        |> Espreso.Repo.update!()
       end
     end
 

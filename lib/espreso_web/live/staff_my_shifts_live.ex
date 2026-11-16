@@ -119,7 +119,7 @@ defmodule EspresoWeb.StaffMyShiftsLive do
     current =
       case StaffShifts.get_open_shift(user.id) do
         %StaffShift{} = open ->
-          with_sales_for_shop_date(open, Orders.shop_date_today())
+          with_sales_for_shop_date(open, Orders.shop_business_date())
 
         nil ->
           nil

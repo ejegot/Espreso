@@ -9,6 +9,7 @@ defmodule EspresoWeb.StaffAttendanceLiveTest do
   alias Espreso.Orders
   alias Espreso.Orders.Order
   alias Espreso.Repo
+  alias Espreso.Shifts
   alias Espreso.StaffShifts.StaffShift
 
   setup %{conn: conn} do
@@ -369,6 +370,42 @@ defmodule EspresoWeb.StaffAttendanceLiveTest do
     refute has_element?(view, "#attendance-shift-#{shift.id}", "₱510")
   end
 
+  test "attendance includes a shift starting after midnight in the opening business date", %{
+    conn: conn,
+    manager: manager,
+    worker: worker
+  } do
+    date = Date.add(Orders.shop_date_today(), -2)
+    {day_start, _} = Orders.shop_day_bounds_utc(date)
+    session = Shifts.current_session()
+
+    session
+    |> Ecto.Changeset.change(
+      shop_date: date,
+      opened_at: DateTime.add(day_start, 20 * 3600, :second)
+    )
+    |> Repo.update!()
+
+    started_at = DateTime.add(day_start, 25 * 3600, :second)
+    shift = insert_shift!(worker, started_at, DateTime.add(started_at, 3600, :second))
+
+    paid =
+      create_paid_pos!(worker,
+        settled_at: DateTime.add(started_at, 1800, :second),
+        price: "360",
+        legacy: false
+      )
+
+    assert paid.shop_session_id == session.id
+    assert {:ok, %{rows: rows}} = Espreso.Reports.AttendanceExport.pack(date, date)
+    assert Enum.any?(rows, &(&1.name == worker.name and &1.order_count == 1))
+
+    {:ok, view, _html} = live(log_in(conn, manager), ~p"/staff/attendance")
+    render_change(view, "select_date", %{"shop_date" => Date.to_iso8601(date)})
+    assert has_element?(view, "#attendance-shift-#{shift.id}", "1 order")
+    assert has_element?(view, "#attendance-shift-#{shift.id}", "₱360")
+  end
+
   test "renders open and completed shifts with PASS 5C sales", %{
     conn: conn,
     manager: manager,
@@ -535,11 +572,16 @@ defmodule EspresoWeb.StaffAttendanceLiveTest do
         settlement_source: "pos"
       })
 
-    set_settled_at!(order, settled_at)
+    set_settled_at!(order, settled_at, Keyword.get(opts, :legacy, true))
   end
 
-  defp set_settled_at!(%Order{id: id}, %DateTime{} = settled_at) do
-    Repo.update_all(from(o in Order, where: o.id == ^id), set: [settled_at: settled_at])
+  defp set_settled_at!(%Order{id: id}, %DateTime{} = settled_at, legacy \\ true) do
+    updates =
+      if legacy,
+        do: [settled_at: settled_at, shop_session_id: nil],
+        else: [settled_at: settled_at]
+
+    Repo.update_all(from(o in Order, where: o.id == ^id), set: updates)
     Repo.get!(Order, id)
   end
 

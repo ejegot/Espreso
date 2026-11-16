@@ -26,8 +26,7 @@ defmodule Espreso.Reports.AttendanceExport do
     with :ok <- Orders.validate_sales_export_shop_dates(from_date, to_date) do
       rows =
         Enum.flat_map(Date.range(from_date, to_date), fn shop_date ->
-          shop_date
-          |> StaffShifts.list_shifts_for_shop_day()
+          StaffShifts.list_shifts_for_business_date(shop_date)
           |> Enum.map(fn %StaffShift{} = shift ->
             sales = Orders.sales_summary_for_staff_shift_on_shop_date(shift, shop_date)
 

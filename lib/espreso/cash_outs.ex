@@ -39,30 +39,29 @@ defmodule Espreso.CashOuts do
     with :ok <- authorize_create(actor),
          :ok <- Shifts.assert_selling_allowed(),
          {:ok, staff_shift_id} <- resolve_staff_shift_id(actor) do
-      recorded_at = utc_now()
-      shop_date = Orders.shop_date_today()
+      Repo.transaction(fn ->
+        session = Shifts.session_for_write!()
 
-      %CashOut{}
-      |> CashOut.create_changeset(%{
-        amount: Map.get(attrs, :amount) || Map.get(attrs, "amount"),
-        category: Map.get(attrs, :category) || Map.get(attrs, "category"),
-        note: Map.get(attrs, :note) || Map.get(attrs, "note"),
-        recorded_at: recorded_at,
-        shop_date: shop_date,
-        status: "recorded",
-        created_by_user_id: actor.id,
-        staff_shift_id: staff_shift_id,
-        tenant_id: actor.tenant_id,
-        branch_id: actor.branch_id
-      })
-      |> Repo.insert()
-      |> case do
-        {:ok, cash_out} ->
-          {:ok, Repo.preload(cash_out, [:created_by_user, :staff_shift])}
-
-        {:error, %Ecto.Changeset{} = changeset} ->
-          {:error, changeset}
-      end
+        %CashOut{}
+        |> CashOut.create_changeset(%{
+          amount: Map.get(attrs, :amount) || Map.get(attrs, "amount"),
+          category: Map.get(attrs, :category) || Map.get(attrs, "category"),
+          note: Map.get(attrs, :note) || Map.get(attrs, "note"),
+          recorded_at: utc_now(),
+          shop_date: session.shop_date,
+          shop_session_id: session.id,
+          status: "recorded",
+          created_by_user_id: actor.id,
+          staff_shift_id: staff_shift_id,
+          tenant_id: session.tenant_id,
+          branch_id: session.branch_id
+        })
+        |> Repo.insert()
+        |> case do
+          {:ok, cash_out} -> Repo.preload(cash_out, [:created_by_user, :staff_shift])
+          {:error, changeset} -> Repo.rollback(changeset)
+        end
+      end)
     end
   end
 
@@ -77,6 +76,15 @@ defmodule Espreso.CashOuts do
     |> where([c], c.shop_date == ^shop_date)
     |> order_by([c], desc: c.recorded_at, desc: c.id)
     |> preload([:created_by_user])
+    |> Repo.all()
+  end
+
+  def list_for_session(session_id) when is_integer(session_id) do
+    CashOut
+    |> Tenancy.scope_to_branch()
+    |> where([c], c.shop_session_id == ^session_id)
+    |> order_by([c], desc: c.recorded_at, desc: c.id)
+    |> preload(:created_by_user)
     |> Repo.all()
   end
 
@@ -97,9 +105,8 @@ defmodule Espreso.CashOuts do
   @doc """
   Read-only Cash Out history grouped by Manila shop date, newest day first.
 
-  Excludes today's shop date (`shop_date < Orders.shop_date_today/0` on the
-  first page). Optional `:cursor` is a `%Date{}` and continues with older days
-  (`shop_date < cursor`).
+  Excludes the active session but includes earlier closed sessions on the same
+  business date. Optional `:cursor` continues with older dates.
 
   Each day includes all rows (recorded + voided) and the recorded-only total
   via the existing day-scoped helpers.
@@ -119,13 +126,37 @@ defmodule Espreso.CashOuts do
       )
       |> cash_out_history_page_limit()
 
-    today = Orders.shop_date_today()
+    session = Shifts.current_session()
+    today = if session, do: session.shop_date, else: Orders.shop_date_today()
     cursor = normalize_cash_out_history_cursor(Keyword.get(opts, :cursor))
     upper_bound = cursor || today
 
+    base_query = Tenancy.scope_to_branch(CashOut)
+
+    base_query =
+      cond do
+        cursor ->
+          where(base_query, [c], c.shop_date < ^upper_bound)
+
+        session ->
+          where(
+            base_query,
+            [c],
+            c.shop_date < ^upper_bound or
+              (c.shop_date == ^upper_bound and
+                 (is_nil(c.shop_session_id) or c.shop_session_id != ^session.id))
+          )
+
+        true ->
+          where(
+            base_query,
+            [c],
+            c.shop_date <= ^upper_bound
+          )
+      end
+
     shop_dates =
-      from(c in Tenancy.scope_to_branch(CashOut),
-        where: c.shop_date < ^upper_bound,
+      from(c in base_query,
         group_by: c.shop_date,
         select: c.shop_date,
         order_by: [desc: c.shop_date],
@@ -138,10 +169,19 @@ defmodule Espreso.CashOuts do
 
     days =
       Enum.map(page_dates, fn shop_date ->
+        cash_outs =
+          list_cash_outs_for_shop_date(shop_date)
+          |> Enum.reject(fn cash_out ->
+            session && cash_out.shop_session_id == session.id
+          end)
+
         %{
           shop_date: shop_date,
-          cash_outs: list_cash_outs_for_shop_date(shop_date),
-          total: total_for_shop_date(shop_date)
+          cash_outs: cash_outs,
+          total:
+            cash_outs
+            |> Enum.filter(&(&1.status == "recorded"))
+            |> Enum.reduce(Decimal.new("0"), &Decimal.add(&1.amount, &2))
         }
       end)
 
@@ -189,6 +229,15 @@ defmodule Espreso.CashOuts do
     decimalize(total)
   end
 
+  def total_for_session(session_id) when is_integer(session_id) do
+    CashOut
+    |> Tenancy.scope_to_branch()
+    |> where([c], c.shop_session_id == ^session_id and c.status == "recorded")
+    |> select([c], sum(c.amount))
+    |> Repo.one()
+    |> decimalize()
+  end
+
   @doc """
   Non-voided Cash Outs for a shop date, newest first.
   """
@@ -206,24 +255,32 @@ defmodule Espreso.CashOuts do
   """
   def void_cash_out(%CashOut{} = cash_out, %User{} = actor, reason)
       when is_binary(reason) or is_nil(reason) do
-    with :ok <- authorize_void(actor),
-         :ok <- ensure_shop_day_open(cash_out.shop_date),
-         :ok <- ensure_recorded(cash_out) do
-      cash_out
-      |> CashOut.void_changeset(%{
-        status: "voided",
-        voided_at: utc_now(),
-        voided_by_user_id: actor.id,
-        void_reason: reason
-      })
-      |> Repo.update()
-      |> case do
-        {:ok, voided} ->
-          {:ok, Repo.preload(voided, [:created_by_user, :voided_by_user], force: true)}
+    with :ok <- authorize_void(actor) do
+      Repo.transaction(fn ->
+        session = Shifts.session_for_write!()
 
-        {:error, %Ecto.Changeset{} = changeset} ->
-          {:error, changeset}
-      end
+        current =
+          case CashOut |> Tenancy.scope_to_branch() |> Repo.get(cash_out.id) do
+            nil -> Repo.rollback(:not_found)
+            row -> row
+          end
+
+        if current.shop_session_id != session.id, do: Repo.rollback(:shop_day_closed)
+        if ensure_recorded(current) != :ok, do: Repo.rollback(:already_voided)
+
+        current
+        |> CashOut.void_changeset(%{
+          status: "voided",
+          voided_at: utc_now(),
+          voided_by_user_id: actor.id,
+          void_reason: reason
+        })
+        |> Repo.update()
+        |> case do
+          {:ok, voided} -> Repo.preload(voided, [:created_by_user, :voided_by_user], force: true)
+          {:error, changeset} -> Repo.rollback(changeset)
+        end
+      end)
     end
   end
 
@@ -233,13 +290,6 @@ defmodule Espreso.CashOuts do
 
   defp authorize_void(%User{} = user) do
     if can_void?(user), do: :ok, else: {:error, :unauthorized}
-  end
-
-  defp ensure_shop_day_open(%Date{} = shop_date) do
-    case Shifts.get_close_for_date(shop_date) do
-      nil -> :ok
-      %Shifts.ShiftClose{} -> {:error, :shop_day_closed}
-    end
   end
 
   defp ensure_recorded(%CashOut{status: "recorded"}), do: :ok

@@ -216,9 +216,6 @@ defmodule EspresoWeb.StaffPosLive do
   end
 
   def handle_event("reopen_shop_prompt", _params, socket) do
-    # Clear the closed state and show the open modal
-    Shifts.clear_shop_close()
-
     socket =
       socket
       |> assign_shop_day()

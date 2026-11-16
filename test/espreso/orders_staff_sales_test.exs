@@ -507,7 +507,10 @@ defmodule Espreso.OrdersStaffSalesTest do
   end
 
   defp set_settled_at!(%Order{id: id}, %DateTime{} = settled_at) do
-    Repo.update_all(from(o in Order, where: o.id == ^id), set: [settled_at: settled_at])
+    Repo.update_all(from(o in Order, where: o.id == ^id),
+      set: [settled_at: settled_at, shop_session_id: nil]
+    )
+
     Repo.get!(Order, id)
   end
 end

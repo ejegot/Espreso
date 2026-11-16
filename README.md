@@ -9,6 +9,19 @@ Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
 
 Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
 
+## Shop sessions
+
+Staff record opening cash to start a shop session and explicitly close it after
+counting the drawer. The business date is the Manila date of opening; sales and
+cash movements after midnight remain in that session. Staff attendance is
+separate, and opening hours do not automatically close the shop.
+
+**Cutover:** apply the session migration only while the shop is closed. Existing
+unmatched opening records remain historical and incomplete; they are not made
+active and no close timestamp is invented. Record a fresh opening at the next
+operation. Once multiple sessions have been recorded for one business date,
+rolling back the migration requires resolving those rows first.
+
 ## Deploy to DigitalOcean
 
 After merging changes into `main`, run this from a clean Espreso checkout:

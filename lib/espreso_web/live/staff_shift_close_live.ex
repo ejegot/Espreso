@@ -127,15 +127,13 @@ defmodule EspresoWeb.StaffShiftCloseLive do
 
       case Shifts.record_close(socket.assigns.current_user, params) do
         {:ok, close} ->
-          staff_shift_ended? = barista?(socket.assigns.current_user)
-
           {:noreply,
            socket
-           |> put_flash(:info, close_success_flash(staff_shift_ended?))
+           |> put_flash(:info, "Shift close recorded")
            |> assign(:close, close)
            |> assign(:already_closed?, true)
            |> assign(:blocked?, false)
-           |> assign(:staff_shift_ended?, staff_shift_ended?)
+           |> assign(:staff_shift_ended?, false)
            |> assign(:confirming?, false)
            |> assign(:form_error, nil)
            |> reset_close_history()}
@@ -149,6 +147,13 @@ defmodule EspresoWeb.StaffShiftCloseLive do
            |> assign(:confirming?, false)
            |> assign(:form_error, "Shift already closed for today.")
            |> reset_close_history()}
+
+        {:error, :shop_not_open} ->
+          {:noreply,
+           socket
+           |> assign_close_state()
+           |> assign(:confirming?, false)
+           |> assign(:form_error, Shifts.selling_blocked_message(:shop_not_open))}
 
         {:error, :other_staff_active} ->
           {:noreply,
@@ -796,18 +801,18 @@ defmodule EspresoWeb.StaffShiftCloseLive do
               :for={entry <- @close_history}
               class={[
                 "staff-shift-close-history-row",
-                history_open?(@history_open, entry.close.shop_date) && "is-open"
+                history_open?(@history_open, entry.close) && "is-open"
               ]}
-              id={"staff-shift-close-history-#{Date.to_iso8601(entry.close.shop_date)}"}
+              id={"staff-shift-close-history-#{history_key(entry.close)}"}
             >
               <button
                 type="button"
                 class="staff-shift-close-history-summary"
-                id={"staff-shift-close-history-toggle-#{Date.to_iso8601(entry.close.shop_date)}"}
+                id={"staff-shift-close-history-toggle-#{history_key(entry.close)}"}
                 phx-click="toggle_history"
-                phx-value-date={Date.to_iso8601(entry.close.shop_date)}
+                phx-value-date={history_key(entry.close)}
                 aria-expanded={
-                  if(history_open?(@history_open, entry.close.shop_date),
+                  if(history_open?(@history_open, entry.close),
                     do: "true",
                     else: "false"
                   )
@@ -832,9 +837,9 @@ defmodule EspresoWeb.StaffShiftCloseLive do
               </button>
 
               <div
-                :if={history_open?(@history_open, entry.close.shop_date)}
+                :if={history_open?(@history_open, entry.close)}
                 class="staff-shift-close-history-detail"
-                id={"staff-shift-close-history-detail-#{Date.to_iso8601(entry.close.shop_date)}"}
+                id={"staff-shift-close-history-detail-#{history_key(entry.close)}"}
               >
                 <ul class="staff-paid-breakdown staff-shift-close-history-breakdown">
                   <li :for={row <- entry.via_rows} class="staff-paid-breakdown-row">
@@ -854,9 +859,9 @@ defmodule EspresoWeb.StaffShiftCloseLive do
                   :if={Printer.enabled?()}
                   type="button"
                   class="staff-shift-close-history-print"
-                  id={"staff-shift-close-print-#{Date.to_iso8601(entry.close.shop_date)}"}
+                  id={"staff-shift-close-print-#{history_key(entry.close)}"}
                   phx-click="print_day_report"
-                  phx-value-date={Date.to_iso8601(entry.close.shop_date)}
+                  phx-value-id={entry.close.id}
                 >
                   Print
                 </button>
@@ -889,7 +894,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
           <div class="staff-confirm-dialog">
             <p class="staff-confirm-dialog-title">🔐 Close Shop?</p>
             <p class="staff-confirm-dialog-copy">
-              This will seal today's sales and cash counts.
+              This will seal this session's sales and cash counts.
             </p>
 
             <div class="staff-confirm-dialog-sections">
@@ -926,10 +931,6 @@ defmodule EspresoWeb.StaffShiftCloseLive do
               </div>
             </div>
 
-            <p :if={barista?(@current_user)} class="staff-confirm-dialog-note">
-              ⏱️ Your staff shift will also end (Time Out).
-            </p>
-
             <div class="staff-confirm-dialog-actions">
               <button
                 type="button"
@@ -962,23 +963,57 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     close = Shifts.get_todays_close()
     already_closed? = not is_nil(close)
     shop_date = if close, do: close.shop_date, else: breakdown.shop_date
-    cash_outs = CashOuts.list_recorded_for_shop_date(shop_date)
-    cash_out_total = CashOuts.total_for_shop_date(shop_date)
+
+    shop_open =
+      cond do
+        close && close.shop_session_id -> Repo.get(Shifts.ShopDayOpen, close.shop_session_id)
+        is_nil(close) -> Shifts.current_session()
+        true -> Shifts.get_open_for_date(shop_date)
+      end
+
+    session_id = if close, do: close.shop_session_id, else: shop_open && shop_open.id
+
+    cash_outs =
+      if session_id,
+        do: Enum.filter(CashOuts.list_for_session(session_id), &(&1.status == "recorded")),
+        else: CashOuts.list_recorded_for_shop_date(shop_date)
+
+    cash_out_total =
+      if session_id,
+        do: CashOuts.total_for_session(session_id),
+        else: CashOuts.total_for_shop_date(shop_date)
 
     petty_cash_entries =
-      PettyCash.list_for_shop_date(shop_date)
+      if(session_id,
+        do: PettyCash.list_for_session(session_id),
+        else: PettyCash.list_for_shop_date(shop_date)
+      )
       |> Enum.filter(&(&1.status == "recorded"))
 
-    petty_cash_total = PettyCash.total_for_shop_date(shop_date)
+    petty_cash_total =
+      if session_id,
+        do: PettyCash.total_for_session(session_id),
+        else: PettyCash.total_for_shop_date(shop_date)
+
     petty_cash_expected = Decimal.sub(PettyCash.float(), petty_cash_total) |> Decimal.round(2)
 
     # Get per-staff shift sales summary
-    staff_shifts = StaffShifts.list_shifts_for_shop_day(shop_date)
+    staff_shifts =
+      if session_id do
+        end_at = if close, do: close.closed_at, else: DateTime.utc_now()
+        StaffShifts.list_shifts_for_session(shop_open, end_at)
+      else
+        StaffShifts.list_shifts_for_shop_day(shop_date)
+      end
 
     staff_shift_summaries =
       staff_shifts
       |> Enum.map(fn shift ->
-        sales = Orders.sales_summary_for_staff_shift_on_shop_date(shift, shop_date)
+        sales =
+          if session_id,
+            do: Orders.sales_summary_for_staff_shift_in_session(shift, session_id),
+            else: Orders.sales_summary_for_staff_shift_on_shop_date(shift, shop_date)
+
         staff_member = Repo.get(User, shift.user_id)
 
         %{
@@ -1018,7 +1053,6 @@ defmodule EspresoWeb.StaffShiftCloseLive do
           end
       end
 
-    shop_open = Shifts.get_open_for_date(shop_date)
     opening_cash_amount = shop_open && shop_open.opening_cash
     cash_sales = Shifts.cash_sales_total(breakdown)
 
@@ -1094,9 +1128,10 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     %{close: close, via_rows: closed_via_rows(close)}
   end
 
-  defp history_open?(open, %Date{} = date) do
-    open == Date.to_iso8601(date)
-  end
+  defp history_key(%{shop_session_id: nil, shop_date: date}), do: Date.to_iso8601(date)
+  defp history_key(%{shop_date: date, id: id}), do: "#{Date.to_iso8601(date)}-#{id}"
+
+  defp history_open?(open, close) when is_map(close), do: open == history_key(close)
 
   defp history_open?(_, _), do: false
 
@@ -1120,9 +1155,6 @@ defmodule EspresoWeb.StaffShiftCloseLive do
 
   defp other_staff_message,
     do: "Another staff member is still on shift. They need to Time Out before you can Close Shop."
-
-  defp close_success_flash(true), do: "Shift close recorded. Your staff shift has ended."
-  defp close_success_flash(false), do: "Shift close recorded"
 
   defp barista?(%User{role: "barista"}), do: true
   defp barista?(_), do: false
@@ -1191,6 +1223,19 @@ defmodule EspresoWeb.StaffShiftCloseLive do
   defp snapshot_entry_count(_), do: 0
 
   defp printable_close(socket, params) do
+    case Map.get(params, "id") do
+      id when is_binary(id) ->
+        case Integer.parse(id) do
+          {id, ""} -> Shifts.get_close(id)
+          _ -> nil
+        end
+
+      _ ->
+        printable_close_by_date(socket, params)
+    end
+  end
+
+  defp printable_close_by_date(socket, params) do
     case Map.get(params, "date") do
       date when is_binary(date) and date != "" ->
         case Date.from_iso8601(date) do

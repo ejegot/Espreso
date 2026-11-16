@@ -22,6 +22,7 @@ defmodule Espreso.Shifts.ShiftClose do
     field :closed_at, :utc_datetime
 
     belongs_to :closed_by_user, User
+    belongs_to :shop_session, Espreso.Shifts.ShopDayOpen
     belongs_to :tenant, Espreso.Tenancy.Tenant
     belongs_to :branch, Espreso.Tenancy.Branch
 
@@ -46,6 +47,7 @@ defmodule Espreso.Shifts.ShiftClose do
       :petty_cash_transfer,
       :petty_cash_notes,
       :closed_by_user_id,
+      :shop_session_id,
       :closed_at,
       :tenant_id,
       :branch_id
@@ -62,7 +64,7 @@ defmodule Espreso.Shifts.ShiftClose do
     |> validate_length(:notes, max: 500)
     |> validate_length(:petty_cash_notes, max: 500)
     |> Espreso.Tenancy.put_ids()
-    |> unique_constraint(:shop_date, name: :shift_closes_branch_id_shop_date_index)
+    |> unique_constraint(:shop_session_id)
     |> foreign_key_constraint(:closed_by_user_id)
     |> foreign_key_constraint(:tenant_id)
     |> foreign_key_constraint(:branch_id)
