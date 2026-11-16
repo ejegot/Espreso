@@ -134,6 +134,46 @@ defmodule Espreso.OrdersPaymentRaceTest do
     assert Repo.get!(Order, order.id).payment_status == "paid"
   end
 
+  test "a close that wins the race prevents a pending payment from entering the snapshot" do
+    {:ok, manager} =
+      Espreso.Accounts.register_user(%{
+        name: "Closing manager",
+        email: "closing-race@test.local",
+        password: "password123",
+        role: "manager"
+      })
+
+    {:ok, order} =
+      Orders.create_order(
+        [line("Espresso", "75.00")],
+        %{customer_name: "Pending", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    parent = self()
+
+    Application.put_env(:espreso, :orders_apply_paid_barrier, fn ->
+      send(parent, {:apply_paid_barrier, self()})
+
+      receive do
+        :continue_apply_paid -> :ok
+      end
+    end)
+
+    task =
+      Task.async(fn ->
+        Ecto.Adapters.SQL.Sandbox.allow(Repo, parent, self())
+        Orders.mark_paid(order, paid_via: "cash")
+      end)
+
+    assert_receive {:apply_paid_barrier, pid}
+    assert {:ok, close} = Espreso.Shifts.record_close(manager, %{counted_cash: "0"})
+    send(pid, :continue_apply_paid)
+
+    assert {:error, :shop_day_closed} = Task.await(task)
+    assert close.system_count == 0
+    assert Repo.get!(Order, order.id).payment_status == "unpaid"
+  end
+
   defp online_order!(session_id) do
     {:ok, order} =
       Orders.create_order(

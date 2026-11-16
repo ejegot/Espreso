@@ -2985,6 +2985,23 @@ defmodule EspresoWeb.StaffPosLiveTest do
     assert has_element?(view, "#staff-pos-open-shop-form")
   end
 
+  test "opening another session preserves the previous close", %{
+    conn: conn,
+    manager: manager,
+    barista: barista
+  } do
+    assert {:ok, close} = Espreso.Shifts.record_close(manager, %{counted_cash: "0"})
+    {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")
+    assert has_element?(view, "#staff-pos-closed-open-btn")
+
+    view |> element("#staff-pos-closed-open-btn") |> render_click()
+    view |> form("#staff-pos-open-shop-form", %{open: %{opening_cash: "100"}}) |> render_submit()
+
+    assert has_element?(view, "#pos-place-order")
+    assert Espreso.Shifts.current_session().id != close.shop_session_id
+    assert Espreso.Shifts.get_close(close.id).id == close.id
+  end
+
   @tag :without_shop_open
   test "opening cash modal accepts input and records open", %{conn: conn, barista: barista} do
     {:ok, view, _html} = live(log_in(conn, barista), ~p"/pos")

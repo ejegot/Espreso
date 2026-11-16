@@ -3,9 +3,6 @@ defmodule Espreso.StaffShifts do
   Employee attendance shifts (Time In / Time Out).
 
   Browser login opens a shift; explicit logout closes it.
-  A successful shop-day Close Shift may also end the closing barista's shift
-  with `end_reason: "shift_close"`.
-
   Separate from shop-day `Espreso.Shifts` / `ShiftClose`.
   """
 
@@ -14,7 +11,9 @@ defmodule Espreso.StaffShifts do
   alias Espreso.Accounts.User
   alias Espreso.Orders
   alias Espreso.Repo
+  alias Espreso.Shifts
   alias Espreso.StaffShifts.StaffShift
+  alias Espreso.Tenancy
 
   @doc """
   Returns the employee's currently open staff shift, or `nil`.
@@ -36,6 +35,7 @@ defmodule Espreso.StaffShifts do
   def list_open_shifts(opts \\ []) when is_list(opts) do
     query =
       StaffShift
+      |> Tenancy.scope_to_branch()
       |> where([s], is_nil(s.ended_at))
       |> order_by([s], asc: s.id)
       |> preload(:user)
@@ -180,6 +180,7 @@ defmodule Espreso.StaffShifts do
     {day_start, day_end} = Orders.shop_day_bounds_utc(shop_date)
 
     StaffShift
+    |> Tenancy.scope_to_branch()
     |> where(
       [s],
       s.started_at < ^day_end and (is_nil(s.ended_at) or s.ended_at > ^day_start)
@@ -189,6 +190,47 @@ defmodule Espreso.StaffShifts do
       desc: s.started_at,
       desc: s.id
     )
+    |> preload(:user)
+    |> Repo.all()
+  end
+
+  @doc """
+  Lists shifts overlapping a calendar day or any shop session opened that day.
+  """
+  def list_shifts_for_business_date(%Date{} = shop_date) do
+    session_shifts =
+      shop_date
+      |> Shifts.list_opens_for_shop_dates(shop_date)
+      |> Enum.flat_map(fn session ->
+        close = Shifts.get_close_for_session(session.id)
+
+        cond do
+          session.session_active == true ->
+            list_shifts_for_session(session, DateTime.utc_now())
+
+          close ->
+            list_shifts_for_session(session, close.closed_at)
+
+          true ->
+            []
+        end
+      end)
+
+    (list_shifts_for_shop_day(shop_date) ++ session_shifts)
+    |> Enum.uniq_by(& &1.id)
+    |> Enum.sort_by(fn shift ->
+      {if(is_nil(shift.ended_at), do: 0, else: 1), -DateTime.to_unix(shift.started_at), -shift.id}
+    end)
+  end
+
+  def list_shifts_for_session(session, end_at) do
+    StaffShift
+    |> Tenancy.scope_to_branch()
+    |> where(
+      [s],
+      s.started_at <= ^end_at and (is_nil(s.ended_at) or s.ended_at >= ^session.opened_at)
+    )
+    |> order_by([s], desc: s.started_at, desc: s.id)
     |> preload(:user)
     |> Repo.all()
   end

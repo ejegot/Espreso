@@ -193,6 +193,14 @@ defmodule Espreso.Orders do
           Map.get(attrs, "skip_loyalty_earn") == true
 
       Ecto.Multi.new()
+      |> Ecto.Multi.run(:session, fn _repo, _changes ->
+        Shifts.lock_session!()
+
+        case Shifts.current_session() do
+          nil -> Shifts.assert_selling_allowed()
+          session -> {:ok, session}
+        end
+      end)
       |> Ecto.Multi.run(:prices, fn repo, _changes ->
         if skip_prices? do
           {:ok, :skipped}
@@ -200,7 +208,17 @@ defmodule Espreso.Orders do
           validate_authoritative_prices(repo, lines, source)
         end
       end)
-      |> Ecto.Multi.insert(:order, Order.changeset(%Order{}, order_attrs))
+      |> Ecto.Multi.insert(:order, fn %{session: session} ->
+        attrs =
+          if payment_status == "paid",
+            do:
+              order_attrs
+              |> Map.put(:shop_session_id, session.id)
+              |> Map.put(:settled_at, DateTime.utc_now() |> DateTime.truncate(:second)),
+            else: order_attrs
+
+        Order.changeset(%Order{}, attrs)
+      end)
       |> Ecto.Multi.run(:items, fn repo, %{order: order} ->
         snapshots = product_snapshots_for_lines(repo, lines)
 
@@ -654,10 +672,8 @@ defmodule Espreso.Orders do
   def validate_sales_export_shop_dates(_, _), do: {:error, :invalid_range}
 
   @doc """
-  Paid orders settled within inclusive Asia/Manila shop dates `[from_date, to_date]`.
-
-  Uses half-open UTC bounds via `shop_day_bounds_utc/1` on `settled_at`:
-  `[from_start, to_end)`.
+  Paid orders for inclusive session business dates `[from_date, to_date]`.
+  Legacy orders without a session use their Manila settlement date.
 
   Only `payment_status == "paid"` rows with non-nil `settled_at` are included.
   Results are ordered by `settled_at ASC`, `id ASC` and preload `:items` and
@@ -668,17 +684,15 @@ defmodule Espreso.Orders do
   """
   def list_paid_orders_for_shop_dates(%Date{} = from_date, %Date{} = to_date) do
     with :ok <- validate_sales_export_shop_dates(from_date, to_date) do
-      {from_start, _} = shop_day_bounds_utc(from_date)
-      {_, to_end} = shop_day_bounds_utc(to_date)
-
       query =
         from(o in branch_scope(Order),
           where:
             o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
-              not is_nil(o.settled_at) and o.settled_at >= ^from_start and o.settled_at < ^to_end,
+              not is_nil(o.settled_at),
           order_by: [asc: o.settled_at, asc: o.id],
-          preload: [:items, :settled_by_user, :payment_splits]
+          preload: [:items, :settled_by_user, :payment_splits, :shop_session]
         )
+        |> filter_paid_shop_dates(from_date, to_date)
 
       count = Repo.aggregate(query, :count, :id)
 
@@ -706,37 +720,48 @@ defmodule Espreso.Orders do
     sales_summary_for_staff_shift_between(shift, shift.started_at, shift.ended_at)
   end
 
-  @doc """
-  Paid POS sales attributed to one staff shift within a Manila shop date.
+  def sales_summary_for_staff_shift_in_session(%StaffShift{} = shift, session_id) do
+    query =
+      from(o in branch_scope(Order),
+        where:
+          o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
+            o.source == "pos" and o.settled_by_user_id == ^shift.user_id and
+            o.shop_session_id == ^session_id and o.settled_at >= ^shift.started_at
+      )
 
-  The summary is limited to the intersection of the shift window and the
-  selected shop day's UTC boundaries.
+    query =
+      if shift.ended_at,
+        do: where(query, [o], o.settled_at < ^shift.ended_at),
+        else: query
+
+    {count, total} = Repo.one(from(o in query, select: {count(o.id), sum(o.total)}))
+    %{order_count: count, total: decimalize(total)}
+  end
+
+  @doc """
+  Paid POS sales attributed to one staff shift for a business date.
+  Legacy sales without a session use their Manila settlement date.
   """
   def sales_summary_for_staff_shift_on_shop_date(
         %StaffShift{} = shift,
         %Date{} = shop_date
       ) do
-    {day_start, day_end} = shop_day_bounds_utc(shop_date)
+    query =
+      from(o in branch_scope(Order),
+        where:
+          o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
+            o.source == "pos" and o.settled_by_user_id == ^shift.user_id and
+            o.settled_at >= ^shift.started_at
+      )
+      |> filter_paid_shop_dates(shop_date, shop_date)
 
-    window_start =
-      if DateTime.compare(shift.started_at, day_start) == :gt,
-        do: shift.started_at,
-        else: day_start
+    query =
+      if shift.ended_at,
+        do: where(query, [o], o.settled_at < ^shift.ended_at),
+        else: query
 
-    window_end =
-      case shift.ended_at do
-        nil ->
-          day_end
-
-        ended_at ->
-          if DateTime.compare(ended_at, day_end) == :lt, do: ended_at, else: day_end
-      end
-
-    if DateTime.compare(window_start, window_end) == :lt do
-      sales_summary_for_staff_shift_between(shift, window_start, window_end)
-    else
-      %{order_count: 0, total: Decimal.new("0")}
-    end
+    {count, total} = Repo.one(from(o in query, select: {count(o.id), sum(o.total)}))
+    %{order_count: count, total: decimalize(total)}
   end
 
   defp sales_summary_for_staff_shift_between(shift, window_start, window_end) do
@@ -769,14 +794,14 @@ defmodule Espreso.Orders do
 
   defp transaction_query(filters) do
     normalized = normalize_transaction_filters(filters)
-    {day_start, day_end} = shop_day_bounds_utc(normalized.date)
 
     query =
       from(o in branch_scope(Order),
         where:
           o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
-            not is_nil(o.settled_at) and o.settled_at >= ^day_start and o.settled_at < ^day_end
+            not is_nil(o.settled_at)
       )
+      |> filter_paid_shop_dates(normalized.date, normalized.date)
       |> filter_transaction_search(normalized.search)
       |> filter_transaction_value(:paid_via, normalized.payment)
       |> filter_transaction_value(:status, normalized.status)
@@ -819,11 +844,11 @@ defmodule Espreso.Orders do
   defp normalize_transaction_date(value) when is_binary(value) do
     case Date.from_iso8601(value) do
       {:ok, date} -> date
-      _ -> shop_date_today()
+      _ -> shop_business_date()
     end
   end
 
-  defp normalize_transaction_date(_), do: shop_date_today()
+  defp normalize_transaction_date(_), do: shop_business_date()
 
   defp normalize_transaction_search(value) when is_binary(value) do
     value
@@ -963,7 +988,7 @@ defmodule Espreso.Orders do
   """
   def dashboard_overview do
     active_statuses = ["received", "preparing"]
-    today_start = shop_day_start_utc()
+    today_start = session_start_utc()
 
     %{
       active_count: count_orders(status: active_statuses),
@@ -992,7 +1017,7 @@ defmodule Espreso.Orders do
   Excludes cancelled orders.
   """
   def list_todays_orders(limit \\ 5) when is_integer(limit) and limit > 0 do
-    today_start = shop_day_start_utc()
+    today_start = session_start_utc()
 
     branch_scope(Order)
     |> where([o], o.inserted_at >= ^today_start and o.status != "cancelled")
@@ -1024,7 +1049,7 @@ defmodule Espreso.Orders do
   end
 
   defp todays_unpaid_query do
-    today_start = shop_day_start_utc()
+    today_start = session_start_utc()
 
     from(o in branch_scope(Order),
       where:
@@ -1060,40 +1085,57 @@ defmodule Espreso.Orders do
   def list_orders_for_customer(_, _), do: []
 
   @doc """
-  Today's paid sales broken down by `paid_via` (current Asia/Manila shop day).
+  Current session's paid sales broken down by `paid_via`.
 
   Only `payment_status == "paid"` orders are included. Cancelled orders that
   somehow remain paid are still counted if paid (cancel is unpaid-only in practice).
   Nil/`paid_via` values are rolled into `"counter"`.
   """
   def todays_paid_breakdown do
-    today_start = shop_day_start_utc()
+    case Shifts.current_session() do
+      nil -> paid_breakdown_for_shop_date(shop_date_today())
+      session -> paid_breakdown_for_session(session)
+    end
+  end
 
+  def paid_breakdown_for_session(%Shifts.ShopDayOpen{} = session) do
     orders =
       from(o in branch_scope(Order),
         where:
           o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
-            o.settled_at >= ^today_start,
+            o.shop_session_id == ^session.id,
         preload: :payment_splits
       )
       |> Repo.all()
 
-    breakdown_from_paid_orders(orders, shop_date_today())
+    breakdown_from_paid_orders(orders, session.shop_date)
   end
 
   @doc """
-  Paid sales broken down by `paid_via` for one Asia/Manila shop date.
-
-  Half-open UTC bounds via `shop_day_bounds_utc/1` on `settled_at`.
+  Paid sales for a business date, including legacy calendar-date sales.
   """
   def paid_breakdown_for_shop_date(%Date{} = shop_date) do
-    {day_start, day_end} = shop_day_bounds_utc(shop_date)
+    orders =
+      from(o in branch_scope(Order),
+        where:
+          o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
+            not is_nil(o.settled_at),
+        preload: :payment_splits
+      )
+      |> filter_paid_shop_dates(shop_date, shop_date)
+      |> Repo.all()
+
+    breakdown_from_paid_orders(orders, shop_date)
+  end
+
+  def paid_breakdown_for_legacy_shop_date(%Date{} = shop_date) do
+    {start_at, end_at} = shop_day_bounds_utc(shop_date)
 
     orders =
       from(o in branch_scope(Order),
         where:
           o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
-            not is_nil(o.settled_at) and o.settled_at >= ^day_start and o.settled_at < ^day_end,
+            is_nil(o.shop_session_id) and o.settled_at >= ^start_at and o.settled_at < ^end_at,
         preload: :payment_splits
       )
       |> Repo.all()
@@ -1108,9 +1150,12 @@ defmodule Espreso.Orders do
     {day_start, day_end} = shop_day_bounds_utc(shop_date)
 
     from(o in branch_scope(Order),
+      left_join: session in assoc(o, :shop_session),
       where:
         o.payment_status == "refunded" and not is_nil(o.refunded_at) and
-          o.refunded_at >= ^day_start and o.refunded_at < ^day_end,
+          ((not is_nil(o.shop_session_id) and session.shop_date == ^shop_date) or
+             (is_nil(o.shop_session_id) and o.refunded_at >= ^day_start and
+                o.refunded_at < ^day_end)),
       select: sum(o.total)
     )
     |> Repo.one()
@@ -1143,6 +1188,13 @@ defmodule Espreso.Orders do
     |> DateTime.to_date()
   end
 
+  def shop_business_date do
+    case Shifts.current_session() do
+      nil -> shop_date_today()
+      session -> session.shop_date
+    end
+  end
+
   @doc """
   UTC half-open time range for an Asia/Manila shop date.
   """
@@ -1153,6 +1205,19 @@ defmodule Espreso.Orders do
       |> DateTime.add(-@shop_utc_offset_seconds, :second)
 
     {day_start, DateTime.add(day_start, 1, :day)}
+  end
+
+  defp filter_paid_shop_dates(query, from_date, to_date) do
+    {from_start, _} = shop_day_bounds_utc(from_date)
+    {_, to_end} = shop_day_bounds_utc(to_date)
+
+    from(o in query,
+      left_join: session in assoc(o, :shop_session),
+      where:
+        (not is_nil(o.shop_session_id) and session.shop_date >= ^from_date and
+           session.shop_date <= ^to_date) or
+          (is_nil(o.shop_session_id) and o.settled_at >= ^from_start and o.settled_at < ^to_end)
+    )
   end
 
   @doc """
@@ -1176,16 +1241,17 @@ defmodule Espreso.Orders do
   Uses `Order.total` aggregates — does not load items.
   """
   def reports_overview do
-    today_start = shop_day_start_utc()
-    period_start = DateTime.add(today_start, -6, :day)
+    today = shop_business_date()
+    period_start = Date.add(today, -6)
 
     paid_period =
       branch_scope(Order)
       |> where(
         [o],
         o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
-          o.settled_at >= ^period_start
+          not is_nil(o.settled_at)
       )
+      |> filter_paid_shop_dates(period_start, today)
 
     total = Repo.aggregate(paid_period, :sum, :total) || Decimal.new("0")
     count = Repo.aggregate(paid_period, :count, :id)
@@ -1202,22 +1268,22 @@ defmodule Espreso.Orders do
   Used by the owner/manager dashboard bar chart.
   """
   def paid_sales_chart(days \\ 7) when is_integer(days) and days > 0 do
-    today = shop_date_today()
-    today_start = shop_day_start_utc()
-    period_start = DateTime.add(today_start, -(days - 1), :day)
+    today = shop_business_date()
+    period_start = Date.add(today, -(days - 1))
 
     rows =
       from(o in branch_scope(Order),
         where:
           o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
-            not is_nil(o.settled_at) and o.settled_at >= ^period_start,
-        select: {o.settled_at, o.total}
+            not is_nil(o.settled_at)
       )
+      |> filter_paid_shop_dates(period_start, today)
+      |> select([o, session], {session.shop_date, o.settled_at, o.total})
       |> Repo.all()
 
     grouped =
-      Enum.reduce(rows, %{}, fn {settled_at, total}, acc ->
-        date = shop_date_from_utc(settled_at)
+      Enum.reduce(rows, %{}, fn {session_date, settled_at, total}, acc ->
+        date = session_date || shop_date_from_utc(settled_at)
         {sum, count} = Map.get(acc, date, {Decimal.new("0"), 0})
         Map.put(acc, date, {Decimal.add(sum, decimalize(total)), count + 1})
       end)
@@ -1338,7 +1404,7 @@ defmodule Espreso.Orders do
   - `:rank` — `:total` (peso, default) or `:quantity`
   """
   def paid_item_sales(opts \\ []) when is_list(opts) do
-    today = shop_date_today()
+    today = shop_business_date()
     from_date = Keyword.get(opts, :from, today)
     to_date = Keyword.get(opts, :to, from_date)
     limit = Keyword.get(opts, :limit)
@@ -1350,9 +1416,14 @@ defmodule Espreso.Orders do
     rows =
       from(i in OrderItem,
         join: o in assoc(i, :order),
+        left_join: session in assoc(o, :shop_session),
         where:
           o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
-            not is_nil(o.settled_at) and o.settled_at >= ^from_start and o.settled_at < ^to_end and
+            not is_nil(o.settled_at) and
+            ((not is_nil(o.shop_session_id) and session.shop_date >= ^from_date and
+                session.shop_date <= ^to_date) or
+               (is_nil(o.shop_session_id) and o.settled_at >= ^from_start and
+                  o.settled_at < ^to_end)) and
             o.branch_id == ^Tenancy.current_branch_id(),
         group_by: [i.name, i.item_owner],
         select: %{
@@ -1443,6 +1514,14 @@ defmodule Espreso.Orders do
   defp item_sales_number(_), do: 0.0
 
   # CoffeeSpot shop calendar helpers live above; kept here for call-site clarity.
+
+  @doc false
+  def session_start_utc do
+    case Shifts.current_session() do
+      nil -> shop_day_start_utc()
+      session -> session.opened_at
+    end
+  end
 
   @doc false
   def shop_day_start_utc do
@@ -1590,7 +1669,26 @@ defmodule Espreso.Orders do
 
       true ->
         with :ok <- Shifts.assert_selling_allowed() do
-          atomically_refund_paid_order(id, user.id, reason)
+          Repo.transaction(fn ->
+            session = Shifts.session_for_write!()
+
+            order = branch_scope(Order) |> Repo.get(id)
+
+            cond do
+              is_nil(order) ->
+                Repo.rollback(:not_found)
+
+              order.shop_session_id != session.id ->
+                Repo.rollback(:shop_day_closed)
+
+              true ->
+                case atomically_refund_paid_order(id, user.id, reason) do
+                  {:ok, order} -> order
+                  {:error, reason} -> Repo.rollback(reason)
+                end
+            end
+          end)
+          |> broadcast()
         end
     end
   end
@@ -1621,7 +1719,7 @@ defmodule Espreso.Orders do
           |> Repo.get!(order_id)
           |> Repo.preload([:items, :payment_splits, :refunded_by_user])
 
-        broadcast({:ok, order})
+        {:ok, order}
 
       0 ->
         case Repo.get(Order, order_id) do
@@ -1651,50 +1749,52 @@ defmodule Espreso.Orders do
           {:error, :duplicate_void_reason_required}
 
         true ->
-          now = DateTime.utc_now() |> DateTime.truncate(:second)
+          Repo.transaction(fn ->
+            Shifts.lock_session!()
+            now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-          {count, _} =
-            from(o in branch_scope(Order),
-              where:
-                o.id == ^id and o.payment_status == "paid" and
-                  is_nil(o.duplicate_voided_at) and is_nil(o.refunded_at)
-            )
-            |> Repo.update_all(
-              set: [
-                duplicate_voided_at: now,
-                duplicate_voided_by_user_id: user.id,
-                duplicate_void_reason: reason,
-                updated_at: now
-              ]
-            )
+            {count, _} =
+              from(o in branch_scope(Order),
+                where:
+                  o.id == ^id and o.payment_status == "paid" and
+                    is_nil(o.duplicate_voided_at) and is_nil(o.refunded_at)
+              )
+              |> Repo.update_all(
+                set: [
+                  duplicate_voided_at: now,
+                  duplicate_voided_by_user_id: user.id,
+                  duplicate_void_reason: reason,
+                  updated_at: now
+                ]
+              )
 
-          case count do
-            1 ->
-              order =
+            case count do
+              1 ->
                 branch_scope(Order)
                 |> where([o], o.id == ^id)
                 |> preload([:items, :payment_splits, :duplicate_voided_by_user])
                 |> Repo.one()
 
-              broadcast({:ok, order})
+              0 ->
+                reason =
+                  case branch_scope(Order) |> where([o], o.id == ^id) |> Repo.one() do
+                    nil ->
+                      :not_found
 
-            0 ->
-              case branch_scope(Order)
-                   |> where([o], o.id == ^id)
-                   |> Repo.one() do
-                nil ->
-                  {:error, :not_found}
+                    %Order{duplicate_voided_at: timestamp} when not is_nil(timestamp) ->
+                      :already_voided_duplicate
 
-                %Order{duplicate_voided_at: timestamp} when not is_nil(timestamp) ->
-                  {:error, :already_voided_duplicate}
+                    %Order{payment_status: status} when status != "paid" ->
+                      :not_paid
 
-                %Order{payment_status: status} when status != "paid" ->
-                  {:error, :not_paid}
+                    _ ->
+                      :not_voidable
+                  end
 
-                _ ->
-                  {:error, :not_voidable}
-              end
-          end
+                Repo.rollback(reason)
+            end
+          end)
+          |> broadcast()
       end
     else
       {:error, :unauthorized}
@@ -2501,7 +2601,6 @@ defmodule Espreso.Orders do
     invoke_apply_paid_barrier!()
 
     now = DateTime.utc_now() |> DateTime.truncate(:second)
-    settled_at = Map.fetch!(settlement_attrs, :settled_at)
     settled_by_user_id = Map.get(settlement_attrs, :settled_by_user_id)
     settlement_source = Map.fetch!(settlement_attrs, :settlement_source)
     cash_tendered = Map.get(settlement_attrs, :cash_tendered)
@@ -2528,7 +2627,17 @@ defmodule Espreso.Orders do
 
     result =
       Ecto.Multi.new()
-      |> Ecto.Multi.run(:claim, fn repo, _changes ->
+      |> Ecto.Multi.run(:session, fn _repo, _changes ->
+        Shifts.lock_session!()
+
+        case Shifts.current_session() do
+          nil -> Shifts.assert_selling_allowed()
+          session -> {:ok, session}
+        end
+      end)
+      |> Ecto.Multi.run(:claim, fn repo, %{session: session} ->
+        settled_at = DateTime.utc_now() |> DateTime.truncate(:second)
+
         {count, _} =
           payment_query
           |> update([o],
@@ -2536,6 +2645,7 @@ defmodule Espreso.Orders do
               payment_status: "paid",
               paid_via: ^paid_via,
               settled_at: ^settled_at,
+              shop_session_id: ^session.id,
               settled_by_user_id: ^settled_by_user_id,
               settlement_source: ^settlement_source,
               cash_tendered: ^cash_tendered,

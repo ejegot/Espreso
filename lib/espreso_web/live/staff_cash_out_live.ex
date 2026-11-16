@@ -522,8 +522,9 @@ defmodule EspresoWeb.StaffCashOutLive do
 
   defp assign_cash_out_state(socket) do
     user = socket.assigns.current_user
-    shop_date = Orders.shop_date_today()
-    shop_day_closed? = not is_nil(Espreso.Shifts.get_close_for_date(shop_date))
+    session = Shifts.current_session()
+    shop_date = if session, do: session.shop_date, else: Orders.shop_date_today()
+    shop_day_closed? = Shifts.shop_day_status() == :closed
 
     {blocked?, block_message} =
       cond do
@@ -541,7 +542,11 @@ defmodule EspresoWeb.StaffCashOutLive do
           {false, nil}
       end
 
-    cash_outs = CashOuts.list_cash_outs_for_shop_date(shop_date)
+    cash_outs =
+      if session,
+        do: CashOuts.list_for_session(session.id),
+        else: CashOuts.list_cash_outs_for_shop_date(shop_date)
+
     recorded = Enum.filter(cash_outs, &(&1.status == "recorded"))
 
     socket
@@ -553,7 +558,13 @@ defmodule EspresoWeb.StaffCashOutLive do
     |> assign(:can_void?, CashOuts.can_void?(user))
     |> assign(:cash_outs, cash_outs)
     |> assign(:recorded_cash_outs, recorded)
-    |> assign(:total, CashOuts.total_for_shop_date(shop_date))
+    |> assign(
+      :total,
+      if(session,
+        do: CashOuts.total_for_session(session.id),
+        else: CashOuts.total_for_shop_date(shop_date)
+      )
+    )
     |> assign(:amount, "")
     |> assign(:category, "")
     |> assign(:open_category, false)
@@ -568,13 +579,25 @@ defmodule EspresoWeb.StaffCashOutLive do
 
   defp reload_list(socket) do
     shop_date = socket.assigns.shop_date
-    cash_outs = CashOuts.list_cash_outs_for_shop_date(shop_date)
+    session = Shifts.current_session()
+
+    cash_outs =
+      if session,
+        do: CashOuts.list_for_session(session.id),
+        else: CashOuts.list_cash_outs_for_shop_date(shop_date)
+
     recorded = Enum.filter(cash_outs, &(&1.status == "recorded"))
 
     socket
     |> assign(:cash_outs, cash_outs)
     |> assign(:recorded_cash_outs, recorded)
-    |> assign(:total, CashOuts.total_for_shop_date(shop_date))
+    |> assign(
+      :total,
+      if(session,
+        do: CashOuts.total_for_session(session.id),
+        else: CashOuts.total_for_shop_date(shop_date)
+      )
+    )
   end
 
   defp reset_cash_out_history(socket) do

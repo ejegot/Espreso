@@ -26,6 +26,7 @@ defmodule Espreso.CashOuts.CashOut do
 
     belongs_to :created_by_user, User, foreign_key: :created_by_user_id
     belongs_to :staff_shift, StaffShift
+    belongs_to :shop_session, Espreso.Shifts.ShopDayOpen
     belongs_to :voided_by_user, User, foreign_key: :voided_by_user_id
     belongs_to :tenant, Espreso.Tenancy.Tenant
     belongs_to :branch, Espreso.Tenancy.Branch
@@ -47,6 +48,7 @@ defmodule Espreso.CashOuts.CashOut do
       :status,
       :created_by_user_id,
       :staff_shift_id,
+      :shop_session_id,
       :tenant_id,
       :branch_id
     ])

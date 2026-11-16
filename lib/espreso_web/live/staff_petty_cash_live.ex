@@ -333,8 +333,9 @@ defmodule EspresoWeb.StaffPettyCashLive do
 
   defp assign_state(socket) do
     user = socket.assigns.current_user
-    shop_date = Orders.shop_date_today()
-    shop_day_closed? = not is_nil(Shifts.get_close_for_date(shop_date))
+    session = Shifts.current_session()
+    shop_date = if session, do: session.shop_date, else: Orders.shop_date_today()
+    shop_day_closed? = Shifts.shop_day_status() == :closed
 
     {blocked?, block_message} =
       cond do
@@ -370,9 +371,19 @@ defmodule EspresoWeb.StaffPettyCashLive do
   end
 
   defp load_entries(socket, shop_date) do
-    entries = PettyCash.list_for_shop_date(shop_date)
+    session = Shifts.current_session()
+
+    entries =
+      if session,
+        do: PettyCash.list_for_session(session.id),
+        else: PettyCash.list_for_shop_date(shop_date)
+
     recorded = Enum.filter(entries, &(&1.status == "recorded"))
-    total = PettyCash.total_for_shop_date(shop_date)
+
+    total =
+      if session,
+        do: PettyCash.total_for_session(session.id),
+        else: PettyCash.total_for_shop_date(shop_date)
 
     socket
     |> assign(:entries, entries)

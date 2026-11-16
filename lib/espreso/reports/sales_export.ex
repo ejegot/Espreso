@@ -80,7 +80,7 @@ defmodule Espreso.Reports.SalesExport do
     rows =
       Enum.map(orders, fn %Order{} = order ->
         [
-          shop_date_string(order.settled_at),
+          order_shop_date_string(order),
           settled_at_string(order.settled_at),
           order.number || "",
           source_label(order.source),
@@ -106,7 +106,7 @@ defmodule Espreso.Reports.SalesExport do
       |> Enum.flat_map(fn %Order{} = order ->
         settler = settled_by_name(order)
         paid_via = Orders.split_payment_label(order) || Orders.paid_via_label(order.paid_via)
-        shop_date = shop_date_string(order.settled_at)
+        shop_date = order_shop_date_string(order)
 
         (order.items || [])
         |> Enum.sort_by(& &1.id)
@@ -127,6 +127,11 @@ defmodule Espreso.Reports.SalesExport do
 
     %Sheet{name: "Items", rows: [@items_headers | rows]}
   end
+
+  defp order_shop_date_string(%Order{shop_session: %{shop_date: %Date{} = date}}),
+    do: Date.to_iso8601(date)
+
+  defp order_shop_date_string(%Order{settled_at: settled_at}), do: shop_date_string(settled_at)
 
   defp shop_date_string(%DateTime{} = settled_at) do
     settled_at

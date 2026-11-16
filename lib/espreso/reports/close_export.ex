@@ -65,12 +65,12 @@ defmodule Espreso.Reports.CloseExport do
       closes =
         from_date
         |> Shifts.list_closes_for_shop_dates(to_date)
-        |> Map.new(&{&1.shop_date, &1})
+        |> Enum.group_by(& &1.shop_date)
 
       opens =
         from_date
         |> Shifts.list_opens_for_shop_dates(to_date)
-        |> Map.new(&{&1.shop_date, &1})
+        |> Enum.group_by(& &1.shop_date)
 
       cash_outs = CashOuts.list_cash_outs_for_shop_dates(from_date, to_date)
       cash_outs_by_date = Enum.group_by(cash_outs, & &1.shop_date)
@@ -78,11 +78,11 @@ defmodule Espreso.Reports.CloseExport do
       petty_cash_by_date = Enum.group_by(petty_cash_entries, & &1.shop_date)
 
       days =
-        Enum.map(Date.range(from_date, to_date), fn shop_date ->
-          day_row(
+        Enum.flat_map(Date.range(from_date, to_date), fn shop_date ->
+          rows_for_date(
             shop_date,
-            Map.get(opens, shop_date),
-            Map.get(closes, shop_date),
+            Map.get(opens, shop_date, []),
+            Map.get(closes, shop_date, []),
             Map.get(cash_outs_by_date, shop_date, []),
             Map.get(petty_cash_by_date, shop_date, [])
           )
@@ -148,6 +148,45 @@ defmodule Espreso.Reports.CloseExport do
     {:ok, {filename, PlainPdf.render("Elilai Kafe day close", lines)}}
   end
 
+  defp rows_for_date(date, opens, closes, cash_outs, petty_cash_entries) do
+    session_opens = Enum.reject(opens, &is_nil(&1.session_active))
+    legacy_open = Enum.find(opens, &is_nil(&1.session_active))
+    legacy_close = Enum.find(closes, &is_nil(&1.shop_session_id))
+    legacy_cash_outs = Enum.filter(cash_outs, &is_nil(&1.shop_session_id))
+    legacy_petty_cash = Enum.filter(petty_cash_entries, &is_nil(&1.shop_session_id))
+
+    session_rows =
+      Enum.map(session_opens, fn open ->
+        close = Enum.find(closes, &(&1.shop_session_id == open.id))
+
+        day_row(
+          date,
+          open,
+          close,
+          Enum.filter(cash_outs, &(&1.shop_session_id == open.id)),
+          Enum.filter(petty_cash_entries, &(&1.shop_session_id == open.id))
+        )
+      end)
+
+    legacy_rows =
+      if legacy_open || legacy_close || legacy_cash_outs != [] || legacy_petty_cash != [] ||
+           session_rows == [] do
+        [
+          day_row(
+            date,
+            legacy_open,
+            legacy_close,
+            legacy_cash_outs,
+            legacy_petty_cash
+          )
+        ]
+      else
+        []
+      end
+
+    legacy_rows ++ session_rows
+  end
+
   defp day_row(shop_date, open, close, cash_outs, petty_cash_entries) do
     recorded_outs = Enum.filter(cash_outs, &(&1.status == "recorded"))
 
@@ -188,13 +227,17 @@ defmodule Espreso.Reports.CloseExport do
         }
 
       open ->
-        breakdown = Orders.paid_breakdown_for_shop_date(shop_date)
+        breakdown =
+          if is_nil(open.session_active),
+            do: Orders.paid_breakdown_for_legacy_shop_date(shop_date),
+            else: Orders.paid_breakdown_for_session(open)
+
         cash_sales = Shifts.cash_sales_total(breakdown)
         opening = open.opening_cash
 
         %{
           shop_date: shop_date,
-          status: "Open",
+          status: if(open.session_active == true, do: "Open", else: "Incomplete"),
           opened_by: user_name(open.opened_by_user),
           closed_by: "",
           closed_at: nil,

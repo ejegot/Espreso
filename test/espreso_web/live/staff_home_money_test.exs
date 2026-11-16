@@ -97,7 +97,8 @@ defmodule EspresoWeb.StaffHomeMoneyTest do
     assert has_element?(closed_view, "#staff-home-drawer-close", "View Close Shop")
     assert has_element?(closed_view, "#staff-home-reports", "View reports")
     refute has_element?(closed_view, "#staff-home-pos")
-    refute has_element?(closed_view, "#staff-home-shop-open")
+    assert has_element?(closed_view, "#staff-home-shop-open", "Opening cash required")
+    assert has_element?(closed_view, "#staff-home-open-shop", "Enter opening cash")
     refute has_element?(closed_view, "#staff-home-close")
   end
 

@@ -454,7 +454,7 @@ defmodule Espreso.OrdersTest do
     {1, _} =
       Repo.update_all(
         from(o in Order, where: o.id == ^old.id),
-        set: [settled_at: yesterday]
+        set: [settled_at: yesterday, shop_session_id: nil]
       )
 
     %{orders: today, filters: filters} = Orders.list_transactions(%{})
@@ -1525,6 +1525,10 @@ defmodule Espreso.OrdersTest do
   test "list_todays_orders filters today only, newest first, and respects limit" do
     lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
 
+    Espreso.Shifts.current_session()
+    |> Ecto.Changeset.change(opened_at: Orders.shop_day_start_utc())
+    |> Repo.update!()
+
     {:ok, older_today} =
       Orders.create_order(lines, %{
         customer_name: "Older",
@@ -1627,7 +1631,12 @@ defmodule Espreso.OrdersTest do
     {1, _} =
       Espreso.Repo.update_all(
         from(o in Espreso.Orders.Order, where: o.id == ^yesterday_paid.id),
-        set: [inserted_at: yesterday, settled_at: yesterday, updated_at: yesterday]
+        set: [
+          inserted_at: yesterday,
+          settled_at: yesterday,
+          updated_at: yesterday,
+          shop_session_id: nil
+        ]
       )
 
     sales = Orders.sales_overview()
@@ -1683,7 +1692,12 @@ defmodule Espreso.OrdersTest do
     {1, _} =
       Espreso.Repo.update_all(
         from(o in Espreso.Orders.Order, where: o.id == ^yesterday_paid.id),
-        set: [inserted_at: yesterday, settled_at: yesterday, updated_at: yesterday]
+        set: [
+          inserted_at: yesterday,
+          settled_at: yesterday,
+          updated_at: yesterday,
+          shop_session_id: nil
+        ]
       )
 
     popular = Orders.popular_products()
@@ -1850,19 +1864,34 @@ defmodule Espreso.OrdersTest do
     {1, _} =
       Espreso.Repo.update_all(
         from(o in Espreso.Orders.Order, where: o.id == ^paid_mid.id),
-        set: [inserted_at: mid_window, settled_at: mid_window, updated_at: mid_window]
+        set: [
+          inserted_at: mid_window,
+          settled_at: mid_window,
+          updated_at: mid_window,
+          shop_session_id: nil
+        ]
       )
 
     {1, _} =
       Espreso.Repo.update_all(
         from(o in Espreso.Orders.Order, where: o.id == ^paid_edge.id),
-        set: [inserted_at: edge_window, settled_at: edge_window, updated_at: edge_window]
+        set: [
+          inserted_at: edge_window,
+          settled_at: edge_window,
+          updated_at: edge_window,
+          shop_session_id: nil
+        ]
       )
 
     {1, _} =
       Espreso.Repo.update_all(
         from(o in Espreso.Orders.Order, where: o.id == ^paid_old.id),
-        set: [inserted_at: too_old, settled_at: too_old, updated_at: too_old]
+        set: [
+          inserted_at: too_old,
+          settled_at: too_old,
+          updated_at: too_old,
+          shop_session_id: nil
+        ]
       )
 
     reports = Orders.reports_overview()
@@ -1876,6 +1905,10 @@ defmodule Espreso.OrdersTest do
   test "Manila shop day counts orders after UTC midnight but before Manila midnight as previous day" do
     lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
     today_start = Orders.shop_day_start_utc()
+
+    Espreso.Shifts.current_session()
+    |> Ecto.Changeset.change(opened_at: today_start)
+    |> Repo.update!()
 
     # Just after Manila midnight (still previous UTC calendar date when offset is +8).
     after_manila_midnight = DateTime.add(today_start, 30 * 60, :second)
@@ -1943,7 +1976,8 @@ defmodule Espreso.OrdersTest do
         set: [
           inserted_at: before_manila_midnight,
           settled_at: before_manila_midnight,
-          updated_at: before_manila_midnight
+          updated_at: before_manila_midnight,
+          shop_session_id: nil
         ]
       )
 
@@ -1973,6 +2007,10 @@ defmodule Espreso.OrdersTest do
     lines = [%{name: "Espresso", size: nil, quantity: 1, price: Decimal.new("75")}]
     today_start = Orders.shop_day_start_utc()
     yesterday = DateTime.add(today_start, -60, :second)
+
+    Espreso.Shifts.current_session()
+    |> Ecto.Changeset.change(opened_at: today_start)
+    |> Repo.update!()
 
     {:ok, received} =
       Orders.create_order(lines, %{

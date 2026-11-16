@@ -151,4 +151,23 @@ defmodule Espreso.PettyCashTest do
     assert {:ok, {_filename, workbook}} = CloseExport.build_xlsx(pack)
     assert is_binary(workbook)
   end
+
+  test "history includes same-date legacy entries but excludes the active session" do
+    manager = manager!()
+    attrs = %{amount: "30", category: "Supplies", note: "Supplies"}
+    {:ok, legacy} = PettyCash.create_entry(manager, attrs)
+    legacy |> Ecto.Changeset.change(shop_session_id: nil) |> Espreso.Repo.update!()
+    {:ok, active} = PettyCash.create_entry(manager, attrs)
+
+    assert [entry] = PettyCash.list_recent_history()
+    assert entry.id == legacy.id
+    refute entry.id == active.id
+
+    assert {:ok, %{days: [legacy_day, active_day]}} =
+             CloseExport.pack(Orders.shop_date_today(), Orders.shop_date_today())
+
+    assert legacy_day.status == "Not open"
+    assert Decimal.equal?(legacy_day.petty_cash_purchases, Decimal.new("30"))
+    assert Decimal.equal?(active_day.petty_cash_purchases, Decimal.new("30"))
+  end
 end

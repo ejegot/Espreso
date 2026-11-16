@@ -548,7 +548,7 @@ defmodule EspresoWeb.StaffHomeLive do
 
     breakdown = if money?, do: Orders.todays_paid_breakdown(), else: nil
     sales = if breakdown, do: Orders.sales_overview(), else: nil
-    shop_date = Orders.shop_date_today()
+    shop_date = Orders.shop_business_date()
 
     {sales_delta, orders_delta} =
       if money? do
@@ -565,8 +565,7 @@ defmodule EspresoWeb.StaffHomeLive do
     shift_close = if money?, do: close, else: nil
     shop_day_status = Shifts.shop_day_status()
 
-    shop_open_prompt? =
-      Shifts.can_access_open?(user) and is_nil(shop_open) and is_nil(close)
+    shop_open_prompt? = Shifts.can_access_open?(user) and is_nil(shop_open)
 
     ranked = if money?, do: Orders.popular_products(), else: []
     top_seller = List.first(ranked)
@@ -635,6 +634,18 @@ defmodule EspresoWeb.StaffHomeLive do
   end
 
   defp primary_tiles(%User{} = user, overview, shop_day_status) do
+    open_shop_tile = %{
+      id: "open-shop",
+      eyebrow: "Shift",
+      title: "Enter opening cash",
+      body: "Count the drawer before selling",
+      path: ~p"/staff/open",
+      cta: "Enter opening cash →",
+      class: "staff-home-pos-cta--primary",
+      icon: "hero-lock-open",
+      show?: Shifts.can_access_open?(user)
+    }
+
     orders_tile = %{
       id: "orders",
       eyebrow: "Board",
@@ -649,22 +660,11 @@ defmodule EspresoWeb.StaffHomeLive do
 
     cond do
       shop_day_status == :not_open and Shifts.can_access_open?(user) ->
-        [
-          %{
-            id: "open-shop",
-            eyebrow: "Shift",
-            title: "Enter opening cash",
-            body: "Count the drawer before selling",
-            path: ~p"/staff/open",
-            cta: "Enter opening cash →",
-            class: "staff-home-pos-cta--primary",
-            icon: "hero-lock-open",
-            show?: true
-          }
-        ]
+        [open_shop_tile]
 
       shop_day_status == :closed ->
         [
+          open_shop_tile,
           %{
             id: "reports",
             eyebrow: "Day",
@@ -672,7 +672,7 @@ defmodule EspresoWeb.StaffHomeLive do
             body: "Shop day is closed · no new sales",
             path: ~p"/staff/reports",
             cta: "Reports →",
-            class: "staff-home-pos-cta--primary",
+            class: "staff-home-pos-cta--secondary",
             icon: "hero-chart-bar",
             show?: manager_or_owner?(user) and Authorization.can?(user, :reports)
           },
@@ -1306,7 +1306,12 @@ defmodule EspresoWeb.StaffHomeLive do
         true -> Decimal.new("0")
       end
 
-    cash_outs = CashOuts.total_for_shop_date(Orders.shop_date_today())
+    cash_outs =
+      cond do
+        close && close.shop_session_id -> CashOuts.total_for_session(close.shop_session_id)
+        shop_open && shop_open.session_active -> CashOuts.total_for_session(shop_open.id)
+        true -> CashOuts.total_for_shop_date(Orders.shop_date_today())
+      end
 
     cash_sales =
       if close do

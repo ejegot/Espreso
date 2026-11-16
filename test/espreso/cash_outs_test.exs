@@ -272,6 +272,19 @@ defmodule Espreso.CashOutsTest do
   end
 
   describe "list_cash_out_history/1" do
+    test "includes same-date legacy cash outs while excluding the active session", %{
+      manager: manager
+    } do
+      {:ok, legacy} = CashOuts.create_cash_out(manager, %{amount: "30", category: "Other"})
+      legacy |> Ecto.Changeset.change(shop_session_id: nil) |> Repo.update!()
+      {:ok, active} = CashOuts.create_cash_out(manager, %{amount: "40", category: "Other"})
+
+      assert %{days: [%{cash_outs: [entry], total: total}]} = CashOuts.list_cash_out_history()
+      assert entry.id == legacy.id
+      refute entry.id == active.id
+      assert Decimal.equal?(total, Decimal.new("30"))
+    end
+
     test "returns empty history when only today has cash outs", %{manager: manager} do
       assert {:ok, _} =
                CashOuts.create_cash_out(manager, %{amount: "25", category: "Other"})
@@ -332,12 +345,11 @@ defmodule Espreso.CashOutsTest do
 
       assert Decimal.equal?(entry.total, Decimal.new("200"))
 
-      assert {:ok, _} =
+      assert {:error, :shop_day_closed} =
                CashOuts.void_cash_out(Repo.get!(CashOut, recorded.id), manager, "Also wrong")
 
       %{days: [after_void]} = CashOuts.list_cash_out_history()
-      assert Decimal.equal?(after_void.total, Decimal.new("0"))
-      assert Enum.all?(after_void.cash_outs, &(&1.status == "voided"))
+      assert Decimal.equal?(after_void.total, Decimal.new("200"))
     end
 
     test "keyset pages by shop_date without duplicates", %{manager: manager} do

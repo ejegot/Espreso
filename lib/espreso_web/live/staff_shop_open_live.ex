@@ -1,6 +1,6 @@
 defmodule EspresoWeb.StaffShopOpenLive do
   @moduledoc """
-  Opening cash for the Manila shop day. One record per day; not Time In.
+  Opening cash for a shop session, separate from staff Time In.
   """
   use EspresoWeb, :live_view
 
@@ -31,7 +31,7 @@ defmodule EspresoWeb.StaffShopOpenLive do
   end
 
   def handle_event("record_open", %{"open" => params}, socket) do
-    if socket.assigns.already_open? or socket.assigns.already_closed? do
+    if socket.assigns.already_open? do
       {:noreply, socket}
     else
       case Shifts.record_open(socket.assigns.current_user, params) do
@@ -82,14 +82,12 @@ defmodule EspresoWeb.StaffShopOpenLive do
       <main class="staff-shift-close staff-shop-open" id="staff-shop-open">
         <header class="staff-shift-close-head">
           <p class="staff-shop-open-scope" id="staff-shop-open-scope">
-            Count the drawer once at the start of the day. Mid and close shifts do not enter this again.
+            Count the drawer at the start of the session. Staff Time In and Time Out do not reopen it.
           </p>
         </header>
 
         <p class="staff-shift-close-status" id="staff-shop-open-status">
           <%= cond do %>
-            <% @already_closed? -> %>
-              Closed
             <% @already_open? -> %>
               Opened
             <% true -> %>
@@ -106,12 +104,8 @@ defmodule EspresoWeb.StaffShopOpenLive do
           </p>
         </section>
 
-        <p :if={@already_closed? and is_nil(@open)} class="staff-shift-close-section-hint">
-          This shop day is already closed. Opening cash was not recorded.
-        </p>
-
         <form
-          :if={!@already_open? and !@already_closed?}
+          :if={!@already_open?}
           id="staff-shop-open-form"
           phx-change="validate"
           phx-submit="record_open"
@@ -151,13 +145,11 @@ defmodule EspresoWeb.StaffShopOpenLive do
 
   defp assign_open_state(socket) do
     open = Shifts.get_todays_open()
-    close = Shifts.get_todays_close()
 
     socket
     |> assign(:page_title, "Open shop")
     |> assign(:open, open)
     |> assign(:already_open?, not is_nil(open))
-    |> assign(:already_closed?, not is_nil(close))
     |> assign(:opening_cash, "")
     |> assign(:form_error, nil)
   end

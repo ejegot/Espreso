@@ -29,30 +29,30 @@ defmodule Espreso.PettyCash do
     with :ok <- authorize_create(actor),
          :ok <- Shifts.assert_selling_allowed(),
          {:ok, staff_shift_id} <- resolve_staff_shift_id(actor) do
-      shop_date = Orders.shop_date_today()
-
-      changeset =
-        %PettyCashEntry{}
-        |> PettyCashEntry.create_changeset(%{
-          amount: attr(attrs, :amount),
-          category: attr(attrs, :category),
-          note: attr(attrs, :note),
-          recorded_at: utc_now(),
-          shop_date: shop_date,
-          status: "recorded",
-          created_by_user_id: actor.id,
-          staff_shift_id: staff_shift_id,
-          tenant_id: actor.tenant_id,
-          branch_id: actor.branch_id
-        })
-
       result =
         Repo.transaction(fn ->
-          lock_petty_cash!(actor.branch_id, shop_date)
+          session = Shifts.session_for_write!()
+          lock_petty_cash!(session.branch_id, session.shop_date)
+
+          changeset =
+            %PettyCashEntry{}
+            |> PettyCashEntry.create_changeset(%{
+              amount: attr(attrs, :amount),
+              category: attr(attrs, :category),
+              note: attr(attrs, :note),
+              recorded_at: utc_now(),
+              shop_date: session.shop_date,
+              shop_session_id: session.id,
+              status: "recorded",
+              created_by_user_id: actor.id,
+              staff_shift_id: staff_shift_id,
+              tenant_id: session.tenant_id,
+              branch_id: session.branch_id
+            })
 
           if changeset.valid? do
             remaining =
-              Decimal.sub(@float, total_for_shop_date(shop_date))
+              Decimal.sub(@float, total_for_session(session.id))
               |> Decimal.max(Decimal.new("0"))
 
             if Decimal.compare(Ecto.Changeset.get_field(changeset, :amount), remaining) == :gt do
@@ -81,6 +81,15 @@ defmodule Espreso.PettyCash do
     list_for_shop_dates(shop_date, shop_date)
   end
 
+  def list_for_session(session_id) when is_integer(session_id) do
+    PettyCashEntry
+    |> Tenancy.scope_to_branch()
+    |> where([entry], entry.shop_session_id == ^session_id)
+    |> order_by([entry], desc: entry.recorded_at, desc: entry.id)
+    |> preload(:created_by_user)
+    |> Repo.all()
+  end
+
   def list_for_shop_dates(%Date{} = from_date, %Date{} = to_date) do
     PettyCashEntry
     |> Tenancy.scope_to_branch()
@@ -91,12 +100,31 @@ defmodule Espreso.PettyCash do
   end
 
   def list_recent_history do
-    today = Orders.shop_date_today()
+    session = Shifts.current_session()
+    today = if session, do: session.shop_date, else: Orders.shop_date_today()
     start_date = Date.add(today, -30)
 
-    PettyCashEntry
-    |> Tenancy.scope_to_branch()
-    |> where([entry], entry.shop_date >= ^start_date and entry.shop_date < ^today)
+    query = PettyCashEntry |> Tenancy.scope_to_branch()
+
+    query =
+      if session do
+        where(
+          query,
+          [entry],
+          entry.shop_date < ^today or
+            (entry.shop_date == ^today and
+               (is_nil(entry.shop_session_id) or entry.shop_session_id != ^session.id))
+        )
+      else
+        where(
+          query,
+          [entry],
+          entry.shop_date <= ^today
+        )
+      end
+
+    query
+    |> where([entry], entry.shop_date >= ^start_date)
     |> order_by([entry], desc: entry.shop_date, desc: entry.recorded_at, desc: entry.id)
     |> limit(100)
     |> preload([:created_by_user])
@@ -114,19 +142,43 @@ defmodule Espreso.PettyCash do
     total || Decimal.new("0")
   end
 
+  def total_for_session(session_id) when is_integer(session_id) do
+    PettyCashEntry
+    |> Tenancy.scope_to_branch()
+    |> where([entry], entry.shop_session_id == ^session_id and entry.status == "recorded")
+    |> select([entry], sum(entry.amount))
+    |> Repo.one()
+    |> Kernel.||(Decimal.new("0"))
+  end
+
   def void_entry(%PettyCashEntry{} = entry, %User{} = actor, reason)
       when is_binary(reason) do
-    with :ok <- authorize_void(actor),
-         :ok <- ensure_shop_day_open(entry.shop_date),
-         :ok <- ensure_recorded(entry) do
-      entry
-      |> PettyCashEntry.void_changeset(%{
-        status: "voided",
-        voided_at: utc_now(),
-        voided_by_user_id: actor.id,
-        void_reason: reason
-      })
-      |> Repo.update()
+    with :ok <- authorize_void(actor) do
+      Repo.transaction(fn ->
+        session = Shifts.session_for_write!()
+
+        current =
+          case PettyCashEntry |> Tenancy.scope_to_branch() |> Repo.get(entry.id) do
+            nil -> Repo.rollback(:not_found)
+            row -> row
+          end
+
+        if current.shop_session_id != session.id, do: Repo.rollback(:shop_day_closed)
+        if ensure_recorded(current) != :ok, do: Repo.rollback(:already_voided)
+
+        current
+        |> PettyCashEntry.void_changeset(%{
+          status: "voided",
+          voided_at: utc_now(),
+          voided_by_user_id: actor.id,
+          void_reason: reason
+        })
+        |> Repo.update()
+        |> case do
+          {:ok, voided} -> voided
+          {:error, changeset} -> Repo.rollback(changeset)
+        end
+      end)
     end
   end
 
@@ -138,10 +190,6 @@ defmodule Espreso.PettyCash do
 
   defp authorize_void(%User{} = user) do
     if can_void?(user), do: :ok, else: {:error, :unauthorized}
-  end
-
-  defp ensure_shop_day_open(%Date{} = shop_date) do
-    if Shifts.get_close_for_date(shop_date), do: {:error, :shop_day_closed}, else: :ok
   end
 
   defp ensure_recorded(%PettyCashEntry{status: "recorded"}), do: :ok

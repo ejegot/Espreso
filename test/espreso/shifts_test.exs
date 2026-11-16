@@ -135,18 +135,18 @@ defmodule Espreso.ShiftsTest do
     assert StaffShifts.list_shifts_for_user(owner.id) == []
   end
 
-  test "barista can close when last active and StaffShift ends with shift_close" do
+  test "barista can close when last active without ending attendance" do
     barista = barista!()
     assert {:ok, open} = StaffShifts.open_shift_for_login(barista)
 
     assert {:ok, close} = Shifts.record_close(barista, %{counted_cash: "50"})
 
     assert close.closed_by_user_id == barista.id
-    assert is_nil(StaffShifts.get_open_shift(barista))
+    assert StaffShifts.get_open_shift(barista).id == open.id
 
     closed = Repo.get!(StaffShift, open.id)
-    assert closed.end_reason == "shift_close"
-    assert DateTime.compare(closed.ended_at, close.closed_at) == :eq
+    assert is_nil(closed.end_reason)
+    assert is_nil(closed.ended_at)
   end
 
   test "barista cannot close while another StaffShift is open" do
@@ -168,7 +168,7 @@ defmodule Espreso.ShiftsTest do
 
     assert {:ok, close} = Shifts.record_close(a, %{counted_cash: "10"})
     assert close.closed_by_user_id == a.id
-    assert Repo.get!(StaffShift, open_a.id).end_reason == "shift_close"
+    assert is_nil(Repo.get!(StaffShift, open_a.id).ended_at)
     assert Repo.get!(StaffShift, open_b.id).end_reason == "shift_close"
   end
 
@@ -179,7 +179,7 @@ defmodule Espreso.ShiftsTest do
   end
 
   @tag :without_shop_open
-  test "record_open is once per shop day and snapshots into close" do
+  test "record_open is once per active session and snapshots into close" do
     manager = manager!()
     barista = barista!()
 
@@ -207,7 +207,9 @@ defmodule Espreso.ShiftsTest do
     assert Decimal.equal?(close.opening_cash, Decimal.new("500"))
     assert Decimal.equal?(close.expected_cash, Decimal.new("600"))
     assert Decimal.equal?(close.variance, Decimal.new("-10"))
-    assert {:error, :already_closed} = Shifts.record_open(manager, %{opening_cash: "1"})
+    assert {:ok, next_open} = Shifts.record_open(manager, %{opening_cash: "1"})
+    assert next_open.id != open.id
+    assert Shifts.get_close_for_date(open.shop_date).id == close.id
   end
 
   @tag :without_shop_open
@@ -245,6 +247,124 @@ defmodule Espreso.ShiftsTest do
     assert is_nil(Repo.get!(StaffShift, open.id).ended_at)
   end
 
+  @tag :without_shop_open
+  test "an overnight session keeps both sides of midnight in its close and reports" do
+    manager = manager!()
+    date = Date.add(Orders.shop_date_today(), -2)
+    {start_at, _} = Orders.shop_day_bounds_utc(date)
+    opened_at = DateTime.add(start_at, 20 * 60 * 60, :second)
+    before_midnight = DateTime.add(opened_at, 60 * 60, :second)
+    after_midnight = DateTime.add(opened_at, 6 * 60 * 60, :second)
+
+    {:ok, open} = Shifts.record_open(manager, %{opening_cash: "500"})
+
+    open
+    |> Ecto.Changeset.change(shop_date: date, opened_at: opened_at)
+    |> Repo.update!()
+
+    assert Shifts.shop_day_status() == :open
+    assert Shifts.current_session().shop_date == date
+
+    orders =
+      for {amount, at} <- [{"100", before_midnight}, {"200", after_midnight}] do
+        {:ok, order} =
+          Orders.create_order(lines(amount), %{
+            customer_name: "Overnight guest",
+            fulfillment: :pickup,
+            payment_method: :counter
+          })
+
+        {:ok, paid} = Orders.mark_paid(order, paid_via: "cash")
+
+        Repo.update_all(from(o in Espreso.Orders.Order, where: o.id == ^paid.id),
+          set: [settled_at: at]
+        )
+
+        paid
+      end
+
+    assert {:ok, cash_out} =
+             Espreso.CashOuts.create_cash_out(manager, %{amount: "20", category: "Other"})
+
+    assert {:ok, petty} =
+             Espreso.PettyCash.create_entry(manager, %{
+               amount: "50",
+               category: "Supplies",
+               note: "Supplies"
+             })
+
+    assert cash_out.shop_date == date
+    assert petty.shop_date == date
+    assert cash_out.shop_session_id == open.id
+    assert petty.shop_session_id == open.id
+    assert Decimal.equal?(Orders.todays_paid_breakdown().total, Decimal.new("300"))
+
+    assert {:ok, close} =
+             Shifts.record_close(manager, %{counted_cash: "730", petty_cash_counted: "450"})
+
+    assert close.shop_date == date
+    assert close.shop_session_id == open.id
+    assert close.system_count == 2
+    assert Decimal.equal?(close.system_total, Decimal.new("300"))
+    assert Decimal.equal?(close.expected_cash, Decimal.new("730"))
+    assert Decimal.equal?(close.variance, Decimal.new("0"))
+    assert Shifts.shop_day_status() == :closed
+    assert {:ok, reported} = Orders.list_paid_orders_for_shop_dates(date, date)
+    assert Enum.sort(Enum.map(reported, & &1.id)) == Enum.sort(Enum.map(orders, & &1.id))
+
+    assert {:ok, []} =
+             Orders.list_paid_orders_for_shop_dates(Date.add(date, 1), Date.add(date, 1))
+
+    assert {:ok, %{days: [report]}} = Espreso.Reports.CloseExport.pack(date, date)
+    assert report.status == "Closed"
+    assert Decimal.equal?(report.paid_total, Decimal.new("300"))
+    assert Decimal.equal?(report.cash_outs, Decimal.new("20"))
+  end
+
+  @tag :without_shop_open
+  test "unmatched legacy opening remains incomplete and does not become an active session" do
+    manager = manager!()
+    today = Orders.shop_date_today()
+    opened_at = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    legacy =
+      %Shifts.ShopDayOpen{}
+      |> Shifts.ShopDayOpen.changeset(%{
+        shop_date: today,
+        opening_cash: "50",
+        opened_at: opened_at,
+        opened_by_user_id: manager.id
+      })
+      |> Repo.insert!()
+
+    assert is_nil(legacy.session_active)
+    assert is_nil(Shifts.current_session())
+    assert Shifts.shop_day_status() == :not_open
+    assert {:ok, current} = Shifts.record_open(manager, %{opening_cash: "100"})
+    assert current.id != legacy.id
+    assert is_nil(Repo.get!(Shifts.ShopDayOpen, legacy.id).session_active)
+    assert {:ok, %{days: days}} = Espreso.Reports.CloseExport.pack(today, today)
+    assert Enum.map(days, & &1.status) == ["Incomplete", "Open"]
+  end
+
+  test "database rejects a second active session for the same branch" do
+    manager = manager!()
+    session = Shifts.current_session()
+
+    changeset =
+      Shifts.ShopDayOpen.changeset(%Shifts.ShopDayOpen{}, %{
+        shop_date: session.shop_date,
+        opening_cash: "10",
+        opened_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        opened_by_user_id: manager.id,
+        session_active: true
+      })
+
+    assert {:error, changeset} = Repo.insert(changeset, mode: :savepoint)
+    assert %{session_active: [_ | _]} = errors_on(changeset)
+    assert Shifts.current_session().id == session.id
+  end
+
   describe "list_close_history/1" do
     alias Espreso.Shifts.ShiftClose
 
@@ -274,6 +394,45 @@ defmodule Espreso.ShiftsTest do
 
     test "returns empty history" do
       assert %{closes: [], has_next_page: false, next_cursor: nil} = Shifts.list_close_history()
+    end
+
+    test "paginates distinct sessions opened on the same business date" do
+      manager = manager!()
+      attrs = %{customer_name: "Guest", fulfillment: :pickup, payment_method: :counter}
+      assert {:ok, order1} = Orders.create_order(lines("20"), attrs)
+      assert {:ok, _} = Orders.mark_paid(order1, paid_via: "cash")
+
+      assert {:ok, _} =
+               Espreso.CashOuts.create_cash_out(manager, %{amount: "5", category: "Other"})
+
+      assert {:ok, first} = Shifts.record_close(manager, %{counted_cash: "15"})
+      assert {:ok, _} = Shifts.record_open(manager, %{opening_cash: "0"})
+
+      assert {:ok, _} =
+               Espreso.CashOuts.create_cash_out(manager, %{amount: "2", category: "Other"})
+
+      assert %{days: [%{cash_outs: [past], total: historical_total}]} =
+               Espreso.CashOuts.list_cash_out_history()
+
+      assert past.shop_session_id == first.shop_session_id
+      assert Decimal.equal?(historical_total, Decimal.new("5"))
+      assert {:ok, order2} = Orders.create_order(lines("40"), attrs)
+      assert {:ok, _} = Orders.mark_paid(order2, paid_via: "cash")
+      assert {:ok, second} = Shifts.record_close(manager, %{counted_cash: "38"})
+      assert Decimal.equal?(first.system_total, Decimal.new("20"))
+      assert Decimal.equal?(second.system_total, Decimal.new("40"))
+
+      page1 = Shifts.list_close_history(limit: 1)
+      page2 = Shifts.list_close_history(limit: 1, cursor: page1.next_cursor)
+      assert Enum.map(page1.closes, & &1.id) == [second.id]
+      assert Enum.map(page2.closes, & &1.id) == [first.id]
+
+      assert {:ok, %{days: days}} =
+               Espreso.Reports.CloseExport.pack(first.shop_date, first.shop_date)
+
+      assert [day1, day2] = days
+      assert Decimal.equal?(day1.paid_total, Decimal.new("20"))
+      assert Decimal.equal?(day2.paid_total, Decimal.new("40"))
     end
 
     test "returns newest shop_date first with sealed snapshot fields" do
@@ -325,12 +484,12 @@ defmodule Espreso.ShiftsTest do
       page1 = Shifts.list_close_history(limit: 2)
       assert Enum.map(page1.closes, & &1.shop_date) == Enum.take(dates, 2)
       assert page1.has_next_page
-      assert page1.next_cursor == Enum.at(dates, 1)
+      assert page1.next_cursor.date == Enum.at(dates, 1)
 
       page2 = Shifts.list_close_history(limit: 2, cursor: page1.next_cursor)
       assert Enum.map(page2.closes, & &1.shop_date) == Enum.slice(dates, 2, 2)
       assert page2.has_next_page
-      assert page2.next_cursor == Enum.at(dates, 3)
+      assert page2.next_cursor.date == Enum.at(dates, 3)
 
       page3 = Shifts.list_close_history(limit: 2, cursor: page2.next_cursor)
       assert Enum.map(page3.closes, & &1.shop_date) == [List.last(dates)]
@@ -344,7 +503,7 @@ defmodule Espreso.ShiftsTest do
       assert length(all_ids) == length(Enum.uniq(all_ids))
 
       # Cursor excludes the already-loaded boundary row.
-      refute Enum.any?(page2.closes, &(&1.shop_date == page1.next_cursor))
+      refute Enum.any?(page2.closes, &(&1.shop_date == page1.next_cursor.date))
     end
 
     test "page size is respected and clamped" do

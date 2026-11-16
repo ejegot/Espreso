@@ -1,13 +1,12 @@
 defmodule Espreso.Shifts do
   @moduledoc """
-  Light end-of-day shift close snapshots for CoffeeSpot.
+  Shop sessions and close snapshots for CoffeeSpot.
 
-  Shop-wide seal (one per Manila shop day). Separate from employee
+  Shop-wide sessions are separate from employee
   `Espreso.StaffShifts` / StaffShift attendance.
 
-  Baristas may seal the day only when they are the last active StaffShift;
-  a successful barista close also ends that StaffShift (`end_reason: "shift_close"`).
-  Managers/owners retain a management/fallback close path with no StaffShift side effect.
+  Baristas may seal the day only when they are the last active StaffShift.
+  Closing the shop does not end an employee's attendance shift.
   """
 
   import Ecto.Query
@@ -21,7 +20,6 @@ defmodule Espreso.Shifts do
   alias Espreso.Shifts.ShopDayOpen
   alias Espreso.Shifts.ShiftClose
   alias Espreso.StaffShifts
-  alias Espreso.StaffShifts.StaffShift
   alias Espreso.Tenancy
 
   @close_history_page_size 25
@@ -30,13 +28,25 @@ defmodule Espreso.Shifts do
   Returns today's shift close for the current Asia/Manila shop date, if any.
   """
   def get_todays_close do
-    get_close_for_date(Orders.shop_date_today())
+    if current_session() do
+      nil
+    else
+      ShiftClose
+      |> Tenancy.scope_to_branch()
+      |> where([s], not is_nil(s.shop_session_id) or s.shop_date == ^Orders.shop_date_today())
+      |> order_by([s], desc: s.closed_at, desc: s.id)
+      |> limit(1)
+      |> preload(:closed_by_user)
+      |> Repo.one()
+    end
   end
 
   def get_close_for_date(%Date{} = shop_date) do
     ShiftClose
     |> Tenancy.scope_to_branch()
     |> where([s], s.shop_date == ^shop_date)
+    |> order_by([s], desc: s.closed_at, desc: s.id)
+    |> limit(1)
     |> preload(:closed_by_user)
     |> Repo.one()
   end
@@ -68,12 +78,12 @@ defmodule Espreso.Shifts do
   @doc """
   Read-only Close Shift history, newest Manila `shop_date` first.
 
-  Because `shop_date` is unique, keyset pagination uses that date alone:
-  optional `:cursor` is a `%Date{}` and fetches rows with `shop_date < cursor`.
+  Keyset pagination uses the business date and close ID so multiple sessions
+  opened on the same date remain visible.
 
   Optional `opts`:
   - `:limit` — page size (default #{@close_history_page_size}, clamped 1..100)
-  - `:cursor` — last visible `shop_date` from the previous page
+  - `:cursor` — `next_cursor` from the previous page
 
   Returns `%{closes, has_next_page, next_cursor}`.
   Does not recompute totals from orders — returns sealed snapshot rows as stored.
@@ -93,7 +103,7 @@ defmodule Espreso.Shifts do
       ShiftClose
       |> Tenancy.scope_to_branch()
       |> apply_close_history_cursor(cursor)
-      |> order_by([s], desc: s.shop_date)
+      |> order_by([s], desc: s.shop_date, desc: s.id)
       |> limit(^(limit + 1))
       |> preload(:closed_by_user)
 
@@ -104,7 +114,7 @@ defmodule Espreso.Shifts do
     next_cursor =
       if has_next_page? do
         case List.last(closes) do
-          %ShiftClose{shop_date: %Date{} = shop_date} -> shop_date
+          %ShiftClose{shop_date: %Date{} = shop_date, id: id} -> %{date: shop_date, id: id}
           _ -> nil
         end
       else
@@ -123,6 +133,9 @@ defmodule Espreso.Shifts do
 
   defp normalize_close_history_cursor(%Date{} = shop_date), do: shop_date
 
+  defp normalize_close_history_cursor(%{date: %Date{} = date, id: id}) when is_integer(id),
+    do: %{date: date, id: id}
+
   defp normalize_close_history_cursor(shop_date) when is_binary(shop_date) do
     case Date.from_iso8601(shop_date) do
       {:ok, date} -> date
@@ -138,6 +151,24 @@ defmodule Espreso.Shifts do
     from(s in query, where: s.shop_date < ^shop_date)
   end
 
+  defp apply_close_history_cursor(query, %{date: date, id: id}) do
+    from(s in query, where: s.shop_date < ^date or (s.shop_date == ^date and s.id < ^id))
+  end
+
+  def get_close(id) when is_integer(id) do
+    ShiftClose
+    |> Tenancy.scope_to_branch()
+    |> preload(:closed_by_user)
+    |> Repo.get(id)
+  end
+
+  def get_close_for_session(id) when is_integer(id) do
+    ShiftClose
+    |> Tenancy.scope_to_branch()
+    |> where([s], s.shop_session_id == ^id)
+    |> Repo.one()
+  end
+
   @doc """
   True when the user may open the Close Shift screen (barista / manager / owner).
   """
@@ -150,15 +181,13 @@ defmodule Espreso.Shifts do
   def can_access_open?(user), do: can_access_close?(user)
 
   @doc """
-  Manila shop-day sales gate: `:open`, `:not_open`, or `:closed`.
+  Shop session sales gate: `:open`, `:not_open`, or `:closed`.
   """
   def shop_day_status do
-    shop_date = Orders.shop_date_today()
-
     cond do
-      not is_nil(get_close_for_date(shop_date)) -> :closed
-      is_nil(get_open_for_date(shop_date)) -> :not_open
-      true -> :open
+      current_session() -> :open
+      get_todays_close() -> :closed
+      true -> :not_open
     end
   end
 
@@ -178,29 +207,54 @@ defmodule Espreso.Shifts do
     do: "Record opening cash before selling. Open shop once at the start of the day."
 
   def selling_blocked_message(:shop_day_closed),
-    do: "Shop day is closed. No new sales until tomorrow."
+    do: "Shop is closed. Record opening cash before selling."
 
   def selling_blocked_message(_), do: "Selling is not available right now."
 
   @doc """
-  Today's shop-day opening cash, if recorded.
+  The current session's opening cash, if recorded.
   """
   def get_todays_open do
-    get_open_for_date(Orders.shop_date_today())
+    current_session()
+  end
+
+  def current_session do
+    ShopDayOpen
+    |> Tenancy.scope_to_branch()
+    |> where([o], o.session_active == true)
+    |> preload(:opened_by_user)
+    |> Repo.one()
+  end
+
+  def lock_session! do
+    key = :erlang.phash2({:espreso_shop_session, Tenancy.current_branch_id()})
+    Repo.query!("SELECT pg_advisory_xact_lock($1)", [key])
+    :ok
+  end
+
+  def session_for_write! do
+    lock_session!()
+
+    case current_session() do
+      %ShopDayOpen{} = session -> session
+      nil -> Repo.rollback(if(get_todays_close(), do: :shop_day_closed, else: :shop_not_open))
+    end
   end
 
   def get_open_for_date(%Date{} = shop_date) do
     ShopDayOpen
     |> Tenancy.scope_to_branch()
     |> where([o], o.shop_date == ^shop_date)
+    |> order_by([o], desc: o.opened_at, desc: o.id)
+    |> limit(1)
     |> preload(:opened_by_user)
     |> Repo.one()
   end
 
   @doc """
-  Records opening drawer cash for today's shop date.
+  Records opening drawer cash for a new session.
 
-  One open per shop day. Blocked after the day is already sealed.
+  Only one session may be open for a branch at a time.
   Barista, manager, and owner may record it (attendance Time In is separate).
   """
   def record_open(%User{} = user, attrs \\ %{}) do
@@ -212,9 +266,6 @@ defmodule Espreso.Shifts do
   end
 
   defp do_record_open(%User{} = user, attrs) do
-    shop_date = Orders.shop_date_today()
-    opened_at = DateTime.utc_now() |> DateTime.truncate(:second)
-
     opening_cash =
       parse_required_decimal(Map.get(attrs, :opening_cash) || Map.get(attrs, "opening_cash"))
 
@@ -225,15 +276,14 @@ defmodule Espreso.Shifts do
     else
       result =
         Repo.transaction(fn ->
-          lock_shop_open!(shop_date)
+          lock_session!()
 
-          if get_close_for_date(shop_date) do
-            Repo.rollback(:already_closed)
-          end
-
-          if get_open_for_date(shop_date) do
+          if current_session() do
             Repo.rollback(:already_open)
           end
+
+          opened_at = DateTime.utc_now() |> DateTime.truncate(:second)
+          shop_date = opened_at |> DateTime.add(8 * 60 * 60, :second) |> DateTime.to_date()
 
           %ShopDayOpen{}
           |> ShopDayOpen.changeset(%{
@@ -242,8 +292,9 @@ defmodule Espreso.Shifts do
             opened_at: opened_at,
             opened_by_user_id: user.id,
             notes: notes,
-            tenant_id: user.tenant_id,
-            branch_id: user.branch_id
+            session_active: true,
+            tenant_id: Tenancy.current_tenant_id(),
+            branch_id: Tenancy.current_branch_id()
           })
           |> Repo.insert()
           |> case do
@@ -251,7 +302,7 @@ defmodule Espreso.Shifts do
               Repo.preload(open, :opened_by_user)
 
             {:error, %Ecto.Changeset{errors: errors} = changeset} ->
-              if Keyword.has_key?(errors, :shop_date) do
+              if Keyword.has_key?(errors, :session_active) do
                 Repo.rollback(:already_open)
               else
                 Repo.rollback(changeset)
@@ -334,14 +385,12 @@ defmodule Espreso.Shifts do
   end
 
   @doc """
-  Records a shift close for today's shop date.
+  Records a close for the currently open session.
 
-  Snapshots system paid totals from `Orders.todays_paid_breakdown/0`.
-  One close per shop day.
+  Snapshots the session's paid totals, cash movements, and business date.
 
-  Baristas must be the last active StaffShift; on success their open StaffShift
-  ends with `end_reason: "shift_close"` at the same `closed_at` timestamp.
-  Manager/owner closes do not touch StaffShifts.
+  Baristas must be the last active StaffShift. Closing does not end attendance
+  shifts; staff time out separately.
   """
   def record_close(%User{} = user, attrs \\ %{}) do
     cond do
@@ -357,10 +406,6 @@ defmodule Espreso.Shifts do
   end
 
   defp do_record_close(%User{} = user, attrs, mode) do
-    breakdown = Orders.todays_paid_breakdown()
-    shop_date = breakdown.shop_date
-    closed_at = DateTime.utc_now() |> DateTime.truncate(:second)
-
     counted_cash =
       parse_required_decimal(Map.get(attrs, :counted_cash) || Map.get(attrs, "counted_cash"))
 
@@ -379,25 +424,29 @@ defmodule Espreso.Shifts do
     else
       result =
         Repo.transaction(fn ->
-          lock_shop_close!(shop_date)
+          lock_session!()
 
-          case get_close_for_date(shop_date) do
-            %ShiftClose{} ->
-              Repo.rollback(:already_closed)
+          opening =
+            case current_session() do
+              %ShopDayOpen{} = session ->
+                session
 
-            nil ->
-              :ok
-          end
+              nil ->
+                Repo.rollback(if(get_todays_close(), do: :already_closed, else: :shop_not_open))
+            end
+
+          closed_at = DateTime.utc_now() |> DateTime.truncate(:second)
+          shop_date = opening.shop_date
+          breakdown = Orders.paid_breakdown_for_session(opening)
 
           if mode == :barista do
             StaffShifts.assert_last_active_closer!(user)
           end
 
-          opening = get_open_for_date(shop_date)
-          opening_cash = opening && opening.opening_cash
+          opening_cash = opening.opening_cash
           cash_sales = cash_sales_total(breakdown)
-          cash_out_total = CashOuts.total_for_shop_date(shop_date)
-          petty_cash_expenses = PettyCash.total_for_shop_date(shop_date)
+          cash_out_total = CashOuts.total_for_session(opening.id)
+          petty_cash_expenses = PettyCash.total_for_session(opening.id)
 
           petty_cash_expected =
             Decimal.sub(PettyCash.float(), petty_cash_expenses) |> Decimal.round(2)
@@ -427,6 +476,7 @@ defmodule Espreso.Shifts do
             %ShiftClose{}
             |> ShiftClose.changeset(%{
               shop_date: shop_date,
+              shop_session_id: opening.id,
               system_total: breakdown.total,
               system_count: breakdown.count,
               by_via: serialize_by_via(breakdown.by_via),
@@ -442,8 +492,8 @@ defmodule Espreso.Shifts do
               petty_cash_notes: petty_cash_notes,
               closed_by_user_id: user.id,
               closed_at: closed_at,
-              tenant_id: user.tenant_id,
-              branch_id: user.branch_id
+              tenant_id: Tenancy.current_tenant_id(),
+              branch_id: Tenancy.current_branch_id()
             })
             |> Repo.insert()
             |> case do
@@ -451,23 +501,14 @@ defmodule Espreso.Shifts do
                 close
 
               {:error, %Ecto.Changeset{errors: errors} = changeset} ->
-                if Keyword.has_key?(errors, :shop_date) do
+                if Keyword.has_key?(errors, :shop_session_id) do
                   Repo.rollback(:already_closed)
                 else
                   Repo.rollback(changeset)
                 end
             end
 
-          if mode == :barista do
-            case StaffShifts.do_close_open_shift!(user.id, closed_at, "shift_close") do
-              %StaffShift{} ->
-                :ok
-
-              :none ->
-                Repo.rollback(:not_on_shift)
-            end
-          end
-
+          opening |> Ecto.Changeset.change(session_active: false) |> Repo.update!()
           Repo.preload(close, :closed_by_user)
         end)
 
@@ -483,33 +524,8 @@ defmodule Espreso.Shifts do
     end
   end
 
-  defp lock_shop_open!(%Date{} = shop_date) do
-    key = :erlang.phash2({:espreso_shop_open, Date.to_iso8601(shop_date)})
-    Repo.query!("SELECT pg_advisory_xact_lock($1)", [key])
-    :ok
-  end
-
-  defp lock_shop_close!(%Date{} = shop_date) do
-    key = :erlang.phash2({:espreso_shop_close, Date.to_iso8601(shop_date)})
-    Repo.query!("SELECT pg_advisory_xact_lock($1)", [key])
-    :ok
-  end
-
   defp barista?(%User{role: "barista", active: true}), do: true
   defp barista?(_), do: false
-
-  @doc """
-  Clears today's shop close to allow reopening.
-  Used when staff wants to reopen the shop after closing.
-  """
-  def clear_shop_close do
-    shop_date = Orders.shop_date_today()
-
-    case get_close_for_date(shop_date) do
-      %ShiftClose{id: id} -> Repo.delete(%ShiftClose{id: id})
-      nil -> :ok
-    end
-  end
 
   @doc """
   Formats a close timestamp in Asia/Manila for staff UI.

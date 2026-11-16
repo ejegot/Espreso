@@ -94,9 +94,9 @@ defmodule EspresoWeb.StaffCloseMyShiftLiveTest do
     end
 
     test "shows only today's sales before and after closing an overnight shift", %{
-           conn: conn,
-           barista: barista
-         } do
+      conn: conn,
+      barista: barista
+    } do
       today = Orders.shop_date_today()
       {today_start, today_end} = Orders.shop_day_bounds_utc(today)
       yesterday = Date.add(today, -1)
@@ -216,7 +216,7 @@ defmodule EspresoWeb.StaffCloseMyShiftLiveTest do
 
     Repo.update_all(
       from(o in Order, where: o.id == ^order.id),
-      set: [settled_at: settled_at]
+      set: [settled_at: settled_at, shop_session_id: nil]
     )
   end
 

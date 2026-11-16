@@ -16,7 +16,8 @@ defmodule EspresoWeb.StaffCloseMyShiftLive do
 
     case StaffShifts.get_open_shift(user.id) do
       %StaffShifts.StaffShift{} = shift ->
-        sales = Orders.sales_summary_for_staff_shift_on_shop_date(shift, Orders.shop_date_today())
+        sales =
+          Orders.sales_summary_for_staff_shift_on_shop_date(shift, Orders.shop_business_date())
 
         {:ok,
          socket
@@ -42,7 +43,8 @@ defmodule EspresoWeb.StaffCloseMyShiftLive do
 
     case StaffShifts.close_shift_for_shift_close(user.id, closed_at) do
       {:ok, %StaffShifts.StaffShift{} = shift} ->
-        sales = Orders.sales_summary_for_staff_shift_on_shop_date(shift, Orders.shop_date_today())
+        sales =
+          Orders.sales_summary_for_staff_shift_on_shop_date(shift, Orders.shop_business_date())
 
         {:noreply,
          socket

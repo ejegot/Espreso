@@ -219,7 +219,7 @@ defmodule EspresoWeb.StaffAttendanceLive do
     shop_date = Map.get(socket.assigns, :selected_date) || today
     today? = Date.compare(shop_date, today) == :eq
 
-    shifts = StaffShifts.list_shifts_for_shop_day(shop_date)
+    shifts = StaffShifts.list_shifts_for_business_date(shop_date)
     entries = Enum.map(shifts, &with_sales(&1, shop_date))
     {working, completed} = Enum.split_with(entries, &is_nil(&1.shift.ended_at))
 

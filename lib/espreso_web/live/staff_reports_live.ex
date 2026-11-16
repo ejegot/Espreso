@@ -13,7 +13,7 @@ defmodule EspresoWeb.StaffReportsLive do
     user = socket.assigns.current_user
 
     if Authorization.can?(user, :reports) do
-      today = Orders.shop_date_today()
+      today = Orders.shop_business_date()
 
       {:ok,
        socket

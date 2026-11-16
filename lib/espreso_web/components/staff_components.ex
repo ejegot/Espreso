@@ -578,7 +578,8 @@ defmodule EspresoWeb.StaffComponents do
       case assigns.status do
         :closed ->
           {"Shop day is closed",
-           "No new sales until tomorrow. Mid-shift Time In/Out does not reopen the kaha.", false}
+           "Record opening cash to start a new session. Staff Time In/Out does not reopen the kaha.",
+           true}
 
         _ ->
           {"Opening cash required",
