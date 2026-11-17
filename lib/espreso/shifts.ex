@@ -226,6 +226,48 @@ defmodule Espreso.Shifts do
     |> Repo.one()
   end
 
+  def close_preview do
+    Repo.transaction(fn ->
+      lock_session!()
+
+      case current_session() do
+        %ShopDayOpen{} = session ->
+          settlement_snapshot(session)
+
+        nil ->
+          Repo.rollback(if(get_todays_close(), do: :shop_day_closed, else: :shop_not_open))
+      end
+    end)
+    |> case do
+      {:ok, snapshot} -> {:ok, snapshot}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp settlement_snapshot(session) do
+    cash_outs =
+      session.id
+      |> CashOuts.list_for_session()
+      |> Enum.filter(&(&1.status == "recorded"))
+      |> Enum.map(&{&1.id, &1.amount})
+      |> Enum.sort()
+
+    petty_cash_entries =
+      session.id
+      |> PettyCash.list_for_session()
+      |> Enum.filter(&(&1.status == "recorded"))
+      |> Enum.map(&{&1.id, &1.amount})
+      |> Enum.sort()
+
+    %{
+      session_id: session.id,
+      opening_cash: session.opening_cash,
+      breakdown: Orders.paid_breakdown_for_session(session),
+      cash_outs: cash_outs,
+      petty_cash_entries: petty_cash_entries
+    }
+  end
+
   def lock_session! do
     key = :erlang.phash2({:espreso_shop_session, Tenancy.current_branch_id()})
     Repo.query!("SELECT pg_advisory_xact_lock($1)", [key])
@@ -392,20 +434,20 @@ defmodule Espreso.Shifts do
   Baristas must be the last active StaffShift. Closing does not end attendance
   shifts; staff time out separately.
   """
-  def record_close(%User{} = user, attrs \\ %{}) do
+  def record_close(%User{} = user, attrs \\ %{}, opts \\ []) do
     cond do
       Authorization.can?(user, :reports) ->
-        do_record_close(user, attrs, :manager)
+        do_record_close(user, attrs, :manager, opts)
 
       barista?(user) ->
-        do_record_close(user, attrs, :barista)
+        do_record_close(user, attrs, :barista, opts)
 
       true ->
         {:error, :unauthorized}
     end
   end
 
-  defp do_record_close(%User{} = user, attrs, mode) do
+  defp do_record_close(%User{} = user, attrs, mode, opts) do
     counted_cash =
       parse_required_decimal(Map.get(attrs, :counted_cash) || Map.get(attrs, "counted_cash"))
 
@@ -435,9 +477,21 @@ defmodule Espreso.Shifts do
                 Repo.rollback(if(get_todays_close(), do: :already_closed, else: :shop_not_open))
             end
 
+          expected_session_id = Keyword.get(opts, :expected_session_id)
+
+          if expected_session_id && opening.id != expected_session_id do
+            Repo.rollback(:session_changed)
+          end
+
+          snapshot = settlement_snapshot(opening)
+
+          if reviewed_snapshot = Keyword.get(opts, :reviewed_snapshot) do
+            if snapshot != reviewed_snapshot, do: Repo.rollback(:settlement_changed)
+          end
+
           closed_at = DateTime.utc_now() |> DateTime.truncate(:second)
           shop_date = opening.shop_date
-          breakdown = Orders.paid_breakdown_for_session(opening)
+          breakdown = snapshot.breakdown
 
           if mode == :barista do
             StaffShifts.assert_last_active_closer!(user)
@@ -515,6 +569,8 @@ defmodule Espreso.Shifts do
       case result do
         {:ok, %ShiftClose{} = close} -> {:ok, close}
         {:error, :already_closed} -> {:error, :already_closed}
+        {:error, :session_changed} -> {:error, :session_changed}
+        {:error, :settlement_changed} -> {:error, :settlement_changed}
         {:error, :other_staff_active} -> {:error, :other_staff_active}
         {:error, :not_on_shift} -> {:error, :not_on_shift}
         {:error, :petty_cash_notes_required} -> {:error, :petty_cash_notes_required}
