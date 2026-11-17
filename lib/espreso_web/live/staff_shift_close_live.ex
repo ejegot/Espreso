@@ -36,6 +36,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
        |> assign(:petty_cash_counted, Map.get(params, "petty_cash_counted", ""))
        |> assign(:notes, Map.get(params, "notes", ""))
        |> assign(:petty_cash_notes, Map.get(params, "petty_cash_notes", ""))
+       |> assign(:reviewed_snapshot, nil)
        |> assign(:confirming?, false)
        |> assign(:form_error, nil)}
     end
@@ -98,101 +99,116 @@ defmodule EspresoWeb.StaffShiftCloseLive do
            |> assign(:form_error, "Add a reason when petty cash is over or short.")}
 
         true ->
-          {:noreply,
-           socket
-           |> assign(:counted_cash, counted)
-           |> assign(:petty_cash_counted, petty_counted)
-           |> assign(:notes, Map.get(params, "notes", ""))
-           |> assign(:petty_cash_notes, petty_notes)
-           |> assign(:confirming?, true)
-           |> assign(:form_error, nil)}
+          {:noreply, prepare_close_review(socket, params, counted, petty_counted, petty_notes)}
       end
     end
   end
 
   def handle_event("cancel_confirm", _params, socket) do
-    {:noreply, assign(socket, :confirming?, false)}
+    {:noreply,
+     socket
+     |> assign(:confirming?, false)
+     |> assign(:reviewed_snapshot, nil)}
   end
 
   def handle_event("record_close", _params, socket) do
     if socket.assigns.blocked? do
       {:noreply, assign_close_state(socket)}
     else
-      params = %{
-        "counted_cash" => socket.assigns.counted_cash,
-        "notes" => socket.assigns.notes,
-        "petty_cash_counted" => socket.assigns.petty_cash_counted,
-        "petty_cash_notes" => socket.assigns.petty_cash_notes
-      }
+      case socket.assigns.reviewed_snapshot do
+        %{session_id: session_id} = reviewed_snapshot ->
+          params = %{
+            "counted_cash" => socket.assigns.counted_cash,
+            "notes" => socket.assigns.notes,
+            "petty_cash_counted" => socket.assigns.petty_cash_counted,
+            "petty_cash_notes" => socket.assigns.petty_cash_notes
+          }
 
-      case Shifts.record_close(socket.assigns.current_user, params) do
-        {:ok, close} ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Shift close recorded")
-           |> assign(:close, close)
-           |> assign(:already_closed?, true)
-           |> assign(:blocked?, false)
-           |> assign(:staff_shift_ended?, false)
-           |> assign(:confirming?, false)
-           |> assign(:form_error, nil)
-           |> reset_close_history()}
+          case Shifts.record_close(socket.assigns.current_user, params,
+                 expected_session_id: session_id,
+                 reviewed_snapshot: reviewed_snapshot
+               ) do
+            {:ok, close} ->
+              {:noreply,
+               socket
+               |> put_flash(:info, "Shift close recorded")
+               |> assign(:close, close)
+               |> assign(:already_closed?, true)
+               |> assign(:blocked?, false)
+               |> assign(:staff_shift_ended?, false)
+               |> assign(:confirming?, false)
+               |> assign(:reviewed_snapshot, nil)
+               |> assign(:form_error, nil)
+               |> reset_close_history()}
 
-        {:error, :already_closed} ->
-          {:noreply,
-           socket
-           |> assign(:close, Shifts.get_todays_close())
-           |> assign(:already_closed?, true)
-           |> assign(:blocked?, false)
-           |> assign(:confirming?, false)
-           |> assign(:form_error, "Shift already closed for today.")
-           |> reset_close_history()}
+            {:error, :already_closed} ->
+              {:noreply,
+               socket
+               |> assign(:close, Shifts.get_todays_close())
+               |> assign(:already_closed?, true)
+               |> assign(:blocked?, false)
+               |> assign(:confirming?, false)
+               |> assign(:reviewed_snapshot, nil)
+               |> assign(:form_error, "Shift already closed for today.")
+               |> reset_close_history()}
 
-        {:error, :shop_not_open} ->
-          {:noreply,
-           socket
-           |> assign_close_state()
-           |> assign(:confirming?, false)
-           |> assign(:form_error, Shifts.selling_blocked_message(:shop_not_open))}
+            {:error, reason} when reason in [:session_changed, :settlement_changed] ->
+              {:noreply,
+               socket
+               |> refresh_close_review(
+                 "Sales, cash movements, or the shop session changed. Review the refreshed totals and count the drawer again."
+               )}
 
-        {:error, :other_staff_active} ->
-          {:noreply,
-           socket
-           |> assign_close_state()
-           |> assign(:form_error, other_staff_message())}
+            {:error, :shop_not_open} ->
+              {:noreply,
+               socket
+               |> assign_close_state()
+               |> assign(:confirming?, false)
+               |> assign(:form_error, Shifts.selling_blocked_message(:shop_not_open))}
 
-        {:error, :not_on_shift} ->
-          {:noreply,
-           socket
-           |> assign_close_state()
-           |> assign(
-             :form_error,
-             "You need an open staff shift to close the shop as barista."
-           )}
+            {:error, :other_staff_active} ->
+              {:noreply,
+               socket
+               |> assign_close_state()
+               |> assign(:form_error, other_staff_message())}
 
-        {:error, :unauthorized} ->
-          {:noreply,
-           socket
-           |> put_flash(:error, "You don’t have access to close shift.")
-           |> push_navigate(to: ~p"/staff")}
+            {:error, :not_on_shift} ->
+              {:noreply,
+               socket
+               |> assign_close_state()
+               |> assign(
+                 :form_error,
+                 "You need an open staff shift to close the shop as barista."
+               )}
 
-        {:error, :counted_cash_required} ->
-          {:noreply,
-           socket
-           |> assign(:confirming?, false)
-           |> assign(:form_error, "Enter the actual cash in the drawer.")}
+            {:error, :unauthorized} ->
+              {:noreply,
+               socket
+               |> put_flash(:error, "You don’t have access to close shift.")
+               |> push_navigate(to: ~p"/staff")}
 
-        {:error, :petty_cash_notes_required} ->
-          {:noreply,
-           socket
-           |> assign(:confirming?, false)
-           |> assign(:form_error, "Add a reason when petty cash is over or short.")}
+            {:error, :counted_cash_required} ->
+              {:noreply,
+               socket
+               |> assign(:confirming?, false)
+               |> assign(:form_error, "Enter the actual cash in the drawer.")}
 
-        {:error, %Ecto.Changeset{} = changeset} ->
+            {:error, :petty_cash_notes_required} ->
+              {:noreply,
+               socket
+               |> assign(:confirming?, false)
+               |> assign(:form_error, "Add a reason when petty cash is over or short.")}
+
+            {:error, %Ecto.Changeset{} = changeset} ->
+              {:noreply,
+               socket
+               |> assign(:confirming?, false)
+               |> assign(:form_error, close_changeset_error(changeset))}
+          end
+
+        _ ->
           {:noreply,
-           socket
-           |> assign(:confirming?, false)
-           |> assign(:form_error, close_changeset_error(changeset))}
+           refresh_close_review(socket, "Review the current totals before recording the close.")}
       end
     end
   end
@@ -272,6 +288,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     snapshot_cash = snapshot_cash_total(assigns[:close])
     opening_cash = assigns[:opening_cash_amount]
     petty_transfer = petty_cash_transfer(assigns[:petty_cash_counted], assigns[:petty_cash_total])
+    cash_sales = Shifts.cash_sales_total(assigns[:breakdown])
 
     expected_cash =
       Shifts.expected_drawer_cash(
@@ -295,6 +312,8 @@ defmodule EspresoWeb.StaffShiftCloseLive do
       |> assign(:snapshot_rows, snapshot_rows)
       |> assign(:snapshot_cash, snapshot_cash)
       |> assign(:opening_cash, opening_cash)
+      |> assign(:cash_sales, cash_sales)
+      |> assign(:petty_transfer, petty_transfer)
       |> assign(:expected_cash, expected_cash)
       |> assign(:live_variance, live_variance)
       |> assign(:petty_cash_variance, petty_cash_variance)
@@ -626,9 +645,39 @@ defmodule EspresoWeb.StaffShiftCloseLive do
               >
                 Opening cash was not recorded. Expected uses ₱0 opening.
               </p>
-              <p :if={!@missing_opening?} class="staff-shift-close-section-hint">
-                Opening {Menu.format_price(@opening_cash)} + cash sales − drawer Cash Outs − petty-cash refill.
-              </p>
+              <dl class="staff-shift-close-calculation" id="staff-shift-close-calculation">
+                <div>
+                  <dt>Opening cash</dt>
+                  <dd>{Menu.format_price(@opening_cash)}</dd>
+                </div>
+                <div>
+                  <dt>Cash sales only</dt>
+                  <dd>+ {Menu.format_price(@cash_sales)}</dd>
+                </div>
+                <div>
+                  <dt>Drawer cash-outs</dt>
+                  <dd>− {Menu.format_price(@cash_out_total)}</dd>
+                </div>
+                <div>
+                  <%= if Decimal.compare(@petty_transfer, 0) == :lt do %>
+                    <dt>Petty cash returned to drawer</dt>
+                    <dd>+ {Menu.format_price(Decimal.abs(@petty_transfer))}</dd>
+                  <% else %>
+                    <dt>
+                      <%= if parse_display_decimal(@petty_cash_counted) do %>
+                        Petty-cash transfer
+                      <% else %>
+                        Estimated petty-cash transfer
+                      <% end %>
+                    </dt>
+                    <dd>− {Menu.format_price(@petty_transfer)}</dd>
+                  <% end %>
+                </div>
+                <div class="staff-shift-close-calculation-total">
+                  <dt>Expected drawer</dt>
+                  <dd>{Menu.format_price(@expected_cash)}</dd>
+                </div>
+              </dl>
             </section>
 
             <form
@@ -1081,6 +1130,10 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     |> assign(:petty_cash_total, petty_cash_total)
     |> assign(:petty_cash_expected, petty_cash_expected)
     |> assign(:shop_open, shop_open)
+    |> assign(
+      :close_snapshot,
+      close_review_snapshot(shop_open, breakdown, cash_outs, petty_cash_entries)
+    )
     |> assign(:opening_cash_amount, opening_cash_amount)
     |> assign(:expected_cash, expected_cash)
     |> assign(:missing_opening?, is_nil(shop_open))
@@ -1090,8 +1143,57 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     |> assign(:notes, "")
     |> assign(:petty_cash_notes, "")
     |> assign(:confirming?, false)
+    |> assign(:reviewed_snapshot, nil)
     |> assign(:form_error, nil)
     |> reset_close_history()
+  end
+
+  defp prepare_close_review(socket, params, counted, petty_counted, petty_notes) do
+    case Shifts.close_preview() do
+      {:ok, snapshot} when snapshot == socket.assigns.close_snapshot ->
+        socket
+        |> assign(:counted_cash, counted)
+        |> assign(:petty_cash_counted, petty_counted)
+        |> assign(:notes, Map.get(params, "notes", ""))
+        |> assign(:petty_cash_notes, petty_notes)
+        |> assign(:reviewed_snapshot, snapshot)
+        |> assign(:confirming?, true)
+        |> assign(:form_error, nil)
+
+      {:ok, _snapshot} ->
+        refresh_close_review(
+          socket,
+          "Sales, cash movements, or the shop session changed. Review the refreshed totals and count the drawer again."
+        )
+
+      {:error, _reason} ->
+        refresh_close_review(
+          socket,
+          "The shop session changed. Review the current session before closing."
+        )
+    end
+  end
+
+  defp refresh_close_review(socket, message) do
+    socket
+    |> assign_close_state()
+    |> assign(:counted_cash, "")
+    |> assign(:petty_cash_counted, "")
+    |> assign(:confirming?, false)
+    |> assign(:reviewed_snapshot, nil)
+    |> assign(:form_error, message)
+  end
+
+  defp close_review_snapshot(nil, _breakdown, _cash_outs, _petty_cash_entries), do: nil
+
+  defp close_review_snapshot(session, breakdown, cash_outs, petty_cash_entries) do
+    %{
+      session_id: session.id,
+      opening_cash: session.opening_cash,
+      breakdown: breakdown,
+      cash_outs: Enum.map(cash_outs, &{&1.id, &1.amount}) |> Enum.sort(),
+      petty_cash_entries: Enum.map(petty_cash_entries, &{&1.id, &1.amount}) |> Enum.sort()
+    }
   end
 
   defp reset_close_history(socket) do

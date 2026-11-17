@@ -6555,6 +6555,35 @@ a.dashboard-kpi-card {
   line-height: 1.35;
 }
 
+.staff-shift-close-calculation {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0.65rem 0 0;
+  color: var(--close-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.staff-shift-close-calculation > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.staff-shift-close-calculation dd {
+  margin: 0;
+  color: var(--close-forest);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.staff-shift-close-calculation-total {
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--close-line);
+  color: var(--close-forest);
+  font-weight: 800;
+}
+
 .staff-shift-close-form {
   display: grid;
   gap: 0.75rem;

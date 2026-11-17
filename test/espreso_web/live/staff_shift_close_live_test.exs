@@ -54,6 +54,10 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     assert has_element?(view, "#staff-shift-close-cash", "₱75")
     assert has_element?(view, "#staff-shift-close-counted-field", "Counted drawer cash")
     assert has_element?(view, "#staff-shift-close-drawer", "Expected drawer")
+    assert has_element?(view, "#staff-shift-close-calculation", "Opening cash")
+    assert has_element?(view, "#staff-shift-close-calculation", "Cash sales only")
+    assert has_element?(view, "#staff-shift-close-calculation", "Drawer cash-outs")
+    assert has_element?(view, "#staff-shift-close-calculation", "Estimated petty-cash transfer")
     refute has_element?(view, "#staff-shift-close-opening-gap")
     assert has_element?(view, "#staff-shift-close-counted-hint", "Required")
     assert has_element?(view, "#staff-shift-close-breakdown", "GCash")
@@ -116,6 +120,125 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     assert Decimal.equal?(close.expected_cash, Decimal.new("75"))
     assert Decimal.equal?(close.variance, Decimal.new("5"))
     assert StaffShifts.list_shifts_for_user(manager.id) == []
+  end
+
+  test "refreshes and requires review when a sale changes before confirmation", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/staff/close")
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Late sale", size: nil, quantity: 1, price: Decimal.new("100")}],
+        %{customer_name: "Guest", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    assert {:ok, _} = Orders.mark_paid(order, paid_via: "cash")
+
+    view
+    |> form("#staff-shift-close-form", %{
+      close: %{counted_cash: "100", petty_cash_counted: "500"}
+    })
+    |> render_submit()
+
+    refute has_element?(view, "#staff-shift-close-confirm")
+    assert has_element?(view, "#staff-shift-close-error", "changed")
+    assert has_element?(view, "#staff-shift-close-drawer", "₱100")
+    assert has_element?(view, "#staff-shift-close-counted-field input[value='']")
+
+    view
+    |> form("#staff-shift-close-form", %{
+      close: %{counted_cash: "100", petty_cash_counted: "500"}
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#staff-shift-close-confirm", "₱100")
+    view |> element("#staff-shift-close-submit") |> render_click()
+    assert Decimal.equal?(Shifts.get_todays_close().expected_cash, 100)
+  end
+
+  test "confirmation refuses same-session sales and cash-outs changed after review", %{
+    conn: conn,
+    manager: manager
+  } do
+    {:ok, view, _html} = live(conn, ~p"/staff/close")
+
+    view
+    |> form("#staff-shift-close-form", %{
+      close: %{counted_cash: "0", petty_cash_counted: "500"}
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#staff-shift-close-confirm", "₱0")
+
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Concurrent sale", size: nil, quantity: 1, price: Decimal.new("100")}],
+        %{customer_name: "Guest", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    assert {:ok, _} = Orders.mark_paid(order, paid_via: "cash")
+
+    assert {:ok, _} =
+             Espreso.CashOuts.create_cash_out(manager, %{amount: "20", category: "Other"})
+
+    view |> element("#staff-shift-close-submit") |> render_click()
+
+    refute has_element?(view, "#staff-shift-close-confirm")
+    assert has_element?(view, "#staff-shift-close-error", "changed")
+    assert has_element?(view, "#staff-shift-close-drawer", "₱80")
+    assert is_nil(Shifts.get_todays_close())
+
+    view
+    |> form("#staff-shift-close-form", %{
+      close: %{counted_cash: "80", petty_cash_counted: "500"}
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#staff-shift-close-confirm", "₱80")
+    view |> element("#staff-shift-close-submit") |> render_click()
+
+    close = Shifts.get_todays_close()
+    assert Decimal.equal?(close.expected_cash, 80)
+    assert Decimal.equal?(close.variance, 0)
+  end
+
+  test "confirmation for a closed session cannot close the next reopened session", %{
+    conn: conn,
+    manager: manager
+  } do
+    first_session = Shifts.current_session()
+    {:ok, view, _html} = live(conn, ~p"/staff/close")
+
+    view
+    |> form("#staff-shift-close-form", %{
+      close: %{counted_cash: "0", petty_cash_counted: "500"}
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#staff-shift-close-confirm", "₱0")
+
+    assert {:ok, _} =
+             Shifts.record_close(manager, %{counted_cash: "0", petty_cash_counted: "500"})
+
+    {:ok, next_session} = Shifts.record_open(manager, %{opening_cash: "200"})
+    assert next_session.id != first_session.id
+
+    view |> element("#staff-shift-close-submit") |> render_click()
+
+    assert has_element?(view, "#staff-shift-close-status", "Open")
+    assert has_element?(view, "#staff-shift-close-error", "session changed")
+    assert has_element?(view, "#staff-shift-close-drawer", "₱200")
+    assert Shifts.current_session().id == next_session.id
+    assert is_nil(Shifts.get_close_for_session(next_session.id))
+
+    view
+    |> form("#staff-shift-close-form", %{
+      close: %{counted_cash: "200", petty_cash_counted: "500"}
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#staff-shift-close-confirm", "₱200")
+    view |> element("#staff-shift-close-submit") |> render_click()
+    assert Decimal.equal?(Shifts.get_close_for_session(next_session.id).expected_cash, 200)
   end
 
   test "staff shift sales at close are scoped to the session across midnight", %{conn: conn} do
