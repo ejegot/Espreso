@@ -7,6 +7,7 @@ defmodule EspresoWeb.StaffTransactionsLive do
   alias Espreso.Orders.Order
   alias Espreso.PhysicalActionCoordinator
   alias Espreso.Printer
+  alias Espreso.Shifts
 
   @reprintable_statuses ~w(received preparing ready completed)
   # Coalesce rapid {:order_changed, _} transaction list/summary reloads.
@@ -27,6 +28,11 @@ defmodule EspresoWeb.StaffTransactionsLive do
      |> assign(:reprint_permit, nil)
      |> assign(:duplicate_void_transaction, nil)
      |> assign(:duplicate_void_reason, "")
+     |> assign(:post_close_adjustment_order, nil)
+     |> assign(:post_close_adjustment_kind, "refund")
+     |> assign(:post_close_adjustment_reason, "")
+     |> assign(:post_close_cash_refund, "")
+     |> assign(:selected_adjustment, nil)
      |> assign(:action_note, nil)
      |> assign(:pubsub_reload_timer, nil)
      |> assign(:pubsub_reload_token, nil)
@@ -99,6 +105,7 @@ defmodule EspresoWeb.StaffTransactionsLive do
     {:noreply,
      socket
      |> assign(:selected_transaction, selected)
+     |> assign(:selected_adjustment, if(selected, do: Shifts.adjustment_for_order(selected.id)))
      |> assign(:action_note, nil)
      |> close_reprint()}
   end
@@ -107,7 +114,128 @@ defmodule EspresoWeb.StaffTransactionsLive do
     {:noreply,
      socket
      |> assign(:selected_transaction, nil)
+     |> assign(:selected_adjustment, nil)
      |> close_reprint()}
+  end
+
+  def handle_event("open_post_close_adjustment", %{"id" => id}, socket) do
+    user = socket.assigns.current_user
+
+    if Authorization.can?(user, :reports) do
+      with %Order{} = selected <- socket.assigns.selected_transaction,
+           true <- Integer.to_string(selected.id) == id,
+           %Order{} = order <- Orders.get_transaction(selected.id),
+           nil <- Shifts.adjustment_for_order(order.id),
+           true <- post_close_order?(order, current_session_id()) do
+        {:noreply,
+         socket
+         |> assign(:post_close_adjustment_order, order)
+         |> assign(:post_close_adjustment_kind, "refund")
+         |> assign(:post_close_adjustment_reason, "")
+         |> assign(:post_close_cash_refund, "")
+         |> assign(:action_note, nil)
+         |> close_reprint()}
+      else
+        false ->
+          {:noreply,
+           assign(
+             socket,
+             :action_note,
+             "This receipt is in the open session, not a closed session."
+           )}
+
+        _ ->
+          {:noreply,
+           assign(socket, :action_note, "This receipt is no longer eligible for adjustment.")}
+      end
+    else
+      {:noreply, assign(socket, :action_note, "You are not authorized to record adjustments.")}
+    end
+  end
+
+  def handle_event("open_post_close_adjustment", _params, socket) do
+    {:noreply, assign(socket, :action_note, "You are not authorized to record adjustments.")}
+  end
+
+  def handle_event("change_post_close_adjustment", %{"adjustment" => params}, socket) do
+    {:noreply,
+     socket
+     |> assign(:post_close_adjustment_kind, Map.get(params, "kind", "refund"))
+     |> assign(:post_close_adjustment_reason, Map.get(params, "reason", ""))
+     |> assign(:post_close_cash_refund, Map.get(params, "cash_refund", ""))}
+  end
+
+  def handle_event("cancel_post_close_adjustment", _params, socket) do
+    {:noreply, close_post_close_adjustment(socket)}
+  end
+
+  def handle_event("confirm_post_close_adjustment", %{"adjustment" => params}, socket) do
+    user = socket.assigns.current_user
+
+    with true <- Authorization.can?(user, :reports),
+         %Order{} = pending <- socket.assigns.post_close_adjustment_order,
+         %Order{} = order <- Orders.get_transaction(pending.id),
+         {:ok, adjustment} <-
+           Shifts.record_post_close_adjustment(order, user, params) do
+      action_name = if adjustment.kind == "refund", do: "Refund", else: "Duplicate void"
+
+      {:noreply,
+       socket
+       |> close_post_close_adjustment()
+       |> assign(:action_note, "#{action_name} correction recorded in the next shop session.")
+       |> load_transactions(socket.assigns.filters)}
+    else
+      false ->
+        {:noreply,
+         socket
+         |> close_post_close_adjustment()
+         |> assign(:action_note, "You are not authorized to record adjustments.")}
+
+      {:error, :shop_not_open} ->
+        {:noreply,
+         assign(socket, :action_note, "Open a new shop session before recording this adjustment.")}
+
+      {:error, :shop_day_closed} ->
+        {:noreply,
+         assign(socket, :action_note, "Open a new shop session before recording this adjustment.")}
+
+      {:error, :session_not_closed} ->
+        {:noreply,
+         socket
+         |> close_post_close_adjustment()
+         |> assign(:action_note, "This receipt is not from a closed shop session.")}
+
+      {:error, :already_adjusted} ->
+        {:noreply,
+         socket
+         |> close_post_close_adjustment()
+         |> assign(:action_note, "A correction was already recorded for this receipt.")
+         |> load_transactions(socket.assigns.filters)}
+
+      {:error, :drawer_impact_required} ->
+        {:noreply,
+         assign(socket, :action_note, "Enter the actual cash refunded from the drawer.")}
+
+      {:error, :invalid_drawer_impact} ->
+        {:noreply,
+         assign(socket, :action_note, "Cash refunded must be between ₱0 and the receipt total.")}
+
+      {:error, :adjustment_reason_required} ->
+        {:noreply, assign(socket, :action_note, "Enter a reason for the adjustment.")}
+
+      _ ->
+        {:noreply,
+         socket
+         |> close_post_close_adjustment()
+         |> assign(
+           :action_note,
+           "Unable to record the adjustment. Refresh and verify the receipt."
+         )}
+    end
+  end
+
+  def handle_event("confirm_post_close_adjustment", _params, socket) do
+    {:noreply, assign(socket, :action_note, "Complete the adjustment details before submitting.")}
   end
 
   def handle_event("open_reprint", %{"id" => id}, socket) do
@@ -461,7 +589,9 @@ defmodule EspresoWeb.StaffTransactionsLive do
                   <dd>{@selected_transaction.customer_name || "Walk-in"}</dd>
                 </div>
                 <div :if={
-                  @show_totals? and is_nil(@selected_transaction.duplicate_voided_at) and
+                  @show_totals? and is_nil(@selected_adjustment) and
+                    not post_close_order?(@selected_transaction, @current_session_id) and
+                    is_nil(@selected_transaction.duplicate_voided_at) and
                     is_nil(@selected_transaction.refunded_at)
                 }>
                   <dt>Duplicate receipt</dt>
@@ -480,6 +610,18 @@ defmodule EspresoWeb.StaffTransactionsLive do
                 <div :if={@selected_transaction.duplicate_voided_at}>
                   <dt>Receipt status</dt>
                   <dd>Voided as duplicate</dd>
+                </div>
+                <div :if={@selected_adjustment}>
+                  <dt>Post-close correction</dt>
+                  <dd>
+                    {adjustment_label(@selected_adjustment.kind)} · {Menu.format_price(
+                      @selected_adjustment.sales_impact
+                    )} sales · {signed_adjustment_cash(@selected_adjustment.drawer_impact)} drawer · {adjustment_payment_label(
+                      @selected_adjustment
+                    )} · {adjustment_session_date(@selected_adjustment)} · {adjustment_recorder(
+                      @selected_adjustment
+                    )} · {@selected_adjustment.reason}
+                  </dd>
                 </div>
                 <div>
                   <dt>Order status</dt>
@@ -505,6 +647,19 @@ defmodule EspresoWeb.StaffTransactionsLive do
             </ul>
 
             <div class="staff-transaction-actions">
+              <button
+                :if={
+                  @show_totals? and is_nil(@selected_adjustment) and
+                    post_close_order?(@selected_transaction, @current_session_id)
+                }
+                type="button"
+                class="staff-transaction-void-duplicate"
+                id="transaction-open-post-close-adjustment"
+                phx-click="open_post_close_adjustment"
+                phx-value-id={@selected_transaction.id}
+              >
+                Record post-close correction
+              </button>
               <button
                 :if={@selected_transaction.status in @reprintable_statuses}
                 type="button"
@@ -590,6 +745,109 @@ defmodule EspresoWeb.StaffTransactionsLive do
         </div>
 
         <div
+          :if={@post_close_adjustment_order}
+          class="staff-transaction-modal-layer"
+          id="transaction-post-close-adjustment-modal"
+        >
+          <button
+            type="button"
+            class="staff-transaction-modal-scrim"
+            phx-click="cancel_post_close_adjustment"
+            aria-label="Cancel post-close correction"
+          >
+          </button>
+          <section
+            class="staff-transaction-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="transaction-post-close-adjustment-title"
+          >
+            <p class="staff-transactions-eyebrow">Manager action</p>
+            <h3 id="transaction-post-close-adjustment-title">
+              Correct {@post_close_adjustment_order.number} after close?
+            </h3>
+            <p>
+              The sealed close and original transaction stay unchanged. This sales correction is recorded in the next open shop session.
+            </p>
+            <p>
+              Original payment: {Orders.split_payment_label(@post_close_adjustment_order) ||
+                Orders.paid_via_label(@post_close_adjustment_order.paid_via)} · {Menu.format_price(
+                @post_close_adjustment_order.total
+              )}
+            </p>
+            <.form
+              for={%{}}
+              phx-change="change_post_close_adjustment"
+              phx-submit="confirm_post_close_adjustment"
+            >
+              <label for="transaction-post-close-adjustment-kind">Correction type</label>
+              <select
+                id="transaction-post-close-adjustment-kind"
+                name="adjustment[kind]"
+                value={@post_close_adjustment_kind}
+              >
+                <option value="refund">Refund</option>
+                <option value="duplicate_void">Void duplicate receipt</option>
+              </select>
+              <label for="transaction-post-close-adjustment-reason">Reason (required)</label>
+              <textarea
+                id="transaction-post-close-adjustment-reason"
+                name="adjustment[reason]"
+                rows="3"
+                maxlength="500"
+                required
+                phx-debounce="300"
+                placeholder="Explain the correction"
+              >{@post_close_adjustment_reason}</textarea>
+              <%= if @post_close_adjustment_kind == "refund" do %>
+                <label for="transaction-post-close-cash-refund">
+                  Cash actually refunded from the drawer
+                </label>
+                <input
+                  id="transaction-post-close-cash-refund"
+                  type="number"
+                  name="adjustment[cash_refund]"
+                  min="0"
+                  max={Decimal.to_string(@post_close_adjustment_order.total)}
+                  step="0.01"
+                  required
+                  value={@post_close_cash_refund}
+                  placeholder="0.00 for a wallet refund"
+                />
+                <p>
+                  Enter only cash physically returned. A GCash, Maya, or other non-cash refund is ₱0 drawer impact.
+                </p>
+              <% else %>
+                <input type="hidden" name="adjustment[cash_refund]" value="0" />
+                <p>
+                  A duplicate correction changes sales reporting only; it does not refund payment.
+                </p>
+              <% end %>
+              <div>
+                <button
+                  type="button"
+                  id="transaction-cancel-post-close-adjustment"
+                  phx-click="cancel_post_close_adjustment"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  id="transaction-confirm-post-close-adjustment"
+                  disabled={
+                    String.trim(@post_close_adjustment_reason) == "" or
+                      (@post_close_adjustment_kind == "refund" and
+                         String.trim(@post_close_cash_refund) == "")
+                  }
+                >
+                  Record correction
+                </button>
+              </div>
+            </.form>
+          </section>
+        </div>
+
+        <div
           :if={@reprint_transaction}
           class="staff-transaction-modal-layer"
           id="transaction-reprint-modal"
@@ -637,6 +895,7 @@ defmodule EspresoWeb.StaffTransactionsLive do
     summary = Orders.transaction_summary(normalized)
     selected_id = socket.assigns[:selected_transaction] && socket.assigns.selected_transaction.id
     selected = if selected_id, do: Enum.find(orders, &(&1.id == selected_id))
+    current_session = Shifts.current_session()
 
     socket
     |> assign(:transactions, orders)
@@ -645,6 +904,8 @@ defmodule EspresoWeb.StaffTransactionsLive do
     |> assign(:filters, normalized)
     |> assign(:summary, summary)
     |> assign(:selected_transaction, selected)
+    |> assign(:selected_adjustment, if(selected, do: Shifts.adjustment_for_order(selected.id)))
+    |> assign(:current_session_id, current_session && current_session.id)
     |> assign(:printer_enabled?, Printer.enabled?())
   end
 
@@ -739,6 +1000,58 @@ defmodule EspresoWeb.StaffTransactionsLive do
     |> assign(:duplicate_void_transaction, nil)
     |> assign(:duplicate_void_reason, "")
   end
+
+  defp close_post_close_adjustment(socket) do
+    socket
+    |> assign(:post_close_adjustment_order, nil)
+    |> assign(:post_close_adjustment_kind, "refund")
+    |> assign(:post_close_adjustment_reason, "")
+    |> assign(:post_close_cash_refund, "")
+  end
+
+  defp post_close_order?(%Order{shop_session_id: session_id}, current_session_id),
+    do: session_id != current_session_id
+
+  defp post_close_order?(_, _), do: false
+
+  defp current_session_id do
+    case Shifts.current_session() do
+      %{id: id} -> id
+      nil -> nil
+    end
+  end
+
+  defp adjustment_label("refund"), do: "Refund"
+  defp adjustment_label("duplicate_void"), do: "Duplicate void"
+  defp adjustment_label(_), do: "Adjustment"
+
+  defp adjustment_session_date(%{shop_session: %{shop_date: date}}),
+    do: Date.to_iso8601(date)
+
+  defp adjustment_session_date(_), do: "Next session"
+
+  defp adjustment_recorder(%{recorded_by_user: %{name: name}}), do: "by #{name}"
+  defp adjustment_recorder(_), do: "by staff"
+
+  defp adjustment_payment_label(%{payment_method: "split", payment_breakdown: breakdown}) do
+    breakdown
+    |> Map.keys()
+    |> Enum.map(&Orders.paid_via_label/1)
+    |> Enum.sort()
+    |> Enum.join(" + ")
+  end
+
+  defp adjustment_payment_label(%{payment_method: method}), do: Orders.paid_via_label(method)
+
+  defp signed_adjustment_cash(%Decimal{} = amount) do
+    case Decimal.compare(amount, 0) do
+      :gt -> "+ #{Menu.format_price(amount)}"
+      :lt -> "− #{Menu.format_price(Decimal.abs(amount))}"
+      :eq -> Menu.format_price(0)
+    end
+  end
+
+  defp signed_adjustment_cash(_), do: "₱0.00"
 
   defp close_reprint(socket) do
     socket

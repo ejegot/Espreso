@@ -15,9 +15,11 @@ defmodule Espreso.Shifts do
   alias Espreso.Accounts.User
   alias Espreso.CashOuts
   alias Espreso.Orders
+  alias Espreso.Orders.Order
   alias Espreso.PettyCash
   alias Espreso.Repo
   alias Espreso.Shifts.ShopDayOpen
+  alias Espreso.Shifts.ShopSessionAdjustment
   alias Espreso.Shifts.ShiftClose
   alias Espreso.StaffShifts
   alias Espreso.Tenancy
@@ -74,6 +76,37 @@ defmodule Espreso.Shifts do
     |> preload(:opened_by_user)
     |> Repo.all()
   end
+
+  def list_adjustments_for_session(session_id) when is_integer(session_id) do
+    ShopSessionAdjustment
+    |> Tenancy.scope_to_branch()
+    |> where([a], a.shop_session_id == ^session_id)
+    |> order_by([a], asc: a.inserted_at, asc: a.id)
+    |> preload([:original_order, :recorded_by_user])
+    |> Repo.all()
+  end
+
+  def list_adjustments_for_session(_), do: []
+
+  def list_adjustments_for_shop_dates(%Date{} = from_date, %Date{} = to_date) do
+    ShopSessionAdjustment
+    |> Tenancy.scope_to_branch()
+    |> join(:inner, [a], session in assoc(a, :shop_session))
+    |> where([_a, session], session.shop_date >= ^from_date and session.shop_date <= ^to_date)
+    |> order_by([a, session], asc: session.shop_date, asc: a.inserted_at, asc: a.id)
+    |> preload([:original_order, :recorded_by_user, :shop_session])
+    |> Repo.all()
+  end
+
+  def adjustment_for_order(order_id) when is_integer(order_id) do
+    ShopSessionAdjustment
+    |> Tenancy.scope_to_branch()
+    |> where([a], a.original_order_id == ^order_id)
+    |> preload([:original_order, :recorded_by_user, :shop_session])
+    |> Repo.one()
+  end
+
+  def adjustment_for_order(_), do: nil
 
   @doc """
   Read-only Close Shift history, newest Manila `shop_date` first.
@@ -259,13 +292,195 @@ defmodule Espreso.Shifts do
       |> Enum.map(&{&1.id, &1.amount})
       |> Enum.sort()
 
+    adjustment_rows = list_adjustments_for_session(session.id)
+
+    adjustments =
+      Enum.map(adjustment_rows, &{&1.id, &1.sales_impact, &1.drawer_impact, &1.payment_breakdown})
+
+    adjustment_cash_impact =
+      Enum.reduce(adjustment_rows, Decimal.new("0"), fn adjustment, total ->
+        Decimal.add(total, adjustment.drawer_impact)
+      end)
+      |> Decimal.round(2)
+
     %{
       session_id: session.id,
       opening_cash: session.opening_cash,
       breakdown: Orders.paid_breakdown_for_session(session),
+      cash_sales: Orders.cash_sales_for_session(session),
+      adjustments: adjustments,
+      adjustment_cash_impact: adjustment_cash_impact,
       cash_outs: cash_outs,
       petty_cash_entries: petty_cash_entries
     }
+  end
+
+  def record_post_close_adjustment(%Order{id: id}, %User{} = user, attrs)
+      when is_integer(id) and is_map(attrs) do
+    if Authorization.can?(user, :reports) do
+      do_record_post_close_adjustment(id, user, attrs)
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  def record_post_close_adjustment(%Order{}, _user, _attrs), do: {:error, :not_found}
+
+  def record_post_close_adjustment(_, _, _), do: {:error, :not_found}
+
+  defp do_record_post_close_adjustment(order_id, user, attrs) do
+    kind = attr(attrs, :kind) |> to_string()
+    reason = attr(attrs, :reason) |> normalize_notes()
+    cash_refund = parse_optional_decimal(attr(attrs, :cash_refund))
+
+    cond do
+      kind not in ShopSessionAdjustment.kinds() ->
+        {:error, :invalid_adjustment_kind}
+
+      is_nil(reason) or String.length(reason) < 2 ->
+        {:error, :adjustment_reason_required}
+
+      kind == "refund" and is_nil(cash_refund) ->
+        {:error, :drawer_impact_required}
+
+      not is_nil(cash_refund) and Decimal.compare(cash_refund, 0) == :lt ->
+        {:error, :invalid_drawer_impact}
+
+      kind == "duplicate_void" and not is_nil(cash_refund) and
+          not Decimal.equal?(cash_refund, 0) ->
+        {:error, :invalid_drawer_impact}
+
+      true ->
+        result =
+          Repo.transaction(fn ->
+            session = session_for_write!()
+
+            order =
+              Order
+              |> Tenancy.scope_to_branch()
+              |> where(
+                [o],
+                o.id == ^order_id and o.payment_status == "paid" and
+                  not is_nil(o.settled_at) and is_nil(o.refunded_at) and
+                  is_nil(o.duplicate_voided_at)
+              )
+              |> preload(:payment_splits)
+              |> Repo.one()
+
+            cond do
+              is_nil(order) ->
+                Repo.rollback(:not_eligible)
+
+              order.shop_session_id == session.id ->
+                Repo.rollback(:session_not_closed)
+
+              not closed_order_before_session?(order, session) ->
+                Repo.rollback(:session_not_closed)
+
+              adjustment_for_order(order.id) ->
+                Repo.rollback(:already_adjusted)
+
+              kind == "refund" and Decimal.compare(cash_refund, order.total) == :gt ->
+                Repo.rollback(:invalid_drawer_impact)
+
+              true ->
+                payment_breakdown = adjustment_payment_breakdown(order)
+                sales_impact = Decimal.negate(order.total) |> Decimal.round(2)
+
+                drawer_impact =
+                  Decimal.negate(cash_refund || Decimal.new("0")) |> Decimal.round(2)
+
+                %ShopSessionAdjustment{}
+                |> ShopSessionAdjustment.changeset(%{
+                  kind: kind,
+                  reason: reason,
+                  payment_method: adjustment_payment_method(order),
+                  payment_breakdown: payment_breakdown,
+                  sales_impact: sales_impact,
+                  drawer_impact: drawer_impact,
+                  original_order_id: order.id,
+                  shop_session_id: session.id,
+                  recorded_by_user_id: user.id,
+                  tenant_id: Tenancy.current_tenant_id(),
+                  branch_id: Tenancy.current_branch_id()
+                })
+                |> Repo.insert()
+                |> case do
+                  {:ok, adjustment} ->
+                    Repo.preload(adjustment, [:original_order, :recorded_by_user, :shop_session])
+
+                  {:error, changeset} ->
+                    if Keyword.has_key?(changeset.errors, :original_order_id) do
+                      Repo.rollback(:already_adjusted)
+                    else
+                      Repo.rollback(changeset)
+                    end
+                end
+            end
+          end)
+
+        case result do
+          {:ok, %ShopSessionAdjustment{} = adjustment} ->
+            Phoenix.PubSub.broadcast(
+              Espreso.PubSub,
+              "orders",
+              {:order_changed, adjustment.original_order}
+            )
+
+            {:ok, adjustment}
+
+          {:error, reason} when reason in [:shop_not_open, :shop_day_closed] ->
+            {:error, reason}
+
+          {:error, reason}
+          when reason in [:not_eligible, :session_not_closed, :already_adjusted] ->
+            {:error, reason}
+
+          {:error, reason} when reason == :invalid_drawer_impact ->
+            {:error, reason}
+
+          {:error, %Ecto.Changeset{} = changeset} ->
+            {:error, changeset}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+    end
+  end
+
+  defp closed_order_before_session?(%Order{shop_session_id: nil, settled_at: settled_at}, session) do
+    DateTime.compare(settled_at, session.opened_at) == :lt
+  end
+
+  defp closed_order_before_session?(%Order{shop_session_id: order_session_id}, session) do
+    if order_session_id != session.id do
+      ShiftClose
+      |> Tenancy.scope_to_branch()
+      |> where([close], close.shop_session_id == ^order_session_id)
+      |> Repo.exists?()
+    else
+      false
+    end
+  end
+
+  defp adjustment_payment_method(%Order{payment_splits: splits}) when splits != [],
+    do: "split"
+
+  defp adjustment_payment_method(%Order{paid_via: paid_via})
+       when paid_via in ["cash", "gcash", "maya", "counter", "paymongo"],
+       do: paid_via
+
+  defp adjustment_payment_method(_), do: "counter"
+
+  defp adjustment_payment_breakdown(%Order{payment_splits: splits}) when splits != [] do
+    Map.new(splits, fn split ->
+      {split.paid_via, Decimal.negate(split.amount) |> Decimal.round(2) |> Decimal.to_string()}
+    end)
+  end
+
+  defp adjustment_payment_breakdown(%Order{} = order) do
+    via = order.paid_via || "counter"
+    %{via => Decimal.negate(order.total) |> Decimal.round(2) |> Decimal.to_string()}
   end
 
   def lock_session! do
@@ -367,9 +582,18 @@ defmodule Espreso.Shifts do
 
   Missing opening cash is treated as ₱0 so close still works, with a visible gap.
   """
-  def expected_drawer_cash(opening_cash, cash_sales, cash_out_total, petty_cash_transfer \\ 0) do
+  def expected_drawer_cash(
+        opening_cash,
+        cash_sales,
+        cash_out_total,
+        petty_cash_transfer \\ 0,
+        adjustment_cash_impact \\ 0
+      ) do
     Decimal.sub(
-      Decimal.add(decimalize_money(opening_cash), decimalize_money(cash_sales)),
+      Decimal.add(
+        Decimal.add(decimalize_money(opening_cash), decimalize_money(cash_sales)),
+        decimalize_money(adjustment_cash_impact)
+      ),
       Decimal.add(
         decimalize_money(cash_out_total),
         decimalize_money(petty_cash_transfer)
@@ -382,6 +606,9 @@ defmodule Espreso.Shifts do
     Decimal.sub(decimalize_money(counted_cash), decimalize_money(expected_cash))
     |> Decimal.round(2)
   end
+
+  def cash_sales_total(%{cash_sales: cash_sales}) when not is_nil(cash_sales),
+    do: decimalize_money(cash_sales)
 
   def cash_sales_total(%{by_via: by_via}) when is_map(by_via) do
     entry = Map.get(by_via, "cash") || Map.get(by_via, :cash) || %{}
@@ -400,6 +627,7 @@ defmodule Espreso.Shifts do
       when not is_nil(opening) and not is_nil(expected) do
     cash_sales_total(close)
     |> Decimal.add(decimalize_money(opening))
+    |> Decimal.add(Map.get(close, :adjustment_cash_impact) || Decimal.new("0"))
     |> Decimal.sub(decimalize_money(expected))
     |> Decimal.round(2)
   end
@@ -498,7 +726,8 @@ defmodule Espreso.Shifts do
           end
 
           opening_cash = opening.opening_cash
-          cash_sales = cash_sales_total(breakdown)
+          cash_sales = snapshot.cash_sales
+          adjustment_cash_impact = snapshot.adjustment_cash_impact
           cash_out_total = CashOuts.total_for_session(opening.id)
           petty_cash_expenses = PettyCash.total_for_session(opening.id)
 
@@ -521,7 +750,8 @@ defmodule Espreso.Shifts do
               opening_cash,
               cash_sales,
               cash_out_total,
-              petty_cash_transfer
+              petty_cash_transfer,
+              adjustment_cash_impact
             )
 
           variance = drawer_variance(counted_cash, expected_cash)
@@ -536,6 +766,8 @@ defmodule Espreso.Shifts do
               by_via: serialize_by_via(breakdown.by_via),
               counted_cash: counted_cash,
               opening_cash: opening_cash,
+              cash_sales: cash_sales,
+              adjustment_cash_impact: adjustment_cash_impact,
               expected_cash: expected_cash,
               variance: variance,
               notes: notes,
@@ -617,6 +849,10 @@ defmodule Espreso.Shifts do
   defp parse_optional_decimal(value) when is_integer(value), do: Decimal.new(value)
   defp parse_optional_decimal(value) when is_float(value), do: Decimal.from_float(value)
   defp parse_optional_decimal(_), do: nil
+
+  defp attr(attrs, key) do
+    Map.get(attrs, key) || Map.get(attrs, Atom.to_string(key))
+  end
 
   defp parse_required_decimal(value) do
     case parse_optional_decimal(value) do

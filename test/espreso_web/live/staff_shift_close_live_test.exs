@@ -201,6 +201,58 @@ defmodule EspresoWeb.StaffShiftCloseLiveTest do
     assert Decimal.equal?(close.variance, 0)
   end
 
+  test "a new post-close adjustment invalidates the drawer review until recounted", %{
+    conn: conn,
+    manager: manager
+  } do
+    {:ok, old_order} =
+      Orders.create_order(
+        [%{name: "Closed sale", size: nil, quantity: 1, price: Decimal.new("100")}],
+        %{customer_name: "Guest", fulfillment: :pickup, payment_method: :counter}
+      )
+
+    assert {:ok, _} = Orders.mark_paid(old_order, paid_via: "gcash")
+    assert {:ok, _} = Shifts.record_close(manager, %{counted_cash: "0"})
+    assert {:ok, next_session} = Shifts.record_open(manager, %{opening_cash: "200"})
+
+    {:ok, view, _html} = live(conn, ~p"/staff/close")
+
+    view
+    |> form("#staff-shift-close-form", %{
+      close: %{counted_cash: "200", petty_cash_counted: "500"}
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#staff-shift-close-confirm", "₱200")
+
+    assert {:ok, _adjustment} =
+             Shifts.record_post_close_adjustment(old_order, manager, %{
+               kind: "refund",
+               reason: "Wallet refund",
+               cash_refund: "10"
+             })
+
+    view |> element("#staff-shift-close-submit") |> render_click()
+
+    refute has_element?(view, "#staff-shift-close-confirm")
+    assert has_element?(view, "#staff-shift-close-error", "changed")
+    assert has_element?(view, "#staff-shift-close-drawer", "₱190")
+    assert has_element?(view, "#staff-shift-close-counted-field input[value='']")
+
+    view
+    |> form("#staff-shift-close-form", %{
+      close: %{counted_cash: "190", petty_cash_counted: "500"}
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#staff-shift-close-confirm", "₱190")
+    view |> element("#staff-shift-close-submit") |> render_click()
+
+    close = Shifts.get_close_for_session(next_session.id)
+    assert Decimal.equal?(close.expected_cash, Decimal.new("190"))
+    assert Decimal.equal?(close.system_total, Decimal.new("-100"))
+  end
+
   test "confirmation for a closed session cannot close the next reopened session", %{
     conn: conn,
     manager: manager

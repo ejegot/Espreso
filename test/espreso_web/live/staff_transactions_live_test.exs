@@ -6,6 +6,7 @@ defmodule EspresoWeb.StaffTransactionsLiveTest do
   alias Espreso.Accounts
   alias Espreso.Orders
   alias Espreso.Printer
+  alias Espreso.Shifts
 
   setup %{conn: conn} do
     {:ok, barista} =
@@ -211,6 +212,72 @@ defmodule EspresoWeb.StaffTransactionsLiveTest do
     assert is_nil(stored.duplicate_voided_at)
     assert is_nil(stored.duplicate_voided_by_user_id)
     assert is_nil(stored.duplicate_void_reason)
+  end
+
+  test "manager records a post-close refund in the next session without changing the old receipt",
+       %{
+         conn: conn,
+         barista: barista,
+         manager: manager
+       } do
+    {:ok, order} =
+      Orders.create_order(
+        [%{name: "Closed receipt", size: nil, quantity: 1, price: Decimal.new("75")}],
+        %{
+          customer_name: "Closed receipt",
+          fulfillment: :pickup,
+          payment_method: :counter,
+          payment_status: :paid,
+          paid_via: "gcash",
+          settlement_source: "pos",
+          settled_by_user_id: barista.id
+        }
+      )
+
+    original_session = Shifts.current_session()
+
+    assert {:ok, original_close} = Shifts.record_close(manager, %{counted_cash: "75"})
+    assert {:ok, next_session} = Shifts.record_open(manager, %{opening_cash: "200"})
+
+    {:ok, view, _html} = live(log_in(conn, manager), ~p"/transactions")
+    view |> element("#transaction-#{order.id}") |> render_click()
+
+    assert has_element?(view, "#transaction-open-post-close-adjustment")
+    refute has_element?(view, "#transaction-open-duplicate-void")
+
+    view |> element("#transaction-open-post-close-adjustment") |> render_click()
+    assert has_element?(view, "#transaction-post-close-adjustment-modal", order.number)
+
+    view
+    |> form("#transaction-post-close-adjustment-modal form", %{
+      "adjustment" => %{
+        "kind" => "refund",
+        "reason" => "Wallet refund after close",
+        "cash_refund" => "0"
+      }
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#transactions-action-note", "recorded in the next shop session")
+    assert has_element?(view, "#transaction-detail", "Post-close correction")
+    assert has_element?(view, "#transaction-detail", "Wallet refund after close")
+
+    adjustment = Shifts.adjustment_for_order(order.id)
+    assert adjustment.kind == "refund"
+    assert adjustment.shop_session_id == next_session.id
+    assert adjustment.original_order_id == order.id
+    assert adjustment.recorded_by_user_id == manager.id
+    assert adjustment.payment_method == "gcash"
+    assert Decimal.equal?(adjustment.drawer_impact, Decimal.new("0"))
+    assert Espreso.Repo.get!(Espreso.Orders.Order, order.id).payment_status == "paid"
+
+    assert Decimal.equal?(
+             Espreso.Repo.get!(Shifts.ShiftClose, original_close.id).system_total,
+             Decimal.new("75")
+           )
+
+    assert Shifts.current_session().id == next_session.id
+    assert original_session.id != next_session.id
   end
 
   test "guest cannot access transaction history", %{conn: conn} do

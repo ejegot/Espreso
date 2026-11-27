@@ -178,6 +178,143 @@ defmodule Espreso.ShiftsTest do
     assert is_nil(Shifts.get_todays_close())
   end
 
+  test "post-close adjustments preserve the sealed snapshot and settle sales and actual cash in the next session" do
+    manager = manager!()
+
+    {:ok, cash_order} =
+      Orders.create_order(lines("80"), %{
+        customer_name: "Cash refund",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, _} = Orders.mark_paid(cash_order, paid_via: "cash")
+
+    {:ok, wallet_order} =
+      Orders.create_order(lines("60"), %{
+        customer_name: "Wallet duplicate",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, _} =
+      Orders.mark_paid(wallet_order,
+        paid_via: "cash",
+        splits: [
+          %{paid_via: "cash", amount: "30"},
+          %{paid_via: "gcash", amount: "30"}
+        ]
+      )
+
+    original_session = Shifts.current_session()
+
+    assert {:ok, original_close} =
+             Shifts.record_close(manager, %{counted_cash: "140"})
+
+    assert Decimal.equal?(original_close.system_total, Decimal.new("140"))
+
+    assert {:ok, next_session} = Shifts.record_open(manager, %{opening_cash: "200"})
+
+    {:ok, current_order} =
+      Orders.create_order(lines("100"), %{
+        customer_name: "Next session sale",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, _} = Orders.mark_paid(current_order, paid_via: "cash")
+
+    assert {:ok, cash_refund} =
+             Shifts.record_post_close_adjustment(cash_order, manager, %{
+               kind: "refund",
+               reason: "Customer refund issued partly in cash",
+               cash_refund: "20"
+             })
+
+    assert cash_refund.payment_method == "cash"
+    assert Decimal.equal?(cash_refund.sales_impact, Decimal.new("-80"))
+    assert Decimal.equal?(cash_refund.drawer_impact, Decimal.new("-20"))
+    assert cash_refund.original_order_id == cash_order.id
+    assert cash_refund.shop_session_id == next_session.id
+    assert cash_refund.recorded_by_user_id == manager.id
+
+    assert {:ok, wallet_void} =
+             Shifts.record_post_close_adjustment(wallet_order, manager, %{
+               kind: "duplicate_void",
+               reason: "Duplicate wallet receipt",
+               cash_refund: "0"
+             })
+
+    assert wallet_void.payment_method == "split"
+    assert Decimal.equal?(wallet_void.drawer_impact, Decimal.new("0"))
+
+    assert {:error, :already_adjusted} =
+             Shifts.record_post_close_adjustment(wallet_order, manager, %{
+               kind: "refund",
+               reason: "Second correction",
+               cash_refund: "0"
+             })
+
+    assert {:error, :post_close_adjustment_required} =
+             Orders.void_duplicate_order(cash_order, manager, "Do not rewrite old session")
+
+    assert Repo.reload!(cash_order).payment_status == "paid"
+    assert is_nil(Repo.reload!(cash_order).refunded_at)
+    assert is_nil(Repo.reload!(cash_order).duplicate_voided_at)
+
+    assert Decimal.equal?(
+             Repo.get!(Shifts.ShiftClose, original_close.id).system_total,
+             Decimal.new("140")
+           )
+
+    breakdown = Orders.paid_breakdown_for_session(next_session)
+    assert breakdown.count == 1
+    assert Decimal.equal?(breakdown.total, Decimal.new("-40"))
+    assert Decimal.equal?(breakdown.by_via["cash"].total, Decimal.new("-10"))
+    assert Decimal.equal?(breakdown.by_via["gcash"].total, Decimal.new("-30"))
+    assert Decimal.equal?(Orders.cash_sales_for_session(next_session), Decimal.new("100"))
+
+    assert {:ok, next_close} =
+             Shifts.record_close(manager, %{counted_cash: "280"})
+
+    assert Decimal.equal?(next_close.system_total, Decimal.new("-40"))
+    assert Decimal.equal?(next_close.cash_sales, Decimal.new("100"))
+    assert Decimal.equal?(next_close.adjustment_cash_impact, Decimal.new("-20"))
+    assert Decimal.equal?(next_close.expected_cash, Decimal.new("280"))
+
+    assert Repo.get!(Shifts.ShiftClose, original_close.id).shop_session_id ==
+             original_session.id
+
+    assert {:ok, report} =
+             Espreso.Reports.CloseExport.pack(next_session.shop_date, next_session.shop_date)
+
+    assert length(report.adjustments) == 2
+    assert Enum.any?(report.days, &Decimal.equal?(&1.paid_total, Decimal.new("-40")))
+  end
+
+  test "only managers and owners can record post-close adjustments" do
+    manager = manager!()
+    barista = barista!()
+
+    {:ok, order} =
+      Orders.create_order(lines("75"), %{
+        customer_name: "Protected adjustment",
+        fulfillment: :pickup,
+        payment_method: :counter
+      })
+
+    {:ok, _} = Orders.mark_paid(order, paid_via: "cash")
+    assert {:ok, _close} = Shifts.record_close(manager, %{counted_cash: "75"})
+    assert {:ok, _session} = Shifts.record_open(manager, %{opening_cash: "100"})
+
+    assert {:error, :unauthorized} =
+             Shifts.record_post_close_adjustment(order, barista, %{
+               kind: "refund",
+               reason: "Attempt",
+               cash_refund: "0"
+             })
+  end
+
   @tag :without_shop_open
   test "record_open is once per active session and snapshots into close" do
     manager = manager!()

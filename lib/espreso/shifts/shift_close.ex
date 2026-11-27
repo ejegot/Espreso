@@ -11,6 +11,8 @@ defmodule Espreso.Shifts.ShiftClose do
     field :by_via, :map, default: %{}
     field :counted_cash, :decimal
     field :opening_cash, :decimal
+    field :cash_sales, :decimal
+    field :adjustment_cash_impact, :decimal
     field :expected_cash, :decimal
     field :variance, :decimal
     field :notes, :string
@@ -38,6 +40,8 @@ defmodule Espreso.Shifts.ShiftClose do
       :by_via,
       :counted_cash,
       :opening_cash,
+      :cash_sales,
+      :adjustment_cash_impact,
       :expected_cash,
       :variance,
       :notes,
