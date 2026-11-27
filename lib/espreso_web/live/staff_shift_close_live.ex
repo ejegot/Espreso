@@ -283,19 +283,21 @@ defmodule EspresoWeb.StaffShiftCloseLive do
   @impl true
   def render(assigns) do
     shop_date = close_shop_date(assigns)
-    cash_total = open_cash_total(assigns)
+    cash_total = assigns[:cash_sales] || open_cash_total(assigns)
     snapshot_rows = closed_via_rows(assigns[:close])
     snapshot_cash = snapshot_cash_total(assigns[:close])
     opening_cash = assigns[:opening_cash_amount]
     petty_transfer = petty_cash_transfer(assigns[:petty_cash_counted], assigns[:petty_cash_total])
-    cash_sales = Shifts.cash_sales_total(assigns[:breakdown])
+    cash_sales = assigns[:cash_sales]
+    adjustment_cash_impact = assigns[:adjustment_cash_impact]
 
     expected_cash =
       Shifts.expected_drawer_cash(
         opening_cash,
-        Shifts.cash_sales_total(assigns[:breakdown]),
+        cash_sales,
         assigns[:cash_out_total],
-        petty_transfer
+        petty_transfer,
+        adjustment_cash_impact
       )
 
     live_variance = live_variance(assigns[:counted_cash], expected_cash)
@@ -313,6 +315,7 @@ defmodule EspresoWeb.StaffShiftCloseLive do
       |> assign(:snapshot_cash, snapshot_cash)
       |> assign(:opening_cash, opening_cash)
       |> assign(:cash_sales, cash_sales)
+      |> assign(:adjustment_cash_impact, adjustment_cash_impact)
       |> assign(:petty_transfer, petty_transfer)
       |> assign(:expected_cash, expected_cash)
       |> assign(:live_variance, live_variance)
@@ -391,6 +394,15 @@ defmodule EspresoWeb.StaffShiftCloseLive do
               <p class="staff-shift-close-section-label">Cash settled</p>
               <p class="staff-shift-close-cash-value">{Menu.format_price(@snapshot_cash)}</p>
               <p class="staff-shift-close-section-hint">Cash payments sealed in this close.</p>
+              <p
+                :if={
+                  @close.adjustment_cash_impact && !Decimal.equal?(@close.adjustment_cash_impact, 0)
+                }
+                class="staff-shift-close-section-hint"
+                id="staff-shift-close-sealed-adjustment-cash"
+              >
+                Post-close cash adjustments: {signed_adjustment_cash(@close.adjustment_cash_impact)}
+              </p>
             </div>
 
             <section
@@ -481,6 +493,30 @@ defmodule EspresoWeb.StaffShiftCloseLive do
                   <span class="staff-paid-breakdown-label">{row.label}</span>
                   <span class="staff-paid-breakdown-total">{Menu.format_price(row.total)}</span>
                   <span class="staff-paid-breakdown-count">{row.count}</span>
+                </li>
+              </ul>
+            </section>
+
+            <section
+              :if={@adjustments != []}
+              class="staff-shift-close-cash-outs"
+              id="staff-shift-close-sealed-adjustments"
+              aria-label="Post-close adjustments"
+            >
+              <p class="staff-shift-close-section-label">Post-close adjustments</p>
+              <ul class="staff-shift-close-cash-out-list">
+                <li :for={adjustment <- @adjustments} class="staff-shift-close-cash-out-row">
+                  <span class="staff-shift-close-cash-out-amount">
+                    {Menu.format_price(adjustment.sales_impact)}
+                  </span>
+                  <span class="staff-shift-close-cash-out-category">
+                    {adjustment_label(adjustment.kind)} · {adjustment.payment_method}
+                  </span>
+                  <span class="staff-shift-close-cash-out-note">
+                    {adjustment.original_order.number} · {adjustment.reason} · drawer {signed_adjustment_cash(
+                      adjustment.drawer_impact
+                    )}
+                  </span>
                 </li>
               </ul>
             </section>
@@ -654,6 +690,10 @@ defmodule EspresoWeb.StaffShiftCloseLive do
                   <dt>Cash sales only</dt>
                   <dd>+ {Menu.format_price(@cash_sales)}</dd>
                 </div>
+                <div :if={!Decimal.equal?(@adjustment_cash_impact, 0)}>
+                  <dt>Post-close cash refunds</dt>
+                  <dd>{signed_adjustment_cash(@adjustment_cash_impact)}</dd>
+                </div>
                 <div>
                   <dt>Drawer cash-outs</dt>
                   <dd>− {Menu.format_price(@cash_out_total)}</dd>
@@ -678,6 +718,33 @@ defmodule EspresoWeb.StaffShiftCloseLive do
                   <dd>{Menu.format_price(@expected_cash)}</dd>
                 </div>
               </dl>
+            </section>
+
+            <section
+              :if={@adjustments != []}
+              class="staff-shift-close-cash-outs"
+              id="staff-shift-close-adjustments"
+              aria-label="Post-close adjustments"
+            >
+              <p class="staff-shift-close-section-label">Post-close adjustments</p>
+              <p class="staff-shift-close-section-hint">
+                These sales corrections are posted to this session; drawer impact reflects only cash actually refunded.
+              </p>
+              <ul class="staff-shift-close-cash-out-list">
+                <li :for={adjustment <- @adjustments} class="staff-shift-close-cash-out-row">
+                  <span class="staff-shift-close-cash-out-amount">
+                    {Menu.format_price(adjustment.sales_impact)}
+                  </span>
+                  <span class="staff-shift-close-cash-out-category">
+                    {adjustment_label(adjustment.kind)} · {adjustment.payment_method}
+                  </span>
+                  <span class="staff-shift-close-cash-out-note">
+                    {adjustment.original_order.number} · {adjustment.reason} · drawer {signed_adjustment_cash(
+                      adjustment.drawer_impact
+                    )}
+                  </span>
+                </li>
+              </ul>
             </section>
 
             <form
@@ -1044,6 +1111,25 @@ defmodule EspresoWeb.StaffShiftCloseLive do
         do: PettyCash.total_for_session(session_id),
         else: PettyCash.total_for_shop_date(shop_date)
 
+    adjustments = if session_id, do: Shifts.list_adjustments_for_session(session_id), else: []
+
+    adjustment_cash_impact =
+      if close do
+        close.adjustment_cash_impact || Decimal.new("0")
+      else
+        Enum.reduce(adjustments, Decimal.new("0"), fn adjustment, total ->
+          Decimal.add(total, adjustment.drawer_impact)
+        end)
+        |> Decimal.round(2)
+      end
+
+    cash_sales =
+      if shop_open do
+        Orders.cash_sales_for_session(shop_open)
+      else
+        Shifts.cash_sales_total(close || breakdown)
+      end
+
     petty_cash_expected = Decimal.sub(PettyCash.float(), petty_cash_total) |> Decimal.round(2)
 
     # Get per-staff shift sales summary
@@ -1103,14 +1189,14 @@ defmodule EspresoWeb.StaffShiftCloseLive do
       end
 
     opening_cash_amount = shop_open && shop_open.opening_cash
-    cash_sales = Shifts.cash_sales_total(breakdown)
 
     expected_cash =
       Shifts.expected_drawer_cash(
         opening_cash_amount,
         cash_sales,
         cash_out_total,
-        petty_cash_total
+        petty_cash_total,
+        adjustment_cash_impact
       )
 
     socket
@@ -1125,6 +1211,9 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     |> assign(:staff_shift_ended?, staff_shift_ended?)
     |> assign(:cash_outs, cash_outs)
     |> assign(:cash_out_total, cash_out_total)
+    |> assign(:adjustments, adjustments)
+    |> assign(:adjustment_cash_impact, adjustment_cash_impact)
+    |> assign(:cash_sales, cash_sales)
     |> assign(:staff_shift_summaries, staff_shift_summaries)
     |> assign(:petty_cash_entries, petty_cash_entries)
     |> assign(:petty_cash_total, petty_cash_total)
@@ -1132,7 +1221,15 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     |> assign(:shop_open, shop_open)
     |> assign(
       :close_snapshot,
-      close_review_snapshot(shop_open, breakdown, cash_outs, petty_cash_entries)
+      close_review_snapshot(
+        shop_open,
+        breakdown,
+        cash_outs,
+        petty_cash_entries,
+        cash_sales,
+        adjustments,
+        adjustment_cash_impact
+      )
     )
     |> assign(:opening_cash_amount, opening_cash_amount)
     |> assign(:expected_cash, expected_cash)
@@ -1184,13 +1281,37 @@ defmodule EspresoWeb.StaffShiftCloseLive do
     |> assign(:form_error, message)
   end
 
-  defp close_review_snapshot(nil, _breakdown, _cash_outs, _petty_cash_entries), do: nil
+  defp close_review_snapshot(
+         nil,
+         _breakdown,
+         _cash_outs,
+         _petty_cash_entries,
+         _cash_sales,
+         _adjustments,
+         _adjustment_cash_impact
+       ),
+       do: nil
 
-  defp close_review_snapshot(session, breakdown, cash_outs, petty_cash_entries) do
+  defp close_review_snapshot(
+         session,
+         breakdown,
+         cash_outs,
+         petty_cash_entries,
+         cash_sales,
+         adjustments,
+         adjustment_cash_impact
+       ) do
     %{
       session_id: session.id,
       opening_cash: session.opening_cash,
       breakdown: breakdown,
+      cash_sales: cash_sales,
+      adjustments:
+        Enum.map(
+          adjustments,
+          &{&1.id, &1.sales_impact, &1.drawer_impact, &1.payment_breakdown}
+        ),
+      adjustment_cash_impact: adjustment_cash_impact,
       cash_outs: Enum.map(cash_outs, &{&1.id, &1.amount}) |> Enum.sort(),
       petty_cash_entries: Enum.map(petty_cash_entries, &{&1.id, &1.amount}) |> Enum.sort()
     }
@@ -1264,6 +1385,20 @@ defmodule EspresoWeb.StaffShiftCloseLive do
   defp close_changeset_error(_changeset),
     do: "Could not record shift close. Check the amounts and try again."
 
+  defp adjustment_label("refund"), do: "Refund"
+  defp adjustment_label("duplicate_void"), do: "Duplicate void"
+  defp adjustment_label(_), do: "Adjustment"
+
+  defp signed_adjustment_cash(%Decimal{} = amount) do
+    case Decimal.compare(amount, 0) do
+      :gt -> "+ #{Menu.format_price(amount)}"
+      :lt -> "− #{Menu.format_price(Decimal.abs(amount))}"
+      :eq -> Menu.format_price(0)
+    end
+  end
+
+  defp signed_adjustment_cash(_), do: Menu.format_price(0)
+
   defp close_shop_date(%{already_closed?: true, close: %{shop_date: shop_date}})
        when not is_nil(shop_date),
        do: shop_date
@@ -1298,6 +1433,9 @@ defmodule EspresoWeb.StaffShiftCloseLive do
   defp closed_via_rows(_), do: []
 
   defp snapshot_cash_total(nil), do: Decimal.new("0")
+
+  defp snapshot_cash_total(%{cash_sales: cash_sales}) when not is_nil(cash_sales),
+    do: cash_sales
 
   defp snapshot_cash_total(%{by_via: by_via}) when is_map(by_via) do
     by_via

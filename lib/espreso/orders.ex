@@ -1108,7 +1108,11 @@ defmodule Espreso.Orders do
       )
       |> Repo.all()
 
-    breakdown_from_paid_orders(orders, session.shop_date)
+    breakdown_from_paid_orders(
+      orders,
+      session.shop_date,
+      Shifts.list_adjustments_for_session(session.id)
+    )
   end
 
   @doc """
@@ -1125,7 +1129,11 @@ defmodule Espreso.Orders do
       |> filter_paid_shop_dates(shop_date, shop_date)
       |> Repo.all()
 
-    breakdown_from_paid_orders(orders, shop_date)
+    breakdown_from_paid_orders(
+      orders,
+      shop_date,
+      Shifts.list_adjustments_for_shop_dates(shop_date, shop_date)
+    )
   end
 
   def paid_breakdown_for_legacy_shop_date(%Date{} = shop_date) do
@@ -1141,6 +1149,25 @@ defmodule Espreso.Orders do
       |> Repo.all()
 
     breakdown_from_paid_orders(orders, shop_date)
+  end
+
+  def cash_sales_for_session(%Shifts.ShopDayOpen{} = session) do
+    orders =
+      from(o in branch_scope(Order),
+        where:
+          o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
+            o.shop_session_id == ^session.id,
+        preload: :payment_splits
+      )
+      |> Repo.all()
+
+    Enum.reduce(orders, Decimal.new("0"), fn order, total ->
+      Enum.reduce(payment_parts(order), total, fn
+        {"cash", amount}, acc -> Decimal.add(acc, amount)
+        _, acc -> acc
+      end)
+    end)
+    |> Decimal.round(2)
   end
 
   @doc """
@@ -1164,13 +1191,28 @@ defmodule Espreso.Orders do
 
   def refund_total_for_shop_date(_), do: Decimal.new("0")
 
-  defp breakdown_from_paid_orders(orders, shop_date) do
+  defp breakdown_from_paid_orders(orders, shop_date, adjustments \\ []) do
     empty = %{total: Decimal.new("0"), count: 0}
-    by_via = paid_via_breakdown(orders, empty)
+
+    by_via =
+      Enum.reduce(adjustments, paid_via_breakdown(orders, empty), fn adjustment, current ->
+        Enum.reduce(adjustment.payment_breakdown || %{}, current, fn {via, amount}, acc ->
+          via = to_string(via)
+
+          Map.update(acc, via, %{total: decimalize(amount), count: 0}, fn entry ->
+            %{entry | total: Decimal.add(entry.total, decimalize(amount))}
+          end)
+        end)
+      end)
+
+    adjustment_total =
+      Enum.reduce(adjustments, Decimal.new("0"), fn adjustment, total ->
+        Decimal.add(total, adjustment.sales_impact)
+      end)
 
     %{
       total:
-        Enum.reduce(orders, Decimal.new("0"), fn order, acc ->
+        Enum.reduce(orders, adjustment_total, fn order, acc ->
           Decimal.add(acc, decimalize(order.total))
         end),
       count: length(orders),
@@ -1393,6 +1435,14 @@ defmodule Espreso.Orders do
   defp decimalize(%Decimal{} = value), do: value
   defp decimalize(value) when is_integer(value), do: Decimal.new(value)
   defp decimalize(value) when is_float(value), do: Decimal.from_float(value)
+
+  defp decimalize(value) when is_binary(value) do
+    case Decimal.parse(String.trim(value)) do
+      {decimal, ""} -> decimal
+      _ -> Decimal.new("0")
+    end
+  end
+
   defp decimalize(_), do: Decimal.new("0")
 
   @doc """
@@ -1753,11 +1803,18 @@ defmodule Espreso.Orders do
             Shifts.lock_session!()
             now = DateTime.utc_now() |> DateTime.truncate(:second)
 
+            session = Shifts.current_session()
+
+            if is_nil(session) do
+              Repo.rollback(:post_close_adjustment_required)
+            end
+
             {count, _} =
               from(o in branch_scope(Order),
                 where:
                   o.id == ^id and o.payment_status == "paid" and
-                    is_nil(o.duplicate_voided_at) and is_nil(o.refunded_at)
+                    o.shop_session_id == ^session.id and is_nil(o.duplicate_voided_at) and
+                    is_nil(o.refunded_at)
               )
               |> Repo.update_all(
                 set: [
@@ -1786,6 +1843,10 @@ defmodule Espreso.Orders do
 
                     %Order{payment_status: status} when status != "paid" ->
                       :not_paid
+
+                    %Order{shop_session_id: shop_session_id}
+                    when shop_session_id != session.id ->
+                      :post_close_adjustment_required
 
                     _ ->
                       :not_voidable

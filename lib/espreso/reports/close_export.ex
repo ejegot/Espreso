@@ -30,6 +30,8 @@ defmodule Espreso.Reports.CloseExport do
     "Petty Cash Purchases",
     "Petty Cash Transfer",
     "Petty Cash Variance",
+    "Sales Adjustments",
+    "Cash Adjustments",
     "Expected",
     "Counted",
     "Variance"
@@ -55,6 +57,17 @@ defmodule Espreso.Reports.CloseExport do
     "Recorded By"
   ]
 
+  @adjustment_headers [
+    "Shop Date",
+    "Kind",
+    "Sales Impact",
+    "Drawer Cash Impact",
+    "Original Receipt",
+    "Original Payment",
+    "Reason",
+    "Recorded By"
+  ]
+
   def days_headers, do: @days_headers
   def mix_headers, do: @mix_headers
   def cash_out_headers, do: @cash_out_headers
@@ -76,6 +89,8 @@ defmodule Espreso.Reports.CloseExport do
       cash_outs_by_date = Enum.group_by(cash_outs, & &1.shop_date)
       petty_cash_entries = PettyCash.list_for_shop_dates(from_date, to_date)
       petty_cash_by_date = Enum.group_by(petty_cash_entries, & &1.shop_date)
+      adjustments = Shifts.list_adjustments_for_shop_dates(from_date, to_date)
+      adjustments_by_session = Enum.group_by(adjustments, & &1.shop_session_id)
 
       days =
         Enum.flat_map(Date.range(from_date, to_date), fn shop_date ->
@@ -84,7 +99,8 @@ defmodule Espreso.Reports.CloseExport do
             Map.get(opens, shop_date, []),
             Map.get(closes, shop_date, []),
             Map.get(cash_outs_by_date, shop_date, []),
-            Map.get(petty_cash_by_date, shop_date, [])
+            Map.get(petty_cash_by_date, shop_date, []),
+            adjustments_by_session
           )
         end)
 
@@ -94,7 +110,8 @@ defmodule Espreso.Reports.CloseExport do
          to_date: to_date,
          days: days,
          cash_outs: cash_outs,
-         petty_cash_entries: petty_cash_entries
+         petty_cash_entries: petty_cash_entries,
+         adjustments: adjustments
        }}
     end
   end
@@ -107,7 +124,8 @@ defmodule Espreso.Reports.CloseExport do
         days_sheet(pack.days),
         mix_sheet(pack.days),
         cash_outs_sheet(pack.cash_outs),
-        petty_cash_sheet(pack.petty_cash_entries)
+        petty_cash_sheet(pack.petty_cash_entries),
+        adjustments_sheet(pack.adjustments)
       ]
     }
 
@@ -130,7 +148,8 @@ defmodule Espreso.Reports.CloseExport do
         to_date: to_date,
         days: days,
         cash_outs: cash_outs,
-        petty_cash_entries: petty_cash_entries
+        petty_cash_entries: petty_cash_entries,
+        adjustments: adjustments
       }) do
     lines =
       [
@@ -142,13 +161,15 @@ defmodule Espreso.Reports.CloseExport do
         ["Cash outs", ""] ++
         pdf_cash_out_lines(cash_outs) ++
         ["Petty-cash purchases", ""] ++
-        pdf_petty_cash_lines(petty_cash_entries)
+        pdf_petty_cash_lines(petty_cash_entries) ++
+        ["Post-close adjustments", ""] ++
+        pdf_adjustment_lines(adjustments)
 
     filename = "elilai-close-#{Date.to_iso8601(from_date)}-#{Date.to_iso8601(to_date)}.pdf"
     {:ok, {filename, PlainPdf.render("Elilai Kafe day close", lines)}}
   end
 
-  defp rows_for_date(date, opens, closes, cash_outs, petty_cash_entries) do
+  defp rows_for_date(date, opens, closes, cash_outs, petty_cash_entries, adjustments_by_session) do
     session_opens = Enum.reject(opens, &is_nil(&1.session_active))
     legacy_open = Enum.find(opens, &is_nil(&1.session_active))
     legacy_close = Enum.find(closes, &is_nil(&1.shop_session_id))
@@ -164,7 +185,8 @@ defmodule Espreso.Reports.CloseExport do
           open,
           close,
           Enum.filter(cash_outs, &(&1.shop_session_id == open.id)),
-          Enum.filter(petty_cash_entries, &(&1.shop_session_id == open.id))
+          Enum.filter(petty_cash_entries, &(&1.shop_session_id == open.id)),
+          Map.get(adjustments_by_session, open.id, [])
         )
       end)
 
@@ -177,7 +199,8 @@ defmodule Espreso.Reports.CloseExport do
             legacy_open,
             legacy_close,
             legacy_cash_outs,
-            legacy_petty_cash
+            legacy_petty_cash,
+            []
           )
         ]
       else
@@ -187,7 +210,7 @@ defmodule Espreso.Reports.CloseExport do
     legacy_rows ++ session_rows
   end
 
-  defp day_row(shop_date, open, close, cash_outs, petty_cash_entries) do
+  defp day_row(shop_date, open, close, cash_outs, petty_cash_entries, adjustments) do
     recorded_outs = Enum.filter(cash_outs, &(&1.status == "recorded"))
 
     cash_out_total =
@@ -202,6 +225,9 @@ defmodule Espreso.Reports.CloseExport do
         Decimal.add(acc, row.amount || Decimal.new("0"))
       end)
 
+    sales_adjustment_total = adjustment_total(adjustments, :sales_impact)
+    adjustment_cash_impact = adjustment_total(adjustments, :drawer_impact)
+
     cond do
       close ->
         by_via = close.by_via || %{}
@@ -215,11 +241,13 @@ defmodule Espreso.Reports.CloseExport do
           paid_total: close.system_total,
           paid_count: close.system_count,
           opening: close.opening_cash,
-          cash_sales: Shifts.cash_sales_total(%{by_via: by_via}),
+          cash_sales: Shifts.cash_sales_total(close),
           cash_outs: cash_out_total,
           petty_cash_purchases: petty_cash_total,
           petty_cash_transfer: close.petty_cash_transfer,
           petty_cash_variance: close.petty_cash_variance,
+          sales_adjustments: sales_adjustment_total,
+          adjustment_cash_impact: close.adjustment_cash_impact || adjustment_cash_impact,
           expected: close.expected_cash,
           counted: close.counted_cash,
           variance: close.variance,
@@ -232,7 +260,11 @@ defmodule Espreso.Reports.CloseExport do
             do: Orders.paid_breakdown_for_legacy_shop_date(shop_date),
             else: Orders.paid_breakdown_for_session(open)
 
-        cash_sales = Shifts.cash_sales_total(breakdown)
+        cash_sales =
+          if open.session_active == true,
+            do: Orders.cash_sales_for_session(open),
+            else: Shifts.cash_sales_total(breakdown)
+
         opening = open.opening_cash
 
         %{
@@ -249,8 +281,16 @@ defmodule Espreso.Reports.CloseExport do
           petty_cash_purchases: petty_cash_total,
           petty_cash_transfer: petty_cash_total,
           petty_cash_variance: nil,
+          sales_adjustments: sales_adjustment_total,
+          adjustment_cash_impact: adjustment_cash_impact,
           expected:
-            Shifts.expected_drawer_cash(opening, cash_sales, cash_out_total, petty_cash_total),
+            Shifts.expected_drawer_cash(
+              opening,
+              cash_sales,
+              cash_out_total,
+              petty_cash_total,
+              adjustment_cash_impact
+            ),
           counted: nil,
           variance: nil,
           by_via: breakdown.by_via
@@ -271,6 +311,8 @@ defmodule Espreso.Reports.CloseExport do
           petty_cash_purchases: petty_cash_total,
           petty_cash_transfer: nil,
           petty_cash_variance: nil,
+          sales_adjustments: Decimal.new("0"),
+          adjustment_cash_impact: Decimal.new("0"),
           expected: nil,
           counted: nil,
           variance: nil,
@@ -296,6 +338,8 @@ defmodule Espreso.Reports.CloseExport do
           money(day.petty_cash_purchases),
           money(day.petty_cash_transfer),
           money(day.petty_cash_variance),
+          money(day.sales_adjustments),
+          money(day.adjustment_cash_impact),
           money(day.expected),
           money(day.counted),
           money(day.variance)
@@ -355,12 +399,31 @@ defmodule Espreso.Reports.CloseExport do
     %Sheet{name: "Petty cash", rows: [@petty_cash_headers | rows]}
   end
 
+  defp adjustments_sheet(adjustments) do
+    rows =
+      Enum.map(adjustments, fn row ->
+        [
+          Date.to_iso8601(row.shop_session.shop_date),
+          row.kind,
+          money(row.sales_impact),
+          money(row.drawer_impact),
+          row.original_order.number,
+          adjustment_payment_label(row),
+          row.reason,
+          user_name(row.recorded_by_user)
+        ]
+      end)
+
+    %Sheet{name: "Adjustments", rows: [@adjustment_headers | rows]}
+  end
+
   defp pdf_day_lines(day) do
     [
       "#{Date.to_iso8601(day.shop_date)}  #{day.status}",
       "Opened by #{blank(day.opened_by)}  Closed by #{blank(day.closed_by)} #{datetime_string(day.closed_at)}",
       "Paid #{money(day.paid_total)} (#{day.paid_count} tickets)",
       "Opening #{money(day.opening)}  Cash sales #{money(day.cash_sales)}  Cash outs #{money(day.cash_outs)}  Petty purchases #{money(day.petty_cash_purchases)}  Petty transfer #{money(day.petty_cash_transfer)}",
+      "Sales adjustments #{money(day.sales_adjustments)}  Drawer cash adjustments #{money(day.adjustment_cash_impact)}",
       "Expected #{money(day.expected)}  Counted #{money(day.counted)}  Variance #{money(day.variance)}",
       mix_line(day.by_via),
       ""
@@ -382,6 +445,31 @@ defmodule Espreso.Reports.CloseExport do
       "#{Date.to_iso8601(row.shop_date)}  #{row.status}  #{money(row.amount)}  #{row.category}  #{row.note}  #{user_name(row.created_by_user)}"
     end) ++ [""]
   end
+
+  defp pdf_adjustment_lines([]), do: ["None", ""]
+
+  defp pdf_adjustment_lines(rows) do
+    Enum.map(rows, fn row ->
+      "#{Date.to_iso8601(row.shop_session.shop_date)}  #{row.kind}  #{money(row.sales_impact)} sales  #{money(row.drawer_impact)} drawer  #{row.original_order.number}  #{adjustment_payment_label(row)}  #{row.reason}  #{user_name(row.recorded_by_user)}"
+    end) ++ [""]
+  end
+
+  defp adjustment_total(adjustments, field) do
+    Enum.reduce(adjustments, Decimal.new("0"), fn row, total ->
+      Decimal.add(total, Map.fetch!(row, field))
+    end)
+    |> Decimal.round(2)
+  end
+
+  defp adjustment_payment_label(%{payment_method: "split", payment_breakdown: breakdown}) do
+    breakdown
+    |> Map.keys()
+    |> Enum.map(&Orders.paid_via_label/1)
+    |> Enum.sort()
+    |> Enum.join(" + ")
+  end
+
+  defp adjustment_payment_label(%{payment_method: method}), do: Orders.paid_via_label(method)
 
   defp mix_line(by_via) do
     @vias

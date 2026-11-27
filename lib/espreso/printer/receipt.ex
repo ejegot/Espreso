@@ -143,6 +143,7 @@ defmodule Espreso.Printer.Receipt do
         EscPos.columns("Cash sales", money(cash_sales))
       ] ++
         optional_money_line("Cash outs", cash_outs) ++
+        optional_money_line("Cash adjustments", close.adjustment_cash_impact) ++
         [
           EscPos.columns("Expected", money(close.expected_cash)),
           EscPos.columns("Counted", money(close.counted_cash)),
