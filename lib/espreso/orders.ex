@@ -1151,6 +1151,22 @@ defmodule Espreso.Orders do
     breakdown_from_paid_orders(orders, shop_date)
   end
 
+  @doc """
+  Gross paid order total for inclusive Asia/Manila shop dates, before post-close
+  sales adjustments. Historical ticket totals are never rewritten.
+  """
+  def paid_total_for_shop_dates(%Date{} = from_date, %Date{} = to_date) do
+    from(o in branch_scope(Order),
+      where:
+        o.payment_status == "paid" and is_nil(o.duplicate_voided_at) and
+          not is_nil(o.settled_at),
+      select: sum(o.total)
+    )
+    |> filter_paid_shop_dates(from_date, to_date)
+    |> Repo.one()
+    |> decimalize()
+  end
+
   def cash_sales_for_session(%Shifts.ShopDayOpen{} = session) do
     orders =
       from(o in branch_scope(Order),

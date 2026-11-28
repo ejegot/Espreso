@@ -28315,9 +28315,59 @@ a.brune-contact-value:focus-visible {
   padding: 0;
 }
 
+#staff-reports-settlement .staff-reports-settlement-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+#staff-reports-settlement .staff-reports-settlement-totals div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+#staff-reports-settlement .staff-reports-settlement-totals dt {
+  color: var(--rpt-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+#staff-reports-settlement .staff-reports-settlement-totals dd {
+  margin: 0;
+  color: var(--rpt-forest);
+  font-size: 1.15rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+#staff-reports-adjustments .staff-reports-table-wrap {
+  overflow-x: auto;
+}
+
+#staff-reports-adjustments .staff-reports-adjustments-table {
+  min-width: 52rem;
+}
+
+#staff-reports-adjustments .staff-reports-adjustments-table th,
+#staff-reports-adjustments .staff-reports-adjustments-table td {
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+#staff-reports-adjustments .staff-reports-adjustments-table th:nth-child(4),
+#staff-reports-adjustments .staff-reports-adjustments-table td:nth-child(4),
+#staff-reports-adjustments .staff-reports-adjustments-table th:nth-child(5),
+#staff-reports-adjustments .staff-reports-adjustments-table td:nth-child(5) {
+  text-align: right;
+  white-space: nowrap;
+}
+
 @media (max-width: 640px) {
   #staff-reports .staff-reports-fields,
-  #staff-reports .staff-reports-actions {
+  #staff-reports .staff-reports-actions,
+  #staff-reports-settlement .staff-reports-settlement-totals {
     grid-template-columns: 1fr;
   }
 }

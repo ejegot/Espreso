@@ -776,6 +776,12 @@ defmodule Espreso.MenuTest do
       assert Menu.format_price(Decimal.new("1500.5")) == "₱1,500.50"
       assert Menu.format_price(Decimal.new("10000.99")) == "₱10,000.99"
     end
+
+    test "formats negative amounts without grouping the sign as a digit" do
+      assert Menu.format_price(Decimal.new("-100")) == "−₱100"
+      assert Menu.format_price(Decimal.new("-1234.5")) == "−₱1,234.50"
+      assert Menu.format_price(Decimal.new("-0.001")) == "₱0"
+    end
   end
 
   describe "signature product helpers" do

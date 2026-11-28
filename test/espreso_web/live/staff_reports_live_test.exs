@@ -7,6 +7,7 @@ defmodule EspresoWeb.StaffReportsLiveTest do
   alias Espreso.Orders
   alias Espreso.Orders.Order
   alias Espreso.Repo
+  alias Espreso.Shifts
 
   import Ecto.Query
 
@@ -108,6 +109,90 @@ defmodule EspresoWeb.StaffReportsLiveTest do
     assert has_element?(owner_view, "#staff-reports-payout", "Manager")
     assert has_element?(owner_view, "#staff-reports-payout", "160")
     assert has_element?(manager_view, "#staff-reports-payout", "Manager")
+  end
+
+  test "reports original paid sales separately from corrections in the next session", %{
+    conn: conn,
+    owner: owner
+  } do
+    {:ok, cash_order} = paid_report_order!("Cash receipt", "100", "cash")
+    {:ok, wallet_order} = paid_report_order!("Wallet receipt", "100", "gcash")
+
+    original_session = Shifts.current_session()
+    assert {:ok, original_close} = Shifts.record_close(owner, %{counted_cash: "100"})
+    assert {:ok, next_session} = Shifts.record_open(owner, %{opening_cash: "200"})
+
+    next_session =
+      next_session
+      |> Ecto.Changeset.change(shop_date: Date.add(original_session.shop_date, 1))
+      |> Repo.update!()
+
+    assert {:ok, _} =
+             Shifts.record_post_close_adjustment(cash_order, owner, %{
+               kind: "refund",
+               reason: "Cash returned",
+               cash_refund: "100"
+             })
+
+    assert {:ok, _} =
+             Shifts.record_post_close_adjustment(wallet_order, owner, %{
+               kind: "refund",
+               reason: "Wallet returned",
+               cash_refund: "0"
+             })
+
+    assert original_close.shop_session_id == original_session.id
+    assert Decimal.equal?(Repo.get!(Shifts.ShiftClose, original_close.id).system_total, 200)
+
+    {:ok, view, _html} = live(log_in(conn, owner), ~p"/staff/reports")
+
+    assert has_element?(view, "#staff-reports-gross-sales", "₱0")
+    assert has_element?(view, "#staff-reports-adjustment-total", "−₱200")
+    assert has_element?(view, "#staff-reports-net-sales", "−₱200")
+    assert has_element?(view, "#staff-reports-item-empty", "No paid items in this range.")
+
+    view
+    |> form("#staff-reports-export-form", %{
+      report: %{
+        from: Date.to_iso8601(original_session.shop_date),
+        to: Date.to_iso8601(next_session.shop_date)
+      }
+    })
+    |> render_change()
+
+    assert has_element?(view, "#staff-reports-gross-sales", "₱200")
+    assert has_element?(view, "#staff-reports-adjustment-total", "−₱200")
+    assert has_element?(view, "#staff-reports-net-sales", "₱0")
+    assert has_element?(view, "#staff-reports-item-sales", "Cash receipt")
+    assert has_element?(view, "#staff-reports-item-sales", "Wallet receipt")
+    assert has_element?(view, "#staff-reports-item-sales", "₱200")
+
+    assert has_element?(
+             view,
+             "#staff-reports-adjustments",
+             "#{Date.to_iso8601(next_session.shop_date)} · Session #{next_session.id}"
+           )
+
+    assert has_element?(view, "#staff-reports-adjustments", cash_order.number)
+    assert has_element?(view, "#staff-reports-adjustments", wallet_order.number)
+    assert has_element?(view, "#staff-reports-adjustments", "−₱100")
+    assert has_element?(view, "#staff-reports-adjustments", "Cash returned")
+    assert has_element?(view, "#staff-reports-adjustments", "Wallet returned")
+    assert has_element?(view, "#staff-reports-adjustments", owner.name)
+
+    view
+    |> form("#staff-reports-export-form", %{
+      report: %{
+        from: Date.to_iso8601(original_session.shop_date),
+        to: Date.to_iso8601(original_session.shop_date)
+      }
+    })
+    |> render_change()
+
+    assert has_element?(view, "#staff-reports-gross-sales", "₱200")
+    assert has_element?(view, "#staff-reports-adjustment-total", "₱0")
+    assert has_element?(view, "#staff-reports-net-sales", "₱200")
+    assert has_element?(view, "#staff-reports-adjustments-empty")
   end
 
   test "rejects ranges longer than 31 days in the form", %{conn: conn, owner: owner} do
@@ -327,5 +412,20 @@ defmodule EspresoWeb.StaffReportsLiveTest do
       Repo.update_all(from(o in Order, where: o.id == ^order.id), set: [settled_at: settled_at])
 
     order
+  end
+
+  defp paid_report_order!(name, amount, paid_via) do
+    with {:ok, order} <-
+           Orders.create_order(
+             [%{name: name, size: nil, quantity: 1, price: Decimal.new(amount)}],
+             %{
+               customer_name: name,
+               fulfillment: :pickup,
+               payment_method: :counter
+             }
+           ),
+         {:ok, paid} <- Orders.mark_paid(order, paid_via: paid_via) do
+      {:ok, paid}
+    end
   end
 end

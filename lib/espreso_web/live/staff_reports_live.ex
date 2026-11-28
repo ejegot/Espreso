@@ -7,6 +7,7 @@ defmodule EspresoWeb.StaffReportsLive do
   alias Espreso.Accounts.Authorization
   alias Espreso.Menu
   alias Espreso.Orders
+  alias Espreso.Shifts
 
   @impl true
   def mount(_params, _session, socket) do
@@ -152,10 +153,90 @@ defmodule EspresoWeb.StaffReportsLive do
           </form>
         </section>
 
+        <section
+          class="staff-reports-card"
+          id="staff-reports-settlement"
+          aria-label="Net session settlement"
+        >
+          <header class="staff-reports-item-head">
+            <h3>Net session settlement</h3>
+            <p>
+              Corrections are recorded against the session that accepted them. Original tickets
+              and sealed close snapshots remain unchanged.
+            </p>
+          </header>
+          <dl class="staff-reports-settlement-totals">
+            <div>
+              <dt>Gross paid sales</dt>
+              <dd id="staff-reports-gross-sales">{peso(@gross_paid_total)}</dd>
+            </div>
+            <div>
+              <dt>Post-close sales corrections</dt>
+              <dd id="staff-reports-adjustment-total">{peso(@adjustment_sales_total)}</dd>
+            </div>
+            <div>
+              <dt>Net settled sales</dt>
+              <dd id="staff-reports-net-sales">{peso(@net_settlement_total)}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section
+          class="staff-reports-card"
+          id="staff-reports-adjustments"
+          aria-label="Post-close corrections"
+        >
+          <header class="staff-reports-item-head">
+            <h3>Post-close corrections</h3>
+            <p>
+              Listed on the Manila shop date and session where each correction was recorded.
+              These rows are separate from the original paid-ticket detail below.
+            </p>
+          </header>
+          <p
+            :if={@adjustments == []}
+            class="staff-reports-item-empty"
+            id="staff-reports-adjustments-empty"
+          >
+            No post-close corrections in this range.
+          </p>
+          <div :if={@adjustments != []} class="staff-reports-table-wrap">
+            <table class="staff-reports-item-table staff-reports-adjustments-table">
+              <thead>
+                <tr>
+                  <th>Adjustment date / session</th>
+                  <th>Correction</th>
+                  <th>Original receipt / payment</th>
+                  <th>Sales impact</th>
+                  <th>Drawer impact</th>
+                  <th>Reason / recorded by</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr :for={adjustment <- @adjustments}>
+                  <td>
+                    {Date.to_iso8601(adjustment.shop_session.shop_date)} · Session {adjustment.shop_session_id}
+                  </td>
+                  <td>{adjustment_label(adjustment.kind)}</td>
+                  <td>
+                    {adjustment.original_order.number} · {adjustment_payment_label(adjustment)}
+                  </td>
+                  <td>{peso(adjustment.sales_impact)}</td>
+                  <td>{signed_adjustment_drawer(adjustment.drawer_impact)}</td>
+                  <td>{adjustment.reason} · {adjustment_recorder(adjustment)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <section class="staff-reports-card" id="staff-reports-item-sales" aria-label="Sales by item">
           <header class="staff-reports-item-head">
             <h3>Sales by item</h3>
-            <p>Paid tickets only. Ranked by peso. Manager food is marked on the ticket.</p>
+            <p>
+              Original paid-ticket sales, before post-close corrections. Ranked by peso.
+              Manager food is marked on the ticket.
+            </p>
           </header>
           <p :if={@item_sales == []} class="staff-reports-item-empty" id="staff-reports-item-empty">
             No paid items in this range.
@@ -193,7 +274,7 @@ defmodule EspresoWeb.StaffReportsLive do
         <section class="staff-reports-card" id="staff-reports-payout" aria-label="Payout">
           <header class="staff-reports-item-head">
             <h3>Payout</h3>
-            <p>Settle Manager food vs Café from paid tickets.</p>
+            <p>Original paid-ticket payout, before post-close corrections.</p>
           </header>
           <p
             :if={@item_payouts == []}
@@ -295,16 +376,27 @@ defmodule EspresoWeb.StaffReportsLive do
   defp assign_item_sales(socket, from_date, to_date, nil)
        when not is_nil(from_date) and not is_nil(to_date) do
     rows = Orders.paid_item_sales(from: from_date, to: to_date)
+    adjustments = Shifts.list_adjustments_for_shop_dates(from_date, to_date)
+    adjustment_sales_total = adjustment_total(adjustments)
+    gross_paid_total = Orders.paid_total_for_shop_dates(from_date, to_date)
 
     socket
     |> assign(:item_sales, rows)
     |> assign(:item_payouts, Orders.paid_item_payouts(from: from_date, to: to_date))
+    |> assign(:adjustments, adjustments)
+    |> assign(:gross_paid_total, gross_paid_total)
+    |> assign(:adjustment_sales_total, adjustment_sales_total)
+    |> assign(:net_settlement_total, Decimal.add(gross_paid_total, adjustment_sales_total))
   end
 
   defp assign_item_sales(socket, _, _, _) do
     socket
     |> assign(:item_sales, [])
     |> assign(:item_payouts, [])
+    |> assign(:adjustments, [])
+    |> assign(:gross_paid_total, Decimal.new("0"))
+    |> assign(:adjustment_sales_total, Decimal.new("0"))
+    |> assign(:net_settlement_total, Decimal.new("0"))
   end
 
   defp peso(amount) do
@@ -327,6 +419,40 @@ defmodule EspresoWeb.StaffReportsLive do
   defp item_owner(_), do: nil
 
   defp payout_owner(row), do: item_owner(row) || "Café"
+
+  defp adjustment_label("refund"), do: "Refund"
+  defp adjustment_label("duplicate_void"), do: "Duplicate void"
+  defp adjustment_label(_), do: "Correction"
+
+  defp adjustment_payment_label(%{payment_method: "split", payment_breakdown: breakdown}) do
+    breakdown
+    |> Map.keys()
+    |> Enum.map(&Orders.paid_via_label/1)
+    |> Enum.sort()
+    |> Enum.join(" + ")
+  end
+
+  defp adjustment_payment_label(%{payment_method: method}), do: Orders.paid_via_label(method)
+
+  defp adjustment_recorder(%{recorded_by_user: %{name: name}}), do: name
+  defp adjustment_recorder(_), do: "Unknown staff"
+
+  defp signed_adjustment_drawer(%Decimal{} = amount) do
+    case Decimal.compare(amount, 0) do
+      :gt -> "+ #{peso(amount)}"
+      :lt -> peso(amount)
+      :eq -> peso(Decimal.new("0"))
+    end
+  end
+
+  defp signed_adjustment_drawer(_), do: peso(Decimal.new("0"))
+
+  defp adjustment_total(adjustments) do
+    Enum.reduce(adjustments, Decimal.new("0"), fn adjustment, total ->
+      Decimal.add(total, adjustment.sales_impact)
+    end)
+    |> Decimal.round(2)
+  end
 
   defp item_qty_total(rows) when is_list(rows) do
     Enum.reduce(rows, 0, fn row, acc -> acc + item_qty(row.quantity) end)

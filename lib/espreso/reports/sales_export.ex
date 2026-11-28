@@ -9,6 +9,7 @@ defmodule Espreso.Reports.SalesExport do
   alias Espreso.Menu
   alias Espreso.Orders
   alias Espreso.Orders.{Order, OrderItem}
+  alias Espreso.Shifts.ShopSessionAdjustment
 
   @shop_utc_offset_seconds 8 * 60 * 60
 
@@ -41,11 +42,37 @@ defmodule Espreso.Reports.SalesExport do
     "Paid Via"
   ]
 
+  @settlement_headers [
+    "Date From",
+    "Date To",
+    "Gross Paid Sales",
+    "Post-close Sales Corrections",
+    "Net Settled Sales"
+  ]
+
+  @adjustment_headers [
+    "Adjustment Date",
+    "Shop Session",
+    "Correction",
+    "Original Receipt",
+    "Original Payment",
+    "Sales Impact",
+    "Drawer Cash Impact",
+    "Reason",
+    "Recorded By"
+  ]
+
   @doc false
   def sales_headers, do: @sales_headers
 
   @doc false
   def items_headers, do: @items_headers
+
+  @doc false
+  def settlement_headers, do: @settlement_headers
+
+  @doc false
+  def adjustment_headers, do: @adjustment_headers
 
   @doc """
   Builds an `.xlsx` binary for the given paid orders and inclusive shop dates.
@@ -53,10 +80,19 @@ defmodule Espreso.Reports.SalesExport do
   Returns `{:ok, {filename, binary}}`.
   """
   def build(orders, %Date{} = from_date, %Date{} = to_date) when is_list(orders) do
+    build(orders, [], from_date, to_date)
+  end
+
+  def build(_, _, _), do: {:error, :invalid_orders}
+
+  def build(orders, adjustments, %Date{} = from_date, %Date{} = to_date)
+      when is_list(orders) and is_list(adjustments) do
     workbook = %Workbook{
       sheets: [
         sales_sheet(orders),
-        items_sheet(orders)
+        items_sheet(orders),
+        settlement_sheet(orders, adjustments, from_date, to_date),
+        adjustments_sheet(adjustments)
       ]
     }
 
@@ -74,7 +110,7 @@ defmodule Espreso.Reports.SalesExport do
     end
   end
 
-  def build(_, _, _), do: {:error, :invalid_orders}
+  def build(_, _, _, _), do: {:error, :invalid_orders}
 
   defp sales_sheet(orders) do
     rows =
@@ -128,6 +164,75 @@ defmodule Espreso.Reports.SalesExport do
     %Sheet{name: "Items", rows: [@items_headers | rows]}
   end
 
+  defp settlement_sheet(orders, adjustments, from_date, to_date) do
+    gross_paid_total =
+      Enum.reduce(orders, Decimal.new("0"), fn order, total ->
+        Decimal.add(total, decimal(order.total))
+      end)
+
+    adjustments_total = adjustment_total(adjustments)
+
+    rows = [
+      [
+        Date.to_iso8601(from_date),
+        Date.to_iso8601(to_date),
+        money(gross_paid_total),
+        money(adjustments_total),
+        money(Decimal.add(gross_paid_total, adjustments_total))
+      ]
+    ]
+
+    %Sheet{name: "Settlement", rows: [@settlement_headers | rows]}
+  end
+
+  defp adjustments_sheet(adjustments) do
+    rows =
+      Enum.map(adjustments, fn %ShopSessionAdjustment{} = adjustment ->
+        [
+          adjustment_date(adjustment),
+          adjustment.shop_session_id,
+          adjustment_label(adjustment.kind),
+          (adjustment.original_order && adjustment.original_order.number) || "",
+          adjustment_payment_label(adjustment),
+          money(adjustment.sales_impact),
+          money(adjustment.drawer_impact),
+          adjustment.reason || "",
+          (adjustment.recorded_by_user && adjustment.recorded_by_user.name) || ""
+        ]
+      end)
+
+    %Sheet{name: "Adjustments", rows: [@adjustment_headers | rows]}
+  end
+
+  defp adjustment_date(%ShopSessionAdjustment{shop_session: %{shop_date: %Date{} = date}}),
+    do: Date.to_iso8601(date)
+
+  defp adjustment_date(_), do: ""
+
+  defp adjustment_label("refund"), do: "Refund"
+  defp adjustment_label("duplicate_void"), do: "Duplicate void"
+  defp adjustment_label(_), do: "Correction"
+
+  defp adjustment_payment_label(%{
+         payment_method: "split",
+         payment_breakdown: breakdown
+       }) do
+    breakdown
+    |> Map.keys()
+    |> Enum.map(&Orders.paid_via_label/1)
+    |> Enum.sort()
+    |> Enum.join(" + ")
+  end
+
+  defp adjustment_payment_label(%{payment_method: method}), do: Orders.paid_via_label(method)
+
+  defp adjustment_total(adjustments) do
+    Enum.reduce(adjustments, Decimal.new("0"), fn adjustment, total ->
+      Decimal.add(total, adjustment.sales_impact || Decimal.new("0"))
+    end)
+    |> Decimal.round(2)
+  end
+
   defp order_shop_date_string(%Order{shop_session: %{shop_date: %Date{} = date}}),
     do: Date.to_iso8601(date)
 
@@ -158,6 +263,9 @@ defmodule Espreso.Reports.SalesExport do
   defp money(amount) when is_integer(amount), do: Menu.format_price(Decimal.new(amount))
   defp money(amount) when is_binary(amount), do: Menu.format_price(Decimal.new(amount))
   defp money(_), do: Menu.format_price(Decimal.new("0"))
+
+  defp decimal(%Decimal{} = amount), do: amount
+  defp decimal(_), do: Decimal.new("0")
 
   defp loyalty_free_money(centavos) when is_integer(centavos) and centavos > 0 do
     centavos

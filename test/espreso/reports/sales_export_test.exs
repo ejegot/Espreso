@@ -7,6 +7,7 @@ defmodule Espreso.Reports.SalesExportTest do
   alias Espreso.Orders.Order
   alias Espreso.Repo
   alias Espreso.Reports.SalesExport
+  alias Espreso.Shifts.ShopSessionAdjustment
 
   import Ecto.Query
 
@@ -58,6 +59,26 @@ defmodule Espreso.Reports.SalesExportTest do
              "Settled By",
              "Paid Via"
            ]
+
+    assert SalesExport.settlement_headers() == [
+             "Date From",
+             "Date To",
+             "Gross Paid Sales",
+             "Post-close Sales Corrections",
+             "Net Settled Sales"
+           ]
+
+    assert SalesExport.adjustment_headers() == [
+             "Adjustment Date",
+             "Shop Session",
+             "Correction",
+             "Original Receipt",
+             "Original Payment",
+             "Sales Impact",
+             "Drawer Cash Impact",
+             "Reason",
+             "Recorded By"
+           ]
   end
 
   test "paid order and line items appear with separate payment fields", %{barista: barista} do
@@ -83,6 +104,81 @@ defmodule Espreso.Reports.SalesExportTest do
     assert order.source == "pos"
     assert Enum.any?(order.items, &(&1.name == "Espresso"))
     assert Menu.format_price(order.total) =~ "₱"
+  end
+
+  test "sales workbook includes dated adjustment rows and net settlement totals", %{
+    barista: barista
+  } do
+    order =
+      create_paid!(barista,
+        settled_at: ~U[2026-09-10 02:30:00Z],
+        paid_via: "cash",
+        price: "100"
+      )
+
+    session_date = ~D[2026-09-11]
+
+    adjustment = %ShopSessionAdjustment{
+      kind: "refund",
+      reason: "Cash returned",
+      payment_method: "cash",
+      sales_impact: Decimal.new("-100"),
+      drawer_impact: Decimal.new("-25"),
+      shop_session_id: 42,
+      shop_session: %Espreso.Shifts.ShopDayOpen{id: 42, shop_date: session_date},
+      original_order: order,
+      recorded_by_user: barista
+    }
+
+    assert {:ok, {_filename, binary}} =
+             SalesExport.build([order], [adjustment], ~D[2026-09-10], session_date)
+
+    assert String.starts_with?(binary, "PK")
+    assert {:ok, files} = :zip.unzip(binary, [:memory])
+    assert cell_value(files, "xl/worksheets/sheet3.xml", "C2") == "₱200"
+    assert cell_value(files, "xl/worksheets/sheet3.xml", "D2") == "−₱100"
+    assert cell_value(files, "xl/worksheets/sheet3.xml", "E2") == "₱100"
+
+    assert cell_value(files, "xl/worksheets/sheet4.xml", "A2") ==
+             Date.to_iso8601(session_date)
+
+    assert cell_value(files, "xl/worksheets/sheet4.xml", "B2") == "42"
+    assert cell_value(files, "xl/worksheets/sheet4.xml", "D2") == order.number
+    assert cell_value(files, "xl/worksheets/sheet4.xml", "F2") == "−₱100"
+    assert cell_value(files, "xl/worksheets/sheet4.xml", "G2") == "−₱25"
+    assert cell_value(files, "xl/worksheets/sheet4.xml", "H2") == "Cash returned"
+  end
+
+  defp cell_value(files, sheet_path, cell_reference) do
+    sheet_xml = unzip_entry!(files, sheet_path)
+
+    [_, attributes, content] =
+      Regex.run(
+        ~r/<c r="#{cell_reference}"([^>]*)>(.*?)<\/c>/s,
+        sheet_xml
+      )
+
+    [_, value] = Regex.run(~r/<v>(.*?)<\/v>/s, content)
+
+    if attributes =~ ~r/\bt="s"/ do
+      shared_strings_xml = unzip_entry!(files, "xl/sharedStrings.xml")
+
+      shared_strings =
+        Regex.scan(~r/<si>(.*?)<\/si>/s, shared_strings_xml, capture: :all_but_first)
+        |> Enum.map(fn [item] ->
+          [_, string] = Regex.run(~r/<t(?:\s[^>]*)?>(.*?)<\/t>/s, item)
+          string
+        end)
+
+      Enum.at(shared_strings, String.to_integer(value))
+    else
+      value
+    end
+  end
+
+  defp unzip_entry!(files, name) do
+    {_name, content} = Enum.find(files, fn {entry_name, _} -> to_string(entry_name) == name end)
+    IO.iodata_to_binary(content)
   end
 
   defp create_paid!(user, opts) do
