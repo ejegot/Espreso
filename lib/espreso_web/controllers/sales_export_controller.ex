@@ -7,6 +7,7 @@ defmodule EspresoWeb.SalesExportController do
   alias Espreso.Accounts.Authorization
   alias Espreso.Orders
   alias Espreso.Reports.SalesExport
+  alias Espreso.Shifts
 
   @xlsx_content_type "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -18,7 +19,9 @@ defmodule EspresoWeb.SalesExportController do
          {:ok, to_date} <- parse_date(params["to"]),
          :ok <- Orders.validate_sales_export_shop_dates(from_date, to_date),
          {:ok, orders} <- Orders.list_paid_orders_for_shop_dates(from_date, to_date),
-         {:ok, {filename, binary}} <- SalesExport.build(orders, from_date, to_date) do
+         adjustments <- Shifts.list_adjustments_for_shop_dates(from_date, to_date),
+         {:ok, {filename, binary}} <-
+           SalesExport.build(orders, adjustments, from_date, to_date) do
       conn
       |> put_resp_content_type(@xlsx_content_type)
       |> send_download({:binary, binary},

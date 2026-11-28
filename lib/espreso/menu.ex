@@ -1096,24 +1096,32 @@ defmodule Espreso.Menu do
 
   Whole peso amounts omit decimals (₱75). Fractional amounts use two decimals (₱75.50).
   Amounts of ₱1,000 and above include thousands separators (₱1,500).
+  Negative amounts place the minus sign before the currency symbol (−₱75).
   """
   def format_price(price) do
     rounded = Decimal.round(price, 2)
 
     formatted =
-      if Decimal.equal?(rounded, Decimal.round(rounded, 0)) do
-        rounded
-        |> Decimal.round(0)
-        |> Decimal.to_string(:normal)
-        |> add_thousands_separator()
-      else
-        rounded
-        |> Decimal.to_string(:normal)
-        |> ensure_two_decimals()
-        |> add_thousands_separator_to_amount()
-      end
+      rounded
+      |> Decimal.abs()
+      |> format_price_amount()
 
-    "₱#{formatted}"
+    sign = if Decimal.compare(rounded, 0) == :lt, do: "−", else: ""
+    "#{sign}₱#{formatted}"
+  end
+
+  defp format_price_amount(amount) do
+    if Decimal.equal?(amount, Decimal.round(amount, 0)) do
+      amount
+      |> Decimal.round(0)
+      |> Decimal.to_string(:normal)
+      |> add_thousands_separator()
+    else
+      amount
+      |> Decimal.to_string(:normal)
+      |> ensure_two_decimals()
+      |> add_thousands_separator_to_amount()
+    end
   end
 
   defp add_thousands_separator_to_amount(string) do
